@@ -11,6 +11,7 @@ use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\ScopeCancellation;
+use Thesis\Async\Internal\Suppressed;
 use function Thesis\Async\Internal\fiberKey;
 
 /**
@@ -128,6 +129,22 @@ function onCancel(\Closure $callback): \Closure
 function remaining(): ?float
 {
     return Scope::current()->remaining();
+}
+
+/**
+ * Failures that happened in the groups $error was rethrown from, but were not rethrown themselves:
+ * a group rethrows only its first failure. For example, a sibling task that failed at the same time,
+ * or a rollback that failed while a task was being cancelled because of $error.
+ *
+ * $error itself is left as it was. Each of the returned errors may have suppressed ones of its own,
+ * if it came out of a nested group. Nobody sees them unless asked: log them where errors are handled.
+ *
+ * @api
+ * @return list<\Throwable> in the order they happened, empty if there are none
+ */
+function suppressed(\Throwable $error): array
+{
+    return Suppressed::of($error);
 }
 
 /**

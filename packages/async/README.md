@@ -167,6 +167,29 @@ If a foreign event loop callback throws, that is a failure of the group: the tas
 and the `UncaughtThrowable` is rethrown (unless an earlier failure takes precedence). If the loop runs dry
 while tasks are waiting, it is a deadlock: the tasks are cancelled, and once they have unwound, Revolt's error is rethrown.
 
+### Failures that were not rethrown: `suppressed()`
+
+A group rethrows only its first failure. Others may follow while the group is cancelled: a sibling that failed
+in the same tick, a rollback that failed during the cancellation. They are not lost: `suppressed()` returns them.
+The rethrown error itself is left as it was, so `catch` by type works as before.
+
+```php
+use function Thesis\Async\suppressed;
+
+try {
+    handle($request);
+} catch (\Throwable $exception) {
+    $logger->error('Request failed', ['exception' => $exception]);
+
+    foreach (suppressed($exception) as $other) {
+        $logger->error('Also failed', ['exception' => $other]);
+    }
+}
+```
+
+Nobody sees them unless asked, so ask where errors are logged. Nested groups give a tree: an error that left an inner group
+has suppressed errors of its own. The list goes away with the error it belongs to.
+
 ### Deadlines: `timeout()`
 
 A deadline covers everything inside the closure, including nested groups.
@@ -570,11 +593,11 @@ all([user, orders])              orders fails after 50 ms
 | `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
 | `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
+| `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled` | exceptions |
 
 ## Limitations
 
-- If several tasks of a group fail, only the first failure is reported.
 - `each()` and `map()` start a fiber per item, not per worker.
 - Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope
   unless it runs under `ampCancellable()` and is given its cancellation: otherwise it behaves as if shielded until it returns.

@@ -35,6 +35,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Cancelling a task does not fail its group; a task failure does, and the first failure is the one rethrown.
   A regular task cut short by an outer cancellation makes `group()` throw `Cancelled` after join.
 - A task cancelled before it started never runs.
+- Every other failure of a group is recorded by `GroupImpl::fail()` through `Internal\Suppressed`: a `WeakMap` from the rethrown
+  error to the list of the others. The rethrown error is never changed (no wrapper, no `previous`); the same object
+  is recorded at most once and never under itself. When a join gives up on a deadlock, the group's failure
+  is recorded under Revolt's error, unless it is the same deadlock from an earlier round.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
   unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).

@@ -105,7 +105,12 @@ final class GroupImpl implements Group
 
     private function fail(\Throwable $error): void
     {
-        $this->error ??= $error;
+        if ($this->error === null) {
+            $this->error = $error;
+        } else {
+            Suppressed::add($this->error, $error);
+        }
+
         $this->body->cancel();
     }
 
@@ -128,6 +133,9 @@ final class GroupImpl implements Group
      */
     private function join(): void
     {
+        /** the loop that ran dry on an earlier round: it is not a failure of its own when the join gives up */
+        $dry = null;
+
         try {
             while ($this->tasks > 0 || $this->daemons > 0) {
                 if ($this->tasks === 0) {
@@ -141,10 +149,22 @@ final class GroupImpl implements Group
                     // and a task finishing after a give-up has nothing to resume.
                     $this->joiner = null;
 
-                    if (!$error instanceof UncaughtThrowable && $this->body->isCancelled()) {
+                    if ($error instanceof UncaughtThrowable) {
+                        $this->fail($error);
+
+                        continue;
+                    }
+
+                    if ($this->body->isCancelled()) {
+                        // Revolt's error replaces the group's failure: it is not lost, unless it is the same deadlock.
+                        if ($this->error !== null && $this->error !== $dry) {
+                            Suppressed::add($error, $this->error);
+                        }
+
                         throw $error;
                     }
 
+                    $dry = $error;
                     $this->fail($error);
                 }
             }
