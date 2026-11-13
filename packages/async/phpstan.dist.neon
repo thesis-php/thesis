@@ -1,0 +1,21 @@
+includes:
+    - /composer/vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+    tmpDir: var/phpstan
+    editorUrl: ''
+    editorUrlTitle: '%%relFile%%:%%line%%'
+
+    # strict rules
+    checkBenevolentUnionTypes: true
+    checkMissingCallableSignature: true
+    checkUninitializedProperties: true
+    rememberPossiblyImpureFunctionValues: false
+    reportAlwaysTrueInLastCondition: true
+    reportAnyTypeWideningInVarTag: true
+    reportPossiblyNonexistentConstantArrayOffset: true
+    reportPossiblyNonexistentGeneralArrayOffset: true
