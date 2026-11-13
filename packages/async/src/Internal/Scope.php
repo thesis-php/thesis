@@ -39,15 +39,35 @@ final class Scope
     /** @var array<int, self> held strongly to deliver cancellation; released by {@see close()} */
     private array $children = [];
 
+    /**
+     * The nearest deadline of this scope and its visible ancestors, as {@see now()}; INF if there is none.
+     * Like the cancelled flag, it is resolved on creation, so {@see remaining()} reads one field.
+     */
+    private readonly float $deadline;
+
+    /**
+     * @param ?float $timeout a deadline of this scope in seconds from now; an earlier one of the parent wins
+     */
     public function __construct(
         private readonly ?self $parent = null,
         private readonly bool $shield = false,
+        ?float $timeout = null,
     ) {
+        $deadline = $timeout === null ? INF : self::now() + $timeout;
+
         if ($parent !== null) {
             $parent->children[spl_object_id($this)] = $this;
-            // The parent's subtree has been notified before this scope existed.
-            $this->cancelled = !$shield && $parent->cancelled;
+
+            // A shield hides the deadlines of its ancestors together with their cancellation:
+            // the code under it would otherwise think it has no time, although nothing will stop it.
+            if (!$shield) {
+                // The parent's subtree has been notified before this scope existed.
+                $this->cancelled = $parent->cancelled;
+                $deadline = min($deadline, $parent->deadline);
+            }
         }
+
+        $this->deadline = $deadline;
     }
 
     public static function current(): self
@@ -74,6 +94,19 @@ final class Scope
     public function isCancelled(): bool
     {
         return $this->cancelled;
+    }
+
+    /**
+     * Seconds left until the nearest deadline of this scope or a visible ancestor, null if there is none.
+     * Zero once the deadline has passed, even if its timer has not fired yet.
+     */
+    public function remaining(): ?float
+    {
+        if ($this->deadline === INF) {
+            return null;
+        }
+
+        return max(0.0, $this->deadline - self::now());
     }
 
     /**
@@ -180,6 +213,14 @@ final class Scope
         if ($this->parent !== null) {
             unset($this->parent->children[spl_object_id($this)]);
         }
+    }
+
+    /**
+     * Monotonic, in seconds: the clock Revolt's timers run on.
+     */
+    private static function now(): float
+    {
+        return hrtime(true) / 1e9;
     }
 
     private function notify(): void

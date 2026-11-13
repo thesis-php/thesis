@@ -185,6 +185,23 @@ try {
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,
 and an outer cancellation always outranks a deadline.
 
+`remaining()` tells how many seconds are left until the nearest deadline, or `null` if there is none,
+so the deadline can be passed on to where a scope cannot reach: a database, a remote call.
+A task sees the deadline under which its group runs; inside `shield()` outer deadlines are not visible,
+since nothing would enforce them there.
+
+```php
+use function Thesis\Async\remaining;
+
+$seconds = remaining();
+
+if ($seconds !== null) {
+    $connection->execute(sprintf('SET statement_timeout = %d', (int) ceil($seconds * 1000)));
+}
+```
+
+It only reads the clock, and it is zero once the deadline has passed, even if the timer has not fired yet.
+
 ### First success wins: `race()`
 
 The losers are cancelled and joined. A failure does not end the race while another contender can still win;
@@ -524,7 +541,8 @@ all([user, orders])              orders fails after 50 ms
 | `each(iterable<K, T>, callable(T, K), int $concurrency)` | bounded concurrency |
 | `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
-| `shield(callable(): T): T` | protect from outer cancellation |
+| `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |
+| `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |

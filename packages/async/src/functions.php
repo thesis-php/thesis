@@ -115,6 +115,21 @@ function onCancel(\Closure $callback): \Closure
 }
 
 /**
+ * Seconds left until the deadline of the current scope, null if there is none: the nearest of the enclosing
+ * {@see timeout()} calls, tasks included, since a task inherits the deadline under which its group runs.
+ * Inside {@see shield()} outer deadlines are not visible, as outer cancellation is not.
+ *
+ * For passing the deadline on to where a scope cannot reach: a `statement_timeout` of a database, a header of a remote call.
+ * Zero once the deadline has passed, even if the scope is not cancelled yet. Only reads a clock: it never waits or throws.
+ *
+ * @api
+ */
+function remaining(): ?float
+{
+    return Scope::current()->remaining();
+}
+
+/**
  * @api
  * @throws Cancelled
  */
@@ -163,7 +178,7 @@ function group(callable $body): mixed
 function timeout(float $seconds, callable $body): mixed
 {
     $parent = Scope::current();
-    $scope = new Scope($parent);
+    $scope = new Scope($parent, timeout: $seconds);
     $timer = EventLoop::delay($seconds, static function () use ($scope) {
         $scope->cancel();
     });

@@ -43,6 +43,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
   inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the tree.
   One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
   A wait subscribes its `ContinuationImpl` itself (`Scope::subscribe()`/`unsubscribe()`), without allocating closures.
+- The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`hrtime`, `INF` if none),
+  the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the clock;
+  `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
 - In `{main}`, `GroupImpl::join()` runs the event loop and Revolt may throw out of it: an `UncaughtThrowable` fails
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.
