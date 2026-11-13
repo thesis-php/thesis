@@ -226,6 +226,26 @@ foreach ($rows as $i => $row) {
 }
 ```
 
+### A value from elsewhere: `Deferred`
+
+A one-shot value that one side completes and any number of fibers await. `await()` is cancellable;
+cancelling one awaiter affects neither the deferred nor the other awaiters.
+
+```php
+use Thesis\Async\Deferred;
+
+/** @var Deferred<Response> */
+$response = new Deferred();
+$pending[$requestId] = $response; // the connection's reader calls $response->complete($frame) or ->fail($error)
+
+$connection->send($request);
+
+return timeout(5, $response->await(...));
+```
+
+`complete()` and `fail()` return `false` if the deferred is already done. A deferred cannot fail with `Cancelled`:
+its awaiters are not cancelled, so fail it with a regular exception.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build channels, locks and I/O on it and they are cancellable for free:
@@ -314,6 +334,7 @@ all([user, orders])              orders fails after 50 ms
 | `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
 | `shield(callable(): T): T` | protect from outer cancellation |
+| `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `delay(float $seconds)` | cancellable sleep |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
