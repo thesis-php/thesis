@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Amp\Cancellation;
+use Amp\CancelledException;
 use Revolt\EventLoop;
 use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
+use Thesis\Async\Internal\ScopeCancellation;
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
@@ -400,4 +403,37 @@ function map(iterable $items, callable $fn, int $concurrency): array
 
     /** @var array<K, R> Every reserved null has been replaced by a result, or each() has thrown. */
     return $results;
+}
+
+/**
+ * Runs an amphp operation so that it is cancelled together with the current scope.
+ *
+ * $fn receives a {@see Cancellation} requested while the current scope is cancelled
+ * (inside {@see shield()} an outer cancellation does not request it). It is bound to the current scope: do not keep it
+ * beyond $fn. If $fn throws {@see CancelledException} while the scope is cancelled, {@see Cancelled} is thrown instead,
+ * as from any other wait. Otherwise the exception is the operation's own (say, a `TimeoutCancellation` passed alongside),
+ * and it is rethrown as is.
+ *
+ * Like {@see suspend()}, it throws {@see Cancelled} right away if the scope is already cancelled.
+ *
+ * @api
+ * @template T
+ * @param callable(Cancellation): T $fn
+ * @return T
+ * @throws Cancelled
+ */
+function ampCancellable(callable $fn): mixed
+{
+    $scope = Scope::current();
+    $scope->throwIfCancelled();
+
+    try {
+        return $fn(new ScopeCancellation($scope));
+    } catch (CancelledException $exception) {
+        if ($scope->isCancelled()) {
+            throw new Cancelled();
+        }
+
+        throw $exception;
+    }
 }

@@ -20,6 +20,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - `onCancel()` callbacks are queued through `EventLoop::queue()`, never called inside `Scope::notify()`: user code does not run
   in the middle of the walk. They are called at most once, never after unsubscribing (even if already queued),
   never after `close()`, and the root scope stores none. They live in their own list: the hot path of `suspend()` is untouched.
+- `Internal\ScopeCancellation` keeps no state of its own and subscribes only through `Scope::onCancel()`: amphp unsubscribes
+  in `finally` and then reuses the fiber's `Suspension` for the next wait, so a callback that runs after `unsubscribe()`
+  would wake the wrong wait (this is how a join broke with "Must call suspend() before calling resume()").
 - `checkpoint()` must yield to the event loop through `EventLoop::defer()`, not only check a flag:
   CPU-bound code starves timers, so a flag set by a `timeout()` timer would never be seen.
   Not `EventLoop::queue()` either: microtasks run before timers.

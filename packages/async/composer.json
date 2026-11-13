@@ -11,6 +11,7 @@
     ],
     "require": {
         "php": "^8.5",
+        "amphp/amp": "^3",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {

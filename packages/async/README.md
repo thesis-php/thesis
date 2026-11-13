@@ -409,6 +409,29 @@ There is no `set()`: `with()` binds the value while the callable runs and restor
 whatever it ends with, so a value never leaks into code that runs later in the same fiber.
 Nothing is inherited: a task starts without a value, bind it again inside the task.
 
+### amphp: `ampCancellable()`
+
+amphp libraries wait through `EventLoop::getSuspension()` directly, so a scope cannot interrupt them by itself.
+They take an `Amp\Cancellation` instead, and `ampCancellable()` gives them one tied to the current scope:
+
+```php
+use Amp\Cancellation;
+use function Thesis\Async\ampCancellable;
+use function Thesis\Async\timeout;
+
+$response = timeout(5, static fn() => ampCancellable(
+    static fn(Cancellation $cancellation) => $httpClient->request($request, $cancellation),
+));
+```
+
+If the operation fails with `CancelledException` while the current scope is cancelled, `ampCancellable()` throws `Cancelled`,
+as any other wait would, and `timeout()` reports `TimedOut`. A `CancelledException` of the operation's own
+(a `TimeoutCancellation` passed alongside, for example) is rethrown as is.
+The cancellation is bound to the current scope: do not keep it beyond the callable.
+
+The cancellation costs nothing until amphp subscribes to it. A subscription removed by amphp is never called,
+even if the cancellation has already happened, so it cannot wake a fiber that has moved on to another wait.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build channels, locks and I/O on it and they are cancellable for free:
@@ -512,13 +535,16 @@ all([user, orders])              orders fails after 50 ms
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
+| `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled` | exceptions |
 
 ## Limitations
 
 - If several tasks of a group fail, only the first failure is reported.
 - `each()` and `map()` start a fiber per item, not per worker.
-- Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope: it behaves as if shielded until it returns.
+- Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope
+  unless it runs under `ampCancellable()` and is given its cancellation: otherwise it behaves as if shielded until it returns.
+- The amphp bridge lives in this package for now, so `amphp/amp` is a dependency.
 - Callbacks registered directly with `EventLoop::queue()`, `defer()` or `delay()` from inside a task, and fibers created by hand,
   run in the root scope: the group neither cancels nor joins them.
 - In `{main}`, if the event loop runs dry while a task waits under a shield for something that never comes,
@@ -531,8 +557,6 @@ all([user, orders])              orders fails after 50 ms
 
 Ideas that are not implemented yet.
 
-- **amphp interop.** Code that waits through `Suspension` directly, which is the whole amphp ecosystem, behaves as shielded.
-  A bridge can drive an `Amp\Cancellation` from `onCancel()`. Probably a separate package.
 - **Synchronisation primitives** built on `suspend()`: `Semaphore`, `Mutex`, `Channel` or a queue.
   `each()` hand-rolls a semaphore today and should use the real one.
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
