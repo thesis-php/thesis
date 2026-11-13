@@ -16,6 +16,19 @@
     "require-dev": {
         "testo/testo": "^0.10.29"
     },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Async\\": "src/"
+        },
+        "files": [
+            "src/functions.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Async\\": "tests/"
+        }
+    },
     "config": {
         "lock": false,
         "sort-packages": true
