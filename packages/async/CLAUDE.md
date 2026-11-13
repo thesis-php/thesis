@@ -16,6 +16,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
   with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`.
 - Only owners cancel scopes: a group (failure, `Group::cancelTasks()`), `Task::cancel()`, the `timeout()` timer.
   There is no public scope object and no public way to cancel an arbitrary scope — do not add one.
+  `onCancel()` does not break this: it only observes the cancellation of the current scope.
+- `onCancel()` callbacks are queued through `EventLoop::queue()`, never called inside `Scope::notify()`: user code does not run
+  in the middle of the walk. They are called at most once, never after unsubscribing (even if already queued),
+  never after `close()`, and the root scope stores none. They live in their own list: the hot path of `suspend()` is untouched.
 - `checkpoint()` must yield to the event loop through `EventLoop::defer()`, not only check a flag:
   CPU-bound code starves timers, so a flag set by a `timeout()` timer would never be seen.
   Not `EventLoop::queue()` either: microtasks run before timers.

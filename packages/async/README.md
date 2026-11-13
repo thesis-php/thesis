@@ -256,6 +256,50 @@ foreach ($rows as $i => $row) {
 }
 ```
 
+### Is it cancelled? `isCancelled()`
+
+`isCancelled()` tells whether the next wait in the current scope would throw `Cancelled`. It only reads a flag:
+it neither yields to the event loop nor throws. Inside `shield()` an outer cancellation is not visible.
+
+```php
+use function Thesis\Async\isCancelled;
+
+try {
+    $connection->execute($query);
+} catch (ConnectionClosed $exception) {
+    if (!isCancelled()) { // a connection closed because the request was cancelled is not an error
+        $logger->error('Query failed', ['exception' => $exception]);
+    }
+
+    throw $exception;
+}
+```
+
+### Code that does not wait through `suspend()`: `onCancel()`
+
+`onCancel()` calls a callback once the current scope is cancelled, by its owner or through an ancestor.
+It is for cancellation that has to be delivered elsewhere: an `Amp\Cancellation`, a request to abort a query on the server.
+
+```php
+use function Thesis\Async\onCancel;
+
+$unsubscribe = onCancel(static function () use ($connection, $queryId) {
+    $connection->cancelQuery($queryId); // a separate request, the query itself fails then
+});
+
+try {
+    return $connection->query($sql);
+} finally {
+    $unsubscribe();
+}
+```
+
+It only observes: a callback cannot be used to cancel a scope it was not given.
+The callback runs from the event loop's microtask queue, never inside the code that cancels, and must not throw.
+It is called at most once and never after unsubscribing, even if the cancellation has already happened;
+if the scope already is cancelled, it is called soon. Inside `shield()` an outer cancellation does not reach it.
+When the scope ends without being cancelled, the callback is dropped, so unsubscribing is optional then.
+
 ### A value from elsewhere: `Deferred`
 
 A one-shot value that one side completes and any number of fibers await. `await()` is cancellable;
@@ -465,6 +509,8 @@ all([user, orders])              orders fails after 50 ms
 | `FiberLocal<T>`: `get(): ?T`, `with(T, callable(): R): R` | a value bound per fiber, {main} included, while a callable runs |
 | `delay(float $seconds)` | cancellable sleep |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
+| `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
+| `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled` | exceptions |
 
@@ -486,8 +532,7 @@ all([user, orders])              orders fails after 50 ms
 Ideas that are not implemented yet.
 
 - **amphp interop.** Code that waits through `Suspension` directly, which is the whole amphp ecosystem, behaves as shielded.
-  A bridge needs only a subscription to the cancellation of the current scope, to drive an `Amp\Cancellation`.
-  It does not need a way to cancel a scope, so it does not break the "only owners cancel" rule. Probably a separate package.
+  A bridge can drive an `Amp\Cancellation` from `onCancel()`. Probably a separate package.
 - **Synchronisation primitives** built on `suspend()`: `Semaphore`, `Mutex`, `Channel` or a queue.
   `each()` hand-rolls a semaphore today and should use the real one.
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.

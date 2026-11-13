@@ -78,6 +78,40 @@ function checkpoint(): void
 }
 
 /**
+ * Whether the current scope is cancelled, that is, whether the next wait would throw {@see Cancelled}.
+ * Inside {@see shield()} an outer cancellation is not visible.
+ *
+ * Only reads a flag: unlike {@see checkpoint()}, it does not yield to the event loop and never throws.
+ * For cleanup code and for deciding whether a failure is worth logging as an error.
+ *
+ * @api
+ */
+function isCancelled(): bool
+{
+    return Scope::current()->isCancelled();
+}
+
+/**
+ * Calls $callback once the current scope is cancelled, by its owner or through an ancestor;
+ * if it already is, soon. For code that is not cancelled through {@see suspend()}: an `Amp\Cancellation`,
+ * a request to abort a query on the server.
+ *
+ * It only observes the cancellation and cannot cause one. $callback runs from the event loop's microtask queue,
+ * never inside the code that cancels, and in the root scope: it must not throw.
+ * It is called at most once and never after the returned function is called, even if the cancellation has already happened.
+ * Inside {@see shield()} an outer cancellation does not reach it. Once the scope ends without being cancelled,
+ * the callback is dropped and never called, so unsubscribing is optional then.
+ *
+ * @api
+ * @param \Closure(): void $callback
+ * @return \Closure(): void unsubscribe, idempotent
+ */
+function onCancel(\Closure $callback): \Closure
+{
+    return Scope::current()->onCancel($callback);
+}
+
+/**
  * @api
  * @throws Cancelled
  */
