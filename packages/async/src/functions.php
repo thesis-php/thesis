@@ -5,27 +5,16 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
-use Thesis\Async\Internal\Context;
-use Thesis\Async\Internal\ScopeImpl;
+use Thesis\Async\Internal\GroupImpl;
+use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\WakerImpl;
-
-/**
- * The scope the current fiber runs in. Outside of any {@see group()}, {@see timeout()} or {@see shield()}
- * it is the root scope, which cannot be cancelled.
- *
- * @api
- */
-function currentScope(): Scope
-{
-    return Context::current();
-}
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
  *
  * $arm receives a {@see Waker}, registers it wherever the event comes from (timer, stream watcher, wait queue)
- * and may return $disarm that undoes the registration. $disarm is called only if the wait is interrupted
- * by cancellation.
+ * and may return $disarm that undoes the registration. $disarm is always called once the wait is over,
+ * whatever ended it, so it must be idempotent with respect to a source that has already fired.
  *
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
@@ -38,16 +27,14 @@ function currentScope(): Scope
  */
 function suspend(callable $arm): mixed
 {
-    $scope = currentScope();
+    $scope = Scope::current();
     $scope->checkpoint();
 
     /** @var WakerImpl<T> */
     $waker = new WakerImpl();
     $disarm = $arm($waker);
-    $interrupted = false;
-
-    $unsubscribe = $scope->onCancel(static function (Scope $origin) use ($waker, &$interrupted) {
-        $interrupted = $waker->throw(new Cancelled($origin));
+    $unsubscribe = $scope->onCancel(static function () use ($waker) {
+        $waker->interrupt();
     });
 
     try {
@@ -55,10 +42,21 @@ function suspend(callable $arm): mixed
     } finally {
         $unsubscribe();
 
-        if ($interrupted && $disarm !== null) {
+        if ($disarm !== null) {
             $disarm();
         }
     }
+}
+
+/**
+ * Explicit cancellation point for CPU-bound loops that never suspend.
+ *
+ * @api
+ * @throws Cancelled
+ */
+function checkpoint(): void
+{
+    Scope::current()->checkpoint();
 }
 
 /**
@@ -90,11 +88,13 @@ function delay(float $seconds): void
  */
 function group(callable $body): mixed
 {
-    return Group::run($body);
+    return GroupImpl::run($body);
 }
 
 /**
  * Deadline for everything that happens inside $body, including nested groups.
+ *
+ * An outer cancellation outranks the deadline: if both happened, {@see Cancelled} is thrown, not {@see TimedOut}.
  *
  * @api
  * @template T
@@ -104,15 +104,21 @@ function group(callable $body): mixed
  */
 function timeout(float $seconds, callable $body): mixed
 {
-    $scope = new ScopeImpl(Context::current());
+    $parent = Scope::current();
+    $scope = new Scope($parent);
     $timer = EventLoop::delay($seconds, static function () use ($scope) {
         $scope->cancel();
     });
 
     try {
-        return Context::enter($scope, $body);
+        return $scope->run($body);
     } catch (Cancelled $cancelled) {
-        throw $cancelled->origin === $scope ? new TimedOut($seconds) : $cancelled;
+        // Only the timer cancels this scope, so if the parent is not cancelled, the deadline is the reason.
+        if ($scope->isCancelled() && !$parent->isCancelled()) {
+            throw new TimedOut($seconds, $cancelled);
+        }
+
+        throw $cancelled;
     } finally {
         EventLoop::cancel($timer);
         $scope->close();
@@ -121,6 +127,7 @@ function timeout(float $seconds, callable $body): mixed
 
 /**
  * Outer cancellation does not get inside. For cleanup: rollback, close frame, returning a connection to a pool.
+ * Combine with {@see timeout()} so that the cleanup cannot hang forever.
  *
  * @api
  * @template T
@@ -129,17 +136,17 @@ function timeout(float $seconds, callable $body): mixed
  */
 function shield(callable $body): mixed
 {
-    $scope = new ScopeImpl(Context::current(), shield: true);
+    $scope = new Scope(Scope::current(), shield: true);
 
     try {
-        return Context::enter($scope, $body);
+        return $scope->run($body);
     } finally {
         $scope->close();
     }
 }
 
 /**
- * All results, or the first failure (the rest are cancelled).
+ * All results in the order of $fns, or the first failure (the rest are cancelled and joined).
  *
  * @api
  * @template K of array-key
@@ -167,7 +174,8 @@ function all(array $fns): array
 }
 
 /**
- * The first one to finish wins; the losers are cancelled AND joined.
+ * The first one to succeed wins; the rest are cancelled AND joined.
+ * Failures are ignored while there is a chance to win; if every contender fails, the first failure is rethrown.
  *
  * @api
  * @template T
@@ -179,11 +187,20 @@ function race(callable $fn, callable ...$fns): mixed
 {
     /** @var list<T> $winner */
     $winner = [];
+    $failure = null;
 
-    group(static function (Group $group) use ($fn, $fns, &$winner) {
+    group(static function (Group $group) use ($fn, $fns, &$winner, &$failure) {
         foreach ([$fn, ...$fns] as $contender) {
-            $group->go(static function () use ($contender, $group, &$winner) {
-                $value = $contender();
+            $group->go(static function () use ($contender, $group, &$winner, &$failure) {
+                try {
+                    $value = $contender();
+                } catch (Cancelled $cancelled) {
+                    throw $cancelled;
+                } catch (\Throwable $error) {
+                    $failure ??= $error;
+
+                    return;
+                }
 
                 if ($winner === []) {
                     $winner = [$value];
@@ -193,34 +210,94 @@ function race(callable $fn, callable ...$fns): mixed
         }
     });
 
-    /** @var array{T} $winner */
+    if ($winner === []) {
+        /** @var \Throwable $failure */
+        throw $failure;
+    }
+
     return $winner[0];
 }
 
 /**
- * Bounded concurrency: $concurrency workers pull from a shared iterator.
+ * Bounded concurrency: calls $fn for every item, at most $concurrency at a time.
  *
- * The iterable itself must not suspend while producing an item.
+ * $items is iterated in the calling fiber, so a generator may suspend (for example, to fetch the next page).
+ * The first failure cancels the rest and is rethrown.
  *
  * @api
+ * @template K
  * @template T
- * @param iterable<T> $items
+ * @param iterable<K, T> $items
+ * @param callable(T, K): mixed $fn
  * @param positive-int $concurrency
- * @param callable(T): mixed $fn
+ * @throws \ValueError if $concurrency is not positive
  */
-function each(iterable $items, int $concurrency, callable $fn): void
+function each(iterable $items, callable $fn, int $concurrency): void
 {
-    $iterator = (static fn() => yield from $items)();
+    /** @phpstan-ignore smaller.alwaysFalse */
+    if ($concurrency < 1) {
+        throw new \ValueError(\sprintf('Concurrency must be positive, got %d.', $concurrency));
+    }
 
-    group(static function (Group $group) use ($iterator, $concurrency, $fn) {
-        for ($worker = 0; $worker < $concurrency; ++$worker) {
-            $group->go(static function () use ($iterator, $fn) {
-                while ($iterator->valid()) {
-                    $item = $iterator->current();
-                    $iterator->next();
-                    $fn($item);
+    group(static function (Group $group) use ($items, $fn, $concurrency) {
+        $running = 0;
+        /** @var ?Waker<null> */
+        $slotWaiter = null;
+
+        foreach ($items as $key => $item) {
+            while ($running >= $concurrency) {
+                suspend(static function (Waker $waker) use (&$slotWaiter) {
+                    /** @var Waker<null> $waker */
+                    $slotWaiter = $waker;
+
+                    return static function () use (&$slotWaiter) {
+                        $slotWaiter = null;
+                    };
+                });
+            }
+
+            ++$running;
+            $group->go(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
+                try {
+                    $fn($item, $key);
+                } finally {
+                    --$running;
+                    $slotWaiter?->resume();
                 }
             });
         }
     });
+}
+
+/**
+ * {@see each()} that collects the results. Keys are preserved, and so is the order of $items.
+ *
+ * @api
+ * @template K of array-key
+ * @template T
+ * @template R
+ * @param iterable<K, T> $items
+ * @param callable(T, K): R $fn
+ * @param positive-int $concurrency
+ * @return array<K, R>
+ * @throws \ValueError if $concurrency is not positive
+ */
+function map(iterable $items, callable $fn, int $concurrency): array
+{
+    $results = [];
+
+    each(
+        $items,
+        static function (mixed $item, mixed $key) use ($fn, &$results) {
+            /** @var T $item */
+            /** @var K $key */
+            // Tasks start in the order of $items: reserving the key first keeps that order in the result.
+            $results[$key] = null;
+            $results[$key] = $fn($item, $key);
+        },
+        $concurrency,
+    );
+
+    /** @var array<K, R> Every reserved null has been replaced by a result, or each() has thrown. */
+    return $results;
 }

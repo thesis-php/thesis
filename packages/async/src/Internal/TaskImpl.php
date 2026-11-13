@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 use Thesis\Async\Task;
+use Thesis\Async\TaskCancelled;
 use Thesis\Async\Waker;
 use function Thesis\Async\suspend;
 
@@ -27,7 +28,7 @@ final class TaskImpl implements Task
     private array $waiters = [];
 
     public function __construct(
-        private readonly ScopeImpl $scope,
+        private readonly Scope $scope,
     ) {}
 
     public function cancel(): void
@@ -38,17 +39,20 @@ final class TaskImpl implements Task
     public function await(): mixed
     {
         if (!$this->isDone) {
-            suspend(
-                function (Waker $waker) {
-                    /** @var Waker<null> $waker */
-                    $id = spl_object_id($waker);
-                    $this->waiters[$id] = $waker;
+            suspend(function (Waker $waker) {
+                /** @var Waker<null> $waker */
+                $id = spl_object_id($waker);
+                $this->waiters[$id] = $waker;
 
-                    return function () use ($id) {
-                        unset($this->waiters[$id]);
-                    };
-                },
-            );
+                return function () use ($id) {
+                    unset($this->waiters[$id]);
+                };
+            });
+        }
+
+        if ($this->error instanceof TaskCancelled) {
+            // TaskCancelled is for an awaiter that is fine itself; a cancelled one gets Cancelled.
+            Scope::current()->checkpoint();
         }
 
         if ($this->error !== null) {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 /**
- * Handle of a child task started via {@see Group}.
+ * Handle of a task started via {@see Group}.
  *
  * @api
  * @template-covariant T
@@ -17,12 +17,14 @@ interface Task
 
     /**
      * Cancels this task only; its group and siblings keep running.
+     * A task cancelled before it started never runs.
      */
     public function cancel(): void;
 
     /**
      * @return T
-     * @throws Cancelled if the awaiting scope or the task itself was cancelled
+     * @throws Cancelled if the awaiting scope is cancelled
+     * @throws TaskCancelled if the task was cancelled
      * @throws \Throwable the task failure
      */
     public function await(): mixed;

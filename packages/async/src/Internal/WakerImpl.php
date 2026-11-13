@@ -6,6 +6,7 @@ namespace Thesis\Async\Internal;
 
 use Revolt\EventLoop;
 use Revolt\EventLoop\Suspension;
+use Thesis\Async\Cancelled;
 use Thesis\Async\Waker;
 
 /**
@@ -26,45 +27,28 @@ final class WakerImpl implements Waker
 
     private ?\Throwable $error = null;
 
-    /** @var ?Suspension<T> */
+    private bool $interrupted = false;
+
+    /** @var ?Suspension<null> */
     private ?Suspension $suspension = null;
 
     public function resume(mixed $value = null): bool
     {
-        if ($this->state === self::FIRED) {
-            return false;
-        }
-
-        $suspension = $this->suspension;
-        $this->state = self::FIRED;
-        $this->suspension = null;
-
-        if ($suspension === null) {
-            $this->value = $value;
-        } else {
-            $suspension->resume($value);
-        }
-
-        return true;
+        return $this->fire($value, null, false);
     }
 
     public function throw(\Throwable $error): bool
     {
-        if ($this->state === self::FIRED) {
-            return false;
-        }
+        return $this->fire(null, $error, false);
+    }
 
-        $suspension = $this->suspension;
-        $this->state = self::FIRED;
-        $this->suspension = null;
-
-        if ($suspension === null) {
-            $this->error = $error;
-        } else {
-            $suspension->throw($error);
-        }
-
-        return true;
+    /**
+     * Fires the waker on behalf of cancellation: {@see park()} then throws a {@see Cancelled}
+     * created in the parked fiber, so its trace points at the interrupted wait.
+     */
+    public function interrupt(): bool
+    {
+        return $this->fire(null, null, true);
     }
 
     /**
@@ -78,20 +62,43 @@ final class WakerImpl implements Waker
             throw new \LogicException('Waker is already parked.');
         }
 
-        if ($this->state === self::FIRED) {
-            if ($this->error !== null) {
-                throw $this->error;
-            }
-
-            /** @var T */
-            return $this->value;
+        if ($this->state === self::ARMED) {
+            $this->state = self::PARKED;
+            /** @var Suspension<null> */
+            $suspension = EventLoop::getSuspension();
+            $this->suspension = $suspension;
+            $suspension->suspend();
         }
 
-        /** @var Suspension<T> */
-        $suspension = EventLoop::getSuspension();
-        $this->state = self::PARKED;
-        $this->suspension = $suspension;
+        if ($this->interrupted) {
+            throw new Cancelled();
+        }
 
-        return $suspension->suspend();
+        if ($this->error !== null) {
+            throw $this->error;
+        }
+
+        /** @var T */
+        return $this->value;
+    }
+
+    /**
+     * @param ?T $value
+     */
+    private function fire(mixed $value, ?\Throwable $error, bool $interrupted): bool
+    {
+        if ($this->state === self::FIRED) {
+            return false;
+        }
+
+        $suspension = $this->suspension;
+        $this->state = self::FIRED;
+        $this->suspension = null;
+        $this->value = $value;
+        $this->error = $error;
+        $this->interrupted = $interrupted;
+        $suspension?->resume();
+
+        return true;
     }
 }
