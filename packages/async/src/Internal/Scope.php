@@ -6,7 +6,6 @@ namespace Thesis\Async\Internal;
 
 use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
-use Thesis\Async\FiberLocal;
 
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
@@ -73,7 +72,7 @@ final class Scope
     public static function current(): self
     {
         /** @var self */
-        return CURRENT_SCOPE->get() ?? ROOT_SCOPE;
+        return CURRENT_SCOPE[fiberKey()] ?? ROOT_SCOPE;
     }
 
     /**
@@ -85,7 +84,22 @@ final class Scope
      */
     public function run(callable $body): mixed
     {
-        return CURRENT_SCOPE->with($this, $body);
+        // A constant cannot be written to by offset, its object can.
+        $scopes = CURRENT_SCOPE;
+        /** @var ?self $previous */
+        $previous = $scopes[fiberKey()] ?? null;
+        $scopes[fiberKey()] = $this;
+
+        try {
+            return $body();
+        } finally {
+            // fiberKey() again, not kept in a variable while $body may be suspended: see fiberKey().
+            if ($previous === null) {
+                unset($scopes[fiberKey()]);
+            } else {
+                $scopes[fiberKey()] = $previous;
+            }
+        }
     }
 
     /**
@@ -258,9 +272,13 @@ final class Scope
 const ROOT_SCOPE = new Scope();
 
 /**
- * Current scope of every fiber, {main} included, that has entered one. Read through {@see Scope::current()}.
+ * Current scope of every fiber that has entered one, keyed by {@see fiberKey()}. Bound by {@see Scope::run()},
+ * which restores the previous one, so nothing leaks into the next callback of a reused Revolt fiber.
+ *
+ * Read in every wait through {@see Scope::current()}, so it is a single WeakMap lookup. Revolt's FiberLocal
+ * makes two (fiber → storage, then instance → value) and wraps the value in an array: ~0.9 µs (~8%) more per wait.
  *
  * @internal
- * @var FiberLocal<Scope>
+ * @var \WeakMap<object, Scope>
  */
-const CURRENT_SCOPE = new FiberLocal();
+const CURRENT_SCOPE = new \WeakMap();

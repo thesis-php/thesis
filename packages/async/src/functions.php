@@ -11,6 +11,7 @@ use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\ScopeCancellation;
+use function Thesis\Async\Internal\fiberKey;
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
@@ -362,16 +363,17 @@ function each(iterable $items, callable $fn, int $concurrency): void
  */
 function synchronized(Semaphore $semaphore, callable $fn): mixed
 {
-    /** @var FiberLocal<\WeakMap<Semaphore, Lock>> $held locks taken by synchronized() in the current fiber */
-    static $held = new FiberLocal();
+    /** @var \WeakMap<object, \WeakMap<Semaphore, Lock>> $held locks taken by synchronized(), per fiber */
+    static $held = new \WeakMap();
 
-    $locks = $held->get();
+    // Only the inner map is kept in a variable, not the fiber's key: see fiberKey().
+    // An emptied map stays for a reused Revolt fiber and goes away with the fiber.
+    $locks = $held[fiberKey()] ?? null;
 
     if ($locks === null) {
         /** @var \WeakMap<Semaphore, Lock> */
         $locks = new \WeakMap();
-
-        return $held->with($locks, static fn() => synchronized($semaphore, $fn));
+        $held[fiberKey()] = $locks;
     }
 
     if (isset($locks[$semaphore])) {

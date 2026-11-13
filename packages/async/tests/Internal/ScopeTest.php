@@ -38,6 +38,20 @@ final class ScopeTest
         Assert::same($inFiber, $root);
     }
 
+    public function rootIsCurrentAgainInFiberAfterScopeEnds(): void
+    {
+        $root = Scope::current();
+        $inFiber = null;
+
+        $fiber = new \Fiber(static function () use (&$inFiber) {
+            timeout(1, static fn() => null);
+            $inFiber = Scope::current();
+        });
+        $fiber->start();
+
+        Assert::same($inFiber, $root);
+    }
+
     public function cancellationReachesDescendantsButNotThroughShield(): void
     {
         $scope = new Scope();
@@ -134,5 +148,18 @@ final class ScopeTest
         $scope->cancel();
 
         Assert::instanceOf(thrown($scope->throwIfCancelled(...)), Cancelled::class);
+    }
+
+    public function fiberSuspendedInRunGoesAwayWithLastReference(): void
+    {
+        $scope = new Scope();
+        $fiber = new \Fiber(static function () use ($scope) {
+            $scope->run(static fn() => \Fiber::suspend());
+        });
+        $fiber->start();
+        $reference = \WeakReference::create($fiber);
+        unset($fiber);
+
+        Assert::null($reference->get());
     }
 }

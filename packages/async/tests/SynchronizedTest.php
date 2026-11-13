@@ -174,4 +174,17 @@ final class SynchronizedTest
             }
         };
     }
+
+    public function fiberSuspendedInsideGoesAwayWithLastReference(): void
+    {
+        $mutex = new LocalMutex();
+        $fiber = new \Fiber(static function () use ($mutex) {
+            synchronized($mutex, static fn() => \Fiber::suspend());
+        });
+        $fiber->start();
+        $reference = \WeakReference::create($fiber);
+        unset($fiber);
+
+        Assert::null($reference->get());
+    }
 }

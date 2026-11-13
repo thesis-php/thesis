@@ -166,6 +166,8 @@ final class GroupImpl implements Group
 
         $daemon = $parent === $this->daemonsScope;
         $scope = new Scope($parent);
+        // Here, in the spawning fiber: the scope tree does not know where the task was spawned.
+        $values = Context::capture();
         /** @var TaskImpl<T> */
         $task = new TaskImpl($scope);
 
@@ -175,11 +177,12 @@ final class GroupImpl implements Group
             ++$this->tasks;
         }
 
-        EventLoop::queue(function () use ($fn, $scope, $task, $daemon) {
+        EventLoop::queue(function () use ($fn, $scope, $task, $daemon, $values) {
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();
-                $task->complete($scope->run($fn));
+                // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
+                $task->complete($values === [] ? $scope->run($fn) : Context::run($values, static fn() => $scope->run($fn)));
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
                     // Cancellation is not a failure: it does not bring the group down.

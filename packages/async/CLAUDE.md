@@ -38,7 +38,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
   unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
-- `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note on `FiberLocal`).
+- `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note on `CURRENT_SCOPE`).
+  Per-fiber state (`CURRENT_SCOPE`, `CONTEXT`, the locks of `synchronized()`) is a plain
+  `WeakMap` keyed by `Internal\fiberKey()`; call it again instead of keeping the key in a variable across a call
+  that may suspend, or a suspended fiber holds itself through its own stack (`valueGoesAwayWithFiber` catches it).
 - Cancellation is propagated eagerly: `Scope::notify()` marks every scope of the non-shielded subtree, and a new scope
   inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the tree.
   One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
@@ -46,6 +49,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`hrtime`, `INF` if none),
   the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the clock;
   `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
+- `ScopedValue`s live outside the scope tree, in `Internal\Context`: an immutable array per fiber, copied by `with()`.
+  A task's scope is a child of the group, not of the spawn site, so `GroupImpl::start()` captures the values
+  in the spawning fiber and the task runs with them. A shield does not hide values. A task that inherits nothing
+  pays for no binding; `suspend()` never reads values.
 - In `{main}`, `GroupImpl::join()` runs the event loop and Revolt may throw out of it: an `UncaughtThrowable` fails
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.

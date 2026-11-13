@@ -405,26 +405,42 @@ A waiter cancelled after the handover keeps the permit, as with any wait: its ne
 An implementation supplies the callable that returns the permit, and `Lock` calls it under `shield()`:
 a release that has to wait still can in `finally` of a cancelled scope.
 
-### Context per fiber: `FiberLocal`
+### Context of a request: `ScopedValue`
 
-A value that follows a task without being passed as an argument: a request id for logs, a tenant, a transaction.
+A value that reaches every task of a request without being passed as an argument: a trace id, a logger context, a tenant.
 
 ```php
-use Thesis\Async\FiberLocal;
+use Thesis\Async\ScopedValue;
 
-/** @var FiberLocal<string> */
-$requestId = new FiberLocal();
+/** @var ScopedValue<?string> */
+$requestId = new ScopedValue(); // once, as a constant or a static property: the object is the key
 
-$group->spawn(static function () use ($requestId, $request) {
-    $requestId->with($request->id, static function () use ($request) {
-        handle($request); // deep inside: $logger->info('...', ['request' => $requestId->get()])
-    });
-});
+$requestId->with($request->id, static fn() => all([
+    'user' => static fn() => fetchUser($userId),     // deep inside: $logger->info('...', ['request' => $requestId->get()])
+    'orders' => static fn() => fetchOrders($userId),
+]));
 ```
 
 There is no `set()`: `with()` binds the value while the callable runs and restores the previous one
-whatever it ends with, so a value never leaks into code that runs later in the same fiber.
-Nothing is inherited: a task starts without a value, bind it again inside the task.
+whatever it ends with. A task takes the values bound where it is spawned, not where its group was created,
+so `with()` around a `spawn()` is visible to the task. Values bound later, in the parent or in the task, do not
+reach the other side. `shield()` does not hide values: it only hides cancellation. `onCancel()` callbacks see only defaults.
+
+Where nothing is bound, `get()` returns the default given to the constructor, `null` unless stated otherwise.
+A value with a natural default never needs a null check:
+
+```php
+$tenant = new ScopedValue(Tenant::system());
+```
+
+A bound value is returned as is, even `null`: `with(null, ...)` hides an inherited value from the code inside.
+`isBound()` tells a binding from its absence, whatever the value, so a layer can keep what an outer one has bound:
+
+```php
+$handle = static fn() => $next($request);
+
+return $requestId->isBound() ? $handle() : $requestId->with(generateId(), $handle);
+```
 
 ### amphp: `ampCancellable()`
 
@@ -547,7 +563,7 @@ all([user, orders])              orders fails after 50 ms
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
-| `FiberLocal<T>`: `get(): ?T`, `with(T, callable(): R): R` | a value bound per fiber, {main} included, while a callable runs |
+| `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(float $seconds)` | cancellable sleep |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
