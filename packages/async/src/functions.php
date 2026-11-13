@@ -318,7 +318,8 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
     if ($locks === null) {
         /** @var \WeakMap<Semaphore, Lock> */
         $locks = new \WeakMap();
-        $held->set($locks);
+
+        return $held->with($locks, static fn() => synchronized($semaphore, $fn));
     }
 
     if (isset($locks[$semaphore])) {

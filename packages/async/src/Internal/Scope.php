@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 use Thesis\Async\Cancelled;
+use Thesis\Async\FiberLocal;
 
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
@@ -22,24 +23,6 @@ use Thesis\Async\Cancelled;
  */
 final class Scope
 {
-    /**
-     * Current scope of every fiber (keyed by \Fiber) that has entered one.
-     *
-     * Why not Revolt's FiberLocal, which does the same: {@see current()} is on the hot path, it runs in every
-     * suspend(). FiberLocal::get() makes two WeakMap lookups (fiber → storage, then instance → value)
-     * and wraps the value in an array; a single WeakMap plus a static for {main} is ~0.9 µs (~8%) cheaper
-     * per wait. FiberLocal's automatic clearing after each event loop callback buys nothing here either:
-     * {@see run()} restores the previous scope in `finally`.
-     *
-     * @var ?\WeakMap<object, self>
-     */
-    private static ?\WeakMap $fibers = null;
-
-    /** current scope of {main} */
-    private static ?self $main = null;
-
-    private static ?self $root = null;
-
     /**
      * This scope or a visible ancestor is cancelled: set by {@see notify()} and inherited on creation.
      * One flag is enough, because it never goes back: whoever cancelled the scope, its subtree has been notified.
@@ -65,10 +48,11 @@ final class Scope
 
     public static function current(): self
     {
-        $fiber = \Fiber::getCurrent();
-        $current = $fiber === null ? self::$main : self::$fibers[$fiber] ?? null;
+        // Hot path, runs in every suspend(): keep it a single FiberLocal lookup.
+        /** @var ?self $current phpstan does not read the type of a constant */
+        $current = CURRENT_SCOPE->get();
 
-        return $current ?? self::$root ??= new self();
+        return $current ?? ROOT_SCOPE;
     }
 
     /**
@@ -80,32 +64,7 @@ final class Scope
      */
     public function run(callable $body): mixed
     {
-        $fiber = \Fiber::getCurrent();
-
-        if ($fiber === null) {
-            $previous = self::$main;
-            self::$main = $this;
-
-            try {
-                return $body();
-            } finally {
-                self::$main = $previous;
-            }
-        }
-
-        $fibers = self::$fibers ??= new \WeakMap();
-        $previous = $fibers[$fiber] ?? null;
-        $fibers[$fiber] = $this;
-
-        try {
-            return $body();
-        } finally {
-            if ($previous === null) {
-                unset($fibers[$fiber]);
-            } else {
-                $fibers[$fiber] = $previous;
-            }
-        }
+        return CURRENT_SCOPE->with($this, $body);
     }
 
     /**
@@ -193,3 +152,18 @@ final class Scope
         }
     }
 }
+
+/**
+ * The scope of code that runs outside of any {@see Scope::run()}. Never cancelled: it has no owner.
+ *
+ * @internal
+ */
+const ROOT_SCOPE = new Scope();
+
+/**
+ * Current scope of every fiber, {main} included, that has entered one. Read through {@see Scope::current()}.
+ *
+ * @internal
+ * @var FiberLocal<Scope>
+ */
+const CURRENT_SCOPE = new FiberLocal();

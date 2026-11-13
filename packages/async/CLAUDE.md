@@ -31,7 +31,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
   unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
-- `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note there).
+- `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note on `FiberLocal`).
 - Cancellation is propagated eagerly: `Scope::notify()` marks every scope of the non-shielded subtree, and a new scope
   inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the tree.
   One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.

@@ -355,18 +355,15 @@ use Thesis\Async\FiberLocal;
 $requestId = new FiberLocal();
 
 $group->spawn(static function () use ($requestId, $request) {
-    $requestId->set($request->id);
-
-    try {
+    $requestId->with($request->id, static function () use ($request) {
         handle($request); // deep inside: $logger->info('...', ['request' => $requestId->get()])
-    } finally {
-        $requestId->unset();
-    }
+    });
 });
 ```
 
-Every task is a fiber of its own and starts without a value: nothing is inherited from the fiber that spawned it.
-A value goes away with its fiber; nothing is cleared behind your back.
+There is no `set()`: `with()` binds the value while the callable runs and restores the previous one
+whatever it ends with, so a value never leaks into code that runs later in the same fiber.
+Nothing is inherited: a task starts without a value, bind it again inside the task.
 
 ### Your own primitives: `suspend()`
 
@@ -465,7 +462,7 @@ all([user, orders])              orders fails after 50 ms
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
-| `FiberLocal<T>`: `get(): ?T`, `set(T)`, `unset()` | a value per fiber, {main} included |
+| `FiberLocal<T>`: `get(): ?T`, `with(T, callable(): R): R` | a value bound per fiber, {main} included, while a callable runs |
 | `delay(float $seconds)` | cancellable sleep |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
