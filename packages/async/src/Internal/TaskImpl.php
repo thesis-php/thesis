@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Thesis\Async\Internal;
+
+use Thesis\Async\Task;
+use Thesis\Async\Waker;
+use function Thesis\Async\suspend;
+
+/**
+ * @internal
+ * @template-covariant T
+ * @implements Task<T>
+ */
+final class TaskImpl implements Task
+{
+    #[\Override]
+    public private(set) bool $isDone = false;
+
+    /** @var ?T */
+    private mixed $value = null;
+
+    private ?\Throwable $error = null;
+
+    /** @var array<int, Waker<null>> */
+    private array $waiters = [];
+
+    public function __construct(
+        private readonly ScopeImpl $scope,
+    ) {}
+
+    public function cancel(): void
+    {
+        $this->scope->cancel();
+    }
+
+    public function await(): mixed
+    {
+        if (!$this->isDone) {
+            suspend(
+                function (Waker $waker) {
+                    /** @var Waker<null> $waker */
+                    $id = spl_object_id($waker);
+                    $this->waiters[$id] = $waker;
+
+                    return function () use ($id) {
+                        unset($this->waiters[$id]);
+                    };
+                },
+            );
+        }
+
+        if ($this->error !== null) {
+            throw $this->error;
+        }
+
+        /** @var T */
+        return $this->value;
+    }
+
+    public function settle(mixed $value, ?\Throwable $error): void
+    {
+        $this->isDone = true;
+        /** @var ?T $value */
+        $this->value = $value;
+        $this->error = $error;
+
+        $waiters = $this->waiters;
+        $this->waiters = [];
+
+        foreach ($waiters as $waiter) {
+            $waiter->resume();
+        }
+    }
+}

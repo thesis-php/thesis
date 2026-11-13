@@ -230,7 +230,7 @@ all([user, orders])              orders fails after 50 ms
 | `shield(callable(): T): T` | protect from outer cancellation |
 | `delay(float $seconds)` | cancellable sleep |
 | `suspend(callable(Waker<T>): ?callable(): void): T` | the suspension point |
-| `Scope::current()`, `Scope::$isCancelled`, `Scope::checkpoint()`, `Scope::cancel()`, `Scope::onCancel()` | direct access to the tree |
+| `currentScope(): Scope`, `Scope::$isCancelled`, `Scope::checkpoint()`, `Scope::cancel()`, `Scope::onCancel()` | direct access to the tree |
 
 ## Limitations
 

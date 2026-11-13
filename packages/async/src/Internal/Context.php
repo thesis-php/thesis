@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Thesis\Async\Scope;
-
 /**
  * Tracks the current scope of every fiber.
  *
@@ -13,15 +11,15 @@ use Thesis\Async\Scope;
  */
 final class Context
 {
-    /** @var ?\WeakMap<object, Scope> current scope of every fiber (keyed by \Fiber) that has entered one */
+    /** @var ?\WeakMap<object, ScopeImpl> current scope of every fiber (keyed by \Fiber) that has entered one */
     private static ?\WeakMap $fibers = null;
 
     /** current scope of {main} */
-    private static ?Scope $main = null;
+    private static ?ScopeImpl $main = null;
 
-    private static ?Scope $root = null;
+    private static ?ScopeImpl $root = null;
 
-    public static function current(): Scope
+    public static function current(): ScopeImpl
     {
         $fiber = \Fiber::getCurrent();
 
@@ -39,7 +37,7 @@ final class Context
      * @param callable(): T $body
      * @return T
      */
-    public static function enter(Scope $scope, callable $body): mixed
+    public static function enter(ScopeImpl $scope, callable $body): mixed
     {
         $fiber = \Fiber::getCurrent();
 
@@ -69,8 +67,8 @@ final class Context
         }
     }
 
-    private static function root(): Scope
+    private static function root(): ScopeImpl
     {
-        return self::$root ??= new Scope();
+        return self::$root ??= new ScopeImpl();
     }
 }

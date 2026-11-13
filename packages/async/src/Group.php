@@ -6,6 +6,9 @@ namespace Thesis\Async;
 
 use Revolt\EventLoop;
 use Thesis\Async\Internal\Context;
+use Thesis\Async\Internal\ScopeImpl;
+use Thesis\Async\Internal\TaskImpl;
+use Thesis\Async\Internal\WakerImpl;
 
 /**
  * Nursery: the only way to start a concurrent task. Obtained from {@see group()}.
@@ -20,14 +23,14 @@ final class Group
 
     private int $daemons = 0;
 
-    /** @var array<int, Scope> */
+    /** @var array<int, ScopeImpl> */
     private array $daemonScopes = [];
 
-    /** @var ?Waker<null> */
-    private ?Waker $joiner = null;
+    /** @var ?WakerImpl<null> */
+    private ?WakerImpl $joiner = null;
 
     private function __construct(
-        private readonly Scope $scope,
+        private readonly ScopeImpl $scope,
     ) {}
 
     /**
@@ -40,7 +43,7 @@ final class Group
      */
     public static function run(callable $body): mixed
     {
-        $scope = new Scope(Scope::current());
+        $scope = new ScopeImpl(Context::current());
         $group = new self($scope);
         $result = null;
         $outerCancellation = null;
@@ -120,7 +123,7 @@ final class Group
     private function join(): ?\Throwable
     {
         while ($this->tasks > 0) {
-            ($this->joiner = new Waker())->park();
+            ($this->joiner = new WakerImpl())->park();
         }
 
         foreach ($this->daemonScopes as $scope) {
@@ -128,7 +131,7 @@ final class Group
         }
 
         while ($this->daemons > 0) {
-            ($this->joiner = new Waker())->park();
+            ($this->joiner = new WakerImpl())->park();
         }
 
         return $this->error;
@@ -141,9 +144,9 @@ final class Group
      */
     private function start(callable $fn, bool $daemon): Task
     {
-        $scope = new Scope($this->scope);
-        /** @var Task<T> */
-        $task = new Task($scope);
+        $scope = new ScopeImpl($this->scope);
+        /** @var TaskImpl<T> */
+        $task = new TaskImpl($scope);
 
         if ($daemon) {
             ++$this->daemons;

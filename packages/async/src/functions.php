@@ -6,6 +6,19 @@ namespace Thesis\Async;
 
 use Revolt\EventLoop;
 use Thesis\Async\Internal\Context;
+use Thesis\Async\Internal\ScopeImpl;
+use Thesis\Async\Internal\WakerImpl;
+
+/**
+ * The scope the current fiber runs in. Outside of any {@see group()}, {@see timeout()} or {@see shield()}
+ * it is the root scope, which cannot be cancelled.
+ *
+ * @api
+ */
+function currentScope(): Scope
+{
+    return Context::current();
+}
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
@@ -25,11 +38,11 @@ use Thesis\Async\Internal\Context;
  */
 function suspend(callable $arm): mixed
 {
-    $scope = Scope::current();
+    $scope = currentScope();
     $scope->checkpoint();
 
-    /** @var Waker<T> */
-    $waker = new Waker();
+    /** @var WakerImpl<T> */
+    $waker = new WakerImpl();
     $disarm = $arm($waker);
     $interrupted = false;
 
@@ -91,7 +104,7 @@ function group(callable $body): mixed
  */
 function timeout(float $seconds, callable $body): mixed
 {
-    $scope = new Scope(Scope::current());
+    $scope = new ScopeImpl(Context::current());
     $timer = EventLoop::delay($seconds, static function () use ($scope) {
         $scope->cancel();
     });
@@ -116,7 +129,7 @@ function timeout(float $seconds, callable $body): mixed
  */
 function shield(callable $body): mixed
 {
-    $scope = new Scope(Scope::current(), shield: true);
+    $scope = new ScopeImpl(Context::current(), shield: true);
 
     try {
         return Context::enter($scope, $body);
