@@ -20,7 +20,7 @@ interface Group
      * @return Task<T>
      * @throws \LogicException if {@see group()} has already returned
      */
-    public function go(callable $fn): Task;
+    public function spawn(callable $fn): Task;
 
     /**
      * Starts a background task (heartbeat, ping reader, metrics) the group does NOT wait for:

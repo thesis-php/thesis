@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
+use Thesis\Async\Continuation;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
-use Thesis\Async\Waker;
 use function Thesis\Async\suspend;
 
 /**
@@ -24,7 +24,7 @@ final class TaskImpl implements Task
 
     private ?\Throwable $error = null;
 
-    /** @var array<int, Waker<null>> */
+    /** @var array<int, Continuation<null>> */
     private array $waiters = [];
 
     public function __construct(
@@ -39,10 +39,10 @@ final class TaskImpl implements Task
     public function await(): mixed
     {
         if (!$this->isDone) {
-            suspend(function (Waker $waker) {
-                /** @var Waker<null> $waker */
-                $id = spl_object_id($waker);
-                $this->waiters[$id] = $waker;
+            suspend(function (Continuation $continuation) {
+                /** @var Continuation<null> $continuation */
+                $id = spl_object_id($continuation);
+                $this->waiters[$id] = $continuation;
 
                 return function () use ($id) {
                     unset($this->waiters[$id]);

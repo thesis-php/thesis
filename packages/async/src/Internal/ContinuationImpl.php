@@ -7,20 +7,20 @@ namespace Thesis\Async\Internal;
 use Revolt\EventLoop;
 use Revolt\EventLoop\Suspension;
 use Thesis\Async\Cancelled;
-use Thesis\Async\Waker;
+use Thesis\Async\Continuation;
 
 /**
  * @internal
  * @template T
- * @implements Waker<T>
+ * @implements Continuation<T>
  */
-final class WakerImpl implements Waker
+final class ContinuationImpl implements Continuation
 {
-    private const int ARMED = 0;
+    private const int PENDING = 0;
     private const int PARKED = 1;
     private const int FIRED = 2;
 
-    private int $state = self::ARMED;
+    private int $state = self::PENDING;
 
     /** @var ?T */
     private mixed $value = null;
@@ -43,7 +43,7 @@ final class WakerImpl implements Waker
     }
 
     /**
-     * Fires the waker on behalf of cancellation: {@see park()} then throws a {@see Cancelled}
+     * Fires the continuation on behalf of cancellation: {@see park()} then throws a {@see Cancelled}
      * created in the parked fiber, so its trace points at the interrupted wait.
      */
     public function interrupt(): bool
@@ -59,10 +59,10 @@ final class WakerImpl implements Waker
     public function park(): mixed
     {
         if ($this->state === self::PARKED) {
-            throw new \LogicException('Waker is already parked.');
+            throw new \LogicException('Continuation is already parked.');
         }
 
-        if ($this->state === self::ARMED) {
+        if ($this->state === self::PENDING) {
             $this->state = self::PARKED;
             /** @var Suspension<null> */
             $suspension = EventLoop::getSuspension();

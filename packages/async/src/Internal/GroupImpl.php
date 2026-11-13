@@ -34,8 +34,8 @@ final class GroupImpl implements Group
 
     private bool $closed = false;
 
-    /** @var ?WakerImpl<null> */
-    private ?WakerImpl $joiner = null;
+    /** @var ?ContinuationImpl<null> */
+    private ?ContinuationImpl $joiner = null;
 
     private function __construct(
         private readonly Scope $body,
@@ -85,7 +85,7 @@ final class GroupImpl implements Group
         return $result;
     }
 
-    public function go(callable $fn): Task
+    public function spawn(callable $fn): Task
     {
         return $this->start($this->tasksScope, $fn);
     }
@@ -119,7 +119,7 @@ final class GroupImpl implements Group
                 $this->daemonsScope->cancel();
             }
 
-            ($this->joiner = new WakerImpl())->park();
+            ($this->joiner = new ContinuationImpl())->park();
         }
 
         $this->closed = true;

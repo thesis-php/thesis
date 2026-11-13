@@ -5,57 +5,76 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
-use Thesis\Async\Internal\WakerImpl;
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
  *
- * $arm receives a {@see Waker}, registers it wherever the event comes from (timer, stream watcher, wait queue)
- * and may return $disarm that undoes the registration. $disarm is always called once the wait is over,
- * whatever ended it, so it must be idempotent with respect to a source that has already fired.
+ * $register receives the {@see Continuation} of this wait and registers it wherever the event comes from
+ * (timer, stream watcher, wait queue). It may return $unregister that undoes the registration.
+ * $unregister is always called once the wait is over, whatever ended it,
+ * so it must be harmless for a source that has already fired.
  *
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
  *
  * @api
  * @template T
- * @param callable(Waker<T>): (null|callable(): void) $arm
+ * @param callable(Continuation<T>): (null|callable(): void) $register
  * @return T
  * @throws Cancelled
  */
-function suspend(callable $arm): mixed
+function suspend(callable $register): mixed
 {
     $scope = Scope::current();
     $scope->checkpoint();
 
-    /** @var WakerImpl<T> */
-    $waker = new WakerImpl();
-    $disarm = $arm($waker);
-    $unsubscribe = $scope->onCancel(static function () use ($waker) {
-        $waker->interrupt();
+    /** @var ContinuationImpl<T> */
+    $continuation = new ContinuationImpl();
+    $unregister = $register($continuation);
+    $unsubscribe = $scope->onCancel(static function () use ($continuation) {
+        $continuation->interrupt();
     });
 
     try {
-        return $waker->park();
+        return $continuation->park();
     } finally {
         $unsubscribe();
 
-        if ($disarm !== null) {
-            $disarm();
+        if ($unregister !== null) {
+            $unregister();
         }
     }
 }
 
 /**
- * Explicit cancellation point for CPU-bound loops that never suspend.
+ * Cancellation point for CPU-bound code that never waits.
+ *
+ * Such code starves the event loop: timers, including {@see timeout()} deadlines, cannot fire, and other tasks
+ * do not run. So checking a flag is not enough: checkpoint() yields to the event loop for one tick
+ * and throws {@see Cancelled} if the scope is cancelled by then.
+ *
+ * It costs a full wait, so in a hot loop call it every N iterations, not on every one.
  *
  * @api
  * @throws Cancelled
  */
 function checkpoint(): void
 {
+    suspend(static function (Continuation $continuation) {
+        // Not EventLoop::queue(): microtasks run before timers, so a loop of them would starve the deadline.
+        $callback = EventLoop::defer(static function () use ($continuation) {
+            $continuation->resume();
+        });
+
+        return static function () use ($callback) {
+            EventLoop::cancel($callback);
+        };
+    });
+
+    // The tick may have both resumed and cancelled us; the resumption wins in suspend(), but not here.
     Scope::current()->checkpoint();
 }
 
@@ -65,9 +84,9 @@ function checkpoint(): void
  */
 function delay(float $seconds): void
 {
-    suspend(static function (Waker $waker) use ($seconds) {
-        $timer = EventLoop::delay($seconds, static function () use ($waker) {
-            $waker->resume();
+    suspend(static function (Continuation $continuation) use ($seconds) {
+        $timer = EventLoop::delay($seconds, static function () use ($continuation) {
+            $continuation->resume();
         });
 
         return static function () use ($timer) {
@@ -160,7 +179,7 @@ function all(array $fns): array
         $tasks = [];
 
         foreach ($fns as $key => $fn) {
-            $tasks[$key] = $group->go($fn);
+            $tasks[$key] = $group->spawn($fn);
         }
 
         $results = [];
@@ -191,7 +210,7 @@ function race(callable $fn, callable ...$fns): mixed
 
     group(static function (Group $group) use ($fn, $fns, &$winner, &$failure) {
         foreach ([$fn, ...$fns] as $contender) {
-            $group->go(static function () use ($contender, $group, &$winner, &$failure) {
+            $group->spawn(static function () use ($contender, $group, &$winner, &$failure) {
                 try {
                     $value = $contender();
                 } catch (Cancelled $cancelled) {
@@ -241,14 +260,14 @@ function each(iterable $items, callable $fn, int $concurrency): void
 
     group(static function (Group $group) use ($items, $fn, $concurrency) {
         $running = 0;
-        /** @var ?Waker<null> */
+        /** @var ?Continuation<null> */
         $slotWaiter = null;
 
         foreach ($items as $key => $item) {
             while ($running >= $concurrency) {
-                suspend(static function (Waker $waker) use (&$slotWaiter) {
-                    /** @var Waker<null> $waker */
-                    $slotWaiter = $waker;
+                suspend(static function (Continuation $continuation) use (&$slotWaiter) {
+                    /** @var Continuation<null> $continuation */
+                    $slotWaiter = $continuation;
 
                     return static function () use (&$slotWaiter) {
                         $slotWaiter = null;
@@ -257,7 +276,7 @@ function each(iterable $items, callable $fn, int $concurrency): void
             }
 
             ++$running;
-            $group->go(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
+            $group->spawn(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
                 try {
                     $fn($item, $key);
                 } finally {

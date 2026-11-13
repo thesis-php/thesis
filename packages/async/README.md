@@ -91,7 +91,7 @@ use Thesis\Async\Group;
 use function Thesis\Async\group;
 
 $page = group(static function (Group $group) use ($userId) {
-    $avatar = $group->go(static fn() => fetchAvatar($userId)); // starts right away
+    $avatar = $group->spawn(static fn() => fetchAvatar($userId)); // starts right away
     $profile = loadProfile($userId);                            // meanwhile, in the body
 
     if (!$profile->showsAvatar) {
@@ -109,7 +109,7 @@ The number of tasks is not known in advance:
 ```php
 group(static function (Group $group) use ($server) {
     while (null !== $connection = $server->accept()) {
-        $group->go(static fn() => handle($connection)); // a failure here fails the whole group: handle() catches its own errors
+        $group->spawn(static fn() => handle($connection)); // a failure here fails the whole group: handle() catches its own errors
     }
 }); // on cancellation, stops accepting and waits for the connections in progress
 ```
@@ -210,13 +210,18 @@ try {
 
 ### CPU-bound loops: `checkpoint()`
 
-A loop that never waits is never interrupted. `checkpoint()` throws `Cancelled` if the current scope is cancelled:
+A loop that never waits starves the event loop: timers, including `timeout()` deadlines, cannot fire,
+and other tasks do not run. `checkpoint()` yields to the event loop for one tick and throws `Cancelled`
+if the scope is cancelled by then. It costs a full wait, so call it every N iterations:
 
 ```php
 use function Thesis\Async\checkpoint;
 
-foreach ($rows as $row) {
-    checkpoint();
+foreach ($rows as $i => $row) {
+    if ($i % 1000 === 0) {
+        checkpoint();
+    }
+
     $hash = hash('xxh128', $hash . serialize($row));
 }
 ```
@@ -227,14 +232,14 @@ Every wait in the library goes through a single function. Build channels, locks 
 
 ```php
 use Revolt\EventLoop;
-use Thesis\Async\Waker;
+use Thesis\Async\Continuation;
 use function Thesis\Async\suspend;
 
 function readable(mixed $stream): void
 {
-    suspend(static function (Waker $waker) use ($stream) {
-        $watcher = EventLoop::onReadable($stream, static function () use ($waker) {
-            $waker->resume();
+    suspend(static function (Continuation $continuation) use ($stream) {
+        $watcher = EventLoop::onReadable($stream, static function () use ($continuation) {
+            $continuation->resume();
         });
 
         // Always called once the wait is over: by the event, by cancellation, by anything.
@@ -245,20 +250,21 @@ function readable(mixed $stream): void
 }
 ```
 
-`Waker::resume()` returns `false` if the waker has already fired. A channel uses it to keep a value that was not delivered.
+`Continuation::resume()` returns `false` if the continuation has already fired. A channel uses it to keep a value that was not delivered.
 
 ## How it works
 
 Five small ideas, each built on the previous one.
 
-1. **`Waker`** is a one-shot alarm for a single wait. It fires once; late calls are ignored.
-   A timer and a cancellation may race for the same waker — whoever is first wins, the other is a no-op.
+1. **`Continuation`** is what is left of a single wait: resuming it delivers a value or an error to exactly that wait.
+   It is one-shot; late calls are ignored. A timer and a cancellation may race for the same continuation —
+   whoever is first wins, the other is a no-op.
 2. **Scope** is a node of the cancellation tree: a `cancelled` flag, a parent, children.
    The current scope lives in fiber-local storage, which is why it is never passed as an argument.
    Cancelling a node cancels the whole subtree. Only owners cancel scopes: a group, a task handle, a timeout timer.
    There is no public scope object at all.
 3. **`suspend()`** is the only place where a fiber goes to sleep.
-   It checks for cancellation, subscribes the waker to the scope and parks.
+   It checks for cancellation, subscribes the continuation to the scope and parks.
    Cancellation is therefore implemented exactly once.
 4. **`Group`** starts child fibers in child scopes; `group()` joins them all before returning.
    That join is the structured concurrency guarantee.
@@ -271,8 +277,8 @@ Five small ideas, each built on the previous one.
 all([user, orders])              orders fails after 50 ms
 │
 ├─ group() creates scope G
-│   ├─ go(user)   → fiber parked in suspend(), subscribed to G
-│   └─ go(orders) → fiber parked in suspend(), subscribed to G
+│   ├─ spawn(user)   → fiber parked in suspend(), subscribed to G
+│   └─ spawn(orders) → fiber parked in suspend(), subscribed to G
 │
 ├─ orders throws RuntimeException
 │   └─ G is cancelled → user is woken with Cancelled and unwinds,
@@ -291,14 +297,14 @@ all([user, orders])              orders fails after 50 ms
 - **Cancelling a task is not a failure.** `Task::cancel()` stops one task and leaves its group alive.
 - **`Cancelled` only where the scope is cancelled.** Awaiting a cancelled task throws `TaskCancelled` instead.
 - **No work after cancellation.** A task cancelled before it started never runs: a `race()` won synchronously does not even start the others.
-- **No leaked registrations.** The `$disarm` of `suspend()` always runs.
+- **No leaked registrations.** The `$unregister` of `suspend()` always runs.
 
 ## API
 
 | | |
 |---|---|
 | `group(callable(Group): T): T` | run a body with a nursery, join all tasks |
-| `Group::go(callable(): T): Task<T>` | start a task the group waits for |
+| `Group::spawn(callable(): T): Task<T>` | start a task the group waits for |
 | `Group::daemon(callable(): T): Task<T>` | start a task cancelled when the rest is done |
 | `Group::cancel()` | cancel all tasks, but not the body |
 | `Task::await(): T`, `Task::cancel()`, `Task::$isDone` | task handle |
@@ -309,8 +315,8 @@ all([user, orders])              orders fails after 50 ms
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
 | `shield(callable(): T): T` | protect from outer cancellation |
 | `delay(float $seconds)` | cancellable sleep |
-| `checkpoint()` | cancellation point for code that never waits |
-| `suspend(callable(Waker<T>): ?callable(): void): T` | the suspension point |
+| `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
+| `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled` | exceptions |
 
 ## Limitations
