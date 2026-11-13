@@ -279,6 +279,95 @@ its awaiters are not cancelled, so fail it with a regular exception.
 Awaiting a deferred that is already done returns at once, without suspending: it is not a cancellation point then
 and does not yield to the event loop.
 
+### Exclusive access: `Mutex` and `Semaphore`
+
+Fibers switch only at waits, so a critical section that never waits needs no lock.
+One that does — a request and its response on a connection without multiplexing, a message written as several frames — needs a mutex:
+
+```php
+use Thesis\Async\LocalMutex;
+use function Thesis\Async\synchronized;
+
+final class Connection
+{
+    private readonly LocalMutex $mutex;
+
+    public function __construct()
+    {
+        $this->mutex = new LocalMutex();
+    }
+
+    public function query(string $sql): Result
+    {
+        return synchronized($this->mutex, function () use ($sql) {
+            $this->send($sql);
+
+            return $this->receive();
+        });
+    }
+}
+```
+
+`synchronized()` releases the lock whatever the closure ends with, including cancellation.
+It is reentrant within a fiber: if `query()` called another method under the same mutex, that call would run right away.
+A task started inside is another fiber and waits for the lock as anyone else.
+
+When the lock has to outlive one call, take it explicitly: a `Lock` belongs to whoever holds the object,
+so it may be stored or released by another fiber. It is one-shot: a second `release()` does nothing.
+`acquire()` is not reentrant: a holder that acquires again waits forever.
+
+A semaphore allows several holders at a time; `Mutex` is a `Semaphore` with one permit:
+
+```php
+use Thesis\Async\LocalSemaphore;
+
+$slots = new LocalSemaphore(10);
+
+group(static function (Group $group) use ($slots, $jobs) {
+    foreach ($jobs as $job) {
+        $slot = $slots->acquire(); // the body waits for a free slot, the task releases it
+        $group->spawn(static function () use ($slot, $job) {
+            try {
+                handle($job);
+            } finally {
+                $slot->release();
+            }
+        });
+    }
+});
+```
+
+Both are fair: a released permit goes to the first waiter, and a newcomer cannot overtake it.
+A waiter cancelled after the handover keeps the permit, as with any wait: its next wait throws `Cancelled`.
+
+`Mutex` and `Semaphore` are interfaces, so the permits may live elsewhere: a Redis key, a Postgres advisory lock.
+An implementation supplies the callable that returns the permit, and `Lock` calls it under `shield()`:
+a release that has to wait still can in `finally` of a cancelled scope.
+
+### Context per fiber: `FiberLocal`
+
+A value that follows a task without being passed as an argument: a request id for logs, a tenant, a transaction.
+
+```php
+use Thesis\Async\FiberLocal;
+
+/** @var FiberLocal<string> */
+$requestId = new FiberLocal();
+
+$group->spawn(static function () use ($requestId, $request) {
+    $requestId->set($request->id);
+
+    try {
+        handle($request); // deep inside: $logger->info('...', ['request' => $requestId->get()])
+    } finally {
+        $requestId->unset();
+    }
+});
+```
+
+Every task is a fiber of its own and starts without a value: nothing is inherited from the fiber that spawned it.
+A value goes away with its fiber; nothing is cleared behind your back.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build channels, locks and I/O on it and they are cancellable for free:
@@ -373,6 +462,10 @@ all([user, orders])              orders fails after 50 ms
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
 | `shield(callable(): T): T` | protect from outer cancellation |
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
+| `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
+| `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
+| `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
+| `FiberLocal<T>`: `get(): ?T`, `set(T)`, `unset()` | a value per fiber, {main} included |
 | `delay(float $seconds)` | cancellable sleep |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |

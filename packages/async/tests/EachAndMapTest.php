@@ -154,16 +154,6 @@ final class EachAndMapTest
         }
     }
 
-    #[DataSet([0])]
-    #[DataSet([-1])]
-    public function eachRejectsNonPositiveConcurrency(int $concurrency): void
-    {
-        Expect::exception(\ValueError::class)->withMessage(\sprintf('Concurrency must be positive, got %d.', $concurrency));
-
-        /** @phpstan-ignore argument.type */
-        each([1], static fn() => null, $concurrency);
-    }
-
     public function eachIsCancellable(): void
     {
         Expect::exception(TimedOut::class);

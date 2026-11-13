@@ -261,50 +261,78 @@ function race(array $fns): mixed
  * @param iterable<K, T> $items
  * @param callable(T, K): mixed $fn
  * @param positive-int $concurrency
- * @throws \ValueError if $concurrency is not positive
  */
 function each(iterable $items, callable $fn, int $concurrency): void
 {
-    /** @phpstan-ignore smaller.alwaysFalse */
-    if ($concurrency < 1) {
-        throw new \ValueError(\sprintf('Concurrency must be positive, got %d.', $concurrency));
-    }
-
     group(static function (Group $group) use ($items, $fn, $concurrency) {
         $body = Scope::current();
-        $running = 0;
-        /** @var ?Continuation<null> */
-        $slotWaiter = null;
+        $slots = new LocalSemaphore($concurrency);
+        $slot = $slots->acquire();
 
         foreach ($items as $key => $item) {
-            ++$running;
-            $group->spawn(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
+            // A task cancelled before it started never runs, and its slot is returned by Lock::__destruct().
+            // It does not matter: only a cancelled group cancels tasks here, and then the body acquires no more.
+            $group->spawn(static function () use ($fn, $item, $key, $slot) {
                 try {
                     $fn($item, $key);
                 } finally {
-                    --$running;
-                    $slotWaiter?->resume();
+                    $slot->release();
                 }
             });
 
             // The slot is waited for here, before foreach advances $items: an item is not pulled
             // until it can start (the iterable may be a queue, a cursor or a paginated API).
-            while ($running >= $concurrency) {
-                suspend(static function (Continuation $continuation) use (&$slotWaiter) {
-                    /** @var Continuation<null> $continuation */
-                    $slotWaiter = $continuation;
-
-                    return static function () use (&$slotWaiter) {
-                        $slotWaiter = null;
-                    };
-                });
-            }
+            $slot = $slots->acquire();
 
             // A failing task frees its slot before it fails the group, and an event wins over cancellation,
             // so the wait above returns normally even though the body is cancelled by now. Nothing more is pulled then.
             $body->throwIfCancelled();
         }
+
+        $slot->release();
     });
+}
+
+/**
+ * Runs $fn holding a permit of $semaphore and releases it whatever $fn ends with.
+ *
+ * Reentrant within a fiber: if the current fiber is already inside synchronized() on the same semaphore,
+ * $fn runs right away, without a second permit, so a method under a mutex may call another one under it.
+ * A task started inside is another fiber and waits for the permit as anyone else.
+ *
+ * Use {@see Semaphore::acquire()} directly only when the lock has to outlive one call.
+ *
+ * @api
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ * @throws Cancelled if the scope is cancelled while waiting for the lock
+ */
+function synchronized(Semaphore $semaphore, callable $fn): mixed
+{
+    /** @var FiberLocal<\WeakMap<Semaphore, Lock>> $held locks taken by synchronized() in the current fiber */
+    static $held = new FiberLocal();
+
+    $locks = $held->get();
+
+    if ($locks === null) {
+        /** @var \WeakMap<Semaphore, Lock> */
+        $locks = new \WeakMap();
+        $held->set($locks);
+    }
+
+    if (isset($locks[$semaphore])) {
+        return $fn();
+    }
+
+    $locks[$semaphore] = $semaphore->acquire();
+
+    try {
+        return $fn();
+    } finally {
+        $locks[$semaphore]->release();
+        unset($locks[$semaphore]);
+    }
 }
 
 /**
@@ -318,7 +346,6 @@ function each(iterable $items, callable $fn, int $concurrency): void
  * @param callable(T, K): R $fn
  * @param positive-int $concurrency
  * @return array<K, R>
- * @throws \ValueError if $concurrency is not positive
  */
 function map(iterable $items, callable $fn, int $concurrency): array
 {

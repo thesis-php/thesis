@@ -39,3 +39,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - In `{main}`, `GroupImpl::join()` runs the event loop and Revolt may throw out of it: an `UncaughtThrowable` fails
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.
+
+## Conventions
+
+- Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
+  Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
