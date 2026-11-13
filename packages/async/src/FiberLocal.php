@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use const Thesis\Async\Internal\MAIN_KEY;
-
 /**
  * A value bound per fiber, {main} included, for the time a callable runs: context that has to follow the code
  * without being passed as an argument (a request id for logs, a tenant, a transaction).
@@ -73,3 +71,13 @@ final class FiberLocal
         }
     }
 }
+
+/**
+ * The key of {main}, which has no \Fiber, in {@see FiberLocal}. Not a fiber of {main}: it is never started,
+ * it is a \Fiber only so that the keys of FiberLocal have one type.
+ *
+ * Declared next to the class, not in autoload files: it is read only by FiberLocal, so loading the class defines it.
+ *
+ * @internal
+ */
+const MAIN_KEY = new \Fiber(static function (): void {});
