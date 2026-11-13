@@ -428,6 +428,64 @@ A waiter cancelled after the handover keeps the permit, as with any wait: its ne
 An implementation supplies the callable that returns the permit, and `Lock` calls it under `shield()`:
 a release that has to wait still can in `finally` of a cancelled scope.
 
+### Producers and consumers: `Channel`
+
+A bounded queue between fibers that live on their own: request handlers and one writer that stores events in batches,
+messages delivered to a subscription, stages of a pipeline. `send()` waits while the buffer is full, `receive()` waits while it is empty:
+
+```php
+use Thesis\Async\Channel;
+use Thesis\Async\ChannelClosed;
+use Thesis\Async\TimedOut;
+
+/** @var Channel<Event> */
+$events = new Channel(1000);
+
+group(static function (Group $group) use ($events, $server) {
+    // spawn(), not daemon(): a daemon is cancelled once the body returns, and the last batch would be lost.
+    $group->spawn(static function () use ($events) {
+        foreach ($events as $event) { // waits for the first event of a batch without a deadline, ends once closed and drained
+            $batch = [$event];
+
+            try {
+                // Up to 100 events or 1 second. A value that arrives together with the deadline is not lost.
+                timeout(1, static function () use ($events, &$batch) {
+                    while (\count($batch) < 100) {
+                        $batch[] = $events->receive();
+                    }
+                });
+            } catch (TimedOut|ChannelClosed) {
+            }
+
+            store($batch);
+        }
+    });
+
+    try {
+        $server->serve(static function (Request $request) use ($events) {
+            // ...
+            $events->send(new Event($request));
+        });
+    } finally {
+        $events->close(); // the writer drains the buffer, and the join waits for the last batch
+    }
+});
+```
+
+The capacity has no default: how far a slow receiver may fall behind is a decision. `new Channel(0)` is a rendezvous:
+`send()` waits until a receiver takes the value. `trySend()` does not wait and returns `false` if there is no room:
+for metrics and logs that are better dropped than slowing a request down.
+
+Nothing is lost or duplicated on cancellation: a `send()` that throws `Cancelled` has not delivered its value,
+a `receive()` that throws `Cancelled` has not taken one. Senders and receivers are served in the order they came.
+
+The sender closes the channel. After `close()`, `send()` and `trySend()` throw `ChannelClosed` and waiting senders are woken with it;
+receivers get what is left in the buffer, then `receive()` throws `ChannelClosed` and `foreach` ends.
+Errors are not sent through a channel: a failing producer fails its group, which cancels the consumers.
+
+Do not wait for several channels with `race()`: if two `receive()` calls get a value in the same tick, `race()` keeps one
+and the other is lost. Merge sources by sending into one channel instead.
+
 ### Context of a request: `ScopedValue`
 
 A value that reaches every task of a request without being passed as an argument: a trace id, a logger context, a tenant.
@@ -490,7 +548,7 @@ even if the cancellation has already happened, so it cannot wake a fiber that ha
 
 ### Your own primitives: `suspend()`
 
-Every wait in the library goes through a single function. Build channels, locks and I/O on it and they are cancellable for free:
+Every wait in the library goes through a single function. Build queues, locks and I/O on it and they are cancellable for free:
 
 ```php
 use Revolt\EventLoop;
@@ -585,6 +643,7 @@ all([user, orders])              orders fails after 50 ms
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
+| `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): bool`, `receive(): T`, `close()`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(float $seconds)` | cancellable sleep |
@@ -594,7 +653,7 @@ all([user, orders])              orders fails after 50 ms
 | `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
 | `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
-| `Cancelled extends \Error`, `TimedOut`, `TaskCancelled` | exceptions |
+| `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
 
 ## Limitations
 
@@ -614,8 +673,7 @@ all([user, orders])              orders fails after 50 ms
 
 Ideas that are not implemented yet.
 
-- **Synchronisation primitives** built on `suspend()`: `Semaphore`, `Mutex`, `Channel` or a queue.
-  `each()` hand-rolls a semaphore today and should use the real one.
+- **`select` over several channels**: an atomic choice of the first channel that has a value.
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
 
 ## Prior art

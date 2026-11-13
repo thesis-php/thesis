@@ -39,6 +39,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
   error to the list of the others. The rethrown error is never changed (no wrapper, no `previous`); the same object
   is recorded at most once and never under itself. When a join gives up on a deadlock, the group's failure
   is recorded under Revolt's error, unless it is the same deadlock from an earlier round.
+- `Channel` hands values over like `LocalSemaphore` hands permits: a value goes to a waiting receiver, or is taken
+  from a waiting sender, only if that waiter's `resume()` returns `true`; otherwise it goes to the next one or to the buffer.
+  So a `send()` that throws `Cancelled` has not delivered, and a `receive()` that throws `Cancelled` has not taken anything.
+  Waiting receivers imply an empty buffer; waiting senders imply a full one (or a rendezvous).
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
   unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
