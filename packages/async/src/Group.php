@@ -13,7 +13,8 @@ namespace Thesis\Async;
 interface Group
 {
     /**
-     * Starts a task the group waits for. Its failure cancels the body and every task and is rethrown from {@see group()}.
+     * Starts a task the group waits for. It begins to run at the body's next wait, not inside spawn().
+     * Its failure cancels the body and every task and is rethrown from {@see group()}.
      *
      * @template T
      * @param callable(): T $fn
@@ -34,9 +35,11 @@ interface Group
     public function daemon(callable $fn): Task;
 
     /**
-     * Cancels every task of the group, including the ones started later. The body is not cancelled:
-     * it is the owner of the group, and {@see group()} returns its result.
-     * Work that has to be stoppable this way belongs in a task, not in the body.
+     * Cancels every task and daemon of the group, but not the body: the body is the owner of the group,
+     * and {@see group()} returns its result. Work that has to be stoppable this way belongs in a task.
+     *
+     * It is sticky: a task started afterwards never runs, its handle is done as soon as it would have started,
+     * and {@see Task::await()} throws {@see TaskCancelled}.
      */
-    public function cancel(): void;
+    public function cancelTasks(): void;
 }

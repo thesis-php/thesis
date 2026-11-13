@@ -29,6 +29,7 @@ interface Continuation
 
     /**
      * @return bool whether this call won, false if the continuation has already fired
+     * @throws \ValueError if $error is {@see Cancelled}: it would be thrown in a scope that is not cancelled
      */
     public function throw(\Throwable $error): bool;
 }

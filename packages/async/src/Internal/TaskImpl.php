@@ -42,7 +42,7 @@ final class TaskImpl implements Task
             return $this->result->await();
         } catch (TaskCancelled $cancelled) {
             // TaskCancelled is for an awaiter that is fine itself; a cancelled one gets Cancelled.
-            Scope::current()->checkpoint();
+            Scope::current()->throwIfCancelled();
 
             throw $cancelled;
         }

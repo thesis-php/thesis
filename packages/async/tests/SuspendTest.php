@@ -256,4 +256,42 @@ final class SuspendTest
 
         assertNoCallbacksLeft();
     }
+
+    public function throwOfCancelledIsRejected(): void
+    {
+        $cancelled = thrown(static fn() => timeout(0.001, static fn() => delay(1)))->getPrevious();
+        Assert::instanceOf($cancelled, Cancelled::class);
+        $rejection = null;
+
+        $value = suspend(static function (Continuation $continuation) use ($cancelled, &$rejection) {
+            $rejection = thrown(static fn() => $continuation->throw($cancelled));
+            $continuation->resume('still pending');
+        });
+
+        Assert::instanceOf($rejection, \ValueError::class);
+        Assert::same(
+            $rejection->getMessage(),
+            'A continuation cannot be thrown Cancelled: the waiting scope is not cancelled. Throw a regular exception.',
+        );
+        Assert::same($value, 'still pending');
+    }
+
+    public function cancellationDuringRegisterInterruptsWait(): void
+    {
+        $registered = false;
+
+        $awaited = group(static function (Group $group) use (&$registered) {
+            $task = $group->spawn(static function () use ($group, &$registered) {
+                suspend(static function (Continuation $continuation) use ($group, &$registered) {
+                    $registered = true;
+                    $group->cancelTasks(); // the scope of this very wait
+                });
+            });
+
+            return thrown(static fn() => $task->await());
+        });
+
+        Assert::true($registered);
+        Assert::instanceOf($awaited, TaskCancelled::class);
+    }
 }

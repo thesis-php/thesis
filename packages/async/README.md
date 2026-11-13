@@ -75,6 +75,22 @@ $report = new Report($sales, $costs);
 
 `all()`, `race()`, `map()` and `each()` cover most cases without a task handle. All of them are built on `group()`.
 
+`all()` keeps the keys but not a type per key: its signature is `array<K, callable(): T>` → `array<K, T>`,
+so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. When the results have different types,
+spawn the tasks in a `group()` and await their handles: a `Task<T>` is typed precisely.
+
+```php
+use Thesis\Async\Group;
+use function Thesis\Async\group;
+
+$report = group(static function (Group $group) {
+    $sales = $group->spawn(loadSales(...)); // Task<Sales>
+    $costs = $group->spawn(loadCosts(...)); // Task<Costs>
+
+    return new Report($sales->await(), $costs->await());
+});
+```
+
 ### Tasks: `group()`
 
 When tasks are started dynamically or a background task is needed, use a group directly.
@@ -84,6 +100,9 @@ There is no way to leak a running fiber.
 The group is passed explicitly on purpose. Only a function that takes a `Group` can leave work running after it returns,
 and its signature says so.
 
+`spawn()` does not run the task inside the call: tasks are started through the event loop's microtask queue,
+so they begin at the body's next wait (or when the body returns and the group joins).
+
 Start early, decide later. The body works concurrently with its tasks and may cancel the ones it no longer needs:
 
 ```php
@@ -91,7 +110,7 @@ use Thesis\Async\Group;
 use function Thesis\Async\group;
 
 $page = group(static function (Group $group) use ($userId) {
-    $avatar = $group->spawn(static fn() => fetchAvatar($userId)); // starts right away
+    $avatar = $group->spawn(static fn() => fetchAvatar($userId)); // starts at the body's next wait
     $profile = loadProfile($userId);                            // meanwhile, in the body
 
     if (!$profile->showsAvatar) {
@@ -131,14 +150,22 @@ group(static function (Group $group) use ($message) {
 }); // the daemon is cancelled and joined here
 ```
 
-`Group::cancel()` cancels every task, including the ones started later, but not the body: the body owns the group,
+`Group::cancelTasks()` cancels every task and daemon, but not the body: the body owns the group,
 and `group()` returns its result. Work that has to be stoppable this way belongs in a task.
+It is sticky: a task spawned afterwards never runs, its handle is done as soon as it would have started,
+and awaiting it throws `TaskCancelled`.
 
 Awaiting a cancelled task throws `TaskCancelled`, a regular exception: the awaiting code is not cancelled,
-it has just lost a dependency.
+it has just lost a dependency. Awaiting a task that is already done returns its result without suspending:
+it is not a cancellation point then and does not yield to the event loop.
 
 If an outer cancellation cuts a task short, `group()` throws `Cancelled` even if the body never awaited that task:
 a group never pretends that its work is done.
+
+Called from `{main}`, `group()` runs the event loop itself while it joins, and Revolt may throw out of it.
+If a foreign event loop callback throws, that is a failure of the group: the tasks are cancelled and joined,
+and the `UncaughtThrowable` is rethrown (unless an earlier failure takes precedence). If the loop runs dry
+while tasks are waiting, it is a deadlock: the tasks are cancelled, and once they have unwound, Revolt's error is rethrown.
 
 ### Deadlines: `timeout()`
 
@@ -168,15 +195,17 @@ use function Thesis\Async\delay;
 use function Thesis\Async\race;
 
 // Hedged request: ask the replica only if the primary is slow.
-$value = race(
+$value = race([
     static fn() => read('primary', $key),
     static function () use ($key) {
         delay(0.05);
 
         return read('replica', $key);
     },
-);
+]);
 ```
+
+`race([])` throws `\ValueError`: there would be neither a winner nor a failure to report.
 
 ### Bounded concurrency: `each()` and `map()`
 
@@ -190,6 +219,7 @@ $pages = map($urls, static fn(string $url) => fetch($url), concurrency: 20); // 
 ```
 
 The items are iterated in the calling fiber, so the iterable may itself wait, for example, for the next page of an API.
+The next item is pulled only once a slot is free for it, and none is pulled after a failure.
 
 ### Cleanup: `shield()`
 
@@ -246,6 +276,9 @@ return timeout(5, $response->await(...));
 `complete()` and `fail()` return `false` if the deferred is already done. A deferred cannot fail with `Cancelled`:
 its awaiters are not cancelled, so fail it with a regular exception.
 
+Awaiting a deferred that is already done returns at once, without suspending: it is not a cancellation point then
+and does not yield to the event loop.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build channels, locks and I/O on it and they are cancellable for free:
@@ -271,6 +304,8 @@ function readable(mixed $stream): void
 ```
 
 `Continuation::resume()` returns `false` if the continuation has already fired. A channel uses it to keep a value that was not delivered.
+`Continuation::throw()` rejects `Cancelled` with `\ValueError`, for the same reason as `Deferred::fail()`:
+the waiting scope is not cancelled.
 
 ## How it works
 
@@ -281,8 +316,10 @@ Five small ideas, each built on the previous one.
    whoever is first wins, the other is a no-op.
 2. **Scope** is a node of the cancellation tree: a `cancelled` flag, a parent, children.
    The current scope lives in fiber-local storage, which is why it is never passed as an argument.
-   Cancelling a node cancels the whole subtree. Only owners cancel scopes: a group, a task handle, a timeout timer.
-   There is no public scope object at all.
+   Cancelling a node cancels the whole subtree: the walk marks every node below (a shield stops it)
+   and interrupts the waits subscribed to them, and a node created later inherits the mark from its parent,
+   so checking for cancellation is a flag read at any depth.
+   Only owners cancel scopes: a group, a task handle, a timeout timer. There is no public scope object at all.
 3. **`suspend()`** is the only place where a fiber goes to sleep.
    It checks for cancellation, subscribes the continuation to the scope and parks.
    Cancellation is therefore implemented exactly once.
@@ -310,7 +347,8 @@ all([user, orders])              orders fails after 50 ms
 
 ## Guarantees
 
-- **No orphans.** `group()` returns only after every task it started has finished.
+- **No orphans.** `group()` returns or throws only after every task it started has finished. The one exception
+  is a deadlock in `{main}` that cancellation cannot break (see Limitations).
 - **Cancellation cannot be swallowed.** It is level-triggered: while a scope is cancelled, every wait in it throws `Cancelled` again.
 - **Retry loops are safe.** `Cancelled` extends `\Error`, so `catch (\Exception)` does not see it.
 - **No lost values.** If an event and a cancellation happen together, the event wins and the value is returned; `Cancelled` is thrown at the next wait.
@@ -326,10 +364,10 @@ all([user, orders])              orders fails after 50 ms
 | `group(callable(Group): T): T` | run a body with a nursery, join all tasks |
 | `Group::spawn(callable(): T): Task<T>` | start a task the group waits for |
 | `Group::daemon(callable(): T): Task<T>` | start a task cancelled when the rest is done |
-| `Group::cancel()` | cancel all tasks, but not the body |
+| `Group::cancelTasks()` | cancel all tasks and daemons, including later ones, but not the body |
 | `Task::await(): T`, `Task::cancel()`, `Task::$isDone` | task handle |
 | `all(array<K, callable(): T>): array<K, T>` | all results or the first failure |
-| `race(callable(): T ...): T` | first success wins, the rest are cancelled and joined |
+| `race(non-empty-array<callable(): T>): T` | first success wins, the rest are cancelled and joined |
 | `each(iterable<K, T>, callable(T, K), int $concurrency)` | bounded concurrency |
 | `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
@@ -345,7 +383,24 @@ all([user, orders])              orders fails after 50 ms
 - If several tasks of a group fail, only the first failure is reported.
 - `each()` and `map()` start a fiber per item, not per worker.
 - Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope: it behaves as if shielded until it returns.
-- A wait costs about three times more than a bare Revolt suspension (≈3.3 µs vs ≈1 µs in a micro-benchmark).
+- Callbacks registered directly with `EventLoop::queue()`, `defer()` or `delay()` from inside a task, and fibers created by hand,
+  run in the root scope: the group neither cancels nor joins them.
+- In `{main}`, if the event loop runs dry while a task waits under a shield for something that never comes,
+  cancelling cannot help: `group()` gives up joining and rethrows Revolt's "Event loop terminated" error,
+  which lists the stuck fibers. Those tasks are orphaned; the alternative is to hang forever.
+- A wait costs about 1.7 times a bare Revolt suspension in a micro-benchmark (≈2.0 µs vs ≈1.2 µs, PHP 8.6-dev without opcache),
+  independent of how deep the scope is nested.
+
+## TODO
+
+Ideas that are not implemented yet.
+
+- **amphp interop.** Code that waits through `Suspension` directly, which is the whole amphp ecosystem, behaves as shielded.
+  A bridge needs only a subscription to the cancellation of the current scope, to drive an `Amp\Cancellation`.
+  It does not need a way to cancel a scope, so it does not break the "only owners cancel" rule. Probably a separate package.
+- **Synchronisation primitives** built on `suspend()`: `Semaphore`, `Mutex`, `Channel` or a queue.
+  `each()` hand-rolls a semaphore today and should use the real one.
+- **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
 
 ## Prior art
 

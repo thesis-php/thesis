@@ -29,19 +29,18 @@ use Thesis\Async\Internal\Scope;
 function suspend(callable $register): mixed
 {
     $scope = Scope::current();
-    $scope->checkpoint();
+    $scope->throwIfCancelled();
 
     /** @var ContinuationImpl<T> */
     $continuation = new ContinuationImpl();
     $unregister = $register($continuation);
-    $unsubscribe = $scope->onCancel(static function () use ($continuation) {
-        $continuation->interrupt();
-    });
+    // After $register: if it has cancelled the scope (say, through a task handle), the wait is interrupted right away.
+    $scope->subscribe($continuation);
 
     try {
         return $continuation->park();
     } finally {
-        $unsubscribe();
+        $scope->unsubscribe($continuation);
 
         // Anything else means there is nothing to undo: $register returned nothing,
         // or it is an arrow function that returned the bool of Continuation::resume().
@@ -97,6 +96,9 @@ function delay(float $seconds): void
 
 /**
  * Runs $body and does not return until every task started in the group is finished.
+ *
+ * Tasks are started through the event loop's microtask queue: they begin to run at the body's next wait
+ * (or when the body returns), not inside {@see Group::spawn()}.
  *
  * The first failure (of the body or of a task) cancels everything else and is rethrown after all tasks are joined.
  *
@@ -167,6 +169,10 @@ function shield(callable $body): mixed
 /**
  * All results in the order of $fns, or the first failure (the rest are cancelled and joined).
  *
+ * The result has the keys of $fns, but one value type for all of them: `['user' => ..., 'orders' => ...]`
+ * gives `array<'user'|'orders', User|list<Order>>`. For results of different types, spawn tasks in a {@see group()}
+ * and await their handles, which are typed precisely.
+ *
  * @api
  * @template K of array-key
  * @template T
@@ -198,18 +204,23 @@ function all(array $fns): array
  *
  * @api
  * @template T
- * @param callable(): T $fn
- * @param callable(): T ...$fns
+ * @param non-empty-array<callable(): T> $fns
  * @return T
+ * @throws \ValueError if $fns is empty: there would be no winner and no failure to report
  */
-function race(callable $fn, callable ...$fns): mixed
+function race(array $fns): mixed
 {
+    /** @phpstan-ignore identical.alwaysFalse */
+    if ($fns === []) {
+        throw new \ValueError('A race needs at least one contender.');
+    }
+
     /** @var list<T> $winner */
     $winner = [];
     $failure = null;
 
-    group(static function (Group $group) use ($fn, $fns, &$winner, &$failure) {
-        foreach ([$fn, ...$fns] as $contender) {
+    group(static function (Group $group) use ($fns, &$winner, &$failure) {
+        foreach ($fns as $contender) {
             $group->spawn(static function () use ($contender, $group, &$winner, &$failure) {
                 try {
                     $value = $contender();
@@ -223,7 +234,7 @@ function race(callable $fn, callable ...$fns): mixed
 
                 if ($winner === []) {
                     $winner = [$value];
-                    $group->cancel();
+                    $group->cancelTasks();
                 }
             });
         }
@@ -241,6 +252,7 @@ function race(callable $fn, callable ...$fns): mixed
  * Bounded concurrency: calls $fn for every item, at most $concurrency at a time.
  *
  * $items is iterated in the calling fiber, so a generator may suspend (for example, to fetch the next page).
+ * The next item is pulled only once a slot is free for it, and never after a failure.
  * The first failure cancels the rest and is rethrown.
  *
  * @api
@@ -259,11 +271,24 @@ function each(iterable $items, callable $fn, int $concurrency): void
     }
 
     group(static function (Group $group) use ($items, $fn, $concurrency) {
+        $body = Scope::current();
         $running = 0;
         /** @var ?Continuation<null> */
         $slotWaiter = null;
 
         foreach ($items as $key => $item) {
+            ++$running;
+            $group->spawn(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
+                try {
+                    $fn($item, $key);
+                } finally {
+                    --$running;
+                    $slotWaiter?->resume();
+                }
+            });
+
+            // The slot is waited for here, before foreach advances $items: an item is not pulled
+            // until it can start (the iterable may be a queue, a cursor or a paginated API).
             while ($running >= $concurrency) {
                 suspend(static function (Continuation $continuation) use (&$slotWaiter) {
                     /** @var Continuation<null> $continuation */
@@ -275,15 +300,9 @@ function each(iterable $items, callable $fn, int $concurrency): void
                 });
             }
 
-            ++$running;
-            $group->spawn(static function () use ($fn, $item, $key, &$running, &$slotWaiter) {
-                try {
-                    $fn($item, $key);
-                } finally {
-                    --$running;
-                    $slotWaiter?->resume();
-                }
-            });
+            // A failing task frees its slot before it fails the group, and an event wins over cancellation,
+            // so the wait above returns normally even though the body is cancelled by now. Nothing more is pulled then.
+            $body->throwIfCancelled();
         }
     });
 }

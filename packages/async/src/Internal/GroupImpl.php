@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 use Revolt\EventLoop;
+use Revolt\EventLoop\UncaughtThrowable;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Group;
 use Thesis\Async\Task;
@@ -14,7 +15,7 @@ use Thesis\Async\TaskCancelled;
  * Scope tree of a group:
  *
  *     body       — failure cancels it, and everything below
- *     └─ tasks   — Group::cancel() cancels it: every task, but not the body
+ *     └─ tasks   — Group::cancelTasks() cancels it: every task, but not the body
  *        ├─ task, task, ...
  *        └─ daemons — cancelled by join() once the regular tasks are done
  *           └─ daemon, daemon, ...
@@ -68,9 +69,12 @@ final class GroupImpl implements Group
             $group->fail($error);
         }
 
-        $group->join();
-        // The tasks and daemons scopes are only reachable through the body scope: they go away with it.
-        $bodyScope->close();
+        try {
+            $group->join();
+        } finally {
+            // The tasks and daemons scopes are only reachable through the body scope: they go away with it.
+            $bodyScope->close();
+        }
 
         if ($group->error !== null) {
             throw $group->error;
@@ -94,7 +98,7 @@ final class GroupImpl implements Group
         return $this->start($this->daemonsScope, $fn);
     }
 
-    public function cancel(): void
+    public function cancelTasks(): void
     {
         $this->tasksScope->cancel();
     }
@@ -110,18 +114,43 @@ final class GroupImpl implements Group
      * Outer cancellation reaches the children through the scope tree, and the parent still waits for them.
      *
      * Tasks may start new tasks while the group is joining; they are waited for too.
+     *
+     * In {main}, the wait runs the event loop, and Revolt throws out of it in two cases. A foreign callback
+     * has thrown ({@see UncaughtThrowable}): that is a failure, the tasks are cancelled and still joined.
+     * Or the loop has run dry while the tasks are waiting: a deadlock. Failing the group cancels the tasks, and
+     * a cancellable wait unwinds. But if the loop runs dry while the group is already cancelled (on the second
+     * round at the latest), no cancellation can help any more: a task waits under a shield for something
+     * that never comes. Then the join gives up and rethrows Revolt's error, which lists the stuck fibers.
+     * The stuck tasks are orphaned, but the alternative is to hang forever. The body scope is closed anyway,
+     * and so is the group: a stuck task that wakes up later cannot start new ones.
+     *
+     * @throws \Error if the event loop has run dry in {main} and cancelling the tasks has not helped
      */
     private function join(): void
     {
-        while ($this->tasks > 0 || $this->daemons > 0) {
-            if ($this->tasks === 0) {
-                $this->daemonsScope->cancel();
+        try {
+            while ($this->tasks > 0 || $this->daemons > 0) {
+                if ($this->tasks === 0) {
+                    $this->daemonsScope->cancel();
+                }
+
+                try {
+                    ($this->joiner = new ContinuationImpl())->park();
+                } catch (\Throwable $error) {
+                    // Its {main} suspension has been abandoned by Revolt: the next round parks a fresh continuation,
+                    // and a task finishing after a give-up has nothing to resume.
+                    $this->joiner = null;
+
+                    if (!$error instanceof UncaughtThrowable && $this->body->isCancelled()) {
+                        throw $error;
+                    }
+
+                    $this->fail($error);
+                }
             }
-
-            ($this->joiner = new ContinuationImpl())->park();
+        } finally {
+            $this->closed = true;
         }
-
-        $this->closed = true;
     }
 
     /**
@@ -149,7 +178,7 @@ final class GroupImpl implements Group
         EventLoop::queue(function () use ($fn, $scope, $task, $daemon) {
             try {
                 // A task cancelled before it started does not run at all.
-                $scope->checkpoint();
+                $scope->throwIfCancelled();
                 $task->complete($scope->run($fn));
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {

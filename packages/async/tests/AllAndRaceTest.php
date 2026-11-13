@@ -88,7 +88,7 @@ final class AllAndRaceTest
 
     public function raceReturnsFirstSuccess(): void
     {
-        $winner = race(
+        $winner = race([
             static function () {
                 delay(0.02);
 
@@ -99,26 +99,26 @@ final class AllAndRaceTest
 
                 return 'fast';
             },
-        );
+        ]);
 
         Assert::same($winner, 'fast');
     }
 
     public function raceWithSingleContenderReturnsItsResult(): void
     {
-        Assert::same(race(static fn() => 'only'), 'only');
+        Assert::same(race([static fn() => 'only']), 'only');
     }
 
     public function raceMayBeWonByNull(): void
     {
-        $winner = race(
+        $winner = race([
             static fn() => null,
             static function () {
                 delay(1);
 
                 return 'late';
             },
-        );
+        ]);
 
         Assert::null($winner);
     }
@@ -127,7 +127,7 @@ final class AllAndRaceTest
     {
         $loserCleanedUp = false;
 
-        race(
+        race([
             static function () {
                 delay(0.001);
 
@@ -141,7 +141,7 @@ final class AllAndRaceTest
                     $loserCleanedUp = true;
                 }
             },
-        );
+        ]);
 
         Assert::true($loserCleanedUp);
     }
@@ -150,19 +150,19 @@ final class AllAndRaceTest
     {
         $started = false;
 
-        race(
+        race([
             static fn() => 'cached',
             static function () use (&$started) {
                 $started = true;
             },
-        );
+        ]);
 
         Assert::false($started);
     }
 
     public function raceIgnoresFailureWhileAnotherCanWin(): void
     {
-        $winner = race(
+        $winner = race([
             static function () {
                 throw new \RuntimeException('primary is down');
             },
@@ -171,14 +171,14 @@ final class AllAndRaceTest
 
                 return 'replica';
             },
-        );
+        ]);
 
         Assert::same($winner, 'replica');
     }
 
     public function raceIgnoresLoserFailingOnCancellation(): void
     {
-        $winner = race(
+        $winner = race([
             static function () {
                 delay(0.001);
 
@@ -191,14 +191,14 @@ final class AllAndRaceTest
                     throw new \RuntimeException('connection reset');
                 }
             },
-        );
+        ]);
 
         Assert::same($winner, 'winner');
     }
 
     public function raceIgnoresLoserFinishingAfterWinner(): void
     {
-        $winner = race(
+        $winner = race([
             static function () {
                 delay(0.001);
 
@@ -209,7 +209,7 @@ final class AllAndRaceTest
 
                 return 'second';
             },
-        );
+        ]);
 
         Assert::same($winner, 'first');
     }
@@ -218,7 +218,7 @@ final class AllAndRaceTest
     {
         Expect::exception(\RuntimeException::class)->withMessage('first');
 
-        race(
+        race([
             static function () {
                 delay(0.001);
 
@@ -229,13 +229,35 @@ final class AllAndRaceTest
 
                 throw new \LogicException('second');
             },
-        );
+        ]);
     }
 
     public function raceIsCancellable(): void
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => race(static fn() => delay(1), static fn() => delay(1)));
+        timeout(0.001, static fn() => race([static fn() => delay(1), static fn() => delay(1)]));
+    }
+
+    public function raceAcceptsAnyKeys(): void
+    {
+        $winner = race([
+            'primary' => static function () {
+                delay(1);
+
+                return 'primary';
+            },
+            'replica' => static fn() => 'replica',
+        ]);
+
+        Assert::same($winner, 'replica');
+    }
+
+    public function raceOfNothingIsRejected(): void
+    {
+        Expect::exception(\ValueError::class)->withMessage('A race needs at least one contender.');
+
+        /** @phpstan-ignore argument.type, argument.templateType */
+        race([]);
     }
 }

@@ -54,7 +54,8 @@ final class Deferred
     }
 
     /**
-     * Returns immediately if the deferred is already done.
+     * Does not suspend if the deferred is already done: its value is returned even in a cancelled scope,
+     * so it is not a cancellation point then, and it does not yield to the event loop.
      *
      * @return T
      * @throws Cancelled if the awaiting scope is cancelled

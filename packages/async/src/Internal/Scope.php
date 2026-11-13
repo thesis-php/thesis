@@ -9,9 +9,14 @@ use Thesis\Async\Cancelled;
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
  *
- * Only owners cancel a scope: a group (on failure or {@see GroupImpl::cancel()}), a task handle and a timeout timer.
+ * Only owners cancel a scope: a group (on failure or {@see GroupImpl::cancelTasks()}), a task handle and a timeout timer.
  * That is why a caught {@see Cancelled} needs no payload: the owner tells its own cancellation
  * from a foreign one by the state of the tree.
+ *
+ * Cancellation is propagated eagerly. {@see cancel()} walks the subtree below the scope (a shield stops it)
+ * once, marks every visited scope as cancelled and interrupts the waits subscribed to it;
+ * a scope created later inherits the mark from its parent. So {@see isCancelled()}, which runs twice
+ * in every wait, is a flag read instead of a walk up the tree.
  *
  * @internal
  */
@@ -35,10 +40,14 @@ final class Scope
 
     private static ?self $root = null;
 
+    /**
+     * This scope or a visible ancestor is cancelled: set by {@see notify()} and inherited on creation.
+     * One flag is enough, because it never goes back: whoever cancelled the scope, its subtree has been notified.
+     */
     private bool $cancelled = false;
 
-    /** @var array<int, \Closure(): void> */
-    private array $listeners = [];
+    /** @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id() */
+    private array $waits = [];
 
     /** @var array<int, self> held strongly to deliver cancellation; released by {@see close()} */
     private array $children = [];
@@ -49,6 +58,8 @@ final class Scope
     ) {
         if ($parent !== null) {
             $parent->children[spl_object_id($this)] = $this;
+            // The parent's subtree has been notified before this scope existed.
+            $this->cancelled = !$shield && $parent->cancelled;
         }
     }
 
@@ -102,55 +113,55 @@ final class Scope
      */
     public function isCancelled(): bool
     {
-        for ($scope = $this; $scope !== null; $scope = $scope->shield ? null : $scope->parent) {
-            if ($scope->cancelled) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->cancelled;
     }
 
     /**
+     * Only checks the flag. Unlike `Thesis\Async\checkpoint()`, it does not yield to the event loop.
+     *
      * @throws Cancelled
      */
-    public function checkpoint(): void
+    public function throwIfCancelled(): void
     {
-        if ($this->isCancelled()) {
+        if ($this->cancelled) {
             throw new Cancelled();
         }
     }
 
+    /**
+     * A no-op if the scope is already cancelled, by its owner or through an ancestor: its subtree is notified then.
+     */
     public function cancel(): void
     {
         if (!$this->cancelled) {
-            $this->cancelled = true;
             $this->notify();
         }
     }
 
     /**
-     * The listener is called at most once, synchronously inside {@see cancel()},
-     * or immediately if the scope is already cancelled. It must not throw.
+     * Interrupts the wait on cancellation, synchronously inside {@see cancel()},
+     * or right away if the scope is already cancelled.
      *
-     * @param \Closure(): void $listener
-     * @return \Closure(): void unsubscribe
+     * The continuation itself is subscribed, not a closure around it: a wait allocates nothing for it.
+     *
+     * @param ContinuationImpl<*> $wait
      */
-    public function onCancel(\Closure $listener): \Closure
+    public function subscribe(ContinuationImpl $wait): void
     {
-        if ($this->isCancelled()) {
-            $listener();
-
-            return static function () {};
+        if ($this->cancelled) {
+            $wait->interrupt();
+        } else {
+            // A subscribed continuation is alive, so its object id is unique among the subscribed ones.
+            $this->waits[spl_object_id($wait)] = $wait;
         }
+    }
 
-        // A registered listener is alive, so its object id is unique among the registered ones.
-        $id = spl_object_id($listener);
-        $this->listeners[$id] = $listener;
-
-        return function () use ($id) {
-            unset($this->listeners[$id]);
-        };
+    /**
+     * @param ContinuationImpl<*> $wait
+     */
+    public function unsubscribe(ContinuationImpl $wait): void
+    {
+        unset($this->waits[spl_object_id($wait)]);
     }
 
     /**
@@ -165,15 +176,17 @@ final class Scope
 
     private function notify(): void
     {
-        $listeners = $this->listeners;
-        $this->listeners = [];
+        $this->cancelled = true;
+        $waits = $this->waits;
+        $this->waits = [];
 
-        foreach ($listeners as $listener) {
-            $listener();
+        foreach ($waits as $wait) {
+            $wait->interrupt();
         }
 
         foreach ($this->children as $child) {
-            // A cancelled child has already notified its subtree, and nobody can subscribe to it since.
+            // A cancelled child has already been visited, together with its subtree, and everything
+            // created below it since has inherited the flag; a subscription to it is interrupted right away.
             if (!$child->shield && !$child->cancelled) {
                 $child->notify();
             }

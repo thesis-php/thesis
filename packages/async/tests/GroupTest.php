@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Revolt\EventLoop;
+use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
@@ -152,7 +154,7 @@ final class GroupTest
         });
     }
 
-    public function cancelCancelsTasksButNotBody(): void
+    public function cancelTasksCancelsTasksButNotBody(): void
     {
         $events = [];
 
@@ -168,7 +170,7 @@ final class GroupTest
             });
             delay(0.001);
 
-            $group->cancel();
+            $group->cancelTasks();
             delay(0.001);
 
             return 'body result';
@@ -178,18 +180,26 @@ final class GroupTest
         Assert::same($events, ['task cancelled']);
     }
 
-    public function cancelCancelsTasksStartedLater(): void
+    public function cancelTasksCancelsTasksStartedLater(): void
     {
         $started = false;
 
-        group(static function (Group $group) use (&$started) {
-            $group->cancel();
-            $group->spawn(static function () use (&$started) {
+        $result = group(static function (Group $group) use (&$started) {
+            $group->cancelTasks();
+            $task = $group->spawn(static function () use (&$started) {
                 $started = true;
             });
+            delay(0); // the task would have started here
+
+            Assert::true($task->isDone);
+            $awaited = thrown(static fn() => $task->await());
+            Assert::instanceOf($awaited, TaskCancelled::class);
+
+            return 'body result';
         });
 
         Assert::false($started);
+        Assert::same($result, 'body result');
     }
 
     public function cancelledTaskDoesNotFailGroup(): void
@@ -316,7 +326,7 @@ final class GroupTest
         });
     }
 
-    public function cancelCancelsDaemons(): void
+    public function cancelTasksCancelsDaemons(): void
     {
         $events = [];
 
@@ -331,7 +341,7 @@ final class GroupTest
                 }
             });
             delay(0.001);
-            $group->cancel();
+            $group->cancelTasks();
             delay(0.001);
             $events[] = 'body done';
         });
@@ -497,6 +507,116 @@ final class GroupTest
             'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
         );
         Assert::same($exception->getPrevious(), $foreign);
+    }
+
+    public function foreignCallbackFailureInMainCancelsAndJoinsTasks(): void
+    {
+        $events = [];
+
+        $exception = thrown(static function () use (&$events) {
+            group(static function (Group $group) use (&$events) {
+                $group->spawn(static function () use (&$events) {
+                    try {
+                        delay(1);
+                    } catch (Cancelled $cancelled) {
+                        $events[] = 'task cancelled';
+
+                        throw $cancelled;
+                    } finally {
+                        shield(static fn() => delay(0.001));
+                        $events[] = 'task cleaned up';
+                    }
+                });
+                // In {main}, the join runs the event loop, so this throws out of the join.
+                EventLoop::defer(static function () {
+                    throw new \RuntimeException('foreign');
+                });
+            });
+        });
+
+        Assert::instanceOf($exception, UncaughtThrowable::class);
+        $foreign = $exception->getPrevious();
+        Assert::instanceOf($foreign, \RuntimeException::class);
+        Assert::same($foreign->getMessage(), 'foreign');
+        Assert::same($events, ['task cancelled', 'task cleaned up']);
+        assertNoCallbacksLeft();
+    }
+
+    public function foreignCallbackFailureInMainDuringFailingJoinKeepsJoining(): void
+    {
+        $events = [];
+
+        $exception = thrown(static function () use (&$events) {
+            group(static function (Group $group) use (&$events) {
+                $group->spawn(static function () use (&$events) {
+                    try {
+                        delay(1);
+                    } finally {
+                        EventLoop::defer(static function () {
+                            throw new \RuntimeException('foreign');
+                        });
+                        shield(static fn() => delay(0.001));
+                        $events[] = 'task cleaned up';
+                    }
+                });
+                delay(0);
+
+                throw new \LogicException('body failed');
+            });
+        });
+
+        Assert::instanceOf($exception, \LogicException::class);
+        Assert::same($exception->getMessage(), 'body failed');
+        Assert::same($events, ['task cleaned up']);
+    }
+
+    public function deadlockInMainCancelsTasksAndIsRethrown(): void
+    {
+        $events = [];
+
+        $exception = thrown(static function () use (&$events) {
+            group(static function (Group $group) use (&$events) {
+                $group->spawn(static function () use (&$events) {
+                    try {
+                        new Deferred()->await(); // never completed: the event loop runs dry
+                    } catch (Cancelled $cancelled) {
+                        $events[] = 'task cancelled';
+
+                        throw $cancelled;
+                    }
+                });
+            });
+        });
+
+        Assert::instanceOf($exception, \Error::class);
+        Assert::string($exception->getMessage())->startsWith('Event loop terminated without resuming the current suspension');
+        Assert::same($events, ['task cancelled']);
+    }
+
+    public function deadlockInMainUnderShieldIsRethrownInsteadOfHanging(): void
+    {
+        /** @var Deferred<null> */
+        $never = new Deferred();
+        $escaped = null;
+        $root = Scope::current();
+
+        $exception = thrown(static function () use ($never, &$escaped) {
+            group(static function (Group $group) use ($never, &$escaped) {
+                $escaped = $group;
+                $group->spawn(static fn() => shield($never->await(...)));
+            });
+        });
+
+        Assert::instanceOf($exception, \Error::class);
+        Assert::string($exception->getMessage())->startsWith('Event loop terminated without resuming the current suspension');
+        Assert::same((fn(): array => $this->children)->call($root), []);
+        /** @var Group $escaped */
+        Assert::instanceOf(thrown(static fn() => $escaped->spawn(static fn() => null)), \LogicException::class);
+
+        // let the orphaned task finish
+        $never->complete();
+        delay(0);
+        assertNoCallbacksLeft();
     }
 
     public function worksInsideFiber(): void
