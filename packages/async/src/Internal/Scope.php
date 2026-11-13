@@ -52,11 +52,8 @@ final class Scope
 
     public static function current(): self
     {
-        // Hot path, runs in every suspend(): keep it a single FiberLocal lookup.
-        /** @var ?self $current phpstan does not read the type of a constant */
-        $current = CURRENT_SCOPE->get();
-
-        return $current ?? ROOT_SCOPE;
+        /** @var self */
+        return CURRENT_SCOPE->get() ?? ROOT_SCOPE;
     }
 
     /**
