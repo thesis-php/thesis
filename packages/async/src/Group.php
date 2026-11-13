@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Thesis\Async\Internal\Context;
 
 /**
  * Nursery: the only way to start a concurrent task. Obtained from {@see group()}.
@@ -25,12 +26,51 @@ final class Group
     /** @var ?Waker<null> */
     private ?Waker $joiner = null;
 
-    /**
-     * @internal
-     */
-    public function __construct(
+    private function __construct(
         private readonly Scope $scope,
     ) {}
+
+    /**
+     * Implementation of {@see group()}.
+     *
+     * @internal
+     * @template T
+     * @param callable(self): T $body
+     * @return T
+     */
+    public static function run(callable $body): mixed
+    {
+        $scope = new Scope(Scope::current());
+        $group = new self($scope);
+        $result = null;
+        $outerCancellation = null;
+
+        try {
+            $result = Context::enter($scope, static fn() => $body($group));
+        } catch (Cancelled $cancelled) {
+            // Own cancellation (Group::cancel() or a failed task) is a regular way out of the body.
+            // A foreign one is rethrown, but only after join().
+            if ($cancelled->origin !== $scope) {
+                $outerCancellation = $cancelled;
+            }
+        } catch (\Throwable $error) {
+            $group->fail($error);
+        }
+
+        $error = $group->join();
+        $scope->close();
+
+        if ($error !== null) {
+            throw $error;
+        }
+
+        if ($outerCancellation !== null) {
+            throw $outerCancellation;
+        }
+
+        /** @var T */
+        return $result;
+    }
 
     /**
      * Starts a task the group waits for. Its failure cancels the whole group and is rethrown from {@see group()}.
@@ -65,10 +105,7 @@ final class Group
         $this->scope->cancel();
     }
 
-    /**
-     * @internal
-     */
-    public function fail(\Throwable $error): void
+    private function fail(\Throwable $error): void
     {
         $this->error ??= $error;
         $this->scope->cancel();
@@ -78,10 +115,9 @@ final class Group
      * Uncancellable wait for all children: this is the structured concurrency guarantee.
      * Outer cancellation reaches the children through the scope tree, and the parent still waits for them.
      *
-     * @internal
      * @return ?\Throwable the first failure
      */
-    public function join(): ?\Throwable
+    private function join(): ?\Throwable
     {
         while ($this->tasks > 0) {
             ($this->joiner = new Waker())->park();
@@ -116,9 +152,9 @@ final class Group
             ++$this->tasks;
         }
 
-        EventLoop::queue(function () use ($fn, $scope, $task, $daemon): void {
+        EventLoop::queue(function () use ($fn, $scope, $task, $daemon) {
             try {
-                $task->settle($scope->enter($fn), null);
+                $task->settle(Context::enter($scope, $fn), null);
             } catch (Cancelled $cancelled) {
                 // Cancellation is not a failure: it does not bring the group down.
                 $task->settle(null, $cancelled);

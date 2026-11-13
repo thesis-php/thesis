@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Thesis\Async\Internal\Context;
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
@@ -32,7 +33,7 @@ function suspend(callable $arm): mixed
     $disarm = $arm($waker);
     $interrupted = false;
 
-    $unsubscribe = $scope->onCancel(static function (Scope $origin) use ($waker, &$interrupted): void {
+    $unsubscribe = $scope->onCancel(static function (Scope $origin) use ($waker, &$interrupted) {
         $interrupted = $waker->throw(new Cancelled($origin));
     });
 
@@ -53,12 +54,12 @@ function suspend(callable $arm): mixed
  */
 function delay(float $seconds): void
 {
-    suspend(static function (Waker $waker) use ($seconds): \Closure {
-        $timer = EventLoop::delay($seconds, static function () use ($waker): void {
+    suspend(static function (Waker $waker) use ($seconds) {
+        $timer = EventLoop::delay($seconds, static function () use ($waker) {
             $waker->resume();
         });
 
-        return static function () use ($timer): void {
+        return static function () use ($timer) {
             EventLoop::cancel($timer);
         };
     });
@@ -76,31 +77,7 @@ function delay(float $seconds): void
  */
 function group(callable $body): mixed
 {
-    $scope = new Scope(Scope::current());
-    $group = new Group($scope);
-    $result = null;
-    $outerCancellation = null;
-
-    try {
-        $result = $scope->enter(static fn(): mixed => $body($group));
-    } catch (Cancelled $cancelled) {
-        // Own cancellation (Group::cancel() or a failed task) is a regular way out of the body.
-        // A foreign one is rethrown, but only after join().
-        if ($cancelled->origin !== $scope) {
-            $outerCancellation = $cancelled;
-        }
-    } catch (\Throwable $error) {
-        $group->fail($error);
-    }
-
-    $error = $group->join();
-    $scope->close();
-
-    throw_if($error);
-    throw_if($outerCancellation);
-
-    /** @var T */
-    return $result;
+    return Group::run($body);
 }
 
 /**
@@ -115,12 +92,12 @@ function group(callable $body): mixed
 function timeout(float $seconds, callable $body): mixed
 {
     $scope = new Scope(Scope::current());
-    $timer = EventLoop::delay($seconds, static function () use ($scope): void {
+    $timer = EventLoop::delay($seconds, static function () use ($scope) {
         $scope->cancel();
     });
 
     try {
-        return $scope->enter($body);
+        return Context::enter($scope, $body);
     } catch (Cancelled $cancelled) {
         throw $cancelled->origin === $scope ? new TimedOut($seconds) : $cancelled;
     } finally {
@@ -142,7 +119,7 @@ function shield(callable $body): mixed
     $scope = new Scope(Scope::current(), shield: true);
 
     try {
-        return $scope->enter($body);
+        return Context::enter($scope, $body);
     } finally {
         $scope->close();
     }
@@ -159,7 +136,7 @@ function shield(callable $body): mixed
  */
 function all(array $fns): array
 {
-    return group(static function (Group $group) use ($fns): array {
+    return group(static function (Group $group) use ($fns) {
         $tasks = [];
 
         foreach ($fns as $key => $fn) {
@@ -190,9 +167,9 @@ function race(callable $fn, callable ...$fns): mixed
     /** @var list<T> $winner */
     $winner = [];
 
-    group(static function (Group $group) use ($fn, $fns, &$winner): void {
+    group(static function (Group $group) use ($fn, $fns, &$winner) {
         foreach ([$fn, ...$fns] as $contender) {
-            $group->go(static function () use ($contender, $group, &$winner): void {
+            $group->go(static function () use ($contender, $group, &$winner) {
                 $value = $contender();
 
                 if ($winner === []) {
@@ -220,11 +197,11 @@ function race(callable $fn, callable ...$fns): mixed
  */
 function each(iterable $items, int $concurrency, callable $fn): void
 {
-    $iterator = (static fn(): \Generator => yield from $items)();
+    $iterator = (static fn() => yield from $items)();
 
-    group(static function (Group $group) use ($iterator, $concurrency, $fn): void {
+    group(static function (Group $group) use ($iterator, $concurrency, $fn) {
         for ($worker = 0; $worker < $concurrency; ++$worker) {
-            $group->go(static function () use ($iterator, $fn): void {
+            $group->go(static function () use ($iterator, $fn) {
                 while ($iterator->valid()) {
                     $item = $iterator->current();
                     $iterator->next();
@@ -233,14 +210,4 @@ function each(iterable $items, int $concurrency, callable $fn): void
             });
         }
     });
-}
-
-/**
- * @internal
- */
-function throw_if(?\Throwable $error): void
-{
-    if ($error !== null) {
-        throw $error;
-    }
 }

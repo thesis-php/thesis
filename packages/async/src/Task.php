@@ -12,7 +12,7 @@ namespace Thesis\Async;
  */
 final class Task
 {
-    private bool $done = false;
+    public private(set) bool $isDone = false;
 
     /** @var ?T */
     private mixed $value = null;
@@ -29,11 +29,6 @@ final class Task
         private readonly Scope $scope,
     ) {}
 
-    public function isDone(): bool
-    {
-        return $this->done;
-    }
-
     /**
      * Cancels this task only; its group and siblings keep running.
      */
@@ -49,14 +44,14 @@ final class Task
      */
     public function await(): mixed
     {
-        if (!$this->done) {
+        if (!$this->isDone) {
             suspend(
-                function (Waker $waker): \Closure {
+                function (Waker $waker) {
                     /** @var Waker<null> $waker */
                     $id = spl_object_id($waker);
                     $this->waiters[$id] = $waker;
 
-                    return function () use ($id): void {
+                    return function () use ($id) {
                         unset($this->waiters[$id]);
                     };
                 },
@@ -76,7 +71,7 @@ final class Task
      */
     public function settle(mixed $value, ?\Throwable $error): void
     {
-        $this->done = true;
+        $this->isDone = true;
         /** @var ?T $value */
         $this->value = $value;
         $this->error = $error;

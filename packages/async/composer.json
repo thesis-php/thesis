@@ -21,7 +21,7 @@
             "Thesis\\Async\\": "src/"
         },
         "files": [
-            "src/functions.php"
+            "autoload.files.php"
         ]
     },
     "autoload-dev": {

@@ -69,7 +69,7 @@ There is no way to leak a running fiber.
 use Thesis\Async\Group;
 use function Thesis\Async\group;
 
-$report = group(static function (Group $group): Report {
+$report = group(static function (Group $group) {
     $sales = $group->go(static fn() => loadSales());
     $costs = $group->go(static fn() => loadCosts());
 
@@ -80,8 +80,8 @@ $report = group(static function (Group $group): Report {
 A background task that lives exactly as long as the work it accompanies:
 
 ```php
-group(static function (Group $group) use ($message): void {
-    $group->daemon(static function () use ($message): never {
+group(static function (Group $group) use ($message) {
+    $group->daemon(static function () use ($message) {
         while (true) {
             delay(10);
             $message->touch(); // heartbeat
@@ -118,7 +118,7 @@ use function Thesis\Async\race;
 // Hedged request: ask the replica only if the primary is slow.
 $value = race(
     static fn() => read('primary', $key),
-    static function () use ($key): string {
+    static function () use ($key) {
         delay(0.05);
 
         return read('replica', $key);
@@ -162,14 +162,14 @@ use function Thesis\Async\suspend;
 
 function readable(mixed $stream): void
 {
-    suspend(static function (Waker $waker) use ($stream): \Closure {
-        $watcher = EventLoop::onReadable($stream, static function (string $watcher) use ($waker): void {
+    suspend(static function (Waker $waker) use ($stream) {
+        $watcher = EventLoop::onReadable($stream, static function (string $watcher) use ($waker) {
             EventLoop::cancel($watcher);
             $waker->resume();
         });
 
         // Called only if the wait is interrupted by cancellation.
-        return static function () use ($watcher): void {
+        return static function () use ($watcher) {
             EventLoop::cancel($watcher);
         };
     });
@@ -222,7 +222,7 @@ all([user, orders])              orders fails after 50 ms
 | `Group::go(callable(): T): Task<T>` | start a task the group waits for |
 | `Group::daemon(callable(): T): Task<T>` | start a task cancelled when the rest is done |
 | `Group::cancel()` | cancel the body and all tasks |
-| `Task::await(): T`, `Task::cancel()`, `Task::isDone()` | task handle |
+| `Task::await(): T`, `Task::cancel()`, `Task::$isDone` | task handle |
 | `all(array<K, callable(): T>): array<K, T>` | all results or the first failure |
 | `race(callable(): T ...): T` | first to finish wins, losers are cancelled and joined |
 | `each(iterable<T>, int $concurrency, callable(T))` | bounded concurrency |
@@ -230,7 +230,7 @@ all([user, orders])              orders fails after 50 ms
 | `shield(callable(): T): T` | protect from outer cancellation |
 | `delay(float $seconds)` | cancellable sleep |
 | `suspend(callable(Waker<T>): ?callable(): void): T` | the suspension point |
-| `Scope::current()`, `Scope::checkpoint()`, `Scope::cancel()`, `Scope::onCancel()` | direct access to the tree |
+| `Scope::current()`, `Scope::$isCancelled`, `Scope::checkpoint()`, `Scope::cancel()`, `Scope::onCancel()` | direct access to the tree |
 
 ## Limitations
 

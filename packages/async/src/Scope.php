@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop\FiberLocal;
+use Thesis\Async\Internal\Context;
 
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
@@ -13,11 +13,6 @@ use Revolt\EventLoop\FiberLocal;
  */
 final class Scope
 {
-    /** @var ?FiberLocal<self> */
-    private static ?FiberLocal $current = null;
-
-    private static ?self $root = null;
-
     private bool $cancelled = false;
 
     /** @var array<int, callable(self): void> */
@@ -27,6 +22,11 @@ final class Scope
     private array $children = [];
 
     private int $nextListenerId = 0;
+
+    /** Whether this scope or a visible ancestor is cancelled. */
+    public bool $isCancelled {
+        get => $this->cancelOrigin() !== null;
+    }
 
     /**
      * @internal
@@ -42,12 +42,7 @@ final class Scope
 
     public static function current(): self
     {
-        return self::local()->get();
-    }
-
-    public function isCancelled(): bool
-    {
-        return $this->cancelOrigin() !== null;
+        return Context::current();
     }
 
     /**
@@ -64,8 +59,15 @@ final class Scope
         }
     }
 
+    /**
+     * @throws \LogicException for the root scope: its cancellation would never be lifted
+     */
     public function cancel(): void
     {
+        if ($this->parent === null) {
+            throw new \LogicException('The root scope cannot be cancelled.');
+        }
+
         if ($this->cancelled) {
             return;
         }
@@ -88,36 +90,15 @@ final class Scope
         if ($origin !== null) {
             $listener($origin);
 
-            return static function (): void {};
+            return static function () {};
         }
 
         $id = $this->nextListenerId++;
         $this->listeners[$id] = $listener;
 
-        return function () use ($id): void {
+        return function () use ($id) {
             unset($this->listeners[$id]);
         };
-    }
-
-    /**
-     * Runs $body in the current fiber with this scope as the current one.
-     *
-     * @internal
-     * @template T
-     * @param callable(): T $body
-     * @return T
-     */
-    public function enter(callable $body): mixed
-    {
-        $local = self::local();
-        $previous = $local->get();
-        $local->set($this);
-
-        try {
-            return $body();
-        } finally {
-            $local->set($previous);
-        }
     }
 
     /**
@@ -162,13 +143,5 @@ final class Scope
                 $child->notify($origin);
             }
         }
-    }
-
-    /**
-     * @return FiberLocal<self>
-     */
-    private static function local(): FiberLocal
-    {
-        return self::$current ??= new FiberLocal(static fn(): self => self::$root ??= new self());
     }
 }
