@@ -14,7 +14,12 @@
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
+        "infection/infection": "^0.35.10",
         "llm/skills": "^1.17",
+        "testo/assert": "^0.1.17",
+        "testo/bridge-infection": "^0.1.9",
+        "testo/data": "^0.1.10",
+        "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"
     },
     "autoload": {
@@ -28,10 +33,14 @@
     "autoload-dev": {
         "psr-4": {
             "Thesis\\Async\\": "tests/"
-        }
+        },
+        "files": [
+            "autoload-dev.files.php"
+        ]
     },
     "config": {
         "allow-plugins": {
+            "infection/extension-installer": true,
             "llm/skills": true
         },
         "lock": false,

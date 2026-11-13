@@ -2,7 +2,7 @@
 
 Structured concurrency for PHP fibers on top of [Revolt](https://revolt.run): cancellation is a property of the task tree, not a function parameter.
 
-> **Experimental.** The API is unstable and there is no test suite yet.
+> **Experimental.** The API is unstable.
 
 ## Installation
 

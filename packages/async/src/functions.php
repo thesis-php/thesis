@@ -22,7 +22,7 @@ use Thesis\Async\Internal\Scope;
  *
  * @api
  * @template T
- * @param callable(Continuation<T>): (null|callable(): void) $register
+ * @param callable(Continuation<T>): ((callable(): void)|void) $register
  * @return T
  * @throws Cancelled
  */
@@ -43,7 +43,9 @@ function suspend(callable $register): mixed
     } finally {
         $unsubscribe();
 
-        if ($unregister !== null) {
+        // Anything else means there is nothing to undo: $register returned nothing,
+        // or it is an arrow function that returned the bool of Continuation::resume().
+        if (\is_callable($unregister)) {
             $unregister();
         }
     }
@@ -54,7 +56,8 @@ function suspend(callable $register): mixed
  *
  * Such code starves the event loop: timers, including {@see timeout()} deadlines, cannot fire, and other tasks
  * do not run. So checking a flag is not enough: checkpoint() yields to the event loop for one tick
- * and throws {@see Cancelled} if the scope is cancelled by then.
+ * and throws {@see Cancelled} if the scope is cancelled before or during that tick.
+ * If the tick resumes it first, the cancellation is thrown at the next suspension point, as with any wait.
  *
  * It costs a full wait, so in a hot loop call it every N iterations, not on every one.
  *
@@ -73,9 +76,6 @@ function checkpoint(): void
             EventLoop::cancel($callback);
         };
     });
-
-    // The tick may have both resumed and cancelled us; the resumption wins in suspend(), but not here.
-    Scope::current()->checkpoint();
 }
 
 /**

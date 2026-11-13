@@ -69,8 +69,7 @@ final class GroupImpl implements Group
         }
 
         $group->join();
-        $daemonsScope->close();
-        $tasksScope->close();
+        // The tasks and daemons scopes are only reachable through the body scope: they go away with it.
         $bodyScope->close();
 
         if ($group->error !== null) {
@@ -151,18 +150,25 @@ final class GroupImpl implements Group
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->checkpoint();
-                $task->settle($scope->run($fn), null);
+                $task->complete($scope->run($fn));
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
                     // Cancellation is not a failure: it does not bring the group down.
-                    $task->settle(null, new TaskCancelled($error));
+                    $task->fail(new TaskCancelled($error));
 
                     // But if it came from outside, the group's work is incomplete, even if the body never awaits.
                     if (!$daemon && $this->body->isCancelled()) {
                         $this->cancelled ??= $error;
                     }
                 } else {
-                    $task->settle(null, $error);
+                    if ($error instanceof Cancelled) {
+                        $error = new \LogicException(
+                            'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
+                            previous: $error,
+                        );
+                    }
+
+                    $task->fail($error);
                     $this->fail($error);
                 }
             } finally {

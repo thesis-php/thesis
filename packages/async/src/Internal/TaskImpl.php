@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Thesis\Async\Continuation;
+use Thesis\Async\Deferred;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
-use function Thesis\Async\suspend;
 
 /**
+ * A task is its scope plus a {@see Deferred} result.
+ *
  * @internal
  * @template-covariant T
  * @implements Task<T>
@@ -17,19 +18,18 @@ use function Thesis\Async\suspend;
 final class TaskImpl implements Task
 {
     #[\Override]
-    public private(set) bool $isDone = false;
+    public bool $isDone {
+        get => $this->result->isDone;
+    }
 
-    /** @var ?T */
-    private mixed $value = null;
-
-    private ?\Throwable $error = null;
-
-    /** @var array<int, Continuation<null>> */
-    private array $waiters = [];
+    /** @var Deferred<T> */
+    private readonly Deferred $result;
 
     public function __construct(
         private readonly Scope $scope,
-    ) {}
+    ) {
+        $this->result = new Deferred();
+    }
 
     public function cancel(): void
     {
@@ -38,43 +38,24 @@ final class TaskImpl implements Task
 
     public function await(): mixed
     {
-        if (!$this->isDone) {
-            suspend(function (Continuation $continuation) {
-                /** @var Continuation<null> $continuation */
-                $id = spl_object_id($continuation);
-                $this->waiters[$id] = $continuation;
-
-                return function () use ($id) {
-                    unset($this->waiters[$id]);
-                };
-            });
-        }
-
-        if ($this->error instanceof TaskCancelled) {
+        try {
+            return $this->result->await();
+        } catch (TaskCancelled $cancelled) {
             // TaskCancelled is for an awaiter that is fine itself; a cancelled one gets Cancelled.
             Scope::current()->checkpoint();
-        }
 
-        if ($this->error !== null) {
-            throw $this->error;
+            throw $cancelled;
         }
-
-        /** @var T */
-        return $this->value;
     }
 
-    public function settle(mixed $value, ?\Throwable $error): void
+    public function complete(mixed $value): void
     {
-        $this->isDone = true;
-        /** @var ?T $value */
-        $this->value = $value;
-        $this->error = $error;
+        /** @var T $value */
+        $this->result->complete($value);
+    }
 
-        $waiters = $this->waiters;
-        $this->waiters = [];
-
-        foreach ($waiters as $waiter) {
-            $waiter->resume();
-        }
+    public function fail(\Throwable $error): void
+    {
+        $this->result->fail($error);
     }
 }

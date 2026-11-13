@@ -6,6 +6,9 @@ export DOCKER_USER ?= $(shell id -u):$(shell id -g)
 
 RUN ?= $(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm php)
 COMPOSER ?= $(RUN) composer
+# The image's global Composer plugins (infection/extension-installer among them) would shadow the project's ones
+# and register Infection extensions inside the throwaway container instead of vendor/.
+COMPOSER_LOCAL_PLUGINS ?= $(RUN) env COMPOSER_HOME=/tmp/composer COMPOSER_CACHE_DIR=/composer/cache composer
 
 # Container
 
@@ -30,20 +33,20 @@ down: ## Stop services
 
 i: install
 install: ## (i) Install dependencies
-	$(COMPOSER) install
+	$(COMPOSER_LOCAL_PLUGINS) install
 	@rm -f vendor/.lowest
 	@touch vendor
 .PHONY: i install
 
 u: update
 update: ## (u) Update dependencies
-	$(COMPOSER) update
+	$(COMPOSER_LOCAL_PLUGINS) update
 	@rm -f vendor/.lowest
 	@touch vendor
 .PHONY: u update
 
 install-lowest: ## Install lowest possible dependencies
-	$(COMPOSER) update --prefer-lowest --prefer-stable
+	$(COMPOSER_LOCAL_PLUGINS) update --prefer-lowest --prefer-stable
 	@touch vendor/.lowest
 	@touch vendor
 .PHONY: install-lowest
@@ -75,7 +78,7 @@ test: var vendor up ## Run the test suite
 .PHONY: test
 
 infect: var vendor up ## Run mutation testing
-	$(RUN) infection --show-mutations $(ARGS)
+	$(RUN) vendor/bin/infection --show-mutations $(ARGS)
 .PHONY: infect
 
 deps-analyze: vendor ## Check for unused/missing dependencies

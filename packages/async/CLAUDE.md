@@ -26,5 +26,6 @@ The model, the API and the guarantees are described in `README.md` — read it f
   A regular task cut short by an outer cancellation makes `group()` throw `Cancelled` after join.
 - A task cancelled before it started never runs.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
-- A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`.
+- A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
+  unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
 - `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note there).

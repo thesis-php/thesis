@@ -40,8 +40,6 @@ final class Scope
     /** @var array<int, \Closure(): void> */
     private array $listeners = [];
 
-    private int $nextListenerId = 0;
-
     /** @var array<int, self> held strongly to deliver cancellation; released by {@see close()} */
     private array $children = [];
 
@@ -125,12 +123,10 @@ final class Scope
 
     public function cancel(): void
     {
-        if ($this->cancelled) {
-            return;
+        if (!$this->cancelled) {
+            $this->cancelled = true;
+            $this->notify();
         }
-
-        $this->cancelled = true;
-        $this->notify();
     }
 
     /**
@@ -148,7 +144,8 @@ final class Scope
             return static function () {};
         }
 
-        $id = $this->nextListenerId++;
+        // A registered listener is alive, so its object id is unique among the registered ones.
+        $id = spl_object_id($listener);
         $this->listeners[$id] = $listener;
 
         return function () use ($id) {

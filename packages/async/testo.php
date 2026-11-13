@@ -6,6 +6,7 @@ use Testo\Application\Config\ApplicationConfig;
 use Testo\Application\Config\SuiteConfig;
 
 return new ApplicationConfig(
+    src: ['src'],
     suites: [
         new SuiteConfig(
             name: 'All',
