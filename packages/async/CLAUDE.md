@@ -10,7 +10,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - The `$unregister` returned from `suspend()`'s `$register` is always called once the wait is over, whatever ended it.
   Only a `\Closure` is called: a Revolt callback id is a string and may be callable (`"die"`).
 - Cancellation is level-triggered: while a scope is cancelled, every `suspend()` in it throws `Cancelled`.
-- `Cancelled extends \Error` and carries nothing. Whose cancellation it is, is decided by the state of the scope tree
+- `Cancelled extends \Error` and carries nothing. Its constructor is private: only the library creates it,
+  through the `@internal` `Cancelled::create()`. Whose cancellation it is, is decided by the state of the scope tree
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
   `timeoutOr()` decides the same way, in the shared `Internal\Expired::run()`, never by catching `TimedOut`:
   that would swallow a `TimedOut` of a nested `timeout()`. A deadline `<= 0` cancels the scope at once, without a timer.

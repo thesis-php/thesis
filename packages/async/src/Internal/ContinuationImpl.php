@@ -83,7 +83,7 @@ final class ContinuationImpl implements Continuation
         }
 
         if ($this->interrupted) {
-            throw new Cancelled();
+            throw Cancelled::create();
         }
 
         if ($this->error !== null) {

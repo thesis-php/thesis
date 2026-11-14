@@ -12,15 +12,29 @@ namespace Thesis\Async;
  *
  * Its trace points at the wait that was interrupted.
  *
+ * It cannot be constructed outside the library: a Cancelled thrown by hand where nothing is cancelled would end
+ * code as cancelled that was not. Rethrow the one caught instead.
+ *
  * @api
  */
 final class Cancelled extends \Error
 {
-    /**
-     * @internal
-     */
-    public function __construct()
+    private function __construct()
     {
         parent::__construct('The scope is cancelled.');
+    }
+
+    /**
+     * @internal thrown only by the library, where the current scope is cancelled
+     */
+    public static function create(): self
+    {
+        $cancelled = new self();
+        // Where the library throws it, not this line: with the trace, it points at the wait that was interrupted.
+        $caller = $cancelled->getTrace()[0] ?? [];
+        $cancelled->file = $caller['file'] ?? $cancelled->file;
+        $cancelled->line = $caller['line'] ?? $cancelled->line;
+
+        return $cancelled;
     }
 }

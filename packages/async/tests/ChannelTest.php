@@ -908,7 +908,7 @@ final class ChannelTest
         /** @var Channel<string> */
         $channel = new Channel(1);
 
-        $exception = thrown(static fn() => $channel->close(new Cancelled()));
+        $exception = thrown(static fn() => $channel->close(Cancelled::create()));
 
         Assert::instanceOf($exception, \ValueError::class);
         Assert::false($channel->isClosed);

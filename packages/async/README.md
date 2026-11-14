@@ -893,7 +893,8 @@ Five small ideas, each built on the previous one.
    That join is the structured concurrency guarantee.
 5. **`timeout()`** and **`shield()`** are just child scopes: one is cancelled by a timer, the other does not let outer cancellation in.
 
-`Cancelled` carries nothing. Whoever catches it tells its own cancellation from a foreign one by the state of the tree:
+`Cancelled` carries nothing, and only the library creates it: its constructor is private, since a `Cancelled` thrown
+by hand where nothing is cancelled would make code end as cancelled that was not. Whoever catches it tells its own cancellation from a foreign one by the state of the tree:
 `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
 
 ```

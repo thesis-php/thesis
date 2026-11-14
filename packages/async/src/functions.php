@@ -608,7 +608,7 @@ function ampCancellable(callable $fn): mixed
         return $fn(new ScopeCancellation($scope));
     } catch (CancelledException $exception) {
         if ($scope->isCancelled()) {
-            throw new Cancelled();
+            throw Cancelled::create();
         }
 
         throw $exception;

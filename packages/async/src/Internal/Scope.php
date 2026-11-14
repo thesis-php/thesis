@@ -144,7 +144,7 @@ final class Scope
     public function throwIfCancelled(): void
     {
         if ($this->cancelled) {
-            throw new Cancelled();
+            throw Cancelled::create();
         }
     }
 
