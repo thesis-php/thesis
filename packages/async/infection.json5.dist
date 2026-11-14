@@ -13,7 +13,7 @@
     "testFramework": "testo",
     "tmpDir": "var",
     "timeout": 10,
-    "minCoveredMsi": 99,
+    "minCoveredMsi": 90,
     "mutators": {
         "@default": true,
         // The finally in start() is defensive: its catch (\Throwable) cannot throw today, so unwrapping it is

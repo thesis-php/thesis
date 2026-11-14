@@ -237,7 +237,11 @@ final class OnCancelTest
 
     public function isNotHeldAfterScopeHasEnded(): void
     {
-        $callback = static function () {};
+        // Since PHP 8.6 a closure that captures nothing is cached and never goes away, so this one captures.
+        $called = false;
+        $callback = static function () use (&$called) {
+            $called = true;
+        };
         $reference = \WeakReference::create($callback);
 
         timeout(1_000, static function () use ($callback) {
@@ -250,7 +254,11 @@ final class OnCancelTest
 
     public function isNotHeldByRootScope(): void
     {
-        $callback = static function () {};
+        // Since PHP 8.6 a closure that captures nothing is cached and never goes away, so this one captures.
+        $called = false;
+        $callback = static function () use (&$called) {
+            $called = true;
+        };
         $reference = \WeakReference::create($callback);
 
         $unsubscribe = onCancel($callback);
