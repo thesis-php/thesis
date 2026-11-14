@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo\Command;
+namespace Thesis\Monorepo\Internal\Command;
 
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Thesis\Monorepo\Internal\Scaffolder;
 use Thesis\Monorepo\Layer;
-use Thesis\Monorepo\Scaffolder;
 
+/**
+ * @internal
+ */
 #[AsCommand('new', 'Scaffold a package in packages/<name>/')]
 final readonly class NewPackageCommand
 {
@@ -35,7 +38,12 @@ final readonly class NewPackageCommand
             return 1;
         }
 
-        $path = Scaffolder::create($this->root, $name, $layerCase, $description);
+        $path = Scaffolder::create(
+            root: $this->root,
+            dir: $name,
+            layer: $layerCase,
+            description: $description,
+        );
         $io->success(\sprintf('Created %s. Fill AGENTS.md as the package takes shape.', $path));
 
         return ($this->sync)($io);

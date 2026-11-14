@@ -2,8 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo;
+namespace Thesis\Monorepo\Internal;
 
+use Thesis\Monorepo\Layer;
+
+/**
+ * @internal
+ */
 final readonly class Scaffolder
 {
     /**

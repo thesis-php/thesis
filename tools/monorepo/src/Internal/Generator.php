@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo;
+namespace Thesis\Monorepo\Internal;
+
+use Thesis\Monorepo\Layer;
 
 /**
- * Builds every file derived from monorepo.php and packages/*\/package.php.
+ * @internal
  */
 final readonly class Generator
 {
@@ -23,15 +25,16 @@ final readonly class Generator
      */
     public static function generate(Monorepo $monorepo): array
     {
+        $generator = new self($monorepo);
         $files = [
-            'composer.json' => self::rootComposer($monorepo),
-            'skills.json' => self::skills($monorepo),
-            'testo.php' => self::testo($monorepo),
-            'AGENTS.md' => self::agents($monorepo),
+            'composer.json' => $generator->rootComposer(),
+            'skills.json' => $generator->skills(),
+            'testo.php' => $generator->testo(),
+            'AGENTS.md' => $generator->agents(),
         ];
 
         foreach ($monorepo->packages as $package) {
-            $files[$package->path() . '/composer.json'] = Json::encode(self::packageComposer($monorepo, $package));
+            $files[$package->path() . '/composer.json'] = Json::encode($generator->packageComposer($package));
         }
 
         return $files;
@@ -52,7 +55,8 @@ final readonly class Generator
 
             $same = match (true) {
                 $actual === null => false,
-                str_ends_with($path, '.json') => Json::canonical(Json::decode($actual, $path)) === Json::canonical(Json::decode($expected, $path)),
+                str_ends_with($path, '.json') => self::canonicalJson($actual, $path)
+                    === self::canonicalJson($expected, $path),
                 default => $actual === $expected,
             };
 
@@ -64,13 +68,22 @@ final readonly class Generator
         return $stale;
     }
 
+    private function __construct(
+        private Monorepo $monorepo,
+    ) {}
+
+    private static function canonicalJson(string $content, string $path): mixed
+    {
+        return Json::canonical(Json::decode($content, $path));
+    }
+
     /**
      * @return array<non-empty-string, mixed>
      */
-    private static function packageComposer(Monorepo $monorepo, Package $package): array
+    private function packageComposer(Package $package): array
     {
         $manifest = $package->manifest;
-        $config = $monorepo->config;
+        $config = $this->monorepo->config;
 
         $composer = [
             'name' => $package->name(),
@@ -78,8 +91,15 @@ final readonly class Generator
             'license' => 'MIT',
             'type' => 'library',
             'authors' => $config->authors,
-            'require' => self::sortRequire(['php' => $config->php, ...$manifest->require, ...self::internal($config, $manifest->uses)]),
-            'require-dev' => self::sortRequire([...$manifest->requireDev, ...self::internal($config, $manifest->usesDev)]),
+            'require' => self::sortRequire([
+                'php' => $config->php,
+                ...$manifest->require,
+                ...$this->internal($manifest->uses),
+            ]),
+            'require-dev' => self::sortRequire([
+                ...$manifest->requireDev,
+                ...$this->internal($manifest->usesDev),
+            ]),
             'conflict' => self::sortRequire($manifest->conflict),
             'suggest' => self::sortRequire($manifest->suggest),
             'autoload' => array_filter([
@@ -94,28 +114,28 @@ final readonly class Generator
             ...$manifest->composer,
         ];
 
-        return array_filter($composer, static fn(mixed $value): bool => $value !== []);
+        return array_filter($composer, static fn(mixed $value) => $value !== []);
     }
 
     /**
      * @param list<non-empty-string> $dirs
      * @return array<non-empty-string, non-empty-string>
      */
-    private static function internal(Config $config, array $dirs): array
+    private function internal(array $dirs): array
     {
         $require = [];
 
         foreach ($dirs as $dir) {
-            $require[Monorepo::VENDOR . '/' . $dir] = $config->version;
+            $require[Monorepo::VENDOR . '/' . $dir] = $this->monorepo->config->version;
         }
 
         return $require;
     }
 
-    private static function rootComposer(Monorepo $monorepo): string
+    private function rootComposer(): string
     {
-        $config = $monorepo->config;
-        $current = $monorepo->read('composer.json');
+        $config = $this->monorepo->config;
+        $current = $this->monorepo->read('composer.json');
         $composer = $current === null ? [] : Json::decode($current, 'composer.json');
 
         $require = ['php' => $config->php, ...$config->require];
@@ -126,15 +146,16 @@ final readonly class Generator
         $psr4Dev = $config->autoloadDev;
         $filesDev = [];
 
-        foreach ($monorepo->packages as $package) {
+        foreach ($this->monorepo->packages as $package) {
             $path = $package->path();
             $require = [...$require, ...$package->manifest->require];
             $requireDev = [...$requireDev, ...$package->manifest->requireDev];
             $replace[$package->name()] = 'self.version';
             $psr4[$package->namespace()] = $path . '/src/';
             $psr4Dev[$package->namespace()] = $path . '/tests/';
-            $files = [...$files, ...array_map(static fn(string $file): string => $path . '/' . $file, $package->manifest->files)];
-            $filesDev = [...$filesDev, ...array_map(static fn(string $file): string => $path . '/' . $file, $package->manifest->devFiles)];
+            $prefix = static fn(string $file) => $path . '/' . $file;
+            $files = [...$files, ...array_map($prefix, $package->manifest->files)];
+            $filesDev = [...$filesDev, ...array_map($prefix, $package->manifest->devFiles)];
         }
 
         $generated = [
@@ -156,9 +177,9 @@ final readonly class Generator
         return Json::encode($composer);
     }
 
-    private static function skills(Monorepo $monorepo): string
+    private function skills(): string
     {
-        $current = $monorepo->read('skills.json');
+        $current = $this->monorepo->read('skills.json');
         $skills = $current === null ? [] : Json::decode($current, 'skills.json');
         $sources = [];
 
@@ -173,7 +194,7 @@ final readonly class Generator
             }
         }
 
-        foreach ($monorepo->packages as $package) {
+        foreach ($this->monorepo->packages as $package) {
             if ($package->hasSkills) {
                 $sources[] = ['from' => 'dir', 'path' => $package->path()];
             }
@@ -188,21 +209,25 @@ final readonly class Generator
         return Json::encode($skills);
     }
 
-    /**
-     * One suite per package, named after its directory. Plugins come from packages/<dir>/testo.plugins.php when it exists.
-     */
-    private static function testo(Monorepo $monorepo): string
+    private function testo(): string
     {
+        $plugins = self::TESTO_PLUGINS;
         $src = '';
         $suites = "        new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),\n";
 
-        foreach ($monorepo->packages as $package) {
+        foreach ($this->monorepo->packages as $package) {
             $path = $package->path();
-            $plugins = is_file($monorepo->root . '/' . $path . '/' . self::TESTO_PLUGINS)
-                ? \sprintf(", plugins: require __DIR__ . '/%s/%s'", $path, self::TESTO_PLUGINS)
-                : '';
             $src .= \sprintf("        __DIR__ . '/%s/src',\n", $path);
-            $suites .= \sprintf("        new SuiteConfig(name: '%s', location: [__DIR__ . '/%s/tests']%s),\n", $package->dir, $path, $plugins);
+            $suites .= is_file($this->monorepo->root . '/' . $path . '/' . $plugins)
+                ? <<<PHP
+                            new SuiteConfig(
+                                name: '{$package->dir}',
+                                location: [__DIR__ . '/{$path}/tests'],
+                                plugins: require __DIR__ . '/{$path}/{$plugins}',
+                            ),
+
+                    PHP
+                : "        new SuiteConfig(name: '{$package->dir}', location: [__DIR__ . '/{$path}/tests']),\n";
         }
 
         $src = $src === '' ? '[]' : "[\n{$src}    ]";
@@ -226,29 +251,37 @@ final readonly class Generator
             PHP;
     }
 
-    private static function agents(Monorepo $monorepo): string
+    private function agents(): string
     {
-        $agents = $monorepo->read('AGENTS.md') ?? '';
+        $agents = $this->monorepo->read('AGENTS.md') ?? '';
         $start = strpos($agents, self::CATALOG_START);
         $end = strpos($agents, self::CATALOG_END);
 
         if ($start === false || $end === false || $end < $start) {
-            throw new MonorepoException(\sprintf('AGENTS.md must contain the markers %s and %s.', self::CATALOG_START, self::CATALOG_END));
+            throw new MonorepoException(
+                \sprintf('AGENTS.md must contain the markers %s and %s.', self::CATALOG_START, self::CATALOG_END),
+            );
         }
 
-        return substr($agents, 0, $start)
-            . self::CATALOG_START . "\n\n" . self::catalog($monorepo) . "\n" . self::CATALOG_END
+        $before = substr(
+            string: $agents,
+            offset: 0,
+            length: $start,
+        );
+
+        return $before
+            . self::CATALOG_START . "\n\n" . $this->catalog() . "\n" . self::CATALOG_END
             . substr($agents, $end + \strlen(self::CATALOG_END));
     }
 
-    private static function catalog(Monorepo $monorepo): string
+    private function catalog(): string
     {
         $sections = [];
 
         foreach (Layer::cases() as $layer) {
             $lines = [];
 
-            foreach ($monorepo->packages as $package) {
+            foreach ($this->monorepo->packages as $package) {
                 $manifest = $package->manifest;
 
                 if ($manifest->layer === $layer) {
@@ -281,14 +314,14 @@ final readonly class Generator
      */
     private static function sortRequire(array $require): array
     {
-        $rank = static fn(string $name): string => match (true) {
+        $rank = static fn(string $name) => match (true) {
             $name === 'php' => '0',
             str_starts_with($name, 'php-') => '1' . $name,
             str_starts_with($name, 'ext-') => '2' . $name,
             str_starts_with($name, 'lib-') => '3' . $name,
             default => '4' . $name,
         };
-        uksort($require, static fn(string $a, string $b): int => strcmp($rank($a), $rank($b)));
+        uksort($require, static fn(string $a, string $b) => strcmp($rank($a), $rank($b)));
 
         return $require;
     }

@@ -6,6 +6,8 @@ namespace Thesis\Monorepo;
 
 /**
  * monorepo.php in the root returns an instance of this class.
+ *
+ * @api
  */
 final readonly class Config
 {
@@ -15,7 +17,8 @@ final readonly class Config
      * @param list<array{name: string, email?: string}> $authors authors of every package
      * @param array<non-empty-string, non-empty-string> $require dependencies of the root itself, not of a package
      * @param array<non-empty-string, non-empty-string> $requireDev tools of the root, not of a package
-     * @param array<non-empty-string, non-empty-string> $autoloadDev psr-4 prefix => directory, for the root's own tooling
+     * @param array<non-empty-string, non-empty-string> $autoloadDev psr-4 prefix => directory,
+     *     for the root's own tooling
      */
     public function __construct(
         public string $php,

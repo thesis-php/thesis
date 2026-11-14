@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Thesis\Monorepo\Config;
 
-/**
- * Source of truth for the root composer.json together with packages/*\/package.php. Run `make sync` after a change.
- */
+/** Source of truth for the root composer.json together with packages/*\/package.php. Run `make sync` after a change. */
 return new Config(
     php: '^8.5',
     version: '^0.1',

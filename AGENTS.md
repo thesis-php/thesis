@@ -66,9 +66,13 @@ the whole monorepo is for the final check.
 - Soft line length limit is 120 characters: exceed it only when wrapping would hurt readability
   (long string literals, URLs).
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
-  the pipe operator (`|>`) and first-class callables (`f(...)`) instead of nested calls, temporary variables
-  and wrapper closures, `Uri\WhatWg\Url` instead of `parse_url()` or a URL library.
+  first-class callables (`f(...)`) instead of wrapper closures, `Uri\WhatWg\Url` instead of `parse_url()`
+  or a URL library.
+- The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
+  deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
+  not `$x |> g(...) |> f(...)`.
 - A call with more than two arguments uses named arguments, one per line with a trailing comma.
+  Exception: variadic arguments (`sprintf()` values and the like), which the language does not allow to name.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
@@ -76,13 +80,28 @@ the whole monorepo is for the final check.
   invokable objects, `[$object, 'method']` and the like.
 - A method that doesn't use `$this` is `static` and is called via `self::`, in hand-written and generated code alike.
   Exceptions only where the language forbids it: interface implementations and overrides of instance methods.
+- No static classes that pass complex state between their methods (the same arguments to every method,
+  accumulators by reference). Write an object-function instead: a static entry point that creates a private
+  instance, keeps the state in its properties and returns the result, e.g. `Validator::validate($monorepo)`.
+- State that only one function needs (a memoized value, a cache, a lazily created instance) is a `static` variable
+  inside that function, not a static property: it sits next to the only code that uses it, and since PHP 8.3
+  it is initialized with any expression. A static property is only for state shared by several methods.
 - No return types on closures and arrow functions: `static fn() => new X()`, not `static fn(): X => new X()`.
 - Named typed properties instead of id-indexed arrays (`$this->values[0]`). Use an array only for genuinely dynamic sets.
 - `readonly` wherever possible: `final readonly class` for immutable classes, `readonly` on individual properties
   for partially mutable ones.
+- Every top-level symbol (class, interface, trait, enum, function, constant) is marked either `@api` or `@internal`
+  in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
+  (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
+  `make check` verifies this in `packages/*/src`.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
-- A PHPDoc that fits in one line is written in one line: `/** @var list<int> */`.
+- A PHPDoc of a declaration (class, method, function, property, constant, enum case) is multi-line,
+  even with one tag. An inline annotation in code is one line: `/** @var list<int> $ids */`.
+  PHP CS Fixer enforces both (`phpdoc_line_span`).
+- A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
+  rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
+  they stay.
 - Functions and constants are loaded by one file per scope: `src/autoload.files.php` in `files` of the manifest,
   `tests/autoload.files.php` in `devFiles`. A new file of functions is added there with `require_once`,
   so neither the manifest nor the autoloader changes.

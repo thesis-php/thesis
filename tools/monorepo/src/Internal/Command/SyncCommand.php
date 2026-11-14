@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo\Command;
+namespace Thesis\Monorepo\Internal\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Thesis\Monorepo\Generator;
-use Thesis\Monorepo\Monorepo;
-use Thesis\Monorepo\Validator;
+use Thesis\Monorepo\Internal\Generator;
+use Thesis\Monorepo\Internal\Monorepo;
+use Thesis\Monorepo\Internal\Validator;
 
+/**
+ * @internal
+ */
 #[AsCommand('sync', 'Validate the packages and regenerate every derived file')]
 final readonly class SyncCommand
 {
@@ -23,7 +26,11 @@ final readonly class SyncCommand
         $errors = Validator::validate($monorepo);
 
         if ($errors !== []) {
-            return Report::errors($io, $errors, \count($monorepo->packages));
+            return Report::errors(
+                io: $io,
+                errors: $errors,
+                packages: \count($monorepo->packages),
+            );
         }
 
         $files = Generator::generate($monorepo);
@@ -33,6 +40,10 @@ final readonly class SyncCommand
             $io->writeln('Updated ' . $path);
         }
 
-        return Report::errors($io, [], \count($monorepo->packages));
+        return Report::errors(
+            io: $io,
+            errors: [],
+            packages: \count($monorepo->packages),
+        );
     }
 }

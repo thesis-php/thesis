@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo\Command;
+namespace Thesis\Monorepo\Internal\Command;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;

@@ -6,13 +6,16 @@ namespace Thesis\Monorepo;
 
 /**
  * packages/<dir>/package.php returns an instance of this class. The package's composer.json is generated from it.
+ *
+ * @api
  */
 final readonly class Manifest
 {
     /**
      * @param non-empty-string $description one sentence, it also goes to the package catalog in AGENTS.md
      * @param list<non-empty-string> $uses monorepo packages this package depends on, by directory name
-     * @param array<non-empty-string, non-empty-string> $require external packages and platform requirements (php is added from monorepo.php)
+     * @param array<non-empty-string, non-empty-string> $require external packages and platform requirements
+     *     (php is added from monorepo.php)
      * @param list<non-empty-string> $usesDev monorepo packages needed only by the tests
      * @param array<non-empty-string, non-empty-string> $requireDev
      * @param ?non-empty-string $namespace psr-4 prefix of src/ and tests/, defaults to Thesis\<PascalCaseDir>\

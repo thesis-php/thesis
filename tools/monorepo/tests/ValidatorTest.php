@@ -6,24 +6,27 @@ namespace Thesis\Monorepo\Tests;
 
 use Testo\Assert;
 use Testo\Test;
-use Thesis\Monorepo\Validator;
+use Thesis\Monorepo\Internal\Validator;
 
 #[Test]
 final readonly class ValidatorTest
 {
-    public function acceptsPackageUsingLowerLayer(): void
+    public static function acceptsPackageUsingLowerLayer(): void
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
             ->package('async', "layer: Layer::Runtime, uses: ['bytes'], require: ['revolt/event-loop' => '^1.0']")
-            ->file('packages/async/src/Task.php', '<?php namespace Thesis\Async; use Thesis\Bytes\Buffer; final class Task {}');
+            ->file(
+                'packages/async/src/Task.php',
+                '<?php namespace Thesis\Async; use Thesis\Bytes\Buffer; /** @api */ final class Task {}',
+            );
 
         $errors = Validator::validate($fixture->load());
 
         Assert::same($errors, []);
     }
 
-    public function rejectsDependencyOnHigherLayer(): void
+    public static function rejectsDependencyOnHigherLayer(): void
     {
         $fixture = new Fixture()
             ->package('async', 'layer: Layer::Runtime')
@@ -34,7 +37,7 @@ final readonly class ValidatorTest
         Assert::same($errors, ['packages/bytes (layer primitive) uses async (layer runtime): a package may not depend on a higher layer.']);
     }
 
-    public function rejectsCodeUsingPackageMissingInUses(): void
+    public static function rejectsCodeUsingPackageMissingInUses(): void
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
@@ -46,7 +49,7 @@ final readonly class ValidatorTest
         Assert::same($errors, ['packages/time/src/Clock.php:5: uses Thesis\Bytes\Buffer from bytes, which is not in "uses".']);
     }
 
-    public function allowsTestsToUseUsesDev(): void
+    public static function allowsTestsToUseUsesDev(): void
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
@@ -58,7 +61,7 @@ final readonly class ValidatorTest
         Assert::same($errors, []);
     }
 
-    public function rejectsDifferentConstraintsOfOneDependency(): void
+    public static function rejectsDifferentConstraintsOfOneDependency(): void
     {
         $fixture = new Fixture()
             ->package('a', "layer: Layer::Primitive, require: ['psr/clock' => '^1.0']")
@@ -69,10 +72,14 @@ final readonly class ValidatorTest
         Assert::same($errors, ['Use one constraint for psr/clock across the monorepo, found: ^1.0 in packages/a; ^1.1 in packages/b.']);
     }
 
-    public function rejectsAmphpInRequireButNotInRequireDev(): void
+    public static function rejectsAmphpInRequireButNotInRequireDev(): void
     {
         $fixture = new Fixture()
-            ->package('io', "layer: Layer::Io, require: ['amphp/socket' => '^2.0'], requireDev: ['amphp/amp' => '^3.0']");
+            ->package('io', <<<'PHP'
+                layer: Layer::Io,
+                require: ['amphp/socket' => '^2.0'],
+                requireDev: ['amphp/amp' => '^3.0'],
+                PHP);
 
         $errors = Validator::validate($fixture->load());
 
@@ -81,7 +88,7 @@ final readonly class ValidatorTest
         ]);
     }
 
-    public function rejectsCycle(): void
+    public static function rejectsCycle(): void
     {
         $fixture = new Fixture()
             ->package('a', "layer: Layer::Primitive, uses: ['b']")
@@ -92,7 +99,7 @@ final readonly class ValidatorTest
         Assert::same($errors, ['Dependency cycle: a -> b -> a.']);
     }
 
-    public function rejectsClaudeMd(): void
+    public static function rejectsClaudeMd(): void
     {
         $fixture = new Fixture()
             ->package('a', 'layer: Layer::Primitive')
@@ -101,5 +108,119 @@ final readonly class ValidatorTest
         $errors = Validator::validate($fixture->load());
 
         Assert::same($errors, ['packages/a/CLAUDE.md must not exist: write AGENTS.md, a CLAUDE.md makes Claude Code ignore every AGENTS.md.']);
+    }
+
+    public static function acceptsApiAndInternalSymbolsInTheirNamespaces(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes', 'layer: Layer::Primitive')
+            ->file('packages/bytes/src/Buffer.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes;
+
+                /**
+                 * @api
+                 */
+                #[\Attribute]
+                final readonly class Buffer
+                {
+                    public function __construct()
+                    {
+                        $this->x = new class {};
+                    }
+                }
+
+                /**
+                 * @api
+                 */
+                function buffer(): Buffer
+                {
+                    return new Buffer();
+                }
+                PHP)
+            ->file('packages/bytes/src/Internal/Chunk.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes\Internal;
+
+                /**
+                 * @internal
+                 */
+                enum Chunk
+                {
+                    case Small;
+                }
+
+                /**
+                 * @internal
+                 */
+                const SIZE = 8192;
+                PHP);
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, []);
+    }
+
+    public static function rejectsSymbolMarkedNeitherApiNorInternal(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes', 'layer: Layer::Primitive')
+            ->file('packages/bytes/src/Buffer.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes;
+
+                /**
+                 * A growable buffer.
+                 */
+                final class Buffer {}
+
+                function buffer(): Buffer
+                {
+                    return new Buffer();
+                }
+                PHP);
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, [
+            'packages/bytes/src/Buffer.php:8: mark Thesis\Bytes\Buffer either @api or @internal.',
+            'packages/bytes/src/Buffer.php:10: mark Thesis\Bytes\buffer either @api or @internal.',
+        ]);
+    }
+
+    public static function rejectsSymbolMarkedBothApiAndInternal(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes', 'layer: Layer::Primitive')
+            ->file('packages/bytes/src/Buffer.php', "<?php\n\nnamespace Thesis\\Bytes;\n\n/**\n * @api\n * @internal\n */\ninterface Buffer {}\n");
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, ['packages/bytes/src/Buffer.php:9: mark Thesis\Bytes\Buffer either @api or @internal, not both.']);
+    }
+
+    public static function rejectsInternalSymbolOutsideInternalNamespace(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes', 'layer: Layer::Primitive')
+            ->file('packages/bytes/src/Chunk.php', "<?php\n\nnamespace Thesis\\Bytes;\n\n/**\n * @internal\n */\ntrait Chunk {}\n");
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, ['packages/bytes/src/Chunk.php:8: Thesis\Bytes\Chunk is @internal, move it to an Internal namespace.']);
+    }
+
+    public static function rejectsApiSymbolInsideInternalNamespace(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes', 'layer: Layer::Primitive')
+            ->file('packages/bytes/src/Internal/Chunk.php', "<?php\n\nnamespace Thesis\\Bytes\\Internal;\n\n/**\n * @api\n */\nfinal class Chunk {}\n");
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, ['packages/bytes/src/Internal/Chunk.php:8: Thesis\Bytes\Internal\Chunk is in an Internal namespace, mark it @internal.']);
     }
 }

@@ -2,8 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo;
+namespace Thesis\Monorepo\Internal;
 
+use Thesis\Monorepo\Manifest;
+
+/**
+ * @internal
+ */
 final readonly class Package
 {
     /**
@@ -36,6 +41,16 @@ final readonly class Package
      */
     public function namespace(): string
     {
-        return $this->manifest->namespace ?? Monorepo::NAMESPACE . str_replace('-', '', ucwords($this->dir, '-')) . '\\';
+        if ($this->manifest->namespace !== null) {
+            return $this->manifest->namespace;
+        }
+
+        $pascalCase = str_replace(
+            search: '-',
+            replace: '',
+            subject: ucwords($this->dir, '-'),
+        );
+
+        return Monorepo::NAMESPACE . $pascalCase . '\\';
     }
 }

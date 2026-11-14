@@ -23,4 +23,17 @@ $config = new Config()
 
 new PhpCsFixerCodingStandard()->applyTo($config);
 
+$config->setRules([
+    ...$config->getRules(),
+    'phpdoc_line_span' => [
+        'case' => 'multi',
+        'class' => 'multi',
+        'const' => 'multi',
+        'function' => 'multi',
+        'method' => 'multi',
+        'property' => 'multi',
+        'other' => 'single',
+    ],
+]);
+
 return $config;

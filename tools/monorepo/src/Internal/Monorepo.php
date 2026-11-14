@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Monorepo;
+namespace Thesis\Monorepo\Internal;
+
+use Thesis\Monorepo\Config;
+use Thesis\Monorepo\Manifest;
 
 /**
- * Packages live in packages/<dir>/ and are described by packages/<dir>/package.php.
+ * @internal
  */
 final readonly class Monorepo
 {
@@ -14,17 +17,6 @@ final readonly class Monorepo
     public const string PACKAGES_DIR = 'packages';
     public const string CONFIG = 'monorepo.php';
     public const string MANIFEST = 'package.php';
-
-    /**
-     * @param array<non-empty-string, Package> $packages dir => package
-     * @param list<string> $errors packages that could not be loaded
-     */
-    private function __construct(
-        public string $root,
-        public Config $config,
-        public array $packages,
-        public array $errors,
-    ) {}
 
     public static function load(string $root): self
     {
@@ -38,11 +30,12 @@ final readonly class Monorepo
         foreach ($dirs as $dir) {
             $basename = basename($dir);
             \assert($basename !== '');
+            $manifest = self::PACKAGES_DIR . '/' . $basename . '/' . self::MANIFEST;
 
             try {
                 $packages[$basename] = new Package(
                     dir: $basename,
-                    manifest: self::require($root, self::PACKAGES_DIR . '/' . $basename . '/' . self::MANIFEST, Manifest::class),
+                    manifest: self::require($root, $manifest, Manifest::class),
                     hasSkills: is_dir($dir . '/skills'),
                 );
             } catch (MonorepoException $exception) {
@@ -50,8 +43,24 @@ final readonly class Monorepo
             }
         }
 
-        return new self($root, $config, $packages, $errors);
+        return new self(
+            root: $root,
+            config: $config,
+            packages: $packages,
+            loadErrors: $errors,
+        );
     }
+
+    /**
+     * @param array<non-empty-string, Package> $packages dir => package
+     * @param list<string> $loadErrors
+     */
+    private function __construct(
+        public string $root,
+        public Config $config,
+        public array $packages,
+        public array $loadErrors,
+    ) {}
 
     public function read(string $path): ?string
     {
@@ -72,7 +81,7 @@ final readonly class Monorepo
         }
 
         $path = $root . '/' . $file;
-        $value = (static fn(): mixed => require $path)();
+        $value = (static fn() => require $path)();
 
         if (!$value instanceof $class) {
             throw new MonorepoException(\sprintf('%s must return an instance of %s.', $file, $class));

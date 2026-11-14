@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Monorepo\Tests;
 
-use Thesis\Monorepo\Generator;
-use Thesis\Monorepo\Monorepo;
+use Thesis\Monorepo\Internal\Generator;
+use Thesis\Monorepo\Internal\Monorepo;
 
-/**
- * A throwaway monorepo in the system temp directory, removed when the object is destroyed.
- */
 final readonly class Fixture
 {
     public string $root;

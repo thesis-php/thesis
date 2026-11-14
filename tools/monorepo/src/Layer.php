@@ -6,6 +6,8 @@ namespace Thesis\Monorepo;
 
 /**
  * Declared order matters: a package may depend on packages of its own layer or of the layers above it in this list.
+ *
+ * @api
  */
 enum Layer: string
 {
@@ -44,6 +46,10 @@ enum Layer: string
 
     private function rank(): int
     {
-        return (int) array_search($this, self::cases(), true);
+        return (int) array_search(
+            needle: $this,
+            haystack: self::cases(),
+            strict: true,
+        );
     }
 }

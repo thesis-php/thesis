@@ -6,13 +6,13 @@ namespace Thesis\Monorepo\Tests;
 
 use Testo\Assert;
 use Testo\Test;
-use Thesis\Monorepo\Generator;
-use Thesis\Monorepo\Json;
+use Thesis\Monorepo\Internal\Generator;
+use Thesis\Monorepo\Internal\Json;
 
 #[Test]
 final readonly class GeneratorTest
 {
-    public function generatesPackageComposerJson(): void
+    public static function generatesPackageComposerJson(): void
     {
         $fixture = self::fixture();
 
@@ -31,7 +31,7 @@ final readonly class GeneratorTest
         ]);
     }
 
-    public function mergesPackagesIntoRootComposerJson(): void
+    public static function mergesPackagesIntoRootComposerJson(): void
     {
         $fixture = self::fixture();
 
@@ -42,12 +42,16 @@ final readonly class GeneratorTest
             'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'revolt/event-loop' => '^1.0'],
             'require-dev' => ['amphp/amp' => '^3.0'],
             'replace' => ['thesis/async' => 'self.version', 'thesis/bytes' => 'self.version'],
-            'autoload' => ['psr-4' => ['Thesis\Async\\' => 'packages/async/src/', 'Thesis\Bytes\\' => 'packages/bytes/src/']],
-            'autoload-dev' => ['psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/']],
+            'autoload' => [
+                'psr-4' => ['Thesis\Async\\' => 'packages/async/src/', 'Thesis\Bytes\\' => 'packages/bytes/src/'],
+            ],
+            'autoload-dev' => [
+                'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
+            ],
         ]);
     }
 
-    public function writesCatalogBetweenMarkers(): void
+    public static function writesCatalogBetweenMarkers(): void
     {
         $fixture = self::fixture();
 
@@ -58,7 +62,25 @@ final readonly class GeneratorTest
             ->contains("- `async`: Package async. Uses: bytes.\n");
     }
 
-    public function reportsOnlyChangedFilesAsStale(): void
+    public static function writesTestoSuitesWithPlugins(): void
+    {
+        $fixture = self::fixture()->file('packages/async/testo.plugins.php', "<?php\n\nreturn [];\n");
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files['testo.php'] ?? '')
+            ->contains(<<<'PHP'
+                        new SuiteConfig(
+                            name: 'async',
+                            location: [__DIR__ . '/packages/async/tests'],
+                            plugins: require __DIR__ . '/packages/async/testo.plugins.php',
+                        ),
+                        new SuiteConfig(name: 'bytes', location: [__DIR__ . '/packages/bytes/tests']),
+
+                PHP);
+    }
+
+    public static function reportsOnlyChangedFilesAsStale(): void
     {
         $fixture = self::fixture();
         $monorepo = $fixture->load();
@@ -76,6 +98,11 @@ final readonly class GeneratorTest
     {
         return new Fixture()
             ->package('bytes', "layer: Layer::Primitive, require: ['ext-bcmath' => '*']")
-            ->package('async', "layer: Layer::Runtime, uses: ['bytes'], require: ['revolt/event-loop' => '^1.0'], requireDev: ['amphp/amp' => '^3.0']");
+            ->package('async', <<<'PHP'
+                layer: Layer::Runtime,
+                uses: ['bytes'],
+                require: ['revolt/event-loop' => '^1.0'],
+                requireDev: ['amphp/amp' => '^3.0'],
+                PHP);
     }
 }

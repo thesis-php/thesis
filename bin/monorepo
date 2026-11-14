@@ -4,9 +4,9 @@
 declare(strict_types=1);
 
 use Symfony\Component\Console\Application;
-use Thesis\Monorepo\Command\CheckCommand;
-use Thesis\Monorepo\Command\NewPackageCommand;
-use Thesis\Monorepo\Command\SyncCommand;
+use Thesis\Monorepo\Internal\Command\CheckCommand;
+use Thesis\Monorepo\Internal\Command\NewPackageCommand;
+use Thesis\Monorepo\Internal\Command\SyncCommand;
 
 require __DIR__ . '/../vendor/autoload.php';
 
