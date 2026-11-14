@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class DeferredTest
@@ -215,10 +216,7 @@ final class DeferredTest
         $deferred->complete('value');
 
         $result = timeout(1, static function () use ($deferred) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return $deferred->await();
         });
@@ -234,10 +232,7 @@ final class DeferredTest
         $deferred = new Deferred();
 
         timeout(1, static function () use ($deferred) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             $deferred->await();
         });

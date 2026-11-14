@@ -181,7 +181,7 @@ final class VirtualTimeTest
     {
         $start = now();
         $exception = thrown(static fn() => group(static function (Group $group) {
-            $group->spawn(static fn() => suspend(static fn(Continuation $continuation) => static function () {}));
+            $group->spawn(never(...));
         }));
 
         Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');

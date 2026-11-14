@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class ShieldTest
@@ -93,10 +94,7 @@ final class ShieldTest
     {
         $exception = thrown(static function () {
             timeout(1, static function () {
-                try {
-                    never();
-                } catch (Cancelled) {
-                }
+                untilCancelled();
 
                 shield(static fn() => delay(1));
                 never();

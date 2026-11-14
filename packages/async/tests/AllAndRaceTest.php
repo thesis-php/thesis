@@ -9,6 +9,7 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class AllAndRaceTest
@@ -210,10 +211,7 @@ final class AllAndRaceTest
 
         $winner = race([
             static function () use (&$loserReturned) {
-                try {
-                    never();
-                } catch (Cancelled) {
-                }
+                untilCancelled();
 
                 $loserReturned = true;
 

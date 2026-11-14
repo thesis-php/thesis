@@ -9,7 +9,7 @@ use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
-use function Thesis\Async\Tests\never;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class LocalSlidingWindowRateLimiterTest
@@ -123,10 +123,7 @@ final class LocalSlidingWindowRateLimiterTest
         $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1_000);
 
         $thrown = timeout(1, static function () use ($limiter) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             try {
                 $limiter->wait();

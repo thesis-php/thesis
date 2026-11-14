@@ -10,6 +10,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class LocalSemaphoreTest
@@ -65,10 +66,7 @@ final class LocalSemaphoreTest
         $semaphore = new LocalSemaphore(1);
 
         $lock = timeout(1, static function () use ($semaphore) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return $semaphore->acquire();
         });

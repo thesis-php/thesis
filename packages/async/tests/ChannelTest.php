@@ -12,6 +12,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\reaches;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class ChannelTest
@@ -117,10 +118,7 @@ final class ChannelTest
         $channel = new Channel(1);
 
         timeout(1, static function () use ($channel) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             $channel->send('value');
         });
@@ -135,10 +133,7 @@ final class ChannelTest
         $channel->send('value');
 
         $value = timeout(1, static function () use ($channel) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return $channel->receive();
         });
@@ -292,10 +287,7 @@ final class ChannelTest
         $channel = new Channel(1);
 
         $value = timeout(1, static function () use ($channel) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return $channel->tryReceive('nothing');
         });
@@ -923,8 +915,8 @@ final class ChannelTest
             }
             delay(1);
 
-            Assert::same(\count((fn(): array => $this->receivers->items)->call($toReceive)), 2);
-            Assert::same(\count((fn(): array => $this->senders->items)->call($toSend)), 2);
+            Assert::count(self::waiters($toReceive)['receivers'], 2);
+            Assert::count(self::waiters($toSend)['senders'], 2);
             Assert::true(reaches($toSend, $values[0]));
 
             foreach ($handles as $handle) {
@@ -946,8 +938,17 @@ final class ChannelTest
      */
     private function assertHoldsNothing(Channel $channel): void
     {
-        Assert::same((fn(): array => $this->receivers->items)->call($channel), []);
-        Assert::same((fn(): array => $this->senders->items)->call($channel), []);
+        Assert::same(self::waiters($channel), ['receivers' => [], 'senders' => []]);
+    }
+
+    /**
+     * @template T
+     * @param Channel<T> $channel
+     * @return array{receivers: array<mixed>, senders: array<mixed>}
+     */
+    private static function waiters(Channel $channel): array
+    {
+        return (fn(): array => ['receivers' => $this->receivers->items, 'senders' => $this->senders->items])->call($channel);
     }
 
     /**

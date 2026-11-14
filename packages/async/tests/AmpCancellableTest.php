@@ -13,8 +13,8 @@ use Testo\Test;
 use function Amp\delay as ampDelay;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
-use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class AmpCancellableTest
@@ -71,10 +71,7 @@ final class AmpCancellableTest
     public function throwsCancelledWithoutCallingFnInCancelledScope(): void
     {
         $exception = thrown(static fn() => timeout(1, static function () {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             ampCancellable(static function () {
                 throw new \LogicException('fn is called');

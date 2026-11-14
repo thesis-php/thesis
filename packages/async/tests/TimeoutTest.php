@@ -11,6 +11,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
@@ -193,10 +194,7 @@ final class TimeoutTest
     public function valueReturnedAfterDeadlineWins(): void
     {
         $result = timeout(1, static function () {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return 'value';
         });

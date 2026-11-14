@@ -10,6 +10,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class AllSettledAndSomeTest
@@ -251,10 +252,7 @@ final class AllSettledAndSomeTest
                     throw new \RuntimeException('b');
                 },
                 static function () use (&$returned) {
-                    try {
-                        never();
-                    } catch (Cancelled) {
-                    }
+                    untilCancelled();
 
                     $returned = true;
 
@@ -274,10 +272,7 @@ final class AllSettledAndSomeTest
 
         $results = some(1, [
             'late' => static function () use (&$returned) {
-                try {
-                    never();
-                } catch (Cancelled) {
-                }
+                untilCancelled();
 
                 $returned = true;
 

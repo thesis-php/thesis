@@ -9,6 +9,7 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
@@ -154,10 +155,7 @@ final class TaskTest
                     $handle = $group->spawn(never(...));
                     advance(5);
 
-                    try {
-                        never(); // the deadline cancels both the task and the body
-                    } catch (Cancelled) {
-                    }
+                    untilCancelled(); // the deadline cancels both the task and the body
 
                     shield(static fn() => delay(2)); // let the task finish as cancelled
                     Assert::true($handle->isDone);

@@ -12,6 +12,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class SuspendTest
@@ -226,10 +227,7 @@ final class SuspendTest
 
         $exception = thrown(static function () use (&$registered) {
             timeout(1, static function () use (&$registered) {
-                try {
-                    never();
-                } catch (Cancelled) {
-                }
+                untilCancelled();
 
                 suspend(static function (Continuation $continuation) use (&$registered) {
                     $registered = true;

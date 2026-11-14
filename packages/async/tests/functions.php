@@ -11,6 +11,7 @@ namespace Thesis\Async\Tests;
 
 use Revolt\EventLoop;
 use Testo\Assert;
+use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
 use function Thesis\Async\now;
 use function Thesis\Async\suspend;
@@ -27,6 +28,18 @@ function never(): never
     );
 
     throw new \LogicException('A wait without an event source has returned.');
+}
+
+/**
+ * Waits until the current scope is cancelled and returns: the code after it runs in a cancelled scope,
+ * where every wait throws Cancelled again.
+ */
+function untilCancelled(): void
+{
+    try {
+        never();
+    } catch (Cancelled) {
+    }
 }
 
 /**
@@ -47,7 +60,8 @@ function thrown(callable $fn): \Throwable
 }
 
 /**
- * Runs $fn, ignoring what it throws, and measures how long it took on the clock of deadlines.
+ * Runs $fn and measures how long it took on the clock of deadlines. What $fn throws goes through:
+ * a test that expects an exception catches it inside $fn with thrown() and checks it.
  *
  * @param callable(): mixed $fn
  * @return float seconds
@@ -55,11 +69,7 @@ function thrown(callable $fn): \Throwable
 function elapsed(callable $fn): float
 {
     $start = now();
-
-    try {
-        $fn();
-    } catch (\Throwable) {
-    }
+    $fn();
 
     return now() - $start;
 }

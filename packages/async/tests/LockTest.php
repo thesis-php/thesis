@@ -6,8 +6,8 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
-use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class LockTest
@@ -37,10 +37,7 @@ final class LockTest
         });
 
         timeout(1, static function () use ($lock) {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             $lock->release();
         });

@@ -14,6 +14,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
 final class GroupTest
@@ -368,10 +369,7 @@ final class GroupTest
         $result = timeout(1, static fn() => group(static function (Group $group) {
             $group->daemon(never(...));
 
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             return 'result';
         }));
@@ -658,7 +656,7 @@ final class GroupTest
 
         Assert::instanceOf($exception, \Error::class);
         Assert::string($exception->getMessage())->startsWith('Event loop terminated without resuming the current suspension');
-        Assert::same((fn(): array => $this->children)->call($root), []);
+        Assert::same(self::children($root), []);
         /** @var Group $escaped */
         Assert::instanceOf(thrown(static fn() => $escaped->spawn(static fn() => null)), \LogicException::class);
 
@@ -683,10 +681,8 @@ final class GroupTest
 
     public function closesEveryScope(): void
     {
-        /** @var \Closure(Scope): array<int, Scope> */
-        $children = static fn(Scope $scope): array => (fn(): array => $this->children)->call($scope);
-        $onlyChild = static function (Scope $scope) use ($children): Scope {
-            $scopes = $children($scope);
+        $onlyChild = static function (Scope $scope): Scope {
+            $scopes = self::children($scope);
             Assert::count($scopes, 1);
             $child = current($scopes);
             \assert($child instanceof Scope);
@@ -695,7 +691,7 @@ final class GroupTest
         };
         $root = Scope::current();
 
-        group(static function (Group $group) use ($children, $onlyChild) {
+        group(static function (Group $group) use ($onlyChild) {
             $body = Scope::current();
             timeout(1_000, static fn() => null);
             thrown(static fn() => timeout(1, never(...)));
@@ -711,10 +707,10 @@ final class GroupTest
 
             $tasksScope = $onlyChild($body);
             $daemonsScope = $onlyChild($tasksScope);
-            Assert::same($children($daemonsScope), []);
+            Assert::same(self::children($daemonsScope), []);
         });
 
-        Assert::same($children($root), []);
+        Assert::same(self::children($root), []);
     }
 
     public function scopesGoAwayWithoutCycleCollector(): void
@@ -751,5 +747,13 @@ final class GroupTest
         foreach ($references as $reference) {
             Assert::null($reference->get());
         }
+    }
+
+    /**
+     * @return array<int, Scope>
+     */
+    private static function children(Scope $scope): array
+    {
+        return (fn(): array => $this->children)->call($scope);
     }
 }

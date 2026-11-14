@@ -9,8 +9,8 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
-use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
@@ -24,7 +24,14 @@ final class DelayAndCheckpointTest
 
     public function delayIsCancellable(): void
     {
-        Assert::same(elapsed(static fn() => timeout(1, static fn() => delay(10_000))), 1.0);
+        $exception = null;
+
+        $elapsed = elapsed(static function () use (&$exception) {
+            $exception = thrown(static fn() => timeout(1, static fn() => delay(10_000)));
+        });
+
+        Assert::instanceOf($exception, TimedOut::class);
+        Assert::same($elapsed, 1.0);
         assertNoCallbacksLeft();
     }
 
@@ -51,10 +58,7 @@ final class DelayAndCheckpointTest
     public function delayOfZeroOrLessIsCancellationPoint(): void
     {
         $exception = thrown(static fn() => timeout(1, static function () {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             delay(-1);
         }));
@@ -99,10 +103,7 @@ final class DelayAndCheckpointTest
         Expect::exception(TimedOut::class);
 
         timeout(1, static function () {
-            try {
-                never();
-            } catch (Cancelled) {
-            }
+            untilCancelled();
 
             checkpoint();
         });
