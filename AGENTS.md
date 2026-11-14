@@ -68,6 +68,8 @@ the whole monorepo is for the final check.
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
   first-class callables (`f(...)`) instead of wrapper closures, `Uri\WhatWg\Url` instead of `parse_url()`
   or a URL library.
+- A path to a parent directory is `dirname(__DIR__)` or `dirname(__DIR__, 2)`, never `__DIR__.'/..'`:
+  a path without `..` reads well in errors and can be compared as a string with other paths.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
