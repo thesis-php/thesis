@@ -540,6 +540,44 @@ synchronizedKey($accounts, $accountId, static function () use ($accountId, $amou
 Within a key they behave as `Mutex` and `Semaphore`: fair, cancellable, reentrant under `synchronizedKey()` per key.
 `LocalKeyedSemaphore` keeps a key only while someone holds or waits for it, so keys that come from outside do not pile up.
 
+### Rate limits: `RateLimiter`
+
+A semaphore bounds how many calls run at once; an API that allows 10 requests a second bounds how often they start.
+`LocalRateLimiter` is a token bucket: it holds up to `$burst` tokens, gains `$perSecond` of them a second, and a call takes one:
+
+```php
+use Thesis\Async\LocalRateLimiter;
+
+$github = new LocalRateLimiter(perSecond: 10, burst: 10);
+
+each($repositories, static function (Repository $repository) use ($github) {
+    $github->wait();
+    fetch($repository);
+}, concurrency: 5); // both limits: at most 5 at once, 10 a second on average
+```
+
+After a pause, `$burst` calls start at once, then one every `1 / $perSecond` seconds. No timer refills the bucket:
+the tokens are recomputed from `now()` when a call comes. It is fair like the mutex it queues on: tokens go in the order
+callers came, and only the first one sleeps. A caller cancelled while waiting takes no token, so the next one gets it on time;
+`timeout()` around `wait()` bounds how long a call may wait for its turn.
+
+A bucket limits the average, not every window: within any `T` seconds up to `$burst + $perSecond * T` calls start,
+so `perSecond: 10, burst: 10` may start 20 within one second. For a server that rejects more than `N` requests
+in any `T` seconds, use a sliding window instead, which bounds every interval at full rate:
+
+```php
+use Thesis\Async\LocalSlidingWindowRateLimiter;
+
+$api = new LocalSlidingWindowRateLimiter(calls: 10, seconds: 1); // never 11 starts within one second
+```
+
+It keeps the start times of the last `$calls` calls, and a call waits until the oldest of them leaves the window.
+It is fair and cancellable in the same way. Prefer the bucket unless the limit is enforced per window:
+it spreads the calls evenly, while a window lets `$calls` of them start at once, again and again.
+
+`RateLimiter` is an interface, like `Semaphore`: a limit shared by several processes (in Redis) implements `wait()`
+with the same contract, a cancelled wait counts no call.
+
 ### Producers and consumers: `Channel`
 
 A bounded queue between fibers that live on their own: request handlers and one writer that stores events in batches,
@@ -820,6 +858,7 @@ all([user, orders])              orders fails after 50 ms
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
 | `KeyedMutex extends KeyedSemaphore`: `acquire(string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
 | `synchronizedKey(KeyedSemaphore, string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
+| `RateLimiter`: `wait(): void`; `LocalRateLimiter(float $perSecond, int $burst)`, `LocalSlidingWindowRateLimiter(int $calls, float $seconds)` | how often calls start: a token bucket or a sliding window, fair |
 | `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): bool`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
