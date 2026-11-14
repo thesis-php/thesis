@@ -116,7 +116,35 @@ final class TaskTest
         });
     }
 
-    public function awaitOfFinishedCancelledTaskInCancelledScopeThrowsTaskCancelled(): void
+    public function awaitOfFinishedTaskInCancelledScopeReturnsOutcomeAsIs(): void
+    {
+        $failure = new \RuntimeException('failure');
+        $succeeded = null;
+        $failed = null;
+        group(static function (Group $group) use (&$succeeded) {
+            $succeeded = $group->spawn(static fn() => 'result');
+        });
+        thrown(static function () use ($failure, &$failed) {
+            group(static function (Group $group) use ($failure, &$failed) {
+                $failed = $group->spawn(static fn() => throw $failure);
+            });
+        });
+        \assert($succeeded instanceof Task && $failed instanceof Task);
+        $outcomes = null;
+
+        timeout(1, static function () use ($succeeded, $failed, &$outcomes) {
+            try {
+                never();
+            } catch (Cancelled) {
+                // Not a cancellation point: the outcome of a finished task is returned or thrown as is.
+                $outcomes = [$succeeded->await(), thrown(static fn() => $failed->await())];
+            }
+        });
+
+        Assert::same($outcomes, ['result', $failure]);
+    }
+
+    public function awaitOfFinishedCancelledTaskInCancelledScopeThrowsCancelled(): void
     {
         $awaited = null;
 
@@ -134,13 +162,29 @@ final class TaskTest
                     shield(static fn() => delay(2)); // let the task finish as cancelled
                     Assert::true($task->isDone);
 
-                    // Not a cancellation point: the outcome of a finished task is returned as is.
+                    // The awaiter is cancelled too, so it ends as cancelled.
                     $awaited = thrown(static fn() => $task->await());
                 });
             });
         });
 
-        Assert::instanceOf($awaited, TaskCancelled::class);
+        Assert::instanceOf($awaited, Cancelled::class);
+    }
+
+    public function timeoutAroundTaskAwaitingFinishedCancelledSiblingThrowsTimedOut(): void
+    {
+        Expect::exception(TimedOut::class);
+
+        timeout(1, static function () {
+            group(static function (Group $group) {
+                $sibling = $group->spawn(never(...));
+                $group->spawn(static function () use ($sibling) {
+                    shield(static fn() => delay(2)); // the deadline cancels the sibling meanwhile
+                    Assert::true($sibling->isDone);
+                    $sibling->await();
+                });
+            });
+        });
     }
 
     public function awaiterCancelledAfterCancelledTaskWokeItThrowsCancelled(): void

@@ -160,8 +160,9 @@ and awaiting it throws `TaskCancelled`.
 Awaiting a cancelled task throws `TaskCancelled`, a regular exception: the awaiting code is not cancelled,
 it has just lost a dependency. A task that let through the `TaskCancelled` of another task it awaited
 throws it too: as in Kotlin and Java, the two cannot be told apart. Awaiting a task that is already done returns
-its result, or throws its failure or `TaskCancelled`, without suspending: it is not a cancellation point then,
-even in a cancelled scope, and does not yield to the event loop.
+its result or throws its failure without suspending: it is not a cancellation point then, even in a cancelled scope,
+and does not yield to the event loop. Only a cancelled task awaited from a cancelled scope throws `Cancelled`
+instead of `TaskCancelled`: the awaiter ends as cancelled, so a `timeout()` around it still throws `TimedOut`.
 
 If an outer cancellation cuts a task short, `group()` throws `Cancelled` even if the body never awaited that task:
 a group never pretends that its work is done.

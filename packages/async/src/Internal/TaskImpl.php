@@ -38,15 +38,12 @@ final class TaskImpl implements Task
 
     public function await(): mixed
     {
-        if ($this->result->isDone) {
-            // Not a cancellation point: the outcome of a finished task is returned as is, even in a cancelled scope.
-            return $this->result->await();
-        }
-
         try {
+            // A finished task's success or failure is returned or thrown as is, even in a cancelled scope.
             return $this->result->await();
         } catch (TaskCancelled $cancelled) {
-            // TaskCancelled is for an awaiter that is fine itself; one cancelled after the task woke it gets Cancelled.
+            // TaskCancelled is for an awaiter that is fine itself. A cancelled one gets Cancelled, even if the task
+            // was already done: the awaiter ends as cancelled, so timeout() still throws TimedOut.
             Scope::current()->throwIfCancelled();
 
             throw $cancelled;
