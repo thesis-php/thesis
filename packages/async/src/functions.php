@@ -310,53 +310,143 @@ function all(array $tasks): array
 }
 
 /**
- * The first one to succeed wins; the rest are cancelled AND joined.
- * Failures are ignored while there is a chance to win; if every contender fails, the first failure is rethrown.
+ * Waits for every task, whatever it ends with: a failure neither cancels the rest nor is rethrown.
+ * Returns the results and the failures, each with the keys of $tasks and in their order.
+ *
+ * Settled means finished on its own: {@see Cancelled} is not a result. allSettled() cancels nothing itself,
+ * so a task can be cancelled only from outside, and then allSettled() throws {@see Cancelled} as any wait does.
+ * For "whatever is ready within 100 ms", put a {@see timeout()} around each task, not around allSettled():
+ * its {@see TimedOut} is then a failure of that task.
  *
  * @api
+ * @template K of array-key
  * @template T
- * @param non-empty-array<callable(): T> $tasks
- * @return T
- * @throws \ValueError if $tasks is empty: there would be no winner and no failure to report
+ * @param array<K, callable(): T> $tasks
+ * @return array{array<K, T>, array<K, \Throwable>} the results and the failures
  */
-function race(array $tasks): mixed
+function allSettled(array $tasks): array
 {
-    /** @phpstan-ignore identical.alwaysFalse */
-    if ($tasks === []) {
-        throw new \ValueError('A race needs at least one contender.');
+    return group(static function (Group $group) use ($tasks) {
+        $handles = [];
+
+        foreach ($tasks as $key => $task) {
+            $handles[$key] = $group->spawn(static function () use ($task) {
+                // A result is boxed: it may itself be a \Throwable.
+                try {
+                    return [$task()];
+                } catch (Cancelled $cancelled) {
+                    throw $cancelled;
+                } catch (\Throwable $error) {
+                    return $error;
+                }
+            });
+        }
+
+        $errors = [];
+        $results = [];
+
+        foreach ($handles as $key => $handle) {
+            $settled = $handle->await();
+
+            if ($settled instanceof \Throwable) {
+                $errors[$key] = $settled;
+            } else {
+                $results[$key] = $settled[0];
+            }
+        }
+
+        return [$results, $errors];
+    });
+}
+
+/**
+ * The first $count tasks to succeed win; the rest are cancelled AND joined. For a quorum: two replicas out of three.
+ * Returns their results with the keys of $tasks, in the order they succeeded.
+ *
+ * Failures are ignored while $count successes are still possible. Once they are not, the rest are cancelled
+ * and the first failure is rethrown; every other one is among its `suppressed()` ones,
+ * including those of the tasks that fail while being cancelled. After $count successes, failures are dropped.
+ *
+ * @api
+ * @template K of array-key
+ * @template T
+ * @param positive-int $count
+ * @param array<K, callable(): T> $tasks
+ * @return non-empty-array<K, T>
+ * @throws \ValueError if there are fewer than $count tasks: the failure would be known before anything runs
+ */
+function some(int $count, array $tasks): array
+{
+    if ($count > \count($tasks)) {
+        throw new \ValueError(\sprintf('some() needs at least %d tasks, got %d.', $count, \count($tasks)));
     }
 
-    /** @var list<T> $winner */
-    $winner = [];
+    // Once more than this many have failed, $count successes are no longer possible.
+    $tolerated = \count($tasks) - $count;
+    $results = [];
     $failure = null;
+    $failures = 0;
 
-    group(static function (Group $group) use ($tasks, &$winner, &$failure) {
-        foreach ($tasks as $task) {
-            $group->spawn(static function () use ($task, $group, &$winner, &$failure) {
+    group(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
+        foreach ($tasks as $key => $task) {
+            $group->spawn(static function () use ($key, $task, $group, $count, $tolerated, &$results, &$failure, &$failures) {
                 try {
                     $value = $task();
                 } catch (Cancelled $cancelled) {
                     throw $cancelled;
                 } catch (\Throwable $error) {
-                    $failure ??= $error;
+                    if (\count($results) === $count) {
+                        return;
+                    }
+
+                    if ($failure === null) {
+                        $failure = $error;
+                    } else {
+                        Suppressed::add($failure, $error);
+                    }
+
+                    if (++$failures === $tolerated + 1) {
+                        $group->cancelTasks();
+                    }
 
                     return;
                 }
 
-                if ($winner === []) {
-                    $winner = [$value];
+                // Successes and failures cannot both be decided: that would take more tasks than there are.
+                if ($failures > $tolerated || \count($results) === $count) {
+                    return;
+                }
+
+                $results[$key] = $value;
+
+                if (\count($results) === $count) {
                     $group->cancelTasks();
                 }
             });
         }
     });
 
-    if ($winner === []) {
+    if (\count($results) < $count) {
         /** @var \Throwable $failure */
         throw $failure;
     }
 
-    return $winner[0];
+    return $results;
+}
+
+/**
+ * The first one to succeed wins; the rest are cancelled AND joined: {@see some()} with a count of one.
+ * Failures are ignored while there is a chance to win; if every contender fails, the first failure is rethrown,
+ * and the others are among its `suppressed()` ones.
+ *
+ * @api
+ * @template T
+ * @param non-empty-array<callable(): T> $tasks
+ * @return T
+ */
+function race(array $tasks): mixed
+{
+    return array_first(some(1, $tasks));
 }
 
 /**

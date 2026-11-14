@@ -41,6 +41,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Cancelling a task does not fail its group; a task failure does, and the first failure is the one rethrown.
   A regular task cut short by an outer cancellation makes `group()` throw `Cancelled` after join.
 - A task cancelled before it started never runs.
+- `race()` is `some(1, ...)`. `some()` decides once: after `$count` successes failures are dropped, after more than
+  `count($tasks) - $count` failures successes are dropped and every later failure goes to `suppressed()` of the first.
+  `allSettled()` never records `Cancelled` as an outcome: it cancels nothing, so a cancelled task means the caller is cancelled.
 - Every other failure of a group is recorded by `GroupImpl::fail()` through `Internal\Suppressed`: a `WeakMap` from the rethrown
   error to the list of the others. The rethrown error is never changed (no wrapper, no `previous`); the same object
   is recorded at most once and never under itself. When a join gives up on a deadlock, the group's failure
@@ -84,7 +87,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
   a third party's callable is named by its role, and anything else is a `$fn`.
   - `$body`: runs in the current fiber inside a new scope (`group()`, `timeout()`, `shield()`, `Scope::run()`).
     "Body" is a term of the model: the body owns the group.
-  - `$task` / `$tasks`: run in a new fiber under its own scope (`Group::spawn()`, `Group::daemon()`, `all()`, `race()`).
+  - `$task` / `$tasks`: run in a new fiber under its own scope (`Group::spawn()`, `Group::daemon()`, `all()`, `allSettled()`, `race()`, `some()`).
   - A role name when a third party calls it at a set moment: `$register`, `$unregister`, `$release`, `$callback`.
   - `$fn`: a plain call with no scope of its own (`synchronized()`, `ScopedValue::with()`, `ampCancellable()`,
     `Context`, `each()`, `map()`).

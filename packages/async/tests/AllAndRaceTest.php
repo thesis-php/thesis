@@ -232,6 +232,24 @@ final class AllAndRaceTest
         ]);
     }
 
+    public function raceSuppressesOtherFailuresIfEveryoneFailed(): void
+    {
+        $first = new \RuntimeException('first');
+        $second = new \LogicException('second');
+
+        $exception = thrown(static fn() => race([
+            static fn() => throw $first,
+            static function () use ($second) {
+                delay(0.001);
+
+                throw $second;
+            },
+        ]));
+
+        Assert::same($exception, $first);
+        Assert::same(suppressed($first), [$second]);
+    }
+
     public function raceIsCancellable(): void
     {
         Expect::exception(TimedOut::class);
@@ -251,13 +269,5 @@ final class AllAndRaceTest
         ]);
 
         Assert::same($winner, 'replica');
-    }
-
-    public function raceOfNothingIsRejected(): void
-    {
-        Expect::exception(\ValueError::class)->withMessage('A race needs at least one contender.');
-
-        /** @phpstan-ignore argument.type, argument.templateType */
-        race([]);
     }
 }

@@ -75,7 +75,7 @@ use function Thesis\Async\all;
 $report = new Report($sales, $costs);
 ```
 
-`all()`, `race()`, `map()` and `each()` cover most cases without a task handle. All of them are built on `group()`.
+`all()`, `allSettled()`, `race()`, `some()`, `map()` and `each()` cover most cases without a task handle. All of them are built on `group()`.
 
 `all()` keeps the keys but not a type per key: its signature is `array<K, callable(): T>` → `array<K, T>`,
 so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. When the results have different types,
@@ -247,7 +247,46 @@ $value = race([
 ]);
 ```
 
-`race([])` throws `\ValueError`: there would be neither a winner nor a failure to report.
+If every contender fails, the other failures are among the `suppressed()` ones of the rethrown one.
+
+### Quorum: `some()`
+
+`race()` is `some(1, ...)`. `some()` waits for the first `$count` successes, cancels and joins the rest,
+and returns the results with their keys in the order they succeeded:
+
+```php
+use function Thesis\Async\some;
+
+// Two replicas out of three agree: the write is durable.
+$acks = some(2, [
+    'a' => static fn() => write('a', $record),
+    'b' => static fn() => write('b', $record),
+    'c' => static fn() => write('c', $record),
+]);
+```
+
+It fails as soon as `$count` successes are no longer possible, not when every task is done: the rest are cancelled,
+the first failure is rethrown, and the others (including those of tasks failing while being cancelled) are its `suppressed()` ones.
+Fewer tasks than `$count` is a `\ValueError`.
+
+### Every outcome: `allSettled()`
+
+Waits for every task; a failure neither cancels the others nor is rethrown. Results and failures come apart,
+each with the keys of the tasks and in their order:
+
+```php
+use function Thesis\Async\allSettled;
+use function Thesis\Async\timeout;
+
+[$pages, $errors] = allSettled(array_map(
+    static fn(string $url) => static fn() => timeout(0.1, static fn() => fetch($url)),
+    $urls,
+));
+```
+
+`Cancelled` is not an outcome: `allSettled()` cancels nothing, so a cancelled task means the caller is cancelled,
+and `allSettled()` throws as any wait does. That is why the deadline above is per task: a `timeout()` around `allSettled()`
+would throw `TimedOut` and drop the pages that were ready, while one per task makes it a failure of that task.
 
 ### Bounded concurrency: `each()` and `map()`
 
@@ -752,7 +791,9 @@ all([user, orders])              orders fails after 50 ms
 | `Group::cancelTasks()` | cancel all tasks and daemons, including later ones, but not the body |
 | `Task::await(): T`, `Task::cancel()`, `Task::$isDone` | task handle |
 | `all(array<K, callable(): T>): array<K, T>` | all results or the first failure |
+| `allSettled(array<K, callable(): T>): array{array<K, T>, array<K, \Throwable>}` | every result and every failure, nothing is cancelled |
 | `race(non-empty-array<callable(): T>): T` | first success wins, the rest are cancelled and joined |
+| `some(int $count, array<K, callable(): T>): non-empty-array<K, T>` | first `$count` successes win, the rest are cancelled and joined |
 | `each(iterable<K, T>, callable(T, K), int $concurrency)` | bounded concurrency |
 | `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
