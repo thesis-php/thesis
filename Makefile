@@ -1,11 +1,13 @@
 SHELL := /bin/sh
 
-DOCKER ?= docker
-DOCKER_COMPOSE ?= $(DOCKER) compose
+DOCKER_COMPOSE ?= docker compose
 export DOCKER_USER ?= $(shell id -u):$(shell id -g)
-
 RUN ?= $(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm php)
 COMPOSER ?= $(RUN) composer
+
+# (P=<name> narrows the quality tools and the tests to packages/<name>)
+P ?=
+PATHS = $(if $(P),packages/$(P),bin/monorepo monorepo.php tools packages)
 
 # Container
 
@@ -14,12 +16,8 @@ terminal: var ## (t) Open a shell in the PHP container
 	$(RUN) /bin/sh
 .PHONY: t terminal
 
-run: ## Run a command in the PHP container: CMD='php --version'
-	$(RUN) $(CMD)
-.PHONY: run
-
 up: ## Start services
-	$(DOCKER_COMPOSE) up --remove-orphans --build --detach
+	$(DOCKER_COMPOSE) up --remove-orphans --detach --wait
 .PHONY: up
 
 down: ## Stop services
@@ -31,100 +29,89 @@ down: ## Stop services
 i: install
 install: ## (i) Install dependencies
 	$(COMPOSER) install
-	@rm -f vendor/.lowest
 	@touch vendor
 .PHONY: i install
 
 u: update
 update: ## (u) Update dependencies
 	$(COMPOSER) update
-	@rm -f vendor/.lowest
 	@touch vendor
 .PHONY: u update
 
-install-lowest: ## Install lowest possible dependencies
-	$(COMPOSER) update --prefer-lowest --prefer-stable
-	@touch vendor/.lowest
+# Monorepo
+
+sync: vendor ## Regenerate files derived from the manifests, then update the lock
+	$(RUN) bin/monorepo sync
+	$(COMPOSER) normalize --no-check-lock --no-update-lock
+	$(COMPOSER) update --minimal-changes
 	@touch vendor
-.PHONY: install-lowest
+.PHONY: sync
 
-# Quality tools
+new-package: vendor ## Scaffold a package: NAME=byte-buffer LAYER=primitive DESC='Growable byte buffer'
+	$(RUN) bin/monorepo new '$(NAME)' '$(LAYER)' '$(DESC)'
+	$(COMPOSER) normalize --no-check-lock --no-update-lock
+	$(COMPOSER) update --minimal-changes
+	@touch vendor
+.PHONY: new-package
 
-fixer: var ## Fix code style
-	$(RUN) php-cs-fixer fix --diff --verbose $(ARGS)
+monorepo-check: vendor ## Validate manifests, layers and dependencies, fail if a generated file is stale
+	$(RUN) bin/monorepo check
+	$(COMPOSER) validate --strict
+	$(COMPOSER) normalize --dry-run --diff
+.PHONY: monorepo-check
+
+# Quality
+
+fixer: var ## Fix code style [P=]
+	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php --path-mode=intersection --diff $(ARGS) $(PATHS)
 .PHONY: fixer
 
-fixer-check: var ## Check code style
-	$(RUN) php-cs-fixer fix --diff --verbose --dry-run $(ARGS)
+fixer-check: var ## Check code style [P=]
+	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php --path-mode=intersection --diff --dry-run $(ARGS) $(PATHS)
 .PHONY: fixer-check
 
-rector: var vendor ## Apply Rector rules
-	$(RUN) rector process $(ARGS)
+rector: var vendor ## Apply Rector rules [P=]
+	$(RUN) rector process --config=tools/rector.php $(ARGS) $(PATHS)
 .PHONY: rector
 
-rector-check: var vendor ## Check Rector rules
-	$(RUN) rector process --dry-run $(ARGS)
+rector-check: var vendor ## Check Rector rules [P=]
+	$(RUN) rector process --config=tools/rector.php --dry-run $(ARGS) $(PATHS)
 .PHONY: rector-check
 
-phpstan: var vendor ## Run static analysis
-	$(RUN) phpstan analyze --memory-limit=1G $(ARGS)
+phpstan: var vendor ## Run static analysis [P=]
+	$(RUN) phpstan analyze --configuration=tools/phpstan.neon --memory-limit=1G $(ARGS) $(PATHS)
 .PHONY: phpstan
 
-test: var vendor up ## Run the test suite
-	$(RUN) vendor/bin/testo $(ARGS)
-.PHONY: test
-
-infect: var vendor up ## Run mutation testing
-	$(RUN) infection --show-mutations $(ARGS)
-.PHONY: infect
-
-deps-analyze: vendor ## Check for unused/missing dependencies
+deps-analyze: vendor ## Check for unused and shadow dependencies
 	$(RUN) composer-dependency-analyser $(ARGS)
 .PHONY: deps-analyze
 
-composer-validate: ## Validate composer.json
-	$(COMPOSER) validate
-.PHONY: composer-validate
+test: var vendor ## Run tests [P=]
+	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
+.PHONY: test
 
-composer-normalize: ## Normalize composer.json
-	$(COMPOSER) normalize --no-check-lock --no-update-lock --diff
-.PHONY: composer-normalize
-
-composer-normalize-check: ## Check composer.json is normalized
-	$(COMPOSER) normalize --diff --dry-run
-.PHONY: composer-normalize-check
+infect: var vendor ## Run mutation testing [P=]
+	$(RUN) infection --configuration=tools/infection.json5 --show-mutations $(if $(P),--filter=packages/$(P)/src --test-framework-options=--suite=$(P)) $(ARGS)
+.PHONY: infect
 
 # CI
 
-fix: fixer rector composer-normalize ## Fix code style and normalize composer.json
+fix: fixer rector ## Fix code style and apply Rector rules [P=]
 .PHONY: fix
 
-check: fixer-check rector-check composer-validate composer-normalize-check deps-analyze phpstan test ## Run all checks
+check: monorepo-check fixer-check rector-check phpstan deps-analyze test ## Run all checks
 .PHONY: check
-
-rescaffold:
-	$(DOCKER) run \
-	  --rm --init \
-	  --interactive --tty \
-	  --user $(DOCKER_USER) \
-	  --volume .:/project \
-	  --pull always \
-	  ghcr.io/phpyh/scaffolder:latest \
-	  --user-name-default '$(shell git config user.name 2>/dev/null || whoami 2>/dev/null)' \
-	  --user-email-default '$(shell git config user.email 2>/dev/null)'
-	git add --all 2>/dev/null || true
-.PHONY: rescaffold
 
 # ---
 
 var:
 	mkdir -p var
 
-vendor: composer.json $(wildcard composer.lock)
-	@if [ -f vendor/.lowest ]; then $(MAKE) install-lowest; else $(MAKE) install; fi
+vendor: composer.json composer.lock
+	$(MAKE) install
 
 help:
-	@awk 'BEGIN {FS=":.*?## "} /^# [A-Za-z]/ {printf "%s\033[1;33m[%s]\033[0m\n", (s ? "\n" : ""), substr($$0, 3); s=1} /^[a-zA-Z0-9_-]+:.*## / {printf "\033[32m%-28s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS=":.*?## "} /^# [A-Za-z]/ {printf "%s\033[1;33m[%s]\033[0m\n", (s ? "\n" : ""), substr($$0, 3); s=1} /^[a-zA-Z0-9_-]+:.*## / {printf "\033[32m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 .PHONY: help
 
 .DEFAULT_GOAL := help

@@ -4,10 +4,12 @@ includes:
 parameters:
     level: max
     paths:
-        - bin
-        - src
-        - tests
-    tmpDir: var/phpstan
+        - ../bin/monorepo
+        - ../monorepo.php
+        - ../testo.php
+        - ../tools
+        - ../packages
+    tmpDir: ../var/phpstan
     editorUrl: ''
     editorUrlTitle: '%%relFile%%:%%line%%'
 

@@ -1,0 +1,21 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Symfony\Component\Console\Application;
+use Thesis\Monorepo\Command\CheckCommand;
+use Thesis\Monorepo\Command\NewPackageCommand;
+use Thesis\Monorepo\Command\SyncCommand;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$root = dirname(__DIR__);
+$sync = new SyncCommand($root);
+
+$application = new Application('monorepo');
+$application->addCommand($sync);
+$application->addCommand(new CheckCommand($root));
+$application->addCommand(new NewPackageCommand($root, $sync));
+
+exit($application->run());

@@ -7,21 +7,20 @@ use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
 use PHPyh\CodingStandard\PhpCsFixerCodingStandard;
 
+$root = dirname(__DIR__);
+
 $config = new Config()
     ->setFinder(
         Finder::create()
-            ->in(__DIR__ . '/bin')
-            ->in(__DIR__ . '/src')
-            ->in(__DIR__ . '/tests')
+            ->in([$root . '/tools', $root . '/packages'])
             ->append([
-                __FILE__,
+                $root . '/bin/monorepo',
+                $root . '/monorepo.php',
             ]),
     )
     ->setParallelConfig(ParallelConfigFactory::detect())
-    ->setCacheFile(__DIR__ . '/var/' . basename(__FILE__) . '.cache');
+    ->setCacheFile($root . '/var/php-cs-fixer.cache');
 
-new PhpCsFixerCodingStandard()->applyTo($config, [
-    // 'rule' => ['overridden' => 'config'],
-]);
+new PhpCsFixerCodingStandard()->applyTo($config);
 
 return $config;

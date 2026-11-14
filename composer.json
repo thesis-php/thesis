@@ -1,6 +1,6 @@
 {
-    "name": "thesis/thesis",
-    "description": "Thesis Thesis",
+    "name": "thesis/monorepo",
+    "description": "Thesis: an asynchronous PHP ecosystem built on revolt/event-loop",
     "license": "MIT",
     "type": "project",
     "authors": [
@@ -13,25 +13,24 @@
         "php": "^8.5"
     },
     "require-dev": {
+        "ext-tokenizer": "*",
         "llm/skills": "^1.17",
+        "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"
-    },
-    "autoload": {
-        "psr-4": {
-            "Thesis\\": "src/"
-        }
     },
     "autoload-dev": {
         "psr-4": {
-            "Thesis\\": "tests/"
+            "Thesis\\Monorepo\\": "tools/monorepo/src/",
+            "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/"
         }
     },
     "config": {
-        "bump-after-update": true,
-        "sort-packages": true,
         "allow-plugins": {
             "llm/skills": true
-        }
+        },
+        "sort-packages": true
     }
 }

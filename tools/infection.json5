@@ -1,16 +1,20 @@
 {
     "source": {
         "directories": [
-            "src"
+            "../packages"
+        ],
+        "excludes": [
+            "tests",
+            "skills"
         ]
     },
     "logs": {
-        "text": "var/infection.log",
+        "text": "../var/infection.log",
         "stryker": {
             "report": "/^(?>main|\\d+\\.\\d+\\.x)$/D"
         },
     },
-    "tmpDir": "var",
+    "tmpDir": "../var",
     "minCoveredMsi": 99,
     "mutators": {
         "@default": true,
