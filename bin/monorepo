@@ -8,9 +8,10 @@ use Thesis\Monorepo\Internal\Command\CheckCommand;
 use Thesis\Monorepo\Internal\Command\NewPackageCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
 
-require __DIR__ . '/../vendor/autoload.php';
-
 $root = dirname(__DIR__);
+
+require $root . '/vendor/autoload.php';
+
 $sync = new SyncCommand($root);
 
 $application = new Application('monorepo');

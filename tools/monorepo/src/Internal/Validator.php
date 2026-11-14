@@ -65,6 +65,7 @@ final class Validator
         $this->checkAgentFiles('');
         $this->checkNamespaces();
         $this->checkConstraints();
+        $this->checkVisibility(Monorepo::TOOLING_SRC);
 
         foreach (array_keys($this->monorepo->packages) as $dir) {
             $this->visit($dir, []);
@@ -85,7 +86,7 @@ final class Validator
             section: 'uses or usesDev',
             allowed: [$package->dir, ...$package->manifest->uses, ...$package->manifest->usesDev],
         );
-        $this->checkVisibility($package);
+        $this->checkVisibility($package->path() . '/src');
     }
 
     /**
@@ -278,12 +279,11 @@ final class Validator
     }
 
     /**
-     * Every symbol is either @api or @internal, and only internal symbols live in an Internal namespace,
-     * so a user sees what is safe to depend on from the namespace alone.
+     * So that a user sees what is safe to depend on from the namespace alone.
      */
-    private function checkVisibility(Package $package): void
+    private function checkVisibility(string $dir): void
     {
-        foreach (CodeScanner::phpFiles($this->monorepo->root . '/' . $package->path() . '/src') as $file) {
+        foreach (CodeScanner::phpFiles($this->monorepo->root . '/' . $dir) as $file) {
             foreach (CodeScanner::declarations($file) as $declaration) {
                 $name = $declaration->fullName();
                 $internalNamespace = $declaration->inInternalNamespace();

@@ -92,10 +92,11 @@ the whole monorepo is for the final check.
 - Named typed properties instead of id-indexed arrays (`$this->values[0]`). Use an array only for genuinely dynamic sets.
 - `readonly` wherever possible: `final readonly class` for immutable classes, `readonly` on individual properties
   for partially mutable ones.
-- Every top-level symbol (class, interface, trait, enum, function, constant) is marked either `@api` or `@internal`
-  in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
+- Every top-level symbol (class, interface, trait, enum, function, constant) in `src/` is marked either `@api`
+  or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
   (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
-  `make check` verifies this in `packages/*/src`.
+  Tests are not marked: they are not part of the API. `make check` verifies this in `packages/*/src`
+  and `tools/monorepo/src`.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
 - A PHPDoc of a declaration (class, method, function, property, constant, enum case) is multi-line,

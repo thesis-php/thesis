@@ -36,7 +36,7 @@ final readonly class CodeScanner
     }
 
     /**
-     * Qualified names under the given namespace. A namespace declaration is skipped: it is the file's own.
+     * A namespace declaration is skipped: it is the file's own.
      * Relative names are taken as fully qualified, which is right for "use" statements and for names written in full.
      *
      * @return list<Reference>

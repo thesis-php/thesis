@@ -17,10 +17,15 @@ final readonly class Monorepo
     public const string PACKAGES_DIR = 'packages';
     public const string CONFIG = 'monorepo.php';
     public const string MANIFEST = 'package.php';
+    public const string TOOLING_SRC = 'tools/monorepo/src';
 
     public static function load(string $root): self
     {
-        $config = self::require($root, self::CONFIG, Config::class);
+        $config = self::require(
+            root: $root,
+            file: self::CONFIG,
+            class: Config::class,
+        );
         $packages = [];
         $errors = [];
         $dirs = glob($root . '/' . self::PACKAGES_DIR . '/*', GLOB_ONLYDIR);
@@ -35,7 +40,11 @@ final readonly class Monorepo
             try {
                 $packages[$basename] = new Package(
                     dir: $basename,
-                    manifest: self::require($root, $manifest, Manifest::class),
+                    manifest: self::require(
+                        root: $root,
+                        file: $manifest,
+                        class: Manifest::class,
+                    ),
                     hasSkills: is_dir($dir . '/skills'),
                 );
             } catch (MonorepoException $exception) {

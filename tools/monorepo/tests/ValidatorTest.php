@@ -195,7 +195,17 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
-            ->file('packages/bytes/src/Buffer.php', "<?php\n\nnamespace Thesis\\Bytes;\n\n/**\n * @api\n * @internal\n */\ninterface Buffer {}\n");
+            ->file('packages/bytes/src/Buffer.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes;
+
+                /**
+                 * @api
+                 * @internal
+                 */
+                interface Buffer {}
+                PHP);
 
         $errors = Validator::validate($fixture->load());
 
@@ -206,7 +216,16 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
-            ->file('packages/bytes/src/Chunk.php', "<?php\n\nnamespace Thesis\\Bytes;\n\n/**\n * @internal\n */\ntrait Chunk {}\n");
+            ->file('packages/bytes/src/Chunk.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes;
+
+                /**
+                 * @internal
+                 */
+                trait Chunk {}
+                PHP);
 
         $errors = Validator::validate($fixture->load());
 
@@ -217,10 +236,42 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
-            ->file('packages/bytes/src/Internal/Chunk.php', "<?php\n\nnamespace Thesis\\Bytes\\Internal;\n\n/**\n * @api\n */\nfinal class Chunk {}\n");
+            ->file('packages/bytes/src/Internal/Chunk.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Bytes\Internal;
+
+                /**
+                 * @api
+                 */
+                final class Chunk {}
+                PHP);
 
         $errors = Validator::validate($fixture->load());
 
         Assert::same($errors, ['packages/bytes/src/Internal/Chunk.php:8: Thesis\Bytes\Internal\Chunk is in an Internal namespace, mark it @internal.']);
+    }
+
+    public static function checksVisibilityInMonorepoTooling(): void
+    {
+        $fixture = new Fixture()
+            ->file('tools/monorepo/src/Manifest.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Monorepo;
+
+                final readonly class Manifest {}
+                PHP)
+            ->file('tools/monorepo/tests/ManifestTest.php', <<<'PHP'
+                <?php
+
+                namespace Thesis\Monorepo\Tests;
+
+                final readonly class ManifestTest {}
+                PHP);
+
+        $errors = Validator::validate($fixture->load());
+
+        Assert::same($errors, ['tools/monorepo/src/Manifest.php:5: mark Thesis\Monorepo\Manifest either @api or @internal.']);
     }
 }
