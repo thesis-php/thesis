@@ -11,10 +11,10 @@
     ],
     "require": {
         "php": "^8.5",
-        "amphp/amp": "^3",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
+        "amphp/amp": "^3",
         "amphp/pipeline": "^1.2",
         "amphp/sync": "^2.3",
         "infection/infection": "^0.35.10",
@@ -24,6 +24,9 @@
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"
+    },
+    "conflict": {
+        "amphp/amp": "<3"
     },
     "autoload": {
         "psr-4": {

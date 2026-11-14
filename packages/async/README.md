@@ -10,6 +10,8 @@ Structured concurrency for PHP fibers on top of [Revolt](https://revolt.run): ca
 composer require thesis/async
 ```
 
+The amphp bridge, [`ampCancellable()`](#amphp-ampcancellable), needs `amphp/amp` v3, which is not installed with the package.
+
 ## The problem
 
 With fibers, asynchronous PHP code finally looks synchronous — except for cancellation.
@@ -556,7 +558,8 @@ return $requestId->isBound() ? $handle() : $requestId->with(generateId(), $handl
 ### amphp: `ampCancellable()`
 
 amphp libraries wait through `EventLoop::getSuspension()` directly, so a scope cannot interrupt them by itself.
-They take an `Amp\Cancellation` instead, and `ampCancellable()` gives them one tied to the current scope:
+They take an `Amp\Cancellation` instead, and `ampCancellable()` gives them one tied to the current scope.
+It needs `amphp/amp` v3 (any amphp library brings it); the rest of the package does not load it.
 
 ```php
 use Amp\Cancellation;
@@ -689,7 +692,6 @@ all([user, orders])              orders fails after 50 ms
 
 - Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope
   unless it runs under `ampCancellable()` and is given its cancellation: otherwise it behaves as if shielded until it returns.
-- The amphp bridge lives in this package for now, so `amphp/amp` is a dependency.
 - Callbacks registered directly with `EventLoop::queue()`, `defer()` or `delay()` from inside a task, and fibers created by hand,
   run in the root scope: the group neither cancels nor joins them.
 - In `{main}`, if the event loop runs dry while a task waits under a shield for something that never comes,
@@ -697,8 +699,6 @@ all([user, orders])              orders fails after 50 ms
   which lists the stuck fibers. Those tasks are orphaned; the alternative is to hang forever.
   Even if the group has already failed with an error of its own, the deadlock error is the one thrown, since the tasks
   were not joined; the group's error is among its `suppressed()` ones.
-- A wait costs about 1.7 times a bare Revolt suspension in a micro-benchmark (≈2.0 µs vs ≈1.2 µs, PHP 8.6-dev without opcache),
-  independent of how deep the scope is nested.
 
 ## TODO
 
