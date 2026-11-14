@@ -227,6 +227,17 @@ $recommendations = timeoutOr(0.3, [], static fn() => fetchRecommendations($userI
 It is not `try { timeout() } catch (TimedOut)`: that would also swallow a `TimedOut` of a nested `timeout()`
 that the closure lets out. `timeoutOr()` gives the default only when its own deadline cut the closure short.
 
+If the closure may return the default itself (`null`, for example), pass a default it never returns,
+as with [`Channel::tryReceive()`](#producers-and-consumers-channel):
+
+```php
+$user = timeoutOr(0.3, $expired = new \stdClass(), static fn() => findUser($userId)); // ?User
+
+if ($user === $expired) {
+    // the deadline, not a missing user
+}
+```
+
 `now()` is the monotonic clock of deadlines, for one computed ahead: `$at = now() + 5`, later `timeout($at - now(), ...)`.
 
 `remaining()` tells how many seconds are left until the nearest deadline, or `null` if there is none,

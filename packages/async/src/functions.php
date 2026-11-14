@@ -207,10 +207,13 @@ function timeout(float $seconds, callable $body): mixed
  * and an outer cancellation is rethrown as {@see Cancelled}, as with timeout().
  * Whatever $body has done before the deadline stays done: collect partial results by reference.
  *
+ * If $body may return $default itself (null, for example), pass a $default it never returns to tell the expiry apart:
+ * `$result = timeoutOr(1, $expired = new \stdClass(), $body)`, then compare with `=== $expired`.
+ *
  * @api
  * @template T
  * @template D
- * @param D $default
+ * @param D $default returned if the deadline cuts $body short
  * @param callable(): T $body
  * @return T|D
  * @throws \ValueError if $seconds is NAN, before $body runs

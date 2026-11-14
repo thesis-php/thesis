@@ -32,6 +32,14 @@ final class TimeoutOrTest
         assertNoCallbacksLeft();
     }
 
+    public function sentinelDefaultTellsExpiryFromNullResult(): void
+    {
+        $expired = new \stdClass();
+
+        Assert::null(timeoutOr(1, $expired, static fn() => null));
+        Assert::same(timeoutOr(1, $expired, never(...)), $expired);
+    }
+
     public function returnsDefaultForExpiredDeadline(): void
     {
         Assert::same(timeoutOr(-1, 'default', never(...)), 'default');
