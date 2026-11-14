@@ -10,7 +10,9 @@ use Thesis\Async\Internal\VirtualClock;
 use Thesis\Async\Internal\VirtualTimeDriver;
 
 /**
- * Runs $fn on a virtual clock that starts at zero, and on a fresh Revolt driver whose timers follow it.
+ * Runs $fn on a virtual clock and on a fresh Revolt driver whose timers follow it. The clock starts at the current
+ * `Thesis\Async\now()` rounded up to a whole second, so a time captured before `run()` stays valid in it,
+ * and durations of whole seconds are exact.
  * The clock jumps to the next timer whenever nothing can run: `delay(3600)` is over at once, timers fire exactly
  * in the order of their deadlines, and a deadlock fails at once instead of hanging. CPU work takes no time:
  * see {@see advance()}. `Thesis\Async\now()` and deadlines follow the clock, whatever the driver
@@ -21,6 +23,8 @@ use Thesis\Async\Internal\VirtualTimeDriver;
  * and has no callbacks, so nothing from outside runs on virtual time, and it is dropped with whatever is left in it.
  * Must be called in {main}. Afterwards the previous driver and clock are restored, and whatever $fn
  * leaves in the loop is dropped together with the driver. Calls nest: an inner one has a clock of its own.
+ * An object that keeps times, such as a rate limiter, must not be shared between two calls that run one after another,
+ * or used after the call in the outer clock: each clock goes its own way, and such a time may be in the future of the other.
  *
  * @api
  * @template T
@@ -62,7 +66,9 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     $previousDriver = EventLoop::getDriver();
     $stop($previousDriver);
     $previousClock = Scope::$virtualClock;
-    $clock = new VirtualClock();
+    // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Whole seconds, so that
+    // whole-second durations on it are exact, and rounded up, so that the clock does not go back.
+    $clock = new VirtualClock(ceil(Scope::now()));
     EventLoop::setDriver(new VirtualTimeDriver($clock, $driver));
     Scope::$virtualClock = $clock;
 

@@ -145,11 +145,22 @@ function remaining(): ?float
 }
 
 /**
+ * Cancellable sleep. Zero or less waits as zero, as in Go and Python: until the timers of the next tick of the loop,
+ * so other tasks run meanwhile, and it is a cancellation point.
+ *
  * @api
  * @throws Cancelled
+ * @throws \ValueError if $seconds is NAN
  */
 function delay(float $seconds): void
 {
+    if (is_nan($seconds)) {
+        throw new \ValueError('delay() needs a number of seconds, got NAN.');
+    }
+
+    // Revolt rejects a negative delay.
+    $seconds = max(0.0, $seconds);
+
     suspend(static function (Continuation $continuation) use ($seconds) {
         $timer = EventLoop::delay($seconds, static function () use ($continuation) {
             $continuation->resume();
@@ -173,6 +184,7 @@ function delay(float $seconds): void
  * @param callable(): T $body
  * @return T
  * @throws TimedOut
+ * @throws \ValueError if $seconds is NAN, before $body runs
  */
 function timeout(float $seconds, callable $body): mixed
 {
@@ -198,6 +210,7 @@ function timeout(float $seconds, callable $body): mixed
  * @param callable(): T $body
  * @param D $default
  * @return T|D
+ * @throws \ValueError if $seconds is NAN, before $body runs
  */
 function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
 {

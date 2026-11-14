@@ -50,18 +50,16 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         $lock = $this->mutex->acquire();
 
         try {
-            while (true) {
-                $wait = ($this->starts[$this->oldest] ?? -INF) + $this->seconds - now();
+            $leavesAt = ($this->starts[$this->oldest] ?? -INF) + $this->seconds;
+            $wait = $leavesAt - now();
 
-                if ($wait <= 0) {
-                    break;
-                }
-
-                // A cancelled delay() throws before the call is counted. A wake-up a little early only loops again.
+            // Sleeps once and does not compare the clock again: a wake-up a hair early, as float rounding may cause,
+            // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
+            if ($wait > 0) {
                 delay($wait);
             }
 
-            $this->starts[$this->oldest] = now();
+            $this->starts[$this->oldest] = max($leavesAt, now());
             $this->oldest = ($this->oldest + 1) % $this->calls;
         } finally {
             $lock->release();

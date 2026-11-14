@@ -23,30 +23,42 @@ use function Thesis\Async\VirtualTime\run;
 #[Test]
 final class VirtualTimeTest
 {
-    public function clockStartsAtZero(): void
+    public function clockStartsAtCurrentTimeRoundedUpToWholeSecond(): void
     {
-        Assert::same(now(), 0.0);
+        advance(0.25);
+        $outer = now();
+
+        Assert::same(run(static fn() => now() - $outer), 0.75);
+    }
+
+    public function timeCapturedBeforeRunStaysValidInIt(): void
+    {
+        $deadline = now() + 5;
+
+        Assert::same(run(static fn() => $deadline - now()), 5.0);
     }
 
     public function longDelayIsOverAtOnce(): void
     {
-        $start = hrtime(true);
+        $start = now();
+        $realStart = hrtime(true);
 
         delay(3_600);
 
-        Assert::same(now(), 3_600.0);
-        Assert::int(hrtime(true) - $start)->lessThan(1_000_000_000);
+        Assert::same(now() - $start, 3_600.0);
+        Assert::int(hrtime(true) - $realStart)->lessThan(1_000_000_000);
     }
 
     public function timersFireInOrderOfDeadlines(): void
     {
+        $start = now();
         $log = [];
 
-        group(static function (Group $group) use (&$log) {
+        group(static function (Group $group) use ($start, &$log) {
             foreach ([3, 1, 2] as $seconds) {
-                $group->spawn(static function () use ($seconds, &$log) {
+                $group->spawn(static function () use ($start, $seconds, &$log) {
                     delay($seconds);
-                    $log[] = [$seconds, now()];
+                    $log[] = [$seconds, now() - $start];
                 });
             }
         });
@@ -56,18 +68,21 @@ final class VirtualTimeTest
 
     public function codeTakesNoTime(): void
     {
+        $start = now();
+
         for ($i = 0, $sum = 0; $i < 100_000; ++$i) {
             $sum += $i;
         }
 
-        Assert::same(now(), 0.0);
+        Assert::same(now() - $start, 0.0);
     }
 
     public function repeatedTimerFiresEveryInterval(): void
     {
+        $start = now();
         $fired = [];
-        $timer = EventLoop::repeat(2, static function () use (&$fired) {
-            $fired[] = now();
+        $timer = EventLoop::repeat(2, static function () use ($start, &$fired) {
+            $fired[] = now() - $start;
         });
 
         delay(7);
@@ -78,14 +93,15 @@ final class VirtualTimeTest
 
     public function advanceMovesClockButTimerFiresAtNextSuspension(): void
     {
+        $start = now();
         $fired = null;
-        EventLoop::delay(1, static function () use (&$fired) {
-            $fired = now();
+        EventLoop::delay(1, static function () use ($start, &$fired) {
+            $fired = now() - $start;
         });
 
         advance(2);
 
-        Assert::same([now(), $fired], [2.0, null]);
+        Assert::same([now() - $start, $fired], [2.0, null]);
 
         delay(0);
 
@@ -94,13 +110,14 @@ final class VirtualTimeTest
 
     public function advanceExpiresDeadline(): void
     {
+        $start = now();
         $exception = thrown(static fn() => timeout(1, static function () {
             advance(1);
             delay(0);
         }));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same(now(), 1.0);
+        Assert::same(now() - $start, 1.0);
     }
 
     public function advanceRejectsNegativeSeconds(): void
@@ -112,13 +129,15 @@ final class VirtualTimeTest
 
     public function advanceMovesClockOfInnermostRun(): void
     {
-        $times = run(static function () {
+        $start = now();
+        $inner = run(static function () {
+            $start = now();
             advance(3);
 
-            return now();
+            return now() - $start;
         });
 
-        Assert::same([$times, now()], [3.0, 0.0]);
+        Assert::same([$inner, now() - $start], [3.0, 0.0]);
     }
 
     public function advanceThrowsOutsideRun(): void
@@ -137,29 +156,32 @@ final class VirtualTimeTest
 
     public function clockIsClockOfLibrary(): void
     {
+        $start = now();
         delay(5);
 
-        Assert::same([now(), timeout(10, remaining(...))], [5.0, 10.0]);
+        Assert::same([now() - $start, timeout(10, remaining(...))], [5.0, 10.0]);
     }
 
     public function clockIsFollowedThroughDecoratedDriver(): void
     {
+        $start = now();
         EventLoop::setDriver(new TracingDriver(EventLoop::getDriver()));
 
         $exception = thrown(static fn() => timeout(5, never(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same(now(), 5.0);
+        Assert::same(now() - $start, 5.0);
     }
 
     public function deadlockFailsAtOnce(): void
     {
+        $start = now();
         $exception = thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => suspend(static fn(Continuation $continuation) => static function () {}));
         }));
 
         Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');
-        Assert::same(now(), 0.0);
+        Assert::same(now() - $start, 0.0);
     }
 
     public function streamsAreReal(): void
@@ -167,8 +189,9 @@ final class VirtualTimeTest
         /** @var array{resource, resource} $pair */
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
         [$reader, $writer] = $pair;
+        $start = now();
 
-        $read = group(static function (Group $group) use ($reader, $writer) {
+        $read = group(static function (Group $group) use ($reader, $writer, $start) {
             $group->spawn(static function () use ($writer) {
                 delay(10);
                 fwrite($writer, 'ping');
@@ -184,7 +207,7 @@ final class VirtualTimeTest
                 };
             });
 
-            return [fread($reader, 4), now()];
+            return [fread($reader, 4), now() - $start];
         });
 
         Assert::same($read, ['ping', 10.0]);
@@ -193,13 +216,14 @@ final class VirtualTimeTest
 
     public function signalsAreReal(): void
     {
-        $received = group(static function (Group $group) {
+        $start = now();
+        $received = group(static function (Group $group) use ($start) {
             $group->spawn(static function () {
                 delay(5);
                 posix_kill(posix_getpid(), SIGUSR1);
             });
 
-            return [awaitSignal(SIGUSR1), now()];
+            return [awaitSignal(SIGUSR1), now() - $start];
         });
 
         Assert::same($received, [SIGUSR1, 5.0]);
@@ -253,19 +277,22 @@ final class VirtualTimeTest
 
     public function nestedRunRestoresOuterClock(): void
     {
+        $start = now();
         delay(10);
         $inner = run(static function () {
+            $start = now();
             delay(1);
 
-            return now();
+            return now() - $start;
         });
 
-        Assert::same([$inner, now()], [1.0, 10.0]);
+        Assert::same([$inner, now() - $start], [1.0, 10.0]);
     }
 
     public function runRestoresDriverAndClockEvenIfStoppingLoopThrows(): void
     {
         $driver = EventLoop::getDriver();
+        $start = now();
         delay(5);
         $returned = false;
 
@@ -287,11 +314,11 @@ final class VirtualTimeTest
         Assert::true($returned);
         Assert::instanceOf($exception, UncaughtThrowable::class);
         Assert::instanceOf($exception->getPrevious(), \RuntimeException::class);
-        Assert::same([EventLoop::getDriver(), now()], [$driver, 5.0]);
+        Assert::same([EventLoop::getDriver(), now() - $start], [$driver, 5.0]);
 
         delay(1);
 
-        Assert::same(now(), 6.0);
+        Assert::same(now() - $start, 6.0);
     }
 
     public function runDropsWhatIsLeftInLoop(): void

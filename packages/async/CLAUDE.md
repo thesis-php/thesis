@@ -13,6 +13,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
   `timeoutOr()` decides the same way, in the shared `Internal\Expired::run()`, never by catching `TimedOut`:
   that would swallow a `TimedOut` of a nested `timeout()`. A deadline `<= 0` cancels the scope at once, without a timer.
+  A `NAN` deadline or delay throws `\ValueError`; `delay(<= 0)` is `delay(0)`.
 - `Cancelled` is thrown only where the current scope is cancelled. Awaiting a cancelled task from a healthy scope
   throws `TaskCancelled` (a regular exception). `Deferred::fail()`, `Channel::close()` and `Continuation::throw()` reject `Cancelled`
   with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`.
@@ -77,6 +78,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
   or `microtime()` elsewhere. Within `VirtualTime\run()`, it reads `Internal\Scope::$virtualClock`, bound by `run()`:
   never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on `Scope`, not on
   `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The clock is not read in `suspend()`.
+  The virtual clock starts at `ceil(now())`, not at zero: a time captured before `run()` stays in the past, and whole seconds stay exact.
+- A rate limiter keeps absolute times and sleeps once per call, without comparing the clock again after the wake-up:
+  a wake-up a hair early (float rounding) must not loop on a delay too small to move the virtual clock.
 - `ScopedValue`s live outside the scope tree, in `Internal\Context`: an immutable array per fiber, copied by `with()`.
   A task's scope is a child of the group, not of the spawn site, so `GroupImpl::start()` captures the values
   in the spawning fiber and the task runs with them. A shield does not hide values. A task that inherits nothing

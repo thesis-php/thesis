@@ -209,7 +209,8 @@ try {
 
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,
 and an outer cancellation always outranks a deadline. A deadline that is zero or negative has already passed:
-the closure runs, but its first wait throws.
+the closure runs, but its first wait throws. A `NAN` deadline is a bug and throws `\ValueError` before the closure runs.
+`delay()` of zero or less waits as `delay(0)`, as in Go and Python: until the next tick, a cancellation point all the same.
 
 When running out of time is an expected outcome, `timeoutOr()` returns a default instead of throwing:
 
@@ -557,7 +558,7 @@ each($repositories, static function (Repository $repository) use ($github) {
 ```
 
 After a pause, `$burst` calls start at once, then one every `1 / $perSecond` seconds. No timer refills the bucket:
-the tokens are recomputed from `now()` when a call comes. It is fair like the mutex it queues on: tokens go in the order
+it keeps the time at which it would be full again, and a call compares it with `now()`. It is fair like the mutex it queues on: tokens go in the order
 callers came, and only the first one sleeps. A caller cancelled while waiting takes no token, so the next one gets it on time;
 `timeout()` around `wait()` bounds how long a call may wait for its turn.
 
@@ -758,7 +759,8 @@ even if the cancellation has already happened, so it cannot wake a fiber that ha
 ### Tests on virtual time: `VirtualTime\run()`
 
 Code with long deadlines is hard to test on real time: a heartbeat every 30 seconds, a backoff up to a minute.
-`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at zero and stands still
+`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `now()`
+rounded up to a whole second, so a time captured before `run()` (a deadline, a rate limiter) stays valid in it, and stands still
 while code runs; when nothing can run, it jumps to the nearest timer. So an hour of waiting is over at once,
 timers fire exactly in the order of their deadlines, and durations can be asserted exactly:
 
@@ -790,6 +792,8 @@ so nothing from outside runs on virtual time, and it is dropped with whatever `$
 so a stream that becomes ready from outside the process may be jumped past.
 While `run()` runs, its clock is the clock of the library, bound by `run()` itself rather than found through the driver:
 `now()`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
+Each `run()` has a clock of its own, so an object that keeps times must not outlive the `run()` it was used in:
+a rate limiter shared by two `run()`s one after another, or used again outside, may see a time from the future of its clock.
 
 The tests of this library run this way: a plugin for [Testo](https://github.com/php-testo/testo) in `tests/Testo`,
 `VirtualTimePlugin`, runs every test of the suite in its own `run()`, and the `#[VirtualTime]` attribute does the same
@@ -902,7 +906,7 @@ all([user, orders])              orders fails after 50 ms
 | `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): bool`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
-| `delay(float $seconds)` | cancellable sleep |
+| `delay(float $seconds)` | cancellable sleep; zero or less waits as zero |
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |

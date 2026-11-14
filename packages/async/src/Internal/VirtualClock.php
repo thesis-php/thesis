@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 /**
- * The clock of `Thesis\Async\VirtualTime\run()`: seconds since it started.
+ * The clock of `Thesis\Async\VirtualTime\run()`, in seconds on the same scale as the clock it replaces.
  * While `run()` runs, it is bound to {@see Scope::$virtualClock}, the clock of the library.
  *
  * @internal
  */
 final class VirtualClock
 {
-    private float $now = 0.0;
+    public function __construct(
+        private float $now,
+    ) {}
 
     public function now(): float
     {

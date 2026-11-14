@@ -32,6 +32,49 @@ final class LocalRateLimiterTest
         assertNoCallbacksLeft();
     }
 
+    /**
+     * Rates that are not a power of two: the time of a token is not exact in binary, and a wake-up a hair early
+     * must not make the next token wait a delay so small that the clock does not move (it hung on virtual time).
+     *
+     * @param positive-int $burst
+     */
+    #[DataSet([10.0, 1])]
+    #[DataSet([10.0, 10])]
+    #[DataSet([3.0, 2])]
+    #[DataSet([0.3, 1])]
+    #[DataSet([100.0, 5])]
+    #[DataSet([1.5, 3])]
+    public function callsStartOnScheduleAtAnyRate(float $perSecond, int $burst): void
+    {
+        $limiter = new LocalRateLimiter($perSecond, $burst);
+        $start = now();
+
+        for ($call = 0; $call < $burst + 30; ++$call) {
+            $limiter->wait();
+            $expected = max(0, $call - $burst + 1) / $perSecond;
+
+            Assert::true(abs(now() - $start - $expected) < 1e-9, \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected));
+        }
+
+        assertNoCallbacksLeft();
+    }
+
+    public function limiterCreatedOutsideRunWorksInside(): void
+    {
+        delay(100); // the clock of the inner run() must not start behind the time the limiter has seen
+        $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
+        $limiter->wait();
+
+        $elapsed = VirtualTime\run(static function () use ($limiter) {
+            $start = now();
+            $limiter->wait();
+
+            return now() - $start;
+        });
+
+        Assert::same($elapsed, 1.0);
+    }
+
     public function waitersGetTokensInOrderOfArrival(): void
     {
         $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);

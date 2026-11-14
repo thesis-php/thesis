@@ -27,9 +27,14 @@ final readonly class Expired
      * @template T
      * @param callable(): T $body
      * @return T|self self only if the deadline cut $body short and the parent is not cancelled
+     * @throws \ValueError if $seconds is NAN
      */
     public static function run(float $seconds, callable $body): mixed
     {
+        if (is_nan($seconds)) {
+            throw new \ValueError('A deadline needs a number of seconds, got NAN.');
+        }
+
         $parent = Scope::current();
         $scope = new Scope($parent, timeout: $seconds);
         $timer = null;

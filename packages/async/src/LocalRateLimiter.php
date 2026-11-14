@@ -10,7 +10,8 @@ namespace Thesis\Async;
  * It bounds the average, not every window: within any T seconds at most $burst + $perSecond * T calls start.
  * For a server that rejects more than N calls in any T seconds, use {@see LocalSlidingWindowRateLimiter}.
  *
- * There is no timer that refills the bucket: the tokens are recomputed from the clock ({@see now()}) when a call comes.
+ * There is no timer that refills the bucket and no clock read until the first call: the limiter keeps the absolute
+ * time at which the bucket would be full again, and a call compares it with the clock ({@see now()}).
  * Callers queue on a {@see LocalMutex}, so it is fair in the same way: tokens go in the order of arrival,
  * and only the first in the queue sleeps until the next token. A caller cancelled while queued or sleeping
  * takes no token, and the next one gets it on time.
@@ -24,9 +25,11 @@ final class LocalRateLimiter implements RateLimiter
 {
     private readonly LocalMutex $mutex;
 
-    private float $tokens;
+    /** @var float the time the counting started at: when the bucket was last full */
+    private float $fullAt = -INF;
 
-    private float $refilledAt;
+    /** @var non-negative-int tokens taken since then; the bucket is full again at fullAt + taken / perSecond */
+    private int $taken = 0;
 
     /**
      * @param float $perSecond how many calls a second may start on average, > 0
@@ -42,8 +45,6 @@ final class LocalRateLimiter implements RateLimiter
         }
 
         $this->mutex = new LocalMutex();
-        $this->tokens = $burst;
-        $this->refilledAt = now();
     }
 
     public function wait(): void
@@ -51,20 +52,23 @@ final class LocalRateLimiter implements RateLimiter
         $lock = $this->mutex->acquire();
 
         try {
-            while (true) {
-                $now = now();
-                $this->tokens = min($this->burst, $this->tokens + ($now - $this->refilledAt) * $this->perSecond);
-                $this->refilledAt = $now;
+            $now = now();
 
-                if ($this->tokens >= 1) {
-                    --$this->tokens;
-
-                    return;
-                }
-
-                // A cancelled delay() throws before the token is taken. A wake-up a little early only loops again.
-                delay((1 - $this->tokens) / $this->perSecond);
+            if ($this->fullAt + $this->taken / $this->perSecond <= $now) {
+                $this->fullAt = $now;
+                $this->taken = 0;
             }
+
+            // Each token has an absolute time computed afresh, so float errors do not add up. The caller sleeps once
+            // and does not compare the clock again: a wake-up a hair early, as float rounding may cause, would loop
+            // on a delay too small to move the clock. A cancelled delay() throws before the token is taken.
+            $wait = $this->fullAt + ($this->taken - $this->burst + 1) / $this->perSecond - $now;
+
+            if ($wait > 0) {
+                delay($wait);
+            }
+
+            ++$this->taken;
         } finally {
             $lock->release();
         }

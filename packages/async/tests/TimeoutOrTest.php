@@ -38,6 +38,21 @@ final class TimeoutOrTest
         assertNoCallbacksLeft();
     }
 
+    public function rejectsNan(): void
+    {
+        $ran = false;
+
+        $exception = thrown(static function () use (&$ran) {
+            timeoutOr(NAN, static function () use (&$ran) {
+                $ran = true;
+            }, 'default');
+        });
+
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::false($ran);
+        assertNoCallbacksLeft();
+    }
+
     public function keepsWhatBodyDidBeforeDeadline(): void
     {
         $done = [];

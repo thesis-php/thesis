@@ -42,6 +42,47 @@ final class LocalSlidingWindowRateLimiterTest
         assertNoCallbacksLeft();
     }
 
+    /**
+     * Windows that are not exact in binary: a wake-up a hair before the oldest start leaves the window
+     * must not make the call wait a delay so small that the clock does not move (it hung on virtual time).
+     *
+     * @param positive-int $calls
+     */
+    #[DataSet([1, 0.1])]
+    #[DataSet([2, 0.3])]
+    #[DataSet([3, 1.5])]
+    #[DataSet([10, 0.7])]
+    public function callsStartOnScheduleAtAnyWindow(int $calls, float $seconds): void
+    {
+        $limiter = new LocalSlidingWindowRateLimiter($calls, $seconds);
+        $start = now();
+
+        for ($call = 0; $call < $calls * 30; ++$call) {
+            $limiter->wait();
+            $expected = intdiv($call, $calls) * $seconds;
+
+            Assert::true(abs(now() - $start - $expected) < 1e-9, \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected));
+        }
+
+        assertNoCallbacksLeft();
+    }
+
+    public function limiterUsedOutsideRunWorksInside(): void
+    {
+        delay(100); // the clock of the inner run() must not start behind the time the limiter has seen
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1);
+        $limiter->wait();
+
+        $elapsed = VirtualTime\run(static function () use ($limiter) {
+            $start = now();
+            $limiter->wait();
+
+            return now() - $start;
+        });
+
+        Assert::same($elapsed, 1.0);
+    }
+
     public function fullWindowIsAvailableAfterPause(): void
     {
         $limiter = new LocalSlidingWindowRateLimiter(calls: 2, seconds: 20);

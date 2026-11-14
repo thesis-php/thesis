@@ -58,6 +58,21 @@ final class TimeoutTest
         }
     }
 
+    public function rejectsNan(): void
+    {
+        $ran = false;
+
+        $exception = thrown(static function () use (&$ran) {
+            timeout(NAN, static function () use (&$ran) {
+                $ran = true;
+            });
+        });
+
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::false($ran);
+        assertNoCallbacksLeft();
+    }
+
     public function expiredDeadlineReturnsResultOfBodyThatDoesNotWait(): void
     {
         Assert::same(timeout(-1, static fn() => remaining()), 0.0);

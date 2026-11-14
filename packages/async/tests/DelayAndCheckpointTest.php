@@ -28,6 +28,47 @@ final class DelayAndCheckpointTest
         assertNoCallbacksLeft();
     }
 
+    public function delayOfZeroOrLessWaitsAsZero(): void
+    {
+        foreach ([0.0, -1.0, -INF] as $seconds) {
+            $order = [];
+
+            group(static function (Group $group) use ($seconds, &$order) {
+                $group->spawn(static function () use (&$order) {
+                    $order[] = 'task';
+                });
+
+                $order[] = 'before';
+                Assert::same(elapsed(static fn() => delay($seconds)), 0.0);
+                $order[] = 'after';
+            });
+
+            Assert::same($order, ['before', 'task', 'after']);
+            assertNoCallbacksLeft();
+        }
+    }
+
+    public function delayOfZeroOrLessIsCancellationPoint(): void
+    {
+        $exception = thrown(static fn() => timeout(1, static function () {
+            try {
+                never();
+            } catch (Cancelled) {
+            }
+
+            delay(-1);
+        }));
+
+        Assert::instanceOf($exception, TimedOut::class);
+    }
+
+    public function delayRejectsNan(): void
+    {
+        Expect::exception(\ValueError::class);
+
+        delay(NAN);
+    }
+
     public function delayLetsOtherTasksRun(): void
     {
         $events = [];
