@@ -113,7 +113,11 @@ the whole monorepo is for the final check.
   they stay.
 - Functions and constants are loaded by one file per scope: `src/autoload.files.php` in `files` of the manifest,
   `tests/autoload.files.php` in `devFiles`. A new file of functions is added there with `require_once`,
-  so neither the manifest nor the autoloader changes.
+  so neither the manifest nor the autoloader changes. Only files without a class-like declaration go there:
+  a constant declared next to a class (`const ROOT_SCOPE = new Scope()`) is loaded with it by PSR-4.
+  There is no check for a forgotten `require_once`: the tests fail on an undefined function.
+  Rejected: listing every file in the manifest (each new file rebuilds the autoloader), runtime `glob()`
+  (a cost for every user, magic by file name), static methods instead of functions (a worse API).
 
 ### Tests
 
