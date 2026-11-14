@@ -23,6 +23,7 @@ use Thesis\Async\Internal\WaitQueue;
  *
  * send() and receive() that do not have to wait return immediately, without a cancellation check,
  * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait.
+ * tryReceive() never throws either: on a closed and drained channel it returns its default, and the next receive() reports the end.
  *
  * Do not wait for several channels with {@see race()}: two receive() calls may get values in the same tick,
  * and race() keeps only one of them.
@@ -132,7 +133,10 @@ final class Channel implements \IteratorAggregate
     }
 
     /**
-     * Does not wait: for taking what has piled up without delaying the first value, such as a batch.
+     * Does not wait and never throws: for taking what has piled up without delaying the first value, such as a batch.
+     *
+     * It returns $default whenever there is no value right now, closed or not: the end, or the reason of {@see close()},
+     * is reported by the next {@see receive()} or `foreach`, so a batch taken before it is not lost.
      *
      * If a value may be null, pass a $default that is not one of them to tell "nothing" apart:
      * `$value = $channel->tryReceive($none = new \stdClass())`, then compare with `=== $none`.
@@ -140,8 +144,6 @@ final class Channel implements \IteratorAggregate
      * @template D
      * @param D $default returned if there is no value right now
      * @return T|D
-     * @throws ChannelClosed if the channel is closed and there are no values left
-     * @throws \Throwable the reason of {@see close()} instead, if there is one
      */
     public function tryReceive(mixed $default = null): mixed
     {
@@ -149,10 +151,6 @@ final class Channel implements \IteratorAggregate
 
         if ($value !== null) {
             return $value[0];
-        }
-
-        if ($this->isClosed) {
-            throw $this->reason ?? new ChannelClosed();
         }
 
         return $default;

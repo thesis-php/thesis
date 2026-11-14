@@ -632,6 +632,8 @@ The capacity has no default: how far a slow receiver may fall behind is a decisi
 for metrics and logs that are better dropped than slowing a request down.
 
 `tryReceive()` does not wait either and returns `null` if there is nothing (or the default it is given, when a value may be `null`).
+It never throws: on a closed and drained channel it returns the default too, and the end (or the reason of `close()`)
+comes from the next `receive()` or `foreach`, so the last batch is not lost.
 With it a batch takes what has piled up and goes without waiting for more: large under load, no extra latency when idle:
 
 ```php

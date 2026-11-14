@@ -290,7 +290,7 @@ final class ChannelTest
         });
     }
 
-    public function tryReceiveDrainsBufferAfterCloseThenThrows(): void
+    public function tryReceiveDrainsBufferAfterCloseThenReturnsDefault(): void
     {
         /** @var Channel<string> */
         $channel = new Channel(1);
@@ -298,7 +298,65 @@ final class ChannelTest
         $channel->close();
 
         Assert::same($channel->tryReceive(), 'value');
-        Assert::instanceOf(thrown($channel->tryReceive(...)), ChannelClosed::class);
+        Assert::null($channel->tryReceive());
+        Assert::same($channel->tryReceive('nothing'), 'nothing');
+        Assert::instanceOf(thrown($channel->receive(...)), ChannelClosed::class);
+    }
+
+    public function readmeBatchingKeepsLastBatchOfClosedChannel(): void
+    {
+        /** @var Channel<int> */
+        $events = new Channel(250);
+        $batches = [];
+        $store = static function (array $batch) use (&$batches): void {
+            $batches[] = \count($batch);
+        };
+
+        foreach (range(1, 230) as $value) {
+            $events->send($value);
+        }
+        $events->close();
+
+        // Verbatim from README.md, with store() as a closure.
+        foreach ($events as $event) {
+            $batch = [$event];
+
+            while (\count($batch) < 100 && ($next = $events->tryReceive()) !== null) {
+                $batch[] = $next;
+            }
+
+            $store($batch);
+        }
+
+        Assert::same($batches, [100, 100, 30]);
+    }
+
+    public function batchingStoresLastBatchBeforeReasonOfClose(): void
+    {
+        /** @var Channel<int> */
+        $events = new Channel(10);
+        $reason = new \RuntimeException('connection lost');
+        $batches = [];
+
+        foreach (range(1, 5) as $value) {
+            $events->send($value);
+        }
+        $events->close($reason);
+
+        $exception = thrown(static function () use ($events, &$batches) {
+            foreach ($events as $event) {
+                $batch = [$event];
+
+                while (\count($batch) < 100 && ($next = $events->tryReceive()) !== null) {
+                    $batch[] = $next;
+                }
+
+                $batches[] = $batch;
+            }
+        });
+
+        Assert::same($batches, [[1, 2, 3, 4, 5]]);
+        Assert::same($exception, $reason);
     }
 
     public function receiversGetValuesInOrderOfArrival(): void
@@ -669,8 +727,8 @@ final class ChannelTest
         $channel->close($reason);
 
         Assert::same($channel->receive(), 'value');
+        Assert::null($channel->tryReceive());
         Assert::same(thrown($channel->receive(...)), $reason);
-        Assert::same(thrown($channel->tryReceive(...)), $reason);
     }
 
     public function closeWithReasonWakesWaitingReceiversWithIt(): void
@@ -786,30 +844,40 @@ final class ChannelTest
 
     public function channelHoldsNoWaitersAfterWaitsAreOver(): void
     {
+        /** @var Channel<string> */
+        $toReceive = new Channel(0);
         /** @var Channel<\stdClass> */
-        $channel = new Channel(0);
+        $toSend = new Channel(0);
         $references = [];
 
-        group(static function (Group $group) use ($channel, &$references) {
-            $receiver = $group->spawn($channel->receive(...));
-            $group->spawn(static function () use ($channel, &$references) {
+        group(static function (Group $group) use ($toReceive, $toSend, &$references) {
+            $handles = [
+                $group->spawn($toReceive->receive(...)),
+                $group->spawn($toReceive->receive(...)),
+            ];
+
+            foreach ([1, 2] as $_) {
                 $value = new \stdClass();
                 $references[] = \WeakReference::create($value);
+                $handles[] = $group->spawn(static fn() => $toSend->send($value));
+            }
+            unset($value);
+            delay(1);
 
-                try {
-                    timeout(1, static fn() => $channel->send($value));
-                } catch (TimedOut) {
-                }
-            });
-            delay(2);
+            Assert::same(\count((fn(): array => $this->receivers->items)->call($toReceive)), 2);
+            Assert::same(\count((fn(): array => $this->senders->items)->call($toSend)), 2);
 
-            $receiver->cancel();
+            foreach ($handles as $handle) {
+                $handle->cancel();
+            }
         });
 
-        $this->assertHoldsNothing($channel);
-        $reference = array_pop($references);
-        Assert::instanceOf($reference, \WeakReference::class);
-        Assert::null($reference->get());
+        $this->assertHoldsNothing($toReceive);
+        $this->assertHoldsNothing($toSend);
+
+        foreach ($references as $reference) {
+            Assert::null($reference->get());
+        }
     }
 
     /**
