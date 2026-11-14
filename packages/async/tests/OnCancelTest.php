@@ -131,7 +131,7 @@ final class OnCancelTest
         thrown(static function () use (&$calls) {
             timeout(5, static function () use (&$calls) {
                 group(static function (Group $group) use (&$calls) {
-                    $task = $group->spawn(static function () use (&$calls) {
+                    $handle = $group->spawn(static function () use (&$calls) {
                         onCancel(static function () use (&$calls) {
                             ++$calls;
                         });
@@ -144,8 +144,8 @@ final class OnCancelTest
                     });
 
                     delay(1);
-                    $task->cancel();
-                    $task->cancel();
+                    $handle->cancel();
+                    $handle->cancel();
                     never();
                 });
             });
@@ -160,7 +160,7 @@ final class OnCancelTest
 
         group(static function (Group $group) use (&$observed) {
             $called = false;
-            $task = $group->spawn(static function () use (&$called) {
+            $handle = $group->spawn(static function () use (&$called) {
                 onCancel(static function () use (&$called) {
                     $called = true;
                 });
@@ -169,7 +169,7 @@ final class OnCancelTest
             });
 
             delay(1);
-            $task->cancel();
+            $handle->cancel();
             $observed = $called;
         });
 
@@ -203,7 +203,7 @@ final class OnCancelTest
 
         group(static function (Group $group) use (&$called) {
             $unsubscribe = null;
-            $task = $group->spawn(static function () use (&$called, &$unsubscribe) {
+            $handle = $group->spawn(static function () use (&$called, &$unsubscribe) {
                 $unsubscribe = onCancel(static function () use (&$called) {
                     $called = true;
                 });
@@ -212,7 +212,7 @@ final class OnCancelTest
             });
 
             delay(1);
-            $task->cancel();
+            $handle->cancel();
             /** @var \Closure(): void $unsubscribe */
             $unsubscribe();
         });
@@ -286,13 +286,13 @@ final class OnCancelTest
     {
         $called = false;
 
-        $task = group(static fn(Group $group) => $group->spawn(static function () use (&$called) {
+        $handle = group(static fn(Group $group) => $group->spawn(static function () use (&$called) {
             onCancel(static function () use (&$called) {
                 $called = true;
             });
         }));
-        $called = shield(static function () use ($task, &$called) {
-            $task->cancel();
+        $called = shield(static function () use ($handle, &$called) {
+            $handle->cancel();
             checkpoint();
 
             return $called;

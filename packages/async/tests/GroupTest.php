@@ -187,13 +187,13 @@ final class GroupTest
 
         $result = group(static function (Group $group) use (&$started) {
             $group->cancelTasks();
-            $task = $group->spawn(static function () use (&$started) {
+            $handle = $group->spawn(static function () use (&$started) {
                 $started = true;
             });
             delay(0); // the task would have started here
 
-            Assert::true($task->isDone);
-            $awaited = thrown(static fn() => $task->await());
+            Assert::true($handle->isDone);
+            $awaited = thrown(static fn() => $handle->await());
             Assert::instanceOf($awaited, TaskCancelled::class);
 
             return 'body result';
@@ -206,9 +206,9 @@ final class GroupTest
     public function cancelledTaskDoesNotFailGroup(): void
     {
         $result = group(static function (Group $group) {
-            $task = $group->spawn(never(...));
+            $handle = $group->spawn(never(...));
             delay(1);
-            $task->cancel();
+            $handle->cancel();
 
             return 'ok';
         });
@@ -492,13 +492,13 @@ final class GroupTest
     {
         $elapsed = elapsed(static function () {
             group(static function (Group $group) {
-                $task = $group->spawn(static function () {
+                $handle = $group->spawn(static function () {
                     timeout(1_000, static fn() => null);
                     never(); // still waits in the task's scope
                 });
                 delay(1);
 
-                $task->cancel();
+                $handle->cancel();
             });
         });
 
@@ -709,9 +709,9 @@ final class GroupTest
             })->await();
             delay(1);
 
-            $tasks = $onlyChild($body);
-            $daemons = $onlyChild($tasks);
-            Assert::same($children($daemons), []);
+            $tasksScope = $onlyChild($body);
+            $daemonsScope = $onlyChild($tasksScope);
+            Assert::same($children($daemonsScope), []);
         });
 
         Assert::same($children($root), []);

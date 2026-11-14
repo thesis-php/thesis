@@ -321,14 +321,14 @@ final class SuspendTest
         $registered = false;
 
         $awaited = group(static function (Group $group) use (&$registered) {
-            $task = $group->spawn(static function () use ($group, &$registered) {
+            $handle = $group->spawn(static function () use ($group, &$registered) {
                 suspend(static function (Continuation $continuation) use ($group, &$registered) {
                     $registered = true;
                     $group->cancelTasks(); // the scope of this very wait
                 });
             });
 
-            return thrown(static fn() => $task->await());
+            return thrown(static fn() => $handle->await());
         });
 
         Assert::true($registered);

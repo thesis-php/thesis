@@ -59,7 +59,7 @@ final class IsCancelledTest
         $observed = null;
 
         group(static function (Group $group) use (&$observed) {
-            $task = $group->spawn(static function () use (&$observed) {
+            $handle = $group->spawn(static function () use (&$observed) {
                 try {
                     never();
                 } finally {
@@ -68,7 +68,7 @@ final class IsCancelledTest
             });
 
             delay(1);
-            $task->cancel();
+            $handle->cancel();
         });
 
         Assert::true($observed);

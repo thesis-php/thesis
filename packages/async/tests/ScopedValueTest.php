@@ -147,14 +147,14 @@ final class ScopedValueTest
         $value = new ScopedValue();
 
         $observed = $value->with('request', static fn() => group(static function (Group $group) use ($value) {
-            $task = $group->spawn(static function () use ($value): ?string {
+            $handle = $group->spawn(static function () use ($value): ?string {
                 delay(1);
 
                 return $value->get();
             });
             $daemon = $group->daemon($value->get(...));
 
-            return [$task->await(), $daemon->await()];
+            return [$handle->await(), $daemon->await()];
         }));
 
         Assert::same($observed, ['request', 'request']);
@@ -181,10 +181,10 @@ final class ScopedValueTest
         $value = new ScopedValue();
 
         $observed = $value->with('spawn', static fn() => group(static function (Group $group) use ($value) {
-            $task = $group->spawn($value->get(...));
+            $handle = $group->spawn($value->get(...));
 
             // Rebound before the task starts: the task still sees what was bound at spawn().
-            return $value->with('later', $task->await(...));
+            return $value->with('later', $handle->await(...));
         }));
 
         Assert::same($observed, 'spawn');

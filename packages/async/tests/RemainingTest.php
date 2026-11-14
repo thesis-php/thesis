@@ -72,14 +72,14 @@ final class RemainingTest
 
     public function taskSeesDeadlineOfItsGroup(): void
     {
-        [$task, $daemon] = timeout(500, static fn() => group(static function (Group $group) {
+        $remaining = timeout(500, static fn() => group(static function (Group $group) {
             $daemon = $group->daemon(remaining(...));
-            $task = $group->spawn(remaining(...));
+            $handle = $group->spawn(remaining(...));
 
-            return [$task->await(), $daemon->await()];
+            return [$handle->await(), $daemon->await()];
         }));
 
-        Assert::same([$task, $daemon], [500.0, 500.0]);
+        Assert::same($remaining, [500.0, 500.0]);
     }
 
     public function isZeroOnceDeadlinePassedBeforeTimerFired(): void

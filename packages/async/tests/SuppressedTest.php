@@ -94,9 +94,9 @@ final class SuppressedTest
     {
         $exception = thrown(static function () {
             group(static function (Group $group) {
-                $task = $group->spawn(static fn() => throw new \RuntimeException('failed'));
+                $handle = $group->spawn(static fn() => throw new \RuntimeException('failed'));
 
-                $task->await(); // the task's error is delivered before the body is cancelled: the same object comes back
+                $handle->await(); // the task's error is delivered before the body is cancelled: the same object comes back
             });
         });
 

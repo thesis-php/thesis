@@ -108,14 +108,14 @@ final class AmpCancellableTest
     public function taskCancelInterruptsAmphpWait(): void
     {
         $exception = group(static function (Group $group) {
-            $task = $group->spawn(static fn() => ampCancellable(
+            $handle = $group->spawn(static fn() => ampCancellable(
                 static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
             ));
 
             ampDelay(1);
-            $task->cancel();
+            $handle->cancel();
 
-            return thrown($task->await(...));
+            return thrown($handle->await(...));
         });
 
         Assert::instanceOf($exception, TaskCancelled::class);
