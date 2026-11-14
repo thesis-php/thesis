@@ -27,6 +27,8 @@ final class Lock
      * @param callable(): void $release returns the permit. Called at most once, inside {@see shield()}:
      *     release usually happens in `finally` of a cancelled scope, and a release that has to wait
      *     (a distributed lock) must still be able to. Such a callable must bound its own wait with {@see timeout()}.
+     *     It must not wait when the lock is released by {@see __destruct()}: a destructor may run while a fiber
+     *     is being destroyed, where a wait throws FiberError. Release such a lock explicitly.
      */
     public function __construct(callable $release)
     {
@@ -37,7 +39,9 @@ final class Lock
      * If the lock is destroyed unreleased, the permit is returned here, so that nobody waits for it forever.
      * Do not rely on it: when an object is destroyed is up to the engine (a reference cycle, an exception trace
      * holding the lock, ...). But a lock captured by a task that was cancelled before it started is dropped
-     * exactly like this, and that is not a bug.
+     * exactly like this, and that is not a bug. A release that has to wait must not be left to the destructor:
+     * when the engine destroys a suspended fiber, its `finally` blocks and destructors run where nothing can suspend,
+     * and the wait throws FiberError.
      */
     public function __destruct()
     {

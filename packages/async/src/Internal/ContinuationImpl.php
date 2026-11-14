@@ -61,6 +61,11 @@ final class ContinuationImpl implements Continuation
     /**
      * Uncancellable wait. Use `Thesis\Async\suspend()` for a cancellable one.
      *
+     * Known gap, won't fix: in {main}, Revolt resumes the suspension from a deferred callback, and if a foreign
+     * callback throws first, it throws UncaughtThrowable out of the suspension instead. A {@see resume()} that has
+     * returned true is lost then, although its caller considers the value handed over (a channel value,
+     * a semaphore permit). Keeping it would mean rethrowing Revolt's error elsewhere, which is not local.
+     *
      * @return T
      */
     public function park(): mixed
