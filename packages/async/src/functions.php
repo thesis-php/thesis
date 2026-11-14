@@ -73,12 +73,12 @@ function checkpoint(): void
 {
     suspend(static function (Continuation $continuation) {
         // Not EventLoop::queue(): microtasks run before timers, so a loop of them would starve the deadline.
-        $callback = EventLoop::defer(static function () use ($continuation) {
+        $callbackId = EventLoop::defer(static function () use ($continuation) {
             $continuation->resume();
         });
 
-        return static function () use ($callback) {
-            EventLoop::cancel($callback);
+        return static function () use ($callbackId) {
+            EventLoop::cancel($callbackId);
         };
     });
 }
@@ -238,31 +238,31 @@ function shield(callable $body): mixed
 }
 
 /**
- * All results in the order of $fns, or the first failure (the rest are cancelled and joined).
+ * All results in the order of $tasks, or the first failure (the rest are cancelled and joined).
  *
- * The result has the keys of $fns, but one value type for all of them: `['user' => ..., 'orders' => ...]`
+ * The result has the keys of $tasks, but one value type for all of them: `['user' => ..., 'orders' => ...]`
  * gives `array<'user'|'orders', User|list<Order>>`. For results of different types, spawn tasks in a {@see group()}
  * and await their handles, which are typed precisely.
  *
  * @api
  * @template K of array-key
  * @template T
- * @param array<K, callable(): T> $fns
+ * @param array<K, callable(): T> $tasks
  * @return array<K, T>
  */
-function all(array $fns): array
+function all(array $tasks): array
 {
-    return group(static function (Group $group) use ($fns) {
-        $tasks = [];
+    return group(static function (Group $group) use ($tasks) {
+        $handles = [];
 
-        foreach ($fns as $key => $fn) {
-            $tasks[$key] = $group->spawn($fn);
+        foreach ($tasks as $key => $task) {
+            $handles[$key] = $group->spawn($task);
         }
 
         $results = [];
 
-        foreach ($tasks as $key => $task) {
-            $results[$key] = $task->await();
+        foreach ($handles as $key => $handle) {
+            $results[$key] = $handle->await();
         }
 
         return $results;
@@ -275,14 +275,14 @@ function all(array $fns): array
  *
  * @api
  * @template T
- * @param non-empty-array<callable(): T> $fns
+ * @param non-empty-array<callable(): T> $tasks
  * @return T
- * @throws \ValueError if $fns is empty: there would be no winner and no failure to report
+ * @throws \ValueError if $tasks is empty: there would be no winner and no failure to report
  */
-function race(array $fns): mixed
+function race(array $tasks): mixed
 {
     /** @phpstan-ignore identical.alwaysFalse */
-    if ($fns === []) {
+    if ($tasks === []) {
         throw new \ValueError('A race needs at least one contender.');
     }
 
@@ -290,11 +290,11 @@ function race(array $fns): mixed
     $winner = [];
     $failure = null;
 
-    group(static function (Group $group) use ($fns, &$winner, &$failure) {
-        foreach ($fns as $contender) {
-            $group->spawn(static function () use ($contender, $group, &$winner, &$failure) {
+    group(static function (Group $group) use ($tasks, &$winner, &$failure) {
+        foreach ($tasks as $task) {
+            $group->spawn(static function () use ($task, $group, &$winner, &$failure) {
                 try {
-                    $value = $contender();
+                    $value = $task();
                 } catch (Cancelled $cancelled) {
                     throw $cancelled;
                 } catch (\Throwable $error) {

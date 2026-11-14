@@ -17,22 +17,22 @@ interface Group
      * Its failure cancels the body and every task and is rethrown from {@see group()}.
      *
      * @template T
-     * @param callable(): T $fn
+     * @param callable(): T $task
      * @return Task<T>
      * @throws \LogicException if {@see group()} has already returned
      */
-    public function spawn(callable $fn): Task;
+    public function spawn(callable $task): Task;
 
     /**
      * Starts a background task (heartbeat, ping reader, metrics) the group does NOT wait for:
      * it is cancelled as soon as the body and all regular tasks are finished. Its failure fails the group.
      *
      * @template T
-     * @param callable(): T $fn
+     * @param callable(): T $task
      * @return Task<T>
      * @throws \LogicException if {@see group()} has already returned
      */
-    public function daemon(callable $fn): Task;
+    public function daemon(callable $task): Task;
 
     /**
      * Cancels every task and daemon of the group, but not the body: the body is the owner of the group,

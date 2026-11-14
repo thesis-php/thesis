@@ -74,3 +74,14 @@ The model, the API and the guarantees are described in `README.md` — read it f
 
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
+- A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,
+  a third party's callable is named by its role, and anything else is a `$fn`.
+  - `$body`: runs in the current fiber inside a new scope (`group()`, `timeout()`, `shield()`, `Scope::run()`).
+    "Body" is a term of the model: the body owns the group.
+  - `$task` / `$tasks`: run in a new fiber under its own scope (`Group::spawn()`, `Group::daemon()`, `all()`, `race()`).
+  - A role name when a third party calls it at a set moment: `$register`, `$unregister`, `$release`, `$callback`.
+  - `$fn`: a plain call with no scope of its own (`synchronized()`, `ScopedValue::with()`, `ampCancellable()`,
+    `Context`, `each()`, `map()`).
+- Since `$task` is code, a `Task` object is a `$handle` / `$handles`. A scope is `$xxxScope` when its owner
+  has a namesake that is not a scope (`$bodyScope`, `$tasksScope`, `$daemonsScope`). A Revolt callback id
+  is named by its kind (`$timer`) or `$callbackId`, never `$callback`: that is a closure.

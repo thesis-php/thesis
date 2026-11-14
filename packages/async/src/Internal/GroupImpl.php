@@ -39,7 +39,7 @@ final class GroupImpl implements Group
     private ?ContinuationImpl $joiner = null;
 
     private function __construct(
-        private readonly Scope $body,
+        private readonly Scope $bodyScope,
         private readonly Scope $tasksScope,
         private readonly Scope $daemonsScope,
     ) {}
@@ -88,14 +88,14 @@ final class GroupImpl implements Group
         return $result;
     }
 
-    public function spawn(callable $fn): Task
+    public function spawn(callable $task): Task
     {
-        return $this->start($this->tasksScope, $fn);
+        return $this->start($this->tasksScope, $task);
     }
 
-    public function daemon(callable $fn): Task
+    public function daemon(callable $task): Task
     {
-        return $this->start($this->daemonsScope, $fn);
+        return $this->start($this->daemonsScope, $task);
     }
 
     public function cancelTasks(): void
@@ -111,7 +111,7 @@ final class GroupImpl implements Group
             Suppressed::add($this->error, $error);
         }
 
-        $this->body->cancel();
+        $this->bodyScope->cancel();
     }
 
     /**
@@ -155,7 +155,7 @@ final class GroupImpl implements Group
                         continue;
                     }
 
-                    if ($this->body->isCancelled()) {
+                    if ($this->bodyScope->isCancelled()) {
                         // Revolt's error replaces the group's failure: it is not lost, unless it is the same deadlock.
                         if ($this->error !== null && $this->error !== $dry) {
                             Suppressed::add($error, $this->error);
@@ -175,10 +175,10 @@ final class GroupImpl implements Group
 
     /**
      * @template T
-     * @param callable(): T $fn
+     * @param callable(): T $task
      * @return Task<T>
      */
-    private function start(Scope $parent, callable $fn): Task
+    private function start(Scope $parent, callable $task): Task
     {
         if ($this->closed) {
             throw new \LogicException('The group is closed: a task can only be started until group() returns.');
@@ -189,7 +189,7 @@ final class GroupImpl implements Group
         // Here, in the spawning fiber: the scope tree does not know where the task was spawned.
         $values = Context::capture();
         /** @var TaskImpl<T> */
-        $task = new TaskImpl($scope);
+        $handle = new TaskImpl($scope);
 
         if ($daemon) {
             ++$this->daemons;
@@ -197,19 +197,19 @@ final class GroupImpl implements Group
             ++$this->tasks;
         }
 
-        EventLoop::queue(function () use ($fn, $scope, $task, $daemon, $values) {
+        EventLoop::queue(function () use ($task, $scope, $handle, $daemon, $values) {
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();
                 // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
-                $task->complete($values === [] ? $scope->run($fn) : Context::run($values, static fn() => $scope->run($fn)));
+                $handle->complete($values === [] ? $scope->run($task) : Context::run($values, static fn() => $scope->run($task)));
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
                     // Cancellation is not a failure: it does not bring the group down.
-                    $task->fail(new TaskCancelled($error));
+                    $handle->fail(new TaskCancelled($error));
 
                     // But if it came from outside, the group's work is incomplete, even if the body never awaits.
-                    if (!$daemon && $this->body->isCancelled()) {
+                    if (!$daemon && $this->bodyScope->isCancelled()) {
                         $this->cancelled ??= $error;
                     }
                 } else {
@@ -220,7 +220,7 @@ final class GroupImpl implements Group
                         );
                     }
 
-                    $task->fail($error);
+                    $handle->fail($error);
                     $this->fail($error);
                 }
             } finally {
@@ -238,6 +238,6 @@ final class GroupImpl implements Group
             }
         });
 
-        return $task;
+        return $handle;
     }
 }
