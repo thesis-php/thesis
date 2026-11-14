@@ -119,6 +119,17 @@ function onCancel(\Closure $callback): \Closure
 }
 
 /**
+ * Monotonic time in seconds, on the clock of deadlines and Revolt's timers: for measuring and for deadlines
+ * computed ahead, `timeout($at - now(), ...)`. Not wall-clock time: only differences make sense.
+ *
+ * @api
+ */
+function now(): float
+{
+    return Scope::now();
+}
+
+/**
  * Seconds left until the deadline of the current scope, null if there is none: the nearest of the enclosing
  * {@see timeout()} calls, tasks included, since a task inherits the deadline under which its group runs.
  * Inside {@see shield()} outer deadlines are not visible, as outer cancellation is not.
@@ -131,33 +142,6 @@ function onCancel(\Closure $callback): \Closure
 function remaining(): ?float
 {
     return Scope::current()->remaining();
-}
-
-/**
- * Monotonic time in seconds, on the clock of deadlines and Revolt's timers: for measuring and for deadlines
- * computed ahead, `timeout($at - now(), ...)`. Not wall-clock time: only differences make sense.
- *
- * @api
- */
-function now(): float
-{
-    return Scope::now();
-}
-
-/**
- * Failures that happened in the groups $error was rethrown from, but were not rethrown themselves:
- * a group rethrows only its first failure. For example, a sibling task that failed at the same time,
- * or a rollback that failed while a task was being cancelled because of $error.
- *
- * $error itself is left as it was. Each of the returned errors may have suppressed ones of its own,
- * if it came out of a nested group. Nobody sees them unless asked: log them where errors are handled.
- *
- * @api
- * @return list<\Throwable> in the order they happened, empty if there are none
- */
-function suppressed(\Throwable $error): array
-{
-    return Suppressed::of($error);
 }
 
 /**
@@ -175,64 +159,6 @@ function delay(float $seconds): void
             EventLoop::cancel($timer);
         };
     });
-}
-
-/**
- * Waits for one of the signals and returns the one received: SIGINT or SIGTERM for a graceful shutdown.
- * Cancellable like any other wait. Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
- *
- * The handlers exist only while it waits: a signal that comes before (Revolt installs them at the next tick
- * of the loop) or after gets the default action, so a second Ctrl+C kills the process even if the shutdown hangs.
- * To keep handling a signal, such as SIGHUP to reload, use {@see trapSignals()}.
- *
- * @api
- * @param positive-int $signal
- * @param positive-int ...$signals
- * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
- */
-function awaitSignal(int $signal, int ...$signals): int
-{
-    return trapSignals(
-        signals: [$signal, ...$signals],
-        fn: static fn(SignalTrap $trap) => $trap->receive(),
-    );
-}
-
-/**
- * Catches the signals while $fn runs, instead of their default action, and $fn receives them from the trap:
- * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
- * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
- *
- * Outside $fn, and before the next tick of the loop, when Revolt installs the handlers, a signal gets the default action.
- *
- * @api
- * @template T
- * @param non-empty-array<positive-int> $signals
- * @param callable(SignalTrap): T $fn
- * @return T
- * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
- */
-function trapSignals(array $signals, callable $fn): mixed
-{
-    return SignalTrap::trap($signals, $fn);
-}
-
-/**
- * Runs $body and does not return until every task started in the group is finished.
- *
- * Tasks are started through the event loop's microtask queue: they begin to run at the body's next wait
- * (or when the body returns), not inside {@see Group::spawn()}.
- *
- * The first failure (of the body or of a task) cancels everything else and is rethrown after all tasks are joined.
- *
- * @api
- * @template T
- * @param callable(Group): T $body
- * @return T
- */
-function group(callable $body): mixed
-{
-    return GroupImpl::run($body);
 }
 
 /**
@@ -281,6 +207,24 @@ function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
 }
 
 /**
+ * Runs $body and does not return until every task started in the group is finished.
+ *
+ * Tasks are started through the event loop's microtask queue: they begin to run at the body's next wait
+ * (or when the body returns), not inside {@see Group::spawn()}.
+ *
+ * The first failure (of the body or of a task) cancels everything else and is rethrown after all tasks are joined.
+ *
+ * @api
+ * @template T
+ * @param callable(Group): T $body
+ * @return T
+ */
+function group(callable $body): mixed
+{
+    return GroupImpl::run($body);
+}
+
+/**
  * Outer cancellation does not get inside. For cleanup: rollback, close frame, returning a connection to a pool.
  * Combine with {@see timeout()} so that the cleanup cannot hang forever.
  *
@@ -298,6 +242,22 @@ function shield(callable $body): mixed
     } finally {
         $scope->close();
     }
+}
+
+/**
+ * Failures that happened in the groups $error was rethrown from, but were not rethrown themselves:
+ * a group rethrows only its first failure. For example, a sibling task that failed at the same time,
+ * or a rollback that failed while a task was being cancelled because of $error.
+ *
+ * $error itself is left as it was. Each of the returned errors may have suppressed ones of its own,
+ * if it came out of a nested group. Nobody sees them unless asked: log them where errors are handled.
+ *
+ * @api
+ * @return list<\Throwable> in the order they happened, empty if there are none
+ */
+function suppressed(\Throwable $error): array
+{
+    return Suppressed::of($error);
 }
 
 /**
@@ -498,6 +458,38 @@ function each(iterable $items, callable $fn, int $concurrency): void
 }
 
 /**
+ * {@see each()} that collects the results. Keys are preserved, and so is the order of $items.
+ *
+ * @api
+ * @template K of array-key
+ * @template T
+ * @template R
+ * @param iterable<K, T> $items
+ * @param callable(T, K): R $fn
+ * @param positive-int $concurrency
+ * @return array<K, R>
+ */
+function map(iterable $items, callable $fn, int $concurrency): array
+{
+    $results = [];
+
+    each(
+        $items,
+        static function (mixed $item, mixed $key) use ($fn, &$results) {
+            /** @var T $item */
+            /** @var K $key */
+            // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
+            $results[$key] = null;
+            $results[$key] = $fn($item, $key);
+        },
+        $concurrency,
+    );
+
+    /** @var array<K, R> Every reserved null has been replaced by a result, or each() has thrown. */
+    return $results;
+}
+
+/**
  * Runs $fn holding a permit of $semaphore and releases it whatever $fn ends with.
  *
  * Reentrant within a fiber: if the current fiber is already inside synchronized() on the same semaphore,
@@ -592,35 +584,43 @@ function synchronizedKey(KeyedSemaphore $semaphore, string $key, callable $fn): 
 }
 
 /**
- * {@see each()} that collects the results. Keys are preserved, and so is the order of $items.
+ * Waits for one of the signals and returns the one received: SIGINT or SIGTERM for a graceful shutdown.
+ * Cancellable like any other wait. Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ *
+ * The handlers exist only while it waits: a signal that comes before (Revolt installs them at the next tick
+ * of the loop) or after gets the default action, so a second Ctrl+C kills the process even if the shutdown hangs.
+ * To keep handling a signal, such as SIGHUP to reload, use {@see trapSignals()}.
  *
  * @api
- * @template K of array-key
- * @template T
- * @template R
- * @param iterable<K, T> $items
- * @param callable(T, K): R $fn
- * @param positive-int $concurrency
- * @return array<K, R>
+ * @param positive-int $signal
+ * @param positive-int ...$signals
+ * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
  */
-function map(iterable $items, callable $fn, int $concurrency): array
+function awaitSignal(int $signal, int ...$signals): int
 {
-    $results = [];
-
-    each(
-        $items,
-        static function (mixed $item, mixed $key) use ($fn, &$results) {
-            /** @var T $item */
-            /** @var K $key */
-            // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
-            $results[$key] = null;
-            $results[$key] = $fn($item, $key);
-        },
-        $concurrency,
+    return trapSignals(
+        signals: [$signal, ...$signals],
+        fn: static fn(SignalTrap $trap) => $trap->receive(),
     );
+}
 
-    /** @var array<K, R> Every reserved null has been replaced by a result, or each() has thrown. */
-    return $results;
+/**
+ * Catches the signals while $fn runs, instead of their default action, and $fn receives them from the trap:
+ * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
+ * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ *
+ * Outside $fn, and before the next tick of the loop, when Revolt installs the handlers, a signal gets the default action.
+ *
+ * @api
+ * @template T
+ * @param non-empty-array<positive-int> $signals
+ * @param callable(SignalTrap): T $fn
+ * @return T
+ * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+ */
+function trapSignals(array $signals, callable $fn): mixed
+{
+    return SignalTrap::trap($signals, $fn);
 }
 
 /**
