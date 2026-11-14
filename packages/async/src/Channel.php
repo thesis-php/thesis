@@ -17,9 +17,10 @@ namespace Thesis\Async;
  *
  * The sender closes the channel: after {@see close()}, send() throws {@see ChannelClosed}, waiting senders are woken
  * with it and their values are not delivered, and receivers get what is left in the buffer before they see it.
+ * A producer that failed closes it with the reason: receivers get the reason instead of the end, once the buffer is drained.
  *
  * send() and receive() that do not have to wait return immediately, without a cancellation check,
- * like {@see Deferred::await()} of a done deferred.
+ * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait.
  *
  * Do not wait for several channels with {@see race()}: two receive() calls may get values in the same tick,
  * and race() keeps only one of them.
@@ -39,7 +40,9 @@ final class Channel implements \IteratorAggregate
     /** @var array<int, array{Continuation<null>, T}> in the order of arrival */
     private array $senders = [];
 
-    private bool $closed = false;
+    public private(set) bool $isClosed = false;
+
+    private ?\Throwable $reason = null;
 
     /**
      * @param non-negative-int $capacity how many values may wait in the buffer, 0 for a rendezvous.
@@ -55,7 +58,8 @@ final class Channel implements \IteratorAggregate
      * Waits until there is a receiver or room in the buffer.
      *
      * @param T $value
-     * @throws ChannelClosed if the channel is closed before or while waiting: then the value is not delivered
+     * @throws ChannelClosed if the channel is closed before or while waiting: then the value is not delivered.
+     *                       The reason of {@see close()} is its previous exception.
      * @throws Cancelled if the scope is cancelled while waiting: then the value is not delivered
      */
     public function send(mixed $value): void
@@ -81,12 +85,12 @@ final class Channel implements \IteratorAggregate
      *
      * @param T $value
      * @return bool whether the value was handed over to a receiver or buffered, false if there is no room
-     * @throws ChannelClosed if the channel is closed
+     * @throws ChannelClosed if the channel is closed, with the reason of {@see close()} as the previous exception
      */
     public function trySend(mixed $value): bool
     {
-        if ($this->closed) {
-            throw new ChannelClosed();
+        if ($this->isClosed) {
+            throw new ChannelClosed($this->reason);
         }
 
         // A waiting receiver means the buffer is empty: a value goes to the buffer only when there is no one to hand it to.
@@ -112,33 +116,75 @@ final class Channel implements \IteratorAggregate
      *
      * @return T
      * @throws ChannelClosed if the channel is closed and there are no values left
+     * @throws \Throwable the reason of {@see close()} instead, if there is one
      * @throws Cancelled if the scope is cancelled while waiting: then no value has been taken
      */
     public function receive(): mixed
     {
-        $value = $this->tryReceive() ?? $this->wait();
+        $value = $this->take() ?? $this->wait();
 
         if ($value === null) {
-            throw new ChannelClosed();
+            throw $this->reason ?? new ChannelClosed();
         }
 
         return $value[0];
     }
 
     /**
-     * Wakes every waiter: senders and receivers get {@see ChannelClosed}. Values in the buffer stay to be received.
-     * Idempotent.
+     * Does not wait: for taking what has piled up without delaying the first value, such as a batch.
+     *
+     * If a value may be null, pass a $default that is not one of them to tell "nothing" apart:
+     * `$value = $channel->tryReceive($none = new \stdClass())`, then compare with `=== $none`.
+     *
+     * @template D
+     * @param D $default returned if there is no value right now
+     * @return T|D
+     * @throws ChannelClosed if the channel is closed and there are no values left
+     * @throws \Throwable the reason of {@see close()} instead, if there is one
      */
-    public function close(): void
+    public function tryReceive(mixed $default = null): mixed
     {
-        // Idempotent without a check: a second call finds no waiters to wake.
-        $this->closed = true;
+        $value = $this->take();
+
+        if ($value !== null) {
+            return $value[0];
+        }
+
+        if ($this->isClosed) {
+            throw $this->reason ?? new ChannelClosed();
+        }
+
+        return $default;
+    }
+
+    /**
+     * Wakes every waiter: senders get {@see ChannelClosed}, receivers get the end. Values in the buffer stay to be received.
+     * Only the first call counts: a later one is ignored, its reason too.
+     *
+     * @param ?\Throwable $reason why there is nothing more: receivers get it instead of the end once the buffer is drained,
+     *                           the same object every time, as awaiters of a failed {@see Deferred} do
+     * @throws \ValueError if $reason is {@see Cancelled}: it would be thrown in receivers whose scope is not cancelled
+     */
+    public function close(?\Throwable $reason = null): void
+    {
+        if ($reason instanceof Cancelled) {
+            throw new \ValueError(
+                'A channel cannot be closed with Cancelled: its receivers are not cancelled. Close it with a regular exception.',
+            );
+        }
+
+        if ($this->isClosed) {
+            return;
+        }
+
+        $this->isClosed = true;
+        $this->reason = $reason;
 
         $senders = $this->senders;
         $this->senders = [];
 
         foreach ($senders as [$sender]) {
-            $sender->throw(new ChannelClosed());
+            $sender->throw(new ChannelClosed($reason));
         }
 
         // A waiting receiver means the buffer is empty, so there is nothing left for it.
@@ -151,22 +197,27 @@ final class Channel implements \IteratorAggregate
     }
 
     /**
-     * Receives until the channel is closed and drained, then ends normally.
+     * Receives until the channel is closed and drained, then ends normally, or throws the reason of {@see close()}.
      *
      * @return \Generator<int, T, void, void>
      * @throws Cancelled if the scope is cancelled while waiting
+     * @throws \Throwable the reason of {@see close()}, if there is one
      */
     public function getIterator(): \Generator
     {
-        while (($value = $this->tryReceive() ?? $this->wait()) !== null) {
+        while (($value = $this->take() ?? $this->wait()) !== null) {
             yield $value[0];
+        }
+
+        if ($this->reason !== null) {
+            throw $this->reason;
         }
     }
 
     /**
      * @return ?array{T} null if there is nothing to take right now
      */
-    private function tryReceive(): ?array
+    private function take(): ?array
     {
         if (!$this->buffer->isEmpty()) {
             $value = $this->buffer->dequeue();
@@ -203,7 +254,7 @@ final class Channel implements \IteratorAggregate
      */
     private function wait(): ?array
     {
-        if ($this->closed) {
+        if ($this->isClosed) {
             return null;
         }
 

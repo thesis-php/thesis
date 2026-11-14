@@ -192,6 +192,114 @@ final class ChannelTest
         Assert::same($value, 'value');
     }
 
+    public function tryReceiveReturnsBufferedValuesInOrder(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(2);
+        $channel->send('a');
+        $channel->send('b');
+
+        Assert::same($channel->tryReceive(), 'a');
+        Assert::same($channel->tryReceive(), 'b');
+    }
+
+    public function tryReceiveOfEmptyChannelReturnsNull(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+
+        Assert::null($channel->tryReceive());
+        $this->assertHoldsNothing($channel);
+    }
+
+    public function tryReceiveOfEmptyChannelReturnsDefault(): void
+    {
+        /** @var Channel<?string> */
+        $channel = new Channel(1);
+        $none = new \stdClass();
+        $channel->send(null);
+
+        Assert::null($channel->tryReceive($none));
+        Assert::same($channel->tryReceive($none), $none);
+    }
+
+    public function tryReceiveDoesNotWaitInCancelledScope(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+
+        $value = timeout(0.001, static function () use ($channel) {
+            try {
+                delay(1);
+            } catch (Cancelled) {
+            }
+
+            return $channel->tryReceive('nothing');
+        });
+
+        Assert::same($value, 'nothing');
+    }
+
+    public function tryReceiveTakesValueOfWaitingRendezvousSender(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(0);
+
+        group(static function (Group $group) use ($channel) {
+            $sender = $group->spawn(static fn() => $channel->send('value'));
+            delay(0.001);
+
+            Assert::same($channel->tryReceive(), 'value');
+            $sender->await();
+        });
+
+        $this->assertHoldsNothing($channel);
+    }
+
+    public function tryReceiveSkipsCancelledRendezvousSender(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(0);
+
+        group(static function (Group $group) use ($channel) {
+            $cancelled = $group->spawn(static fn() => $channel->send('cancelled'));
+            delay(0.001);
+
+            $cancelled->cancel();
+
+            Assert::null($channel->tryReceive());
+        });
+
+        $this->assertHoldsNothing($channel);
+    }
+
+    public function tryReceiveLetsWaitingSenderIntoBuffer(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+
+        group(static function (Group $group) use ($channel) {
+            $channel->send('first');
+            $sender = $group->spawn(static fn() => $channel->send('second'));
+            delay(0.001);
+
+            Assert::same($channel->tryReceive(), 'first');
+            $sender->await();
+            Assert::same($channel->tryReceive(), 'second');
+        });
+    }
+
+    public function tryReceiveDrainsBufferAfterCloseThenThrows(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        $channel->send('value');
+        $channel->close();
+
+        Assert::same($channel->tryReceive(), 'value');
+        Assert::instanceOf(thrown($channel->tryReceive(...)), ChannelClosed::class);
+    }
+
     public function receiversGetValuesInOrderOfArrival(): void
     {
         /** @var Channel<int> */
@@ -538,6 +646,131 @@ final class ChannelTest
         $channel->close();
 
         Assert::same(iterator_to_array($channel), ['value']);
+    }
+
+    public function isClosedOnlyAfterClose(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        Assert::false($channel->isClosed);
+
+        $channel->close();
+
+        Assert::true($channel->isClosed);
+    }
+
+    public function receiversGetReasonOfCloseAfterDrainingBuffer(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        $reason = new \RuntimeException('connection lost');
+        $channel->send('value');
+        $channel->close($reason);
+
+        Assert::same($channel->receive(), 'value');
+        Assert::same(thrown($channel->receive(...)), $reason);
+        Assert::same(thrown($channel->tryReceive(...)), $reason);
+    }
+
+    public function closeWithReasonWakesWaitingReceiversWithIt(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(0);
+        $reason = new \RuntimeException('connection lost');
+
+        group(static function (Group $group) use ($channel, $reason) {
+            $receiver = $group->spawn(static fn() => thrown($channel->receive(...)));
+            delay(0.001);
+
+            $channel->close($reason);
+
+            Assert::same($receiver->await(), $reason);
+        });
+    }
+
+    public function iteratorThrowsReasonOfCloseAfterDrainingBuffer(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(2);
+        $reason = new \RuntimeException('connection lost');
+        $channel->send('a');
+        $channel->send('b');
+        $channel->close($reason);
+        $received = [];
+
+        $exception = thrown(static function () use ($channel, &$received) {
+            foreach ($channel as $value) {
+                $received[] = $value;
+            }
+        });
+
+        Assert::same($received, ['a', 'b']);
+        Assert::same($exception, $reason);
+    }
+
+    public function sendersGetReasonOfCloseAsPrevious(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(0);
+        $reason = new \RuntimeException('connection lost');
+
+        group(static function (Group $group) use ($channel, $reason) {
+            $sender = $group->spawn(static fn() => thrown(static fn() => $channel->send('waiting')));
+            delay(0.001);
+
+            $channel->close($reason);
+
+            $waiting = $sender->await();
+            Assert::instanceOf($waiting, ChannelClosed::class);
+            Assert::same($waiting->getPrevious(), $reason);
+        });
+
+        $late = thrown(static fn() => $channel->send('late'));
+        Assert::instanceOf($late, ChannelClosed::class);
+        Assert::same($late->getPrevious(), $reason);
+        Assert::same(thrown(static fn() => $channel->trySend('late'))->getPrevious(), $reason);
+    }
+
+    public function closeWithoutReasonGivesChannelClosedWithoutPrevious(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        $channel->close();
+
+        Assert::null(thrown(static fn() => $channel->send('late'))->getPrevious());
+    }
+
+    public function laterCloseDoesNotReplaceReason(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        $first = new \RuntimeException('first');
+        $channel->close($first);
+        $channel->close(new \RuntimeException('second'));
+
+        Assert::same(thrown($channel->receive(...)), $first);
+    }
+
+    public function laterCloseWithReasonDoesNotTurnEndIntoFailure(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+        $channel->close();
+        $channel->close(new \RuntimeException('too late'));
+
+        Assert::instanceOf(thrown($channel->receive(...)), ChannelClosed::class);
+        Assert::same(iterator_to_array($channel), []);
+    }
+
+    public function closeRejectsCancelled(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(1);
+
+        $exception = thrown(static fn() => $channel->close(new Cancelled()));
+
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::false($channel->isClosed);
     }
 
     public function nullIsValue(): void

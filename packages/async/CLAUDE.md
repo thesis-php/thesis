@@ -12,7 +12,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - `Cancelled extends \Error` and carries nothing. Whose cancellation it is, is decided by the state of the scope tree
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
 - `Cancelled` is thrown only where the current scope is cancelled. Awaiting a cancelled task from a healthy scope
-  throws `TaskCancelled` (a regular exception). `Deferred::fail()` and `Continuation::throw()` reject `Cancelled`
+  throws `TaskCancelled` (a regular exception). `Deferred::fail()`, `Channel::close()` and `Continuation::throw()` reject `Cancelled`
   with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`.
 - Only owners cancel scopes: a group (failure, `Group::cancelTasks()`), `Task::cancel()`, the `timeout()` timer.
   There is no public scope object and no public way to cancel an arbitrary scope — do not add one.
