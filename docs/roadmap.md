@@ -47,6 +47,8 @@ Packages like `amqp`, `nats`, `pgmq` need servers in their tests.
   with the same tag. Pull requests go to the monorepo only.
 - [ ] One version for all packages: `Config::$version` is the constraint packages require each other with,
   bump it on a release. Independent versions are not worth it before 1.0.
+- [ ] `make sync` generates `packages/<name>/.gitattributes`: `export-ignore` for what users of the split package
+  do not need (`tests/`, `AGENTS.md`, `package.php`, ...). Decide the exact list when the split is built.
 
 ## Migrating packages from the old repositories
 

@@ -51,8 +51,8 @@ final readonly class Scaffolder
                 );
 
                 PHP,
-            'src/.gitkeep' => '',
-            'tests/.gitkeep' => '',
+            'src/.gitignore' => '',
+            'tests/.gitignore' => '',
             'README.md' => <<<MD
                 # {$name}
 
