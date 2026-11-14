@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Thesis\Async\Internal\WaitQueue;
+
 /**
  * In-process {@see Semaphore}: `new LocalSemaphore(1)` is a mutex. Fair: permits go to the waiters in the order they came.
  *
@@ -23,8 +25,8 @@ final class LocalSemaphore implements Semaphore
     /** @var non-negative-int */
     private int $permits;
 
-    /** @var array<int, Continuation<null>> in the order of arrival */
-    private array $waiters = [];
+    /** @var WaitQueue<Continuation<null>> */
+    private readonly WaitQueue $waiters;
 
     /**
      * @param positive-int $permits
@@ -32,6 +34,7 @@ final class LocalSemaphore implements Semaphore
     public function __construct(int $permits)
     {
         $this->permits = $permits;
+        $this->waiters = new WaitQueue();
     }
 
     public function acquire(): Lock
@@ -42,11 +45,10 @@ final class LocalSemaphore implements Semaphore
         } else {
             suspend(function (Continuation $continuation) {
                 /** @var Continuation<null> $continuation */
-                $id = spl_object_id($continuation);
-                $this->waiters[$id] = $continuation;
+                $key = $this->waiters->push($continuation);
 
-                return function () use ($id) {
-                    unset($this->waiters[$id]);
+                return function () use ($key) {
+                    $this->waiters->remove($key);
                 };
             });
             // Resumed by release(): the permit has been handed over.
@@ -57,9 +59,7 @@ final class LocalSemaphore implements Semaphore
 
     private function release(): void
     {
-        foreach ($this->waiters as $id => $waiter) {
-            unset($this->waiters[$id]);
-
+        while ($this->waiters->items !== [] && ($waiter = $this->waiters->shift()) !== null) {
             if ($waiter->resume()) {
                 return;
             }

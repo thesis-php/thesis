@@ -242,7 +242,7 @@ final class SignalTest
             } catch (TimedOut) {
             }
 
-            Assert::same((fn(): array => $this->receivers)->call($trap), []);
+            Assert::same((fn(): array => $this->receivers->items)->call($trap), []);
         });
     }
 

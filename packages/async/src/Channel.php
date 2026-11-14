@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Thesis\Async\Internal\WaitQueue;
+
 /**
  * A bounded queue of values from any number of senders to any number of receivers, with backpressure:
  * {@see send()} waits while the buffer is full, {@see receive()} waits while it is empty.
@@ -34,11 +36,11 @@ final class Channel implements \IteratorAggregate
     /** @var \SplQueue<T> */
     private readonly \SplQueue $buffer;
 
-    /** @var array<int, Continuation<?array{T}>> in the order of arrival; resumed with null once the channel is closed */
-    private array $receivers = [];
+    /** @var WaitQueue<Continuation<?array{T}>> resumed with null once the channel is closed */
+    private readonly WaitQueue $receivers;
 
-    /** @var array<int, array{Continuation<null>, T}> in the order of arrival */
-    private array $senders = [];
+    /** @var WaitQueue<array{Continuation<null>, T}> */
+    private readonly WaitQueue $senders;
 
     public private(set) bool $isClosed = false;
 
@@ -52,6 +54,8 @@ final class Channel implements \IteratorAggregate
         private readonly int $capacity,
     ) {
         $this->buffer = new \SplQueue();
+        $this->receivers = new WaitQueue();
+        $this->senders = new WaitQueue();
     }
 
     /**
@@ -70,11 +74,10 @@ final class Channel implements \IteratorAggregate
 
         suspend(function (Continuation $continuation) use ($value) {
             /** @var Continuation<null> $continuation */
-            $id = spl_object_id($continuation);
-            $this->senders[$id] = [$continuation, $value];
+            $key = $this->senders->push([$continuation, $value]);
 
-            return function () use ($id) {
-                unset($this->senders[$id]);
+            return function () use ($key) {
+                $this->senders->remove($key);
             };
         });
         // Resumed by a receiver: the value has been taken.
@@ -94,9 +97,7 @@ final class Channel implements \IteratorAggregate
         }
 
         // A waiting receiver means the buffer is empty: a value goes to the buffer only when there is no one to hand it to.
-        foreach ($this->receivers as $id => $receiver) {
-            unset($this->receivers[$id]);
-
+        while ($this->receivers->items !== [] && ($receiver = $this->receivers->shift()) !== null) {
             if ($receiver->resume([$value])) {
                 return true;
             }
@@ -180,18 +181,12 @@ final class Channel implements \IteratorAggregate
         $this->isClosed = true;
         $this->reason = $reason;
 
-        $senders = $this->senders;
-        $this->senders = [];
-
-        foreach ($senders as [$sender]) {
+        foreach ($this->senders->drain() as [$sender]) {
             $sender->throw(new ChannelClosed($reason));
         }
 
         // A waiting receiver means the buffer is empty, so there is nothing left for it.
-        $receivers = $this->receivers;
-        $this->receivers = [];
-
-        foreach ($receivers as $receiver) {
+        foreach ($this->receivers->drain() as $receiver) {
             $receiver->resume(null);
         }
     }
@@ -223,8 +218,8 @@ final class Channel implements \IteratorAggregate
             $value = $this->buffer->dequeue();
 
             // There is room now: the first waiting sender moves its value to the buffer and goes on.
-            foreach ($this->senders as $id => [$sender, $sent]) {
-                unset($this->senders[$id]);
+            while ($this->senders->items !== [] && ($waiting = $this->senders->shift()) !== null) {
+                [$sender, $sent] = $waiting;
 
                 if ($sender->resume()) {
                     $this->buffer->enqueue($sent);
@@ -237,8 +232,8 @@ final class Channel implements \IteratorAggregate
         }
 
         // An empty buffer with waiting senders is a rendezvous: the value is taken from the sender directly.
-        foreach ($this->senders as $id => [$sender, $sent]) {
-            unset($this->senders[$id]);
+        while ($this->senders->items !== [] && ($waiting = $this->senders->shift()) !== null) {
+            [$sender, $sent] = $waiting;
 
             if ($sender->resume()) {
                 return [$sent];
@@ -261,11 +256,10 @@ final class Channel implements \IteratorAggregate
         /** @var ?array{T} */
         return suspend(function (Continuation $continuation) {
             /** @var Continuation<?array{T}> $continuation */
-            $id = spl_object_id($continuation);
-            $this->receivers[$id] = $continuation;
+            $key = $this->receivers->push($continuation);
 
-            return function () use ($id) {
-                unset($this->receivers[$id]);
+            return function () use ($key) {
+                $this->receivers->remove($key);
             };
         });
     }

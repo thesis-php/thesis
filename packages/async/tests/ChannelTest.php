@@ -818,8 +818,8 @@ final class ChannelTest
      */
     private function assertHoldsNothing(Channel $channel): void
     {
-        Assert::same((fn(): array => $this->receivers)->call($channel), []);
-        Assert::same((fn(): array => $this->senders)->call($channel), []);
+        Assert::same((fn(): array => $this->receivers->items)->call($channel), []);
+        Assert::same((fn(): array => $this->senders->items)->call($channel), []);
     }
 
     /**
