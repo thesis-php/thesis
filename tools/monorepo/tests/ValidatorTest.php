@@ -36,7 +36,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/bytes (layer primitive) uses async (layer runtime): a package may not depend on a higher layer.']);
+        Assert::same($errors, [
+            'packages/bytes (layer primitive) uses async (layer runtime): a package may not depend on a higher layer.',
+        ]);
     }
 
     public static function rejectsCodeUsingPackageMissingInUses(): void
@@ -49,7 +51,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/time/src/Clock.php:5: uses Thesis\Bytes\Buffer from bytes, which is not in "uses".']);
+        Assert::same($errors, [
+            'packages/time/src/Clock.php:5: uses Thesis\Bytes\Buffer from bytes, which is not in "uses".',
+        ]);
     }
 
     public static function allowsTestsToUseUsesDev(): void
@@ -74,7 +78,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['Use one constraint for psr/clock across the monorepo, found: ^1.0 in packages/a; ^1.1 in packages/b.']);
+        Assert::same($errors, [
+            'Use one constraint for psr/clock across the monorepo, found: ^1.0 in packages/a; ^1.1 in packages/b.',
+        ]);
     }
 
     public static function rejectsCycle(): void
@@ -98,7 +104,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/a/CLAUDE.md must not exist: write AGENTS.md, a CLAUDE.md makes Claude Code ignore every AGENTS.md.']);
+        Assert::same($errors, [
+            'packages/a/CLAUDE.md must not exist: write AGENTS.md, a CLAUDE.md makes Claude Code ignore every AGENTS.md.',
+        ]);
     }
 
     public static function acceptsApiAndInternalSymbolsInTheirNamespaces(): void
@@ -203,7 +211,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/bytes/src/Buffer.php:9: mark Thesis\Bytes\Buffer either @api or @internal, not both.']);
+        Assert::same($errors, [
+            'packages/bytes/src/Buffer.php:9: mark Thesis\Bytes\Buffer either @api or @internal, not both.',
+        ]);
     }
 
     public static function rejectsInternalSymbolOutsideInternalNamespace(): void
@@ -224,7 +234,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/bytes/src/Chunk.php:8: Thesis\Bytes\Chunk is @internal, move it to an Internal namespace.']);
+        Assert::same($errors, [
+            'packages/bytes/src/Chunk.php:8: Thesis\Bytes\Chunk is @internal, move it to an Internal namespace.',
+        ]);
     }
 
     public static function rejectsApiSymbolInsideInternalNamespace(): void
@@ -245,7 +257,9 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['packages/bytes/src/Internal/Chunk.php:8: Thesis\Bytes\Internal\Chunk is in an Internal namespace, mark it @internal.']);
+        Assert::same($errors, [
+            'packages/bytes/src/Internal/Chunk.php:8: Thesis\Bytes\Internal\Chunk is in an Internal namespace, mark it @internal.',
+        ]);
     }
 
     public static function checksVisibilityInMonorepoTooling(): void
@@ -269,6 +283,8 @@ final readonly class ValidatorTest
 
         $errors = Validator::validate($fixture->load());
 
-        Assert::same($errors, ['tools/monorepo/src/Manifest.php:5: mark Thesis\Monorepo\Manifest either @api or @internal.']);
+        Assert::same($errors, [
+            'tools/monorepo/src/Manifest.php:5: mark Thesis\Monorepo\Manifest either @api or @internal.',
+        ]);
     }
 }

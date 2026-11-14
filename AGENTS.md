@@ -62,8 +62,8 @@ the whole monorepo is for the final check.
 
 ## PHP code
 
-- Soft line length limit is 120 characters: exceed it only when wrapping would hurt readability
-  (long string literals, URLs).
+- Lines are at most 120 characters, comments and tests included. The only exception is a line that cannot be wrapped:
+  a single string literal (an exception message, an expected error) or a URL.
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
   first-class callables (`f(...)`) instead of wrapper closures, `Uri\WhatWg\Url` instead of `parse_url()`
   or a URL library.

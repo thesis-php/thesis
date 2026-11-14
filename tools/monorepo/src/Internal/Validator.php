@@ -266,12 +266,14 @@ final class Validator
         foreach (CodeScanner::phpFiles($this->monorepo->root . '/' . $dir) as $file) {
             foreach (CodeScanner::declarations($file) as $declaration) {
                 $name = $declaration->fullName();
+                $api = $declaration->api;
+                $internal = $declaration->internal;
                 $internalNamespace = $declaration->inInternalNamespace();
                 $problem = match (true) {
-                    $declaration->api && $declaration->internal => "mark {$name} either @api or @internal, not both",
-                    !$declaration->api && !$declaration->internal => "mark {$name} either @api or @internal",
-                    $declaration->internal && !$internalNamespace => "{$name} is @internal, move it to an Internal namespace",
-                    $declaration->api && $internalNamespace => "{$name} is in an Internal namespace, mark it @internal",
+                    $api && $internal => "mark {$name} either @api or @internal, not both",
+                    !$api && !$internal => "mark {$name} either @api or @internal",
+                    $internal && !$internalNamespace => "{$name} is @internal, move it to an Internal namespace",
+                    $api && $internalNamespace => "{$name} is in an Internal namespace, mark it @internal",
                     default => null,
                 };
 
