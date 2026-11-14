@@ -26,6 +26,9 @@ use Thesis\Async\Internal\WaitQueue;
  * trySend() returns {@see SendResult::Closed} on a closed channel, and tryReceive() returns its default
  * on a closed and drained one, so that the next receive() reports the end.
  *
+ * Like Go `len(ch)` and `cap(ch)`, `count($channel)` tells how many values are in the buffer and {@see $capacity} how many fit:
+ * for metrics and for deciding whether to shed load. Values of waiting senders are not counted, so a rendezvous always has 0.
+ *
  * Do not wait for several channels with {@see race()}: two receive() calls may get values in the same tick,
  * and race() keeps only one of them.
  *
@@ -33,7 +36,7 @@ use Thesis\Async\Internal\WaitQueue;
  * @template T
  * @implements \IteratorAggregate<int, T>
  */
-final class Channel implements \IteratorAggregate
+final class Channel implements \IteratorAggregate, \Countable
 {
     /** @var \SplQueue<T> */
     private readonly \SplQueue $buffer;
@@ -53,7 +56,7 @@ final class Channel implements \IteratorAggregate
      *                                   There is no default: how much a slow receiver may fall behind is a decision.
      */
     public function __construct(
-        private readonly int $capacity,
+        public readonly int $capacity,
     ) {
         $this->buffer = new \SplQueue();
         $this->receivers = new WaitQueue();
@@ -202,6 +205,16 @@ final class Channel implements \IteratorAggregate
         foreach ($this->receivers->drain() as $receiver) {
             $receiver->resume(null);
         }
+    }
+
+    /**
+     * How many values are in the buffer, at most {@see $capacity}. Values of waiting senders are not counted.
+     *
+     * @return non-negative-int
+     */
+    public function count(): int
+    {
+        return $this->buffer->count();
     }
 
     /**

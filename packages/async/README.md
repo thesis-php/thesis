@@ -680,6 +680,9 @@ foreach ($events as $event) {
 }
 ```
 
+`count($channel)` is the number of values in the buffer and `$channel->capacity` the number that fit, as `len(ch)` and `cap(ch)` in Go:
+for metrics, or to shed load before the buffer is full. Values of waiting senders are not counted.
+
 Nothing is lost or duplicated on cancellation: a `send()` that throws `Cancelled` has not delivered its value,
 a `receive()` that throws `Cancelled` has not taken one. Senders and receivers are served in the order they came.
 
@@ -948,7 +951,7 @@ all([user, orders])              orders fails after 50 ms
 | `KeyedMutex extends KeyedSemaphore`: `acquire(int\|string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
 | `synchronizedKey(KeyedSemaphore, int\|string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
 | `RateLimiter`: `wait(): void`; `LocalTokenBucketRateLimiter(float $perSecond, int $burst)`, `LocalSlidingWindowRateLimiter(int $limit, float $window)` | how often calls start: a token bucket or a sliding window, fair |
-| `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): SendResult`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `foreach` | bounded FIFO queue between fibers, fair |
+| `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): SendResult`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `count()`, `$capacity`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(float $seconds)` | cancellable sleep; zero or less waits as zero |

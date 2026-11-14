@@ -214,6 +214,36 @@ final class ChannelTest
         Assert::same($value, 'value');
     }
 
+    public function countsValuesInBuffer(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(2);
+        $counts = [\count($channel)];
+        $channel->send('a');
+        $counts[] = \count($channel);
+        $channel->send('b');
+        $counts[] = \count($channel);
+        $channel->receive();
+        $counts[] = \count($channel);
+
+        Assert::same($counts, [0, 1, 2, 1]);
+        Assert::same($channel->capacity, 2);
+    }
+
+    public function doesNotCountValuesOfWaitingSenders(): void
+    {
+        /** @var Channel<string> */
+        $channel = new Channel(0);
+
+        group(static function (Group $group) use ($channel) {
+            $group->spawn(static fn() => $channel->send('value'));
+            delay(1);
+
+            Assert::same(\count($channel), 0);
+            Assert::same($channel->receive(), 'value');
+        });
+    }
+
     public function trySendWithoutRoomReturnsFull(): void
     {
         /** @var Channel<string> */
