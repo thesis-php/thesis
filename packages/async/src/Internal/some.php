@@ -57,8 +57,9 @@ function some(string $function, int $count, array $tasks): array
                     return;
                 }
 
-                // Successes and failures cannot both be decided: that would take more tasks than there are.
-                if ($failures > $tolerated || \count($results) === $count) {
+                // Once failures are decided, the successes left can no longer reach $count:
+                // a late one only lands in $results, which is dropped.
+                if (\count($results) === $count) {
                     return;
                 }
 
