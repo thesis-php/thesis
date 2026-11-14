@@ -73,8 +73,8 @@ the whole monorepo is for the final check.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
-- A call with more than two arguments uses named arguments, one per line with a trailing comma.
-  Exception: variadic arguments (`sprintf()` values and the like), which the language does not allow to name.
+- A call with more than two arguments puts them one per line with a trailing comma. `make rector` names them
+  (`tools/rector/MoreThanTwoArgumentsStrategy.php`), but does not wrap the lines.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.

@@ -71,11 +71,11 @@ fixer-check: var ## Check code style [P=]
 .PHONY: fixer-check
 
 rector: var vendor ## Apply Rector rules [P=]
-	$(RUN) rector process --config=tools/rector.php $(ARGS) $(PATHS)
+	$(RUN) vendor/bin/rector process --config=tools/rector.php $(ARGS) $(PATHS)
 .PHONY: rector
 
 rector-check: var vendor ## Check Rector rules [P=]
-	$(RUN) rector process --config=tools/rector.php --dry-run $(ARGS) $(PATHS)
+	$(RUN) vendor/bin/rector process --config=tools/rector.php --dry-run $(ARGS) $(PATHS)
 .PHONY: rector-check
 
 phpstan: var vendor ## Run static analysis [P=]
