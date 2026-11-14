@@ -1,3 +1,4 @@
+/.agents/
 /var/
 /vendor/
 /.env.local
