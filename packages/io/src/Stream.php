@@ -14,17 +14,23 @@ final readonly class Stream implements Reader, Writer, Closer
 {
     /**
      * @param resource $stream
+     * @param positive-int $chunkSize max number of bytes a single {@see read()} may return.
+     *        PHP limits reads from sockets to 8 KiB by default, which is too small for {@see Buffer::fill()}.
      */
     public function __construct(
         private mixed $stream,
+        int $chunkSize = 65_536,
     ) {
         if (!\is_resource($stream) || get_resource_type($stream) !== 'stream') {
             throw new \InvalidArgumentException(\sprintf('Expected a stream resource, got %s.', get_debug_type($stream)));
         }
+
+        stream_set_chunk_size($stream, $chunkSize);
     }
 
     public function read(int $max): string
     {
+        error_clear_last();
         $bytes = @fread($this->stream, $max);
 
         if ($bytes === false || $bytes === '') {
@@ -39,6 +45,7 @@ final readonly class Stream implements Reader, Writer, Closer
         $length = \strlen($bytes);
 
         for ($written = 0; $written < $length; $written += $n) {
+            error_clear_last();
             $n = @fwrite($this->stream, $written === 0 ? $bytes : substr($bytes, $written));
 
             if ($n === false || $n === 0) {

@@ -59,6 +59,33 @@ final class StreamTest
         $stream->read(1);
     }
 
+    public function doesNotReportUnrelatedErrorOnEof(): void
+    {
+        @trigger_error('unrelated', E_USER_WARNING);
+        $stream = new Stream(self::open('php://memory', 'r'));
+        Expect::exception(UnexpectedEof::class)->withMessage('Unexpected end of stream.');
+
+        $stream->read(1);
+    }
+
+    public function readsMoreThanDefaultSocketChunk(): void
+    {
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        \assert(\is_array($pair) && isset($pair[0], $pair[1]));
+        [$left, $right] = $pair;
+        $out = new Stream($left);
+        $in = new Stream($right);
+
+        try {
+            $out->write(str_repeat('x', 20_000));
+
+            Assert::same(\strlen($in->read(65_536)), 20_000);
+        } finally {
+            $out->close();
+            $in->close();
+        }
+    }
+
     public function throwsOnFailedWrite(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'thesis-io-');

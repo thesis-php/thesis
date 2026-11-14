@@ -28,6 +28,8 @@ final class BufferVarintTest
         yield '300' => [300, 'ac02'];
         yield '16383' => [16_383, 'ff7f'];
         yield '16384' => [16_384, '808001'];
+        yield '2^21 - 1' => [2_097_151, 'ffff7f'];
+        yield '2^21' => [2_097_152, '80808001'];
         yield 'uint32 max' => [4_294_967_295, 'ffffffff0f'];
         yield 'PHP_INT_MAX' => [PHP_INT_MAX, 'ffffffffffffffff7f'];
         yield '-1 as uint64 max' => [-1, 'ffffffffffffffffff01'];
@@ -146,6 +148,7 @@ final class BufferVarintTest
     {
         yield 'empty' => [''];
         yield 'single continuation byte' => ['80'];
+        yield '3 continuation bytes' => ['ffffff'];
         yield '9 continuation bytes' => [str_repeat('ff', 9)];
     }
 
