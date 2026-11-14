@@ -670,6 +670,8 @@ all([user, orders])              orders fails after 50 ms
 - In `{main}`, if the event loop runs dry while a task waits under a shield for something that never comes,
   cancelling cannot help: `group()` gives up joining and rethrows Revolt's "Event loop terminated" error,
   which lists the stuck fibers. Those tasks are orphaned; the alternative is to hang forever.
+  Even if the group has already failed with an error of its own, the deadlock error is the one thrown, since the tasks
+  were not joined; the group's error is among its `suppressed()` ones.
 - A wait costs about 1.7 times a bare Revolt suspension in a micro-benchmark (≈2.0 µs vs ≈1.2 µs, PHP 8.6-dev without opcache),
   independent of how deep the scope is nested.
 
