@@ -488,6 +488,31 @@ The sender closes the channel. After `close()`, `send()` and `trySend()` throw `
 receivers get what is left in the buffer, then `receive()` throws `ChannelClosed` and `foreach` ends.
 Errors are not sent through a channel: a failing producer fails its group, which cancels the consumers.
 
+There is no `map()` that returns a generator of results as they come: the tasks would outlive the call,
+and a consumer that stops iterating would leave them hanging inside a group that never joins.
+Handle each result inside the callable of `each()`, or, for one sequential consumer, put it in the same group as the producers:
+
+```php
+/** @var Channel<Page> */
+$pages = new Channel(10);
+
+group(static function (Group $group) use ($urls, $pages) {
+    $group->spawn(static function () use ($urls, $pages) {
+        try {
+            each($urls, static fn(string $url) => $pages->send(fetch($url)), concurrency: 10);
+        } finally {
+            $pages->close();
+        }
+    });
+
+    foreach ($pages as $page) { // in the order they are fetched
+        store($page);
+    }
+});
+```
+
+`group()` returns once both the producers and the consumer are done; if the consumer fails, the producers are cancelled.
+
 Do not wait for several channels with `race()`: if two `receive()` calls get a value in the same tick, `race()` keeps one
 and the other is lost. Merge sources by sending into one channel instead.
 
