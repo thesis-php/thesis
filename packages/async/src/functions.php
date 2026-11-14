@@ -105,8 +105,10 @@ function isCancelled(): bool
  * a request to abort a query on the server.
  *
  * It only observes the cancellation and cannot cause one. $callback runs from the event loop's microtask queue,
- * never inside the code that cancels, and in the root scope: it must not throw.
- * It is called at most once and never after the returned function is called, even if the cancellation has already happened.
+ * never inside the code that cancels, and in the root scope: it must not throw. If the scope is cancelled,
+ * it is called exactly once and always before the scope ends: if the queue has not reached it by then,
+ * the code leaving the scope calls it itself. It is never called after the returned function is called,
+ * even if the cancellation has already happened.
  * Inside {@see shield()} an outer cancellation does not reach it. Once the scope ends without being cancelled,
  * the callback is dropped and never called, so unsubscribing is optional then.
  *

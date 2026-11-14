@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
+use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Cancelled;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\Tests\thrown;
@@ -161,5 +163,105 @@ final class ScopeTest
         unset($fiber);
 
         Assert::null($reference->get());
+    }
+
+    public function rootStoresNoWaits(): void
+    {
+        $fiber = new \Fiber(static fn() => \Thesis\Async\Tests\never());
+        $fiber->start();
+        $waits = (fn(): array => $this->waits)->call(ROOT_SCOPE);
+
+        Assert::same($waits, []);
+    }
+
+    public function closedScopeStoresNoCallbacks(): void
+    {
+        $called = false;
+        $scope = new Scope();
+        $scope->close();
+
+        $scope->onCancel(static function () use (&$called) {
+            $called = true;
+        });
+        $callbacks = (fn(): array => $this->callbacks)->call($scope);
+        $scope->cancel();
+        checkpoint();
+
+        Assert::same($callbacks, []);
+        Assert::false($called);
+    }
+
+    public function closedCancelledScopeQueuesNoCallbacks(): void
+    {
+        $called = false;
+        $scope = new Scope();
+        $scope->cancel();
+        $scope->close();
+
+        $scope->onCancel(static function () use (&$called) {
+            $called = true;
+        });
+        checkpoint();
+
+        Assert::false($called);
+    }
+
+    public function closeOfCancelledScopeCallsQueuedCallbacksOnce(): void
+    {
+        $calls = 0;
+        $scope = new Scope();
+        $scope->onCancel(static function () use (&$calls) {
+            ++$calls;
+        });
+
+        $scope->cancel();
+        $before = $calls;
+        $scope->close();
+        $afterClose = $calls;
+        checkpoint();
+
+        Assert::same([$before, $afterClose, $calls], [0, 1, 1]);
+    }
+
+    public function failureOfCallbackCalledByCloseGoesToEventLoop(): void
+    {
+        $second = false;
+        $scope = new Scope();
+        $scope->onCancel(static function () {
+            throw new \RuntimeException('callback failed');
+        });
+        $scope->onCancel(static function () use (&$second) {
+            $second = true;
+        });
+        $errors = [];
+        $previous = EventLoop::getErrorHandler();
+        EventLoop::setErrorHandler(static function (\Throwable $error) use (&$errors) {
+            $errors[] = $error->getMessage();
+        });
+
+        try {
+            $scope->cancel();
+            $scope->close();
+            checkpoint();
+        } finally {
+            EventLoop::setErrorHandler($previous);
+        }
+
+        Assert::true($second);
+        Assert::same($errors, ['callback failed']);
+    }
+
+    public function callbacksDoNotAccumulateInLongLivedScope(): void
+    {
+        $scope = new Scope();
+
+        for ($i = 0; $i < 3; ++$i) {
+            $scope->onCancel(static function () {})();
+        }
+        $scope->onCancel(static function () {});
+        $scope->cancel();
+        checkpoint();
+
+        Assert::same((fn(): array => $this->callbacks)->call($scope), []);
     }
 }

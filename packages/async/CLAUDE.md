@@ -23,9 +23,13 @@ The model, the API and the guarantees are described in `README.md` — read it f
   There is no public scope object and no public way to cancel an arbitrary scope — do not add one.
   `onCancel()` does not break this: it only observes the cancellation of the current scope.
 - `onCancel()` callbacks are queued through `EventLoop::queue()`, never called inside `Scope::notify()`: user code does not run
-  in the middle of the walk. They are called at most once, never after unsubscribing (even if already queued),
-  never after `close()`, and the root scope stores none. They live in their own list: the hot path of `suspend()` is untouched.
-- `Internal\ScopeCancellation` keeps no state of its own and subscribes only through `Scope::onCancel()`: amphp unsubscribes
+  in the middle of the walk. If the scope is cancelled while subscribed, the callback is called exactly once and always
+  before the scope ends: `close()` of a cancelled scope calls the ones the queue has not reached yet (in the root scope,
+  with no scoped values; a throw goes to the event loop), and the queued run is then a no-op. Never after unsubscribing
+  (even if already queued), never after `close()` (a closed scope stores none), and the root scope stores none.
+  They live in their own list: the hot path of `suspend()` is untouched. The root scope stores no waits either.
+- `Internal\ScopeCancellation` keeps no cancellation state of its own (only the unsubscribe functions by id)
+  and subscribes only through `Scope::onCancel()`: amphp unsubscribes
   in `finally` and then reuses the fiber's `Suspension` for the next wait, so a callback that runs after `unsubscribe()`
   would wake the wrong wait (this is how a join broke with "Must call suspend() before calling resume()").
 - `checkpoint()` must yield to the event loop through `EventLoop::defer()`, not only check a flag:

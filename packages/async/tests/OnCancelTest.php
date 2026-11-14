@@ -27,11 +27,77 @@ final class OnCancelTest
             });
         });
 
-        checkpoint(); // the callback is queued, and {main} is resumed before the queue is drained
+        // {main} is resumed before the queue is drained, but the callback has been called before the scope ended.
+        $whenScopeEnded = $calls;
+        checkpoint();
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same($calls, 1);
+        Assert::same([$whenScopeEnded, $calls], [1, 1]);
         assertNoCallbacksLeft();
+    }
+
+    public function isCalledBeforeScopeEndsInTask(): void
+    {
+        $log = [];
+
+        group(static function (Group $group) use (&$log) {
+            $group->spawn(static function () use (&$log) {
+                thrown(static function () use (&$log) {
+                    timeout(1, static function () use (&$log) {
+                        onCancel(static function () use (&$log) {
+                            $log[] = 'called';
+                        });
+
+                        never();
+                    });
+                });
+                $log[] = 'scope ended';
+            });
+        });
+
+        Assert::same($log, ['called', 'scope ended']);
+    }
+
+    public function isCalledInRootScopeWithoutValuesWhenScopeEnds(): void
+    {
+        /** @var ScopedValue<string> */
+        $value = new ScopedValue('default');
+        $observed = null;
+
+        $value->with('bound', static function () use ($value, &$observed) {
+            thrown(static function () use ($value, &$observed) {
+                timeout(1, static function () use ($value, &$observed) {
+                    onCancel(static function () use ($value, &$observed) {
+                        $observed = [isCancelled(), $value->get(), remaining()];
+                    });
+
+                    never();
+                });
+            });
+        });
+
+        Assert::same($observed, [false, 'default', null]);
+    }
+
+    public function isNotCalledAgainAfterScopeHasEnded(): void
+    {
+        $calls = 0;
+
+        group(static function (Group $group) use (&$calls) {
+            $handle = $group->spawn(static function () use (&$calls) {
+                onCancel(static function () use (&$calls) {
+                    ++$calls;
+                });
+
+                never();
+            });
+
+            delay(1);
+            $handle->cancel();
+        });
+        checkpoint();
+
+        Assert::same($calls, 1);
     }
 
     public function isCalledWhenAncestorIsCancelled(): void

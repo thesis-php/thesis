@@ -432,7 +432,10 @@ try {
 
 It only observes: a callback cannot be used to cancel a scope it was not given.
 The callback runs from the event loop's microtask queue, never inside the code that cancels, and must not throw.
-It is called at most once and never after unsubscribing, even if the cancellation has already happened;
+If the scope is cancelled, the callback is called exactly once and always before the scope ends: if the queue has not
+reached it by then, the code leaving the scope calls it itself. So a `cancelQuery()` never arrives after the query
+has ended and the connection has gone back to a pool to run someone else's query.
+It is never called after unsubscribing, even if the cancellation has already happened;
 if the scope already is cancelled, it is called soon. Inside `shield()` an outer cancellation does not reach it.
 When the scope ends without being cancelled, the callback is dropped, so unsubscribing is optional then.
 

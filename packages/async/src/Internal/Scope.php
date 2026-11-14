@@ -39,8 +39,14 @@ final class Scope
     /** @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id() */
     private array $waits = [];
 
-    /** @var array<int, \Closure(): void> queued on cancellation, keyed by spl_object_id(); see {@see onCancel()} */
+    /**
+     * @var array<int, \Closure(): void> the {@see onCancel()} callbacks not called yet, keyed by spl_object_id():
+     *                                  queued on cancellation, and called by {@see close()} if still pending then
+     */
     private array $callbacks = [];
+
+    /** Set by {@see close()}: a closed scope stores no callbacks. */
+    private bool $closed = false;
 
     /** @var array<int, self> held strongly to deliver cancellation; released by {@see close()} */
     private array $children = [];
@@ -164,7 +170,8 @@ final class Scope
     {
         if ($this->cancelled) {
             $wait->interrupt();
-        } else {
+        } elseif ($this !== ROOT_SCOPE) {
+            // The root scope is never cancelled: holding its waits would only keep abandoned fibers alive.
             // A subscribed continuation is alive, so its object id is unique among the subscribed ones.
             $this->waits[spl_object_id($wait)] = $wait;
         }
@@ -181,40 +188,43 @@ final class Scope
     /**
      * Queues $callback through `EventLoop::queue()` once this scope is cancelled, by its owner or through an ancestor.
      * If it already is, $callback is queued right away. Never synchronously: user code does not run inside {@see cancel()}.
+     * If the queue has not reached it when the scope is closed, {@see close()} calls it itself:
+     * a callback of a cancelled scope is always called before the scope ends, and never after.
      *
-     * Not a way to cancel anything: it only observes. The callback runs in the root scope.
+     * Not a way to cancel anything: it only observes. The callback runs in the root scope, with no scoped values.
      * It is called at most once, and never after the returned unsubscribe function is called,
      * even if it is already queued. Once the scope is closed, it is never called.
      *
-     * The root scope is never cancelled, so nothing is stored for it.
+     * The root scope is never cancelled and a closed scope never calls back, so nothing is stored for them.
      *
      * @param \Closure(): void $callback
      * @return \Closure(): void unsubscribe, idempotent
      */
     public function onCancel(\Closure $callback): \Closure
     {
-        if ($this === ROOT_SCOPE) {
+        if ($this === ROOT_SCOPE || $this->closed) {
             return static function () {};
         }
 
         $pending = true;
-        // Queued once at most: by notify() or right here.
-        $fire = static function () use (&$pending, $callback) {
-            /** @phpstan-ignore if.alwaysTrue (reset by the unsubscribe function below) */
+        $id = 0;
+        // Queued once at most, by notify() or right here, and maybe called earlier by close(): only the first call counts.
+        $fire = function () use (&$pending, &$id, $callback) {
             if ($pending) {
+                $pending = false;
+                unset($this->callbacks[$id]);
                 $callback();
             }
         };
         $id = spl_object_id($fire);
+        $this->callbacks[$id] = $fire;
 
         if ($this->cancelled) {
             EventLoop::queue($fire);
-        } else {
-            $this->callbacks[$id] = $fire;
         }
 
-        // Once the scope is cancelled, $this->callbacks stays empty, and before that a stored $fire is alive,
-        // so its id is not reused: unsetting it the first time removes this subscription and nothing else.
+        // A stored $fire is alive, so its id is not reused while it is stored, and it is removed once it is called:
+        // unsetting it while still pending removes this subscription and nothing else.
         return function () use (&$pending, $id) {
             if ($pending) {
                 $pending = false;
@@ -225,14 +235,37 @@ final class Scope
 
     /**
      * Detaches the scope from its parent. Every created scope must be closed by its owner.
+     *
+     * If the scope is cancelled, the {@see onCancel()} callbacks the queue has not reached yet are called here,
+     * so that none runs after the scope has ended; otherwise they are dropped. Either way, none is called afterwards:
+     * a task handle may still cancel a finished task.
      */
     public function close(): void
     {
-        // A task handle may still cancel a finished task: its callbacks must not fire then.
+        $this->closed = true;
+        $callbacks = $this->callbacks;
         $this->callbacks = [];
 
-        if ($this->parent !== null) {
-            unset($this->parent->children[spl_object_id($this)]);
+        try {
+            if ($this->cancelled && $callbacks !== []) {
+                // As from the queue: in the root scope, with no scoped values.
+                ROOT_SCOPE->run(static fn() => Context::run([], static function () use ($callbacks) {
+                    foreach ($callbacks as $fire) {
+                        try {
+                            $fire();
+                        } catch (\Throwable $error) {
+                            // As if it had been thrown from the queue: to the event loop, not to whoever closes the scope.
+                            EventLoop::queue(static function () use ($error) {
+                                throw $error;
+                            });
+                        }
+                    }
+                }));
+            }
+        } finally {
+            if ($this->parent !== null) {
+                unset($this->parent->children[spl_object_id($this)]);
+            }
         }
     }
 
@@ -256,11 +289,9 @@ final class Scope
             $wait->interrupt();
         }
 
-        $callbacks = $this->callbacks;
-        $this->callbacks = [];
-
-        foreach ($callbacks as $callback) {
-            EventLoop::queue($callback);
+        // They stay stored until called: close() calls those the queue has not reached yet.
+        foreach ($this->callbacks as $fire) {
+            EventLoop::queue($fire);
         }
 
         foreach ($this->children as $child) {

@@ -10,8 +10,9 @@ use Amp\CancelledException;
 /**
  * {@see Cancellation} that is requested exactly while its scope is cancelled.
  *
- * It holds no state of its own: {@see isRequested()} reads the scope's flag, {@see subscribe()} goes through
- * {@see Scope::onCancel()}. So it costs nothing until amphp subscribes, and a subscription that has been removed
+ * It holds no cancellation state of its own, only the unsubscribe functions of its subscriptions by id:
+ * {@see isRequested()} reads the scope's flag, {@see subscribe()} goes through {@see Scope::onCancel()}.
+ * So it costs nothing until amphp subscribes, and a subscription that has been removed
  * is never called, even if the cancellation has already been queued: amphp's own code relies on that
  * to not wake a suspension that has moved on to another wait.
  *
