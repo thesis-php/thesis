@@ -20,6 +20,11 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 - How to *use* a package from another package is in its `README.md` or its `skills/`. Read them before
   using a package you have not used yet in this session: its `AGENTS.md` will not be loaded for you.
 - Write `AGENTS.md` only, never `CLAUDE.md`: a `CLAUDE.md` makes Claude Code ignore every `AGENTS.md`.
+- An important finding (an invariant, a decision, a trap, a rejected approach) goes into the right `AGENTS.md`
+  in the same change, without being asked. When we rethink something, rewrite the existing text instead of
+  appending a correction: the file describes how things are now, not how we got here.
+- Keeping `AGENTS.md` files in shape is critical: they are the only memory that survives between sessions.
+  Every rule is short, current and in the section it belongs to. Delete what became obsolete, merge duplicates.
 
 ## Manifests and generated files
 
