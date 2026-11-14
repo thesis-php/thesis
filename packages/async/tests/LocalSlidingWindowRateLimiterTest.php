@@ -16,7 +16,7 @@ final class LocalSlidingWindowRateLimiterTest
 {
     public function atMostCallsStartWithinAnyWindow(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 3, seconds: 10);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 3, window: 10);
         $start = now();
         /** @var \SplQueue<float> $window the starts of the last 3 calls */
         $window = new \SplQueue();
@@ -46,20 +46,20 @@ final class LocalSlidingWindowRateLimiterTest
      * Windows that are not exact in binary: a wake-up a hair before the oldest start leaves the window
      * must not make the call wait a delay so small that the clock does not move (it hung on virtual time).
      *
-     * @param positive-int $calls
+     * @param positive-int $limit
      */
     #[DataSet([1, 0.1])]
     #[DataSet([2, 0.3])]
     #[DataSet([3, 1.5])]
     #[DataSet([10, 0.7])]
-    public function callsStartOnScheduleAtAnyWindow(int $calls, float $seconds): void
+    public function callsStartOnScheduleAtAnyWindow(int $limit, float $window): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter($calls, $seconds);
+        $limiter = new LocalSlidingWindowRateLimiter($limit, $window);
         $start = now();
 
-        for ($call = 0; $call < $calls * 30; ++$call) {
+        for ($call = 0; $call < $limit * 30; ++$call) {
             $limiter->wait();
-            $expected = intdiv($call, $calls) * $seconds;
+            $expected = intdiv($call, $limit) * $window;
 
             Assert::true(abs(now() - $start - $expected) < 1e-9, \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected));
         }
@@ -70,7 +70,7 @@ final class LocalSlidingWindowRateLimiterTest
     public function limiterUsedOutsideRunWorksInside(): void
     {
         delay(100); // the clock of the inner run() must not start behind the time the limiter has seen
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 1);
         $limiter->wait();
 
         $elapsed = VirtualTime\run(static function () use ($limiter) {
@@ -85,7 +85,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function fullWindowIsAvailableAfterPause(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 2, seconds: 20);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 2, window: 20);
         $limiter->wait();
         $limiter->wait();
         delay(40);
@@ -102,7 +102,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function waitersGetTurnsInOrderOfArrival(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 1);
         $limiter->wait();
         $log = [];
 
@@ -120,7 +120,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function waitWithRoomInWindowDoesNotSuspend(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1_000);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 1_000);
 
         $thrown = timeout(1, static function () use ($limiter) {
             untilCancelled();
@@ -139,7 +139,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function cancelledSleeperCountsNoCall(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 20);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 20);
         $limiter->wait();
         $start = now();
 
@@ -153,7 +153,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function cancelledQueuedWaiterCountsNoCall(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 20);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 20);
         $limiter->wait();
         $start = now();
 
@@ -182,10 +182,10 @@ final class LocalSlidingWindowRateLimiterTest
     #[DataSet([0.0])]
     #[DataSet([-1.0])]
     #[DataSet([NAN])]
-    public function windowMustBePositive(float $seconds): void
+    public function windowMustBePositive(float $window): void
     {
         Expect::exception(\ValueError::class);
 
-        new LocalSlidingWindowRateLimiter(1, $seconds);
+        new LocalSlidingWindowRateLimiter(1, $window);
     }
 }

@@ -21,7 +21,7 @@ namespace Thesis\Async;
  *
  * @api
  */
-final class LocalRateLimiter implements RateLimiter
+final class LocalTokenBucketRateLimiter implements RateLimiter
 {
     private readonly LocalMutex $mutex;
 
@@ -41,7 +41,7 @@ final class LocalRateLimiter implements RateLimiter
         private readonly int $burst,
     ) {
         if (!($perSecond > 0)) {
-            throw new \ValueError(\sprintf('LocalRateLimiter needs a positive rate, got %s.', $perSecond));
+            throw new \ValueError(\sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', $perSecond));
         }
 
         $this->mutex = new LocalMutex();

@@ -12,11 +12,11 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\untilCancelled;
 
 #[Test]
-final class LocalRateLimiterTest
+final class LocalTokenBucketRateLimiterTest
 {
     public function burstStartsAtOnceThenOneEveryInterval(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 1, burst: 3);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 3);
         $start = now();
 
         $limiter->wait();
@@ -46,7 +46,7 @@ final class LocalRateLimiterTest
     #[DataSet([1.5, 3])]
     public function callsStartOnScheduleAtAnyRate(float $perSecond, int $burst): void
     {
-        $limiter = new LocalRateLimiter($perSecond, $burst);
+        $limiter = new LocalTokenBucketRateLimiter($perSecond, $burst);
         $start = now();
 
         for ($call = 0; $call < $burst + 30; ++$call) {
@@ -62,7 +62,7 @@ final class LocalRateLimiterTest
     public function limiterCreatedOutsideRunWorksInside(): void
     {
         delay(100); // the clock of the inner run() must not start behind the time the limiter has seen
-        $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
         $limiter->wait();
 
         $elapsed = VirtualTime\run(static function () use ($limiter) {
@@ -77,7 +77,7 @@ final class LocalRateLimiterTest
 
     public function waitersGetTokensInOrderOfArrival(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
         $limiter->wait();
         $log = [];
 
@@ -95,7 +95,7 @@ final class LocalRateLimiterTest
 
     public function waitWithTokenAvailableDoesNotSuspend(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
 
         $thrown = timeout(1, static function () use ($limiter) {
             untilCancelled();
@@ -114,7 +114,7 @@ final class LocalRateLimiterTest
 
     public function cancelledSleeperTakesNoToken(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
         $start = now();
 
@@ -128,7 +128,7 @@ final class LocalRateLimiterTest
 
     public function cancelledQueuedWaiterTakesNoToken(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
         $start = now();
 
@@ -156,7 +156,7 @@ final class LocalRateLimiterTest
 
     public function idleRefillIsCappedAtBurst(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 2);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 2);
         $limiter->wait();
         $limiter->wait();
         delay(10);
@@ -178,6 +178,6 @@ final class LocalRateLimiterTest
     {
         Expect::exception(\ValueError::class);
 
-        new LocalRateLimiter($perSecond, 1);
+        new LocalTokenBucketRateLimiter($perSecond, 1);
     }
 }
