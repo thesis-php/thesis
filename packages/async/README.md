@@ -550,7 +550,8 @@ an unreleased `Lock` releases itself in its destructor, which may run while the 
 and a wait there throws `FiberError`.
 
 When the resources are many and not known in advance — a user, an order, a file — take a lock per key.
-`KeyedMutex` and `KeyedSemaphore` take the key in `acquire()`, and `synchronizedKey()` is `synchronized()` for one key:
+`KeyedMutex` and `KeyedSemaphore` take the key in `acquire()`, an `int` or a `string` (as in an array, `'1'` is the key `1`),
+and `synchronizedKey()` is `synchronized()` for one key:
 
 ```php
 use Thesis\Async\LocalKeyedMutex;
@@ -944,8 +945,8 @@ all([user, orders])              orders fails after 50 ms
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
-| `KeyedMutex extends KeyedSemaphore`: `acquire(string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
-| `synchronizedKey(KeyedSemaphore, string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
+| `KeyedMutex extends KeyedSemaphore`: `acquire(int\|string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
+| `synchronizedKey(KeyedSemaphore, int\|string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
 | `RateLimiter`: `wait(): void`; `LocalTokenBucketRateLimiter(float $perSecond, int $burst)`, `LocalSlidingWindowRateLimiter(int $limit, float $window)` | how often calls start: a token bucket or a sliding window, fair |
 | `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): SendResult`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |

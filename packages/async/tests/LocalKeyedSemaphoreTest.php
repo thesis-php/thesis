@@ -63,6 +63,19 @@ final class LocalKeyedSemaphoreTest
         $lock->release();
     }
 
+    public function takesIntKeysAsArrayKeys(): void
+    {
+        $mutex = new LocalKeyedMutex();
+        $lock = $mutex->acquire(1);
+
+        $sameKey = thrown(static fn() => timeout(1, static fn() => $mutex->acquire('1')));
+        $otherKey = timeout(10, static fn() => synchronizedKey($mutex, 2, static fn() => '2 while 1 is held'));
+
+        Assert::instanceOf($sameKey, TimedOut::class);
+        Assert::same($otherKey, '2 while 1 is held');
+        $lock->release();
+    }
+
     public function waitersOfKeyGetPermitsInOrderOfArrival(): void
     {
         $semaphore = new LocalKeyedSemaphore(1);

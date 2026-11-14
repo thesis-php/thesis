@@ -511,7 +511,7 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
  * @return T
  * @throws Cancelled if the scope is cancelled while waiting for the lock
  */
-function synchronizedKey(KeyedSemaphore $semaphore, string $key, callable $fn): mixed
+function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $fn): mixed
 {
     /** @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>> $held locks taken by synchronizedKey(), per fiber */
     static $held = new \WeakMap();

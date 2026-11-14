@@ -181,7 +181,7 @@ final class SynchronizedTest
         $semaphore = new class implements KeyedSemaphore {
             public int $acquires = 0;
 
-            public function acquire(string $key): Lock
+            public function acquire(int|string $key): Lock
             {
                 ++$this->acquires;
 

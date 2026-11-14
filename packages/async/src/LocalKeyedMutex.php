@@ -18,7 +18,7 @@ final readonly class LocalKeyedMutex implements KeyedMutex
         $this->semaphore = new LocalKeyedSemaphore(1);
     }
 
-    public function acquire(string $key): Lock
+    public function acquire(int|string $key): Lock
     {
         return $this->semaphore->acquire($key);
     }

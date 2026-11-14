@@ -27,7 +27,7 @@ final class LocalKeyedSemaphore implements KeyedSemaphore
         private readonly int $permits,
     ) {}
 
-    public function acquire(string $key): Lock
+    public function acquire(int|string $key): Lock
     {
         $semaphore = $this->semaphores[$key] ??= new LocalSemaphore($this->permits);
         $this->users[$key] = ($this->users[$key] ?? 0) + 1;
@@ -47,7 +47,7 @@ final class LocalKeyedSemaphore implements KeyedSemaphore
         });
     }
 
-    private function leave(string $key): void
+    private function leave(int|string $key): void
     {
         /** @phpstan-ignore offsetAccess.notFound (the key is in use: acquire() has counted the caller) */
         $users = $this->users[$key] - 1;

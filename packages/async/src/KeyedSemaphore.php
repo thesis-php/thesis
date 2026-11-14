@@ -25,7 +25,8 @@ interface KeyedSemaphore
      *
      * The contract for implementations is that of {@see Semaphore::acquire()}.
      *
+     * @param array-key $key an id or a name; as in an array, a numeric string is the same key as its integer
      * @throws Cancelled if the scope is cancelled while waiting
      */
-    public function acquire(string $key): Lock;
+    public function acquire(int|string $key): Lock;
 }
