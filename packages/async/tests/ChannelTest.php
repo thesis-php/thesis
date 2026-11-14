@@ -214,22 +214,22 @@ final class ChannelTest
         Assert::same($value, 'value');
     }
 
-    public function trySendWithoutRoomReturnsFalse(): void
+    public function trySendWithoutRoomReturnsFull(): void
     {
         /** @var Channel<string> */
         $channel = new Channel(1);
 
-        Assert::true($channel->trySend('a'));
-        Assert::false($channel->trySend('b'));
+        Assert::same($channel->trySend('a'), SendResult::Sent);
+        Assert::same($channel->trySend('b'), SendResult::Full);
         Assert::same($channel->receive(), 'a');
     }
 
-    public function trySendOnRendezvousWithoutReceiverReturnsFalse(): void
+    public function trySendOnRendezvousWithoutReceiverReturnsFull(): void
     {
         /** @var Channel<string> */
         $channel = new Channel(0);
 
-        Assert::false($channel->trySend('value'));
+        Assert::same($channel->trySend('value'), SendResult::Full);
         $this->assertHoldsNothing($channel);
     }
 
@@ -242,7 +242,7 @@ final class ChannelTest
             $receiver = $group->spawn($channel->receive(...));
             delay(1);
 
-            Assert::true($channel->trySend('value'));
+            Assert::same($channel->trySend('value'), SendResult::Sent);
 
             return $receiver->await();
         });
@@ -530,7 +530,7 @@ final class ChannelTest
 
             $cancelled->cancel();
 
-            Assert::false($channel->trySend('value'));
+            Assert::same($channel->trySend('value'), SendResult::Full);
         });
 
         $this->assertHoldsNothing($channel);
@@ -565,7 +565,7 @@ final class ChannelTest
 
         // Both callbacks run in the same tick, the send first: the value wins over the deadline.
         EventLoop::delay(1, static function () use ($channel) {
-            Assert::true($channel->trySend('value'));
+            Assert::same($channel->trySend('value'), SendResult::Sent);
         });
 
         $value = timeout(1, $channel->receive(...));
@@ -739,15 +739,14 @@ final class ChannelTest
         $channel->send('value');
     }
 
-    public function trySendOnClosedChannelThrows(): void
+    public function trySendOnClosedChannelReturnsClosed(): void
     {
         /** @var Channel<string> */
         $channel = new Channel(1);
         $channel->close();
 
-        Expect::exception(ChannelClosed::class);
-
-        $channel->trySend('value');
+        Assert::same($channel->trySend('value'), SendResult::Closed);
+        $this->assertHoldsNothing($channel);
     }
 
     public function closeIsIdempotent(): void
@@ -841,7 +840,6 @@ final class ChannelTest
         $late = thrown(static fn() => $channel->send('late'));
         Assert::instanceOf($late, ChannelClosed::class);
         Assert::same($late->getPrevious(), $reason);
-        Assert::same(thrown(static fn() => $channel->trySend('late'))->getPrevious(), $reason);
     }
 
     public function closeWithoutReasonGivesChannelClosedWithoutPrevious(): void

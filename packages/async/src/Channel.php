@@ -22,8 +22,9 @@ use Thesis\Async\Internal\WaitQueue;
  * A producer that failed closes it with the reason: receivers get the reason instead of the end, once the buffer is drained.
  *
  * send() and receive() that do not have to wait return immediately, without a cancellation check,
- * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait.
- * tryReceive() never throws either: on a closed and drained channel it returns its default, and the next receive() reports the end.
+ * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait and never throw:
+ * trySend() returns {@see SendResult::Closed} on a closed channel, and tryReceive() returns its default
+ * on a closed and drained one, so that the next receive() reports the end.
  *
  * Do not wait for several channels with {@see race()}: two receive() calls may get values in the same tick,
  * and race() keeps only one of them.
@@ -69,7 +70,11 @@ final class Channel implements \IteratorAggregate
      */
     public function send(mixed $value): void
     {
-        if ($this->trySend($value)) {
+        if ($this->isClosed) {
+            throw new ChannelClosed($this->reason);
+        }
+
+        if ($this->offer($value)) {
             return;
         }
 
@@ -85,18 +90,28 @@ final class Channel implements \IteratorAggregate
     }
 
     /**
-     * Does not wait: for values that are better dropped than delayed, such as metrics.
+     * Does not wait and never throws: for values that are better dropped than delayed, such as metrics.
+     *
+     * Unlike {@see send()}, it reports a closed channel instead of throwing {@see ChannelClosed}:
+     * a dropped value is dropped whatever the reason.
      *
      * @param T $value
-     * @return bool whether the value was handed over to a receiver or buffered, false if there is no room
-     * @throws ChannelClosed if the channel is closed, with the reason of {@see close()} as the previous exception
      */
-    public function trySend(mixed $value): bool
+    public function trySend(mixed $value): SendResult
     {
         if ($this->isClosed) {
-            throw new ChannelClosed($this->reason);
+            return SendResult::Closed;
         }
 
+        return $this->offer($value) ? SendResult::Sent : SendResult::Full;
+    }
+
+    /**
+     * @param T $value
+     * @return bool whether the value was handed over to a receiver or buffered
+     */
+    private function offer(mixed $value): bool
+    {
         // A waiting receiver means the buffer is empty: a value goes to the buffer only when there is no one to hand it to.
         while ($this->receivers->items !== [] && ($receiver = $this->receivers->shift()) !== null) {
             if ($receiver->resume([$value])) {
