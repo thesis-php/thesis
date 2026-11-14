@@ -1,0 +1,33 @@
+{
+    "name": "thesis/thesis",
+    "description": "Thesis Thesis",
+    "license": "MIT",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.5"
+    },
+    "require-dev": {
+        "symfony/var-dumper": "^8.0",
+        "testo/testo": "^0.10.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\": "tests/"
+        }
+    },
+    "config": {
+        "bump-after-update": true,
+        "sort-packages": true
+    }
+}

@@ -1,0 +1,13 @@
+services:
+  php:
+    image: ghcr.io/phpyh/php:${PHP_VERSION:-8.5}
+    user: ${DOCKER_USER:-}
+    working_dir: /workspace
+    environment:
+      IN_CONTAINER: true
+      HISTFILE: /workspace/var/.docker_history
+    volumes:
+      - .:/workspace
+      - ~/.composer/cache:/composer/cache
+    tty: true
+    init: true
