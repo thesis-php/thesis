@@ -9,6 +9,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Cancelled;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -21,11 +22,7 @@ final class ContinuationImplTest
         EventLoop::queue(static function () use ($continuation) {
             $continuation->park(); // parked in another fiber
         });
-        $main = EventLoop::getSuspension();
-        EventLoop::defer(static function () use ($main) {
-            $main->resume();
-        });
-        $main->suspend();
+        checkpoint(); // one tick: the queued fiber parks first
 
         Expect::exception(\LogicException::class)->withMessage('Continuation is already parked.');
 

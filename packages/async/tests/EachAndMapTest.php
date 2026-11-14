@@ -23,7 +23,7 @@ final class EachAndMapTest
             $calls[] = \func_get_args();
         });
 
-        Assert::array($calls)->sameElementsAs([[1], [2], [3]]);
+        Assert::same($calls, [[1], [2], [3]]);
     }
 
     public function eachAcceptsInternalFunction(): void
@@ -70,7 +70,7 @@ final class EachAndMapTest
             $processed[] = $page;
         });
 
-        Assert::array($processed)->sameElementsAs([1, 2, 3]);
+        Assert::same($processed, [1, 2, 3]);
     }
 
     public function eachOfNothingDoesNothing(): void
@@ -322,10 +322,10 @@ final class EachAndMapTest
 
     public function mapReturnsResultsWithKeysInInputOrder(): void
     {
-        $results = map(['x' => 3, 'y' => 1, 'z' => 2], 3, static function (int $ms) {
-            delay($ms / 1_000);
+        $results = map(['x' => 3, 'y' => 1, 'z' => 2], 3, static function (int $seconds) {
+            delay($seconds);
 
-            return $ms * 10;
+            return $seconds * 10;
         });
 
         Assert::same($results, ['x' => 30, 'y' => 10, 'z' => 20]);
@@ -333,10 +333,10 @@ final class EachAndMapTest
 
     public function mapKeepsInputOrderWhenWorkersTakeItemsOutOfOrder(): void
     {
-        $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], 2, static function (int $ms) {
-            delay($ms / 1_000);
+        $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], 2, static function (int $seconds) {
+            delay($seconds);
 
-            return $ms;
+            return $seconds;
         });
 
         Assert::same($results, ['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1]);

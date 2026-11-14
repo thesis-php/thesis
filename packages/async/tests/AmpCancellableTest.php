@@ -149,19 +149,17 @@ final class AmpCancellableTest
     {
         // The amphp timer and the deadline fire in the same tick: the cancellation callback is queued for
         // a suspension that has already been resumed by the timer. It must not reach the next wait (the join).
-        foreach (range(1, 20) as $_) {
-            $exception = thrown(static fn() => timeout(2, static fn() => group(static function (Group $group) {
-                $group->spawn(static fn() => ampCancellable(
-                    static fn($cancellation) => ampDelay(2, cancellation: $cancellation),
-                ));
-                $group->spawn(static fn() => ampCancellable(
-                    static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
-                ));
-            })));
+        // On virtual time they always do, so one round is enough.
+        $exception = thrown(static fn() => timeout(2, static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => ampCancellable(
+                static fn($cancellation) => ampDelay(2, cancellation: $cancellation),
+            ));
+            $group->spawn(static fn() => ampCancellable(
+                static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
+            ));
+        })));
 
-            Assert::instanceOf($exception, TimedOut::class);
-        }
-
+        Assert::instanceOf($exception, TimedOut::class);
         assertNoCallbacksLeft();
     }
 }

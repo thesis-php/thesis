@@ -283,12 +283,12 @@ final class SuspendTest
         thrown(static function () {
             timeout(1, static function () {
                 suspend(static function (Continuation $continuation) {
-                    $id = EventLoop::delay(10_000, static function () use ($continuation) {
+                    $timer = EventLoop::delay(10_000, static function () use ($continuation) {
                         $continuation->resume();
                     });
 
-                    return static function () use ($id) {
-                        EventLoop::cancel($id);
+                    return static function () use ($timer) {
+                        EventLoop::cancel($timer);
                     };
                 });
             });

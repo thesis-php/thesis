@@ -28,15 +28,15 @@ final class GroupTest
         $finished = [];
 
         group(static function (Group $group) use (&$finished) {
-            foreach ([3, 1, 2] as $ms) {
-                $group->spawn(static function () use ($ms, &$finished) {
-                    delay($ms / 1_000);
-                    $finished[] = $ms;
+            foreach ([3, 1, 2] as $seconds) {
+                $group->spawn(static function () use ($seconds, &$finished) {
+                    delay($seconds);
+                    $finished[] = $seconds;
                 });
             }
         });
 
-        Assert::array($finished)->sameElementsAs([1, 2, 3]);
+        Assert::same($finished, [1, 2, 3]);
         assertNoCallbacksLeft();
     }
 
@@ -89,7 +89,7 @@ final class GroupTest
 
         Assert::instanceOf($exception, \RuntimeException::class);
         Assert::same($exception->getMessage(), 'task failed');
-        Assert::array($events)->sameElementsAs(['sibling cancelled', 'sibling cleaned up', 'body cancelled']);
+        Assert::same($events, ['body cancelled', 'sibling cancelled', 'sibling cleaned up']);
     }
 
     public function firstFailureWins(): void
