@@ -6,10 +6,11 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Data\DataSet;
-use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Async\Tests\withoutWarnings;
 
 #[Test]
 final class LocalSlidingWindowRateLimiterTest
@@ -179,13 +180,15 @@ final class LocalSlidingWindowRateLimiterTest
         Assert::same($at, [20.0, 40.0]); // 60.0 last if the cancelled wait counted
     }
 
-    #[DataSet([0.0])]
-    #[DataSet([-1.0])]
-    #[DataSet([NAN])]
-    public function windowMustBePositive(float $window): void
+    #[DataSet([0.0, '0'])]
+    #[DataSet([-1.0, '-1'])]
+    #[DataSet([-INF, '-INF'])]
+    #[DataSet([NAN, 'NAN'])]
+    public function windowMustBePositive(float $window, string $shown): void
     {
-        Expect::exception(\ValueError::class);
+        $exception = withoutWarnings(static fn() => thrown(static fn() => new LocalSlidingWindowRateLimiter(1, $window)));
 
-        new LocalSlidingWindowRateLimiter(1, $window);
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::same($exception->getMessage(), \sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $shown));
     }
 }

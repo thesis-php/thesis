@@ -40,7 +40,7 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         private readonly float $window,
     ) {
         if (!($window > 0)) {
-            throw new \ValueError(\sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $window));
+            throw new \ValueError(\sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', is_nan($window) ? 'NAN' : $window));
         }
 
         $this->mutex = new LocalMutex();

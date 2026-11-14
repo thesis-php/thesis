@@ -60,6 +60,27 @@ function thrown(callable $fn): \Throwable
 }
 
 /**
+ * Runs $fn with every PHP warning, notice or deprecation thrown as an \ErrorException: for a test that
+ * a message is built without one (PHP 8.6 warns when a NAN is formatted into a string).
+ *
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ */
+function withoutWarnings(callable $fn): mixed
+{
+    set_error_handler(static function (int $severity, string $message, string $file, int $line): never {
+        throw new \ErrorException($message, 0, $severity, $file, $line);
+    });
+
+    try {
+        return $fn();
+    } finally {
+        restore_error_handler();
+    }
+}
+
+/**
  * Runs $fn and measures how long it took on the clock of deadlines. What $fn throws goes through:
  * a test that expects an exception catches it inside $fn with thrown() and checks it.
  *

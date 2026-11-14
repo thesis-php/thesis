@@ -41,7 +41,7 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
         private readonly int $burst,
     ) {
         if (!($perSecond > 0)) {
-            throw new \ValueError(\sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', $perSecond));
+            throw new \ValueError(\sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', is_nan($perSecond) ? 'NAN' : $perSecond));
         }
 
         $this->mutex = new LocalMutex();

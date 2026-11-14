@@ -6,10 +6,11 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Data\DataSet;
-use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Async\Tests\withoutWarnings;
 
 #[Test]
 final class LocalTokenBucketRateLimiterTest
@@ -171,13 +172,15 @@ final class LocalTokenBucketRateLimiterTest
         Assert::same([$afterBurst, $third], [0.0, 2.0]);
     }
 
-    #[DataSet([0.0])]
-    #[DataSet([-1.0])]
-    #[DataSet([NAN])]
-    public function rateMustBePositive(float $perSecond): void
+    #[DataSet([0.0, '0'])]
+    #[DataSet([-1.0, '-1'])]
+    #[DataSet([-INF, '-INF'])]
+    #[DataSet([NAN, 'NAN'])]
+    public function rateMustBePositive(float $perSecond, string $shown): void
     {
-        Expect::exception(\ValueError::class);
+        $exception = withoutWarnings(static fn() => thrown(static fn() => new LocalTokenBucketRateLimiter($perSecond, 1)));
 
-        new LocalTokenBucketRateLimiter($perSecond, 1);
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::same($exception->getMessage(), \sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', $shown));
     }
 }
