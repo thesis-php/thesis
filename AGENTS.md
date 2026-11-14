@@ -52,6 +52,11 @@ the whole monorepo is for the final check.
 - `make sync` after changing a manifest or `monorepo.php`
 - `make check` runs everything CI runs
 
+## Git
+
+Work and commit directly on `main`, do not create branches: the monorepo is in early development,
+branches only get in the way. This rule will change once others contribute.
+
 ## Changing a package others use
 
 When you change the public API of a package, find its users (`grep -rl 'Thesis\\Async\\' packages/*/src`) and fix them
