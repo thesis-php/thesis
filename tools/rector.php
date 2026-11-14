@@ -27,4 +27,5 @@ return RectorConfig::configure()
     ])
     ->withSkip([
         StringableForToStringRector::class,
-    ]);
+    ])
+;

@@ -75,6 +75,8 @@ the whole monorepo is for the final check.
   not `$x |> g(...) |> f(...)`.
 - A call with more than two arguments puts them one per line with a trailing comma. `make rector` names them
   (`tools/rector/MoreThanTwoArgumentsStrategy.php`), but does not wrap the lines.
+- A multiline chain of method calls ends with `;` on its own line, so a call is added or removed without touching
+  the previous line. `make fixer` enforces it.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.

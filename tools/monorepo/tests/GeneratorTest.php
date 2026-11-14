@@ -59,7 +59,8 @@ final readonly class GeneratorTest
 
         Assert::string($files['AGENTS.md'] ?? '')
             ->contains("- `bytes`: Package bytes.\n")
-            ->contains("- `async`: Package async. Uses: bytes.\n");
+            ->contains("- `async`: Package async. Uses: bytes.\n")
+        ;
     }
 
     public static function writesTestoSuitesWithPlugins(): void
@@ -77,7 +78,8 @@ final readonly class GeneratorTest
                         ),
                         new SuiteConfig(name: 'bytes', location: [__DIR__ . '/packages/bytes/tests']),
 
-                PHP);
+                PHP)
+        ;
     }
 
     public static function reportsOnlyChangedFilesAsStale(): void
@@ -103,6 +105,7 @@ final readonly class GeneratorTest
                 uses: ['bytes'],
                 require: ['revolt/event-loop' => '^1.0'],
                 requireDev: ['amphp/amp' => '^3.0'],
-                PHP);
+                PHP)
+        ;
     }
 }

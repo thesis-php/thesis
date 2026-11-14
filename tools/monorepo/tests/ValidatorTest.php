@@ -19,7 +19,8 @@ final readonly class ValidatorTest
             ->file(
                 'packages/async/src/Task.php',
                 '<?php namespace Thesis\Async; use Thesis\Bytes\Buffer; /** @api */ final class Task {}',
-            );
+            )
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -30,7 +31,8 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('async', 'layer: Layer::Runtime')
-            ->package('bytes', "layer: Layer::Primitive, uses: ['async']");
+            ->package('bytes', "layer: Layer::Primitive, uses: ['async']")
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -42,7 +44,8 @@ final readonly class ValidatorTest
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
             ->package('time', 'layer: Layer::Primitive')
-            ->file('packages/time/src/Clock.php', "<?php\n\nnamespace Thesis\\Time;\n\nuse Thesis\\Bytes\\Buffer;\n");
+            ->file('packages/time/src/Clock.php', "<?php\n\nnamespace Thesis\\Time;\n\nuse Thesis\\Bytes\\Buffer;\n")
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -54,7 +57,8 @@ final readonly class ValidatorTest
         $fixture = new Fixture()
             ->package('bytes', 'layer: Layer::Primitive')
             ->package('time', "layer: Layer::Primitive, usesDev: ['bytes']")
-            ->file('packages/time/tests/ClockTest.php', '<?php namespace Thesis\Time; use Thesis\Bytes\Buffer;');
+            ->file('packages/time/tests/ClockTest.php', '<?php namespace Thesis\Time; use Thesis\Bytes\Buffer;')
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -65,7 +69,8 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('a', "layer: Layer::Primitive, require: ['psr/clock' => '^1.0']")
-            ->package('b', "layer: Layer::Primitive, requireDev: ['psr/clock' => '^1.1']");
+            ->package('b', "layer: Layer::Primitive, requireDev: ['psr/clock' => '^1.1']")
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -79,7 +84,8 @@ final readonly class ValidatorTest
                 layer: Layer::Io,
                 require: ['amphp/socket' => '^2.0'],
                 requireDev: ['amphp/amp' => '^3.0'],
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -92,7 +98,8 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('a', "layer: Layer::Primitive, uses: ['b']")
-            ->package('b', "layer: Layer::Primitive, uses: ['a']");
+            ->package('b', "layer: Layer::Primitive, uses: ['a']")
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -103,7 +110,8 @@ final readonly class ValidatorTest
     {
         $fixture = new Fixture()
             ->package('a', 'layer: Layer::Primitive')
-            ->file('packages/a/CLAUDE.md', '@AGENTS.md');
+            ->file('packages/a/CLAUDE.md', '@AGENTS.md')
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -156,7 +164,8 @@ final readonly class ValidatorTest
                  * @internal
                  */
                 const SIZE = 8192;
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -181,7 +190,8 @@ final readonly class ValidatorTest
                 {
                     return new Buffer();
                 }
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -205,7 +215,8 @@ final readonly class ValidatorTest
                  * @internal
                  */
                 interface Buffer {}
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -225,7 +236,8 @@ final readonly class ValidatorTest
                  * @internal
                  */
                 trait Chunk {}
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -245,7 +257,8 @@ final readonly class ValidatorTest
                  * @api
                  */
                 final class Chunk {}
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
@@ -268,7 +281,8 @@ final readonly class ValidatorTest
                 namespace Thesis\Monorepo\Tests;
 
                 final readonly class ManifestTest {}
-                PHP);
+                PHP)
+        ;
 
         $errors = Validator::validate($fixture->load());
 
