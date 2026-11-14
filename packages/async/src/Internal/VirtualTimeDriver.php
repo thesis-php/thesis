@@ -19,7 +19,7 @@ use Revolt\EventLoop\Suspension;
  *
  * Everything but the timers is the inner driver's: streams and signals are real, and so are the suspensions.
  * While a timer is pending, a pump (a defer of the inner driver) runs on every tick and keeps the inner loop
- * from blocking. Every callback given to this driver counts as activity, when it is given and when it runs;
+ * from blocking. Every callback given to this driver counts as activity, when it is given, enabled and when it runs;
  * when there has been none since the previous run of the pump, nothing can run, and the clock jumps. So a stream that is to become ready from outside
  * the process may be jumped past. Without a timer there is no pump, and the inner driver blocks on the streams
  * and signals for real. When nothing at all is left, Revolt ends the loop: a deadlock fails at once.
@@ -37,11 +37,21 @@ final class VirtualTimeDriver implements Driver
     /**
      * @var \SplMinHeap<array{float, int, string}> [expiration, order, id]; an entry is valid while its order
      * is the timer's: {@see enqueue()} gives a new one, {@see disable()} outdates it. The id, not the timer:
-     * an outdated entry stays until it reaches the top, and must not keep the closure of a cancelled timer.
+     * an outdated entry stays until it reaches the top or {@see compact()} drops it, and must not keep the closure
+     * of a cancelled timer.
      */
-    private readonly \SplMinHeap $queue;
+    private \SplMinHeap $queue;
+
+    /** how many entries of the queue are outdated */
+    private int $outdated = 0;
 
     private int $order = 0;
+
+    /** how many timers are pending: enabled, and not handed to their firing defer yet */
+    private int $pending = 0;
+
+    /** how many of the pending timers are referenced */
+    private int $pendingReferenced = 0;
 
     private int $nextId = 0;
 
@@ -151,6 +161,9 @@ final class VirtualTimeDriver implements Driver
         $timer = $this->timers[$callbackId] ?? null;
 
         if ($timer === null) {
+            // A callback enabled is work to do, as one given: the pump must not jump past it.
+            ++$this->activity;
+
             return $this->inner->enable($callbackId);
         }
 
@@ -186,13 +199,18 @@ final class VirtualTimeDriver implements Driver
 
         if ($timer->enabled) {
             $timer->enabled = false;
-            // Outdates its entry in the queue.
-            ++$timer->order;
 
             if ($timer->firing !== null) {
+                // Its entry is already extracted.
                 $this->inner->cancel($timer->firing);
                 unset($this->own[$timer->firing]);
                 $timer->firing = null;
+            } else {
+                // Outdates its entry in the queue.
+                ++$timer->order;
+                ++$this->outdated;
+                $this->leave($timer);
+                $this->compact();
             }
 
             $this->updatePump();
@@ -210,8 +228,16 @@ final class VirtualTimeDriver implements Driver
             return $this->inner->reference($callbackId);
         }
 
-        $timer->referenced = true;
-        $this->updatePump();
+        if (!$timer->referenced) {
+            $timer->referenced = true;
+
+            if ($timer->firing !== null) {
+                $this->inner->reference($timer->firing);
+            } elseif ($timer->enabled) {
+                ++$this->pendingReferenced;
+                $this->updatePump();
+            }
+        }
 
         return $callbackId;
     }
@@ -225,8 +251,16 @@ final class VirtualTimeDriver implements Driver
             return $this->inner->unreference($callbackId);
         }
 
-        $timer->referenced = false;
-        $this->updatePump();
+        if ($timer->referenced) {
+            $timer->referenced = false;
+
+            if ($timer->firing !== null) {
+                $this->inner->unreference($timer->firing);
+            } elseif ($timer->enabled) {
+                --$this->pendingReferenced;
+                $this->updatePump();
+            }
+        }
 
         return $callbackId;
     }
@@ -315,31 +349,67 @@ final class VirtualTimeDriver implements Driver
         return $id;
     }
 
+    /**
+     * Makes the timer pending.
+     */
     private function enqueue(VirtualTimer $timer, float $expiration): void
     {
         $timer->expiration = $expiration;
         $timer->order = ++$this->order;
         $this->queue->insert([$expiration, $timer->order, $timer->id]);
+        ++$this->pending;
+
+        if ($timer->referenced) {
+            ++$this->pendingReferenced;
+        }
+
         $this->updatePump();
     }
 
     /**
-     * The pump is there while an enabled timer is, referenced only if a referenced one is:
+     * The timer is no longer pending: disabled or handed to its firing defer.
+     */
+    private function leave(VirtualTimer $timer): void
+    {
+        --$this->pending;
+
+        if ($timer->referenced) {
+            --$this->pendingReferenced;
+        }
+    }
+
+    /**
+     * Rebuilds the queue once most of its entries are outdated, so that timers cancelled long before their
+     * deadline, as most deadlines are, do not pile up: each rebuild drops more entries than it keeps.
+     */
+    private function compact(): void
+    {
+        if ($this->outdated < 64 || $this->outdated <= $this->pending) {
+            return;
+        }
+
+        /** @var \SplMinHeap<array{float, int, string}> $queue */
+        $queue = new \SplMinHeap();
+
+        foreach ($this->queue as $entry) {
+            $timer = $this->timers[$entry[2]] ?? null;
+
+            if ($timer !== null && $timer->order === $entry[1]) {
+                $queue->insert($entry);
+            }
+        }
+
+        $this->queue = $queue;
+        $this->outdated = 0;
+    }
+
+    /**
+     * The pump is there while a pending timer is, referenced only if a referenced one is:
      * an unreferenced timer does not keep the loop alive, as with Revolt's own timers.
      */
     private function updatePump(): void
     {
-        $enabled = false;
-        $referenced = false;
-
-        foreach ($this->timers as $timer) {
-            if ($timer->enabled && $timer->firing === null) {
-                $enabled = true;
-                $referenced = $referenced || $timer->referenced;
-            }
-        }
-
-        if (!$enabled) {
+        if ($this->pending === 0) {
             if ($this->pump !== null) {
                 $this->inner->cancel($this->pump);
                 unset($this->own[$this->pump]);
@@ -355,7 +425,7 @@ final class VirtualTimeDriver implements Driver
             $this->own[$this->pump] = true;
         }
 
-        if ($referenced) {
+        if ($this->pendingReferenced > 0) {
             $this->inner->reference($this->pump);
         } else {
             $this->inner->unreference($this->pump);
@@ -398,6 +468,7 @@ final class VirtualTimeDriver implements Driver
             }
 
             $this->queue->extract();
+            --$this->outdated;
         }
 
         return null;
@@ -406,6 +477,7 @@ final class VirtualTimeDriver implements Driver
     private function fire(VirtualTimer $timer): void
     {
         // Its entry is extracted: until the defer runs, the timer is neither due nor pending.
+        $this->leave($timer);
         $timer->firing = $this->inner->defer(function () use ($timer): void {
             \assert($timer->firing !== null);
             unset($this->own[$timer->firing]);

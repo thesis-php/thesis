@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Revolt\EventLoop\CallbackType;
 use Revolt\EventLoop\Driver\StreamSelectDriver;
 use Revolt\EventLoop\Driver\TracingDriver;
+use Revolt\EventLoop\InvalidCallbackError;
 use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Async\Internal\VirtualTimeDriver;
+use Thesis\Async\Testo\VirtualTime;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
@@ -334,5 +338,285 @@ final class VirtualTimeTest
 
         Assert::false($fired);
         assertNoCallbacksLeft();
+    }
+
+    public function advanceRejectsNan(): void
+    {
+        $start = now();
+
+        $exception = thrown(static fn() => advance(NAN));
+
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::same(now() - $start, 0.0);
+    }
+
+    public function runThrowsInFiber(): void
+    {
+        $driver = EventLoop::getDriver();
+
+        $exception = thrown(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => run(static fn() => null));
+        }));
+
+        Assert::instanceOf($exception, \LogicException::class);
+        Assert::same(EventLoop::getDriver(), $driver);
+    }
+
+    public function runRejectsRunningDriver(): void
+    {
+        $driver = new StreamSelectDriver();
+        $exception = null;
+        $driver->defer(static function () use ($driver, &$exception) {
+            $exception = thrown(static fn() => run(static fn() => null, $driver));
+        });
+
+        $driver->run();
+
+        Assert::instanceOf($exception, \LogicException::class);
+    }
+
+    public function enablingCallbackIsActivity(): void
+    {
+        $start = now();
+        $ran = null;
+        $callbackId = EventLoop::defer(static function () use ($start, &$ran) {
+            $ran = now() - $start;
+        });
+        EventLoop::disable($callbackId);
+        EventLoop::delay(5, static function () {});
+
+        EventLoop::enable($callbackId);
+        delay(10);
+
+        Assert::same($ran, 0.0);
+    }
+
+    public function callbackLeftForLastTickSeesClockOfItsRun(): void
+    {
+        $seen = null;
+
+        $inner = run(static function () use (&$seen) {
+            $start = now();
+            advance(100);
+
+            // Both in one tick: the first resumes {main}, the second is left to the tick that run() finishes.
+            suspend(static function (Continuation $continuation) use ($start, &$seen) {
+                EventLoop::defer(static function () use ($continuation) {
+                    $continuation->resume();
+                });
+                EventLoop::defer(static function () use ($start, &$seen) {
+                    $seen = now() - $start;
+                });
+            });
+
+            return now() - $start;
+        });
+
+        Assert::same([$inner, $seen], [100.0, 100.0]);
+    }
+
+    public function referencingFiringTimerKeepsLoopAlive(): void
+    {
+        $fired = suspend(static function (Continuation $continuation) {
+            $timer = EventLoop::unreference(EventLoop::delay(1, static function () use ($continuation) {
+                $continuation->resume(true);
+            }));
+            advance(1);
+            // Runs in the tick in which the due timer is handed to its firing defer, after it is.
+            EventLoop::defer(static function () use ($timer) {
+                EventLoop::reference($timer);
+            });
+
+            return static function () use ($timer) {
+                EventLoop::cancel($timer);
+            };
+        });
+
+        Assert::true($fired);
+    }
+
+    public function unreferencingFiringTimerLetsLoopEnd(): void
+    {
+        $exception = thrown(static fn() => suspend(static function (Continuation $continuation) {
+            $timer = EventLoop::delay(1, static function () use ($continuation) {
+                $continuation->resume();
+            });
+            advance(1);
+            EventLoop::defer(static function () use ($timer) {
+                EventLoop::unreference($timer);
+            });
+
+            return static function () use ($timer) {
+                EventLoop::cancel($timer);
+            };
+        }));
+
+        Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');
+    }
+
+    public function disabledTimerDoesNotFireUntilEnabledAgain(): void
+    {
+        $start = now();
+        $fired = [];
+        $timer = EventLoop::delay(2, static function () use ($start, &$fired) {
+            $fired[] = now() - $start;
+        });
+
+        Assert::same(EventLoop::disable($timer), $timer);
+        EventLoop::disable($timer);
+        Assert::false(EventLoop::isEnabled($timer));
+        delay(3);
+        Assert::same(EventLoop::enable($timer), $timer);
+        EventLoop::enable($timer);
+        Assert::true(EventLoop::isEnabled($timer));
+        delay(3);
+
+        Assert::same($fired, [5.0]);
+    }
+
+    public function timerIsDisabledWhileItsFiringIsPending(): void
+    {
+        $fired = false;
+        $timer = EventLoop::delay(1, static function () use (&$fired) {
+            $fired = true;
+        });
+        advance(1);
+        EventLoop::defer(static function () use ($timer) {
+            EventLoop::disable($timer);
+        });
+
+        delay(2);
+
+        Assert::false($fired);
+        EventLoop::cancel($timer);
+    }
+
+    public function unreferencedTimerDoesNotKeepLoopAlive(): void
+    {
+        $fired = 0;
+        $timer = EventLoop::delay(1, static function () use (&$fired) {
+            ++$fired;
+        });
+
+        Assert::same(EventLoop::unreference($timer), $timer);
+        Assert::false(EventLoop::isReferenced($timer));
+        $exception = thrown(never(...));
+
+        Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');
+        Assert::same($fired, 0);
+
+        Assert::same(EventLoop::reference($timer), $timer);
+        Assert::true(EventLoop::isReferenced($timer));
+        delay(1);
+
+        Assert::same($fired, 1);
+    }
+
+    public function timersHaveTypesOfRevolt(): void
+    {
+        $delay = EventLoop::delay(1, static function () {});
+        $repeat = EventLoop::repeat(1, static function () {});
+        $defer = EventLoop::defer(static function () {});
+
+        Assert::same(
+            [EventLoop::getType($delay), EventLoop::getType($repeat), EventLoop::getType($defer)],
+            [CallbackType::Delay, CallbackType::Repeat, CallbackType::Defer],
+        );
+        Assert::same(
+            [EventLoop::isEnabled($defer), EventLoop::isReferenced(EventLoop::unreference($defer))],
+            [true, false],
+        );
+        Assert::true(EventLoop::isReferenced(EventLoop::reference($defer)));
+
+        EventLoop::cancel($delay);
+        EventLoop::cancel($repeat);
+        EventLoop::cancel($defer);
+        assertNoCallbacksLeft();
+    }
+
+    public function negativeDelayIsRejectedAsByRevolt(): void
+    {
+        $delay = thrown(static fn() => EventLoop::delay(-1, static function () {}));
+        $repeat = thrown(static fn() => EventLoop::repeat(-1, static function () {}));
+
+        Assert::same(
+            [$delay->getMessage(), $repeat->getMessage()],
+            ['Delay must be greater than or equal to zero', 'Interval must be greater than or equal to zero'],
+        );
+    }
+
+    public function callbackReturningValueIsRejectedAsByRevolt(): void
+    {
+        /** @var array{resource, resource} $pair */
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        $register = [
+            static fn(\Closure $callback) => EventLoop::delay(0, $callback),
+            EventLoop::defer(...),
+            static fn(\Closure $callback) => EventLoop::onWritable($pair[0], $callback),
+        ];
+
+        foreach ($register as $fn) {
+            // @phpstan-ignore argument.type (the value returned is what is tested)
+            $callbackId = $fn(static fn() => 'value');
+
+            $exception = thrown(never(...));
+
+            Assert::instanceOf($exception, UncaughtThrowable::class);
+            Assert::instanceOf($exception->getPrevious(), InvalidCallbackError::class);
+            EventLoop::cancel($callbackId);
+        }
+    }
+
+    public function errorHandlerAndHandleAreInnerDriverOnes(): void
+    {
+        $driver = new StreamSelectDriver();
+        $handler = static function () {};
+
+        [$handle, $errorHandler, $debugInfo] = run(static function () use ($handler) {
+            EventLoop::setErrorHandler($handler);
+            EventLoop::delay(1, static function () {});
+
+            return [EventLoop::getDriver()->getHandle(), EventLoop::getErrorHandler(), EventLoop::getDriver()->__debugInfo()];
+        }, $driver);
+
+        Assert::same([$handle, $errorHandler], [$driver->getHandle(), $handler]);
+        Assert::same([$debugInfo['timers'] ?? null, $debugInfo['inner'] ?? null], [1, $driver->__debugInfo()]);
+    }
+
+    public function cancelledTimersDoNotPileUpInQueue(): void
+    {
+        $start = now();
+        $fired = [];
+        EventLoop::delay(3_600, static function () use ($start, &$fired) {
+            $fired[] = now() - $start;
+        });
+        $timers = [];
+
+        for ($i = 0; $i < 1_000; ++$i) {
+            $timers[] = EventLoop::delay(3_600, static function () {});
+        }
+
+        foreach ($timers as $timer) {
+            EventLoop::cancel($timer);
+        }
+
+        $driver = EventLoop::getDriver();
+        \assert($driver instanceof VirtualTimeDriver);
+        $queue = (fn() => $this->queue)->call($driver);
+
+        Assert::int($queue->count())->lessThan(100);
+
+        delay(3_600);
+
+        Assert::same($fired, [3_600.0]);
+    }
+
+    #[VirtualTime]
+    public function attributeAndPluginDoNotWrapTwice(): void
+    {
+        $driver = EventLoop::getDriver();
+        \assert($driver instanceof VirtualTimeDriver);
+
+        Assert::false((fn() => $this->inner)->call($driver) instanceof VirtualTimeDriver);
     }
 }

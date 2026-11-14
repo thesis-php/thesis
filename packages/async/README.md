@@ -786,9 +786,11 @@ VirtualTime\run(static function () {
 ```
 
 CPU work takes no time on this clock: `VirtualTime\advance($seconds)` moves it forward without yielding,
-as busy code would.
+as busy code would (a negative or `NAN` `$seconds` throws `\ValueError`).
 A deadline passes then, but its timer fires only at the next suspension, as after a loop that blocked the event loop.
 A deadlock fails at once instead of hanging: there is no timer to jump to, and Revolt ends the loop.
+`run()` swaps the driver of the event loop, so it must be called in `{main}`: in a fiber it throws `LogicException`.
+The callbacks left for the tick it finishes on return still see its clock.
 
 Streams and signals stay real, on the driver that `EventLoop\DriverFactory` creates (`REVOLT_DRIVER` chooses it),
 or on one passed as `run($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,

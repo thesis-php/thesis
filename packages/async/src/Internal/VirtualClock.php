@@ -22,10 +22,14 @@ final class VirtualClock
     }
 
     /**
-     * @throws \ValueError if $seconds is negative: the clock is monotonic
+     * @throws \ValueError if $seconds is negative: the clock is monotonic, or NAN
      */
     public function advance(float $seconds): void
     {
+        if (is_nan($seconds)) {
+            throw new \ValueError('advance() needs a number of seconds, got NAN.');
+        }
+
         if ($seconds < 0) {
             throw new \ValueError('The clock is monotonic: it cannot be moved back.');
         }

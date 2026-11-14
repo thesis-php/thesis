@@ -31,10 +31,15 @@ use Thesis\Async\Internal\VirtualTimeDriver;
  * @param callable(): T $fn
  * @param ?EventLoop\Driver $driver the driver of streams and signals, decorated with virtual timers
  * @return T
- * @throws \LogicException if $driver is the current one, is running or has callbacks
+ * @throws \LogicException outside of {main}, or if $driver is the current one, is running or has callbacks
  */
 function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
 {
+    // In a fiber, the driver it runs on cannot be stopped from inside: run() would spin forever.
+    if (\Fiber::getCurrent() !== null) {
+        throw new \LogicException('VirtualTime\run() must be called in {main}, not in a fiber.');
+    }
+
     if ($driver === null) {
         $driver = new EventLoop\DriverFactory()->create();
     } elseif ($driver === EventLoop::getDriver() || $driver->isRunning() || $driver->getIdentifiers() !== []) {
@@ -75,12 +80,12 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     try {
         return $fn();
     } finally {
-        Scope::$virtualClock = $previousClock;
-
         try {
             // The current one, not the one created above: $fn may have decorated it.
+            // Still on this clock: the callbacks of the last tick are of this run.
             $stop(EventLoop::getDriver());
         } finally {
+            Scope::$virtualClock = $previousClock;
             EventLoop::setDriver($previousDriver);
         }
     }
@@ -91,7 +96,7 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
  * that takes $seconds would: a deadline passes, but its timer fires only at the next suspension.
  *
  * @api
- * @throws \ValueError if $seconds is negative: the clock is monotonic
+ * @throws \ValueError if $seconds is negative (the clock is monotonic) or NAN
  * @throws \LogicException outside of {@see run()}
  */
 function advance(float $seconds): void

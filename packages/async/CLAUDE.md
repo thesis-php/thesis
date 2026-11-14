@@ -86,6 +86,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
   never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on `Scope`, not on
   `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The clock is not read in `suspend()`.
   The virtual clock starts at `ceil(now())`, not at zero: a time captured before `run()` stays in the past, and whole seconds stay exact.
+- `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run since the previous pump.
+  It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
+  An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
+  `VirtualTime\run()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is finished.
 - A rate limiter keeps absolute times and sleeps once per call, without comparing the clock again after the wake-up:
   a wake-up a hair early (float rounding) must not loop on a delay too small to move the virtual clock.
 - `ScopedValue`s live outside the scope tree, in `Internal\Context`: an immutable array per fiber, copied by `with()`.
