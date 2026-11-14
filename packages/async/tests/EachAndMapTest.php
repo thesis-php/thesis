@@ -14,16 +14,25 @@ use function Thesis\Async\Tests\thrown;
 #[Test]
 final class EachAndMapTest
 {
-    public function eachCallsFnForEveryItemWithKey(): void
+    public function eachCallsFnForEveryItemWithValueOnly(): void
     {
         $calls = [];
 
-        each(['a' => 1, 'b' => 2, 'c' => 3], static function (int $item, string $key) use (&$calls) {
+        each(['a' => 1, 'b' => 2, 'c' => 3], 2, static function () use (&$calls) {
             delay(1);
-            $calls[] = $key . $item;
-        }, 2);
+            $calls[] = \func_get_args();
+        });
 
-        Assert::array($calls)->sameElementsAs(['a1', 'b2', 'c3']);
+        Assert::array($calls)->sameElementsAs([[1], [2], [3]]);
+    }
+
+    public function eachAcceptsInternalFunction(): void
+    {
+        $channel = new Channel(3);
+
+        each(['a' => 1, 'b' => 2], 1, $channel->send(...));
+
+        Assert::same([$channel->receive(), $channel->receive()], [1, 2]);
     }
 
     /**
@@ -37,11 +46,11 @@ final class EachAndMapTest
         $running = 0;
         $peak = 0;
 
-        each(range(1, 10), static function () use (&$running, &$peak) {
+        each(range(1, 10), $concurrency, static function () use (&$running, &$peak) {
             $peak = max($peak, ++$running);
             delay(1);
             --$running;
-        }, $concurrency);
+        });
 
         Assert::same($peak, min($concurrency, 10));
     }
@@ -56,10 +65,10 @@ final class EachAndMapTest
         })();
         $processed = [];
 
-        each($pages, static function (int $page) use (&$processed) {
+        each($pages, 2, static function (int $page) use (&$processed) {
             delay(2);
             $processed[] = $page;
-        }, 2);
+        });
 
         Assert::array($processed)->sameElementsAs([1, 2, 3]);
     }
@@ -68,9 +77,9 @@ final class EachAndMapTest
     {
         $called = false;
 
-        each([], static function () use (&$called) {
+        each([], 1, static function () use (&$called) {
             $called = true;
-        }, 1);
+        });
 
         Assert::false($called);
     }
@@ -81,7 +90,7 @@ final class EachAndMapTest
         $events = [];
 
         $exception = thrown(static function () use (&$pulled, &$events) {
-            each(self::recordPulls(range(1, 10), $pulled), static function (int $item) use (&$events) {
+            each(self::recordPulls(range(1, 10), $pulled), 2, static function (int $item) use (&$events) {
                 $events[] = "{$item} started";
 
                 try {
@@ -95,7 +104,7 @@ final class EachAndMapTest
 
                     throw $cancelled;
                 }
-            }, 2);
+            });
         });
 
         Assert::instanceOf($exception, \RuntimeException::class);
@@ -109,9 +118,9 @@ final class EachAndMapTest
         $pulled = [];
 
         $exception = thrown(static function () use (&$pulled) {
-            each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
+            each(self::recordPulls(range(1, 5), $pulled), 1, static function (int $item) {
                 throw new \RuntimeException("item {$item} failed");
-            }, 1);
+            });
         });
 
         Assert::instanceOf($exception, \RuntimeException::class);
@@ -131,7 +140,7 @@ final class EachAndMapTest
         })();
 
         // Both workers are busy until item 1 is done, so item 3 waits for that.
-        each($items, static function (int $item) use (&$events) {
+        each($items, 2, static function (int $item) use (&$events) {
             match ($item) {
                 1 => delay(1),
                 2 => delay(2),
@@ -139,7 +148,7 @@ final class EachAndMapTest
             };
 
             $events[] = "{$item} done";
-        }, 2);
+        });
 
         Assert::same($events, ['1 pulled', '2 pulled', '1 done', '3 pulled', '3 done', '2 done']);
     }
@@ -162,10 +171,10 @@ final class EachAndMapTest
     {
         $fibers = new \SplObjectStorage(); // holds the fibers, so a dead one cannot pass its id to a new one
 
-        each(range(1, 10), static function () use ($fibers) {
+        each(range(1, 10), 3, static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
             delay(1);
-        }, 3);
+        });
 
         Assert::same($fibers->count(), 3);
     }
@@ -174,10 +183,10 @@ final class EachAndMapTest
     {
         $fibers = new \SplObjectStorage();
 
-        each([1, 2], static function () use ($fibers) {
+        each([1, 2], 100, static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
             delay(1);
-        }, 100);
+        });
 
         Assert::same($fibers->count(), 2);
     }
@@ -186,9 +195,9 @@ final class EachAndMapTest
     {
         $fibers = new \SplObjectStorage();
 
-        each(range(1, 10), static function () use ($fibers) {
+        each(range(1, 10), 3, static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
-        }, 3);
+        });
 
         Assert::same($fibers->count(), 1);
     }
@@ -204,23 +213,22 @@ final class EachAndMapTest
         })();
         $processed = [];
 
-        each($pages, static function (int $page) use (&$processed) {
+        each($pages, 3, static function (int $page) use (&$processed) {
             $processed[] = $page; // takes no time: every worker is back for the next page while the generator waits
-        }, 3);
+        });
 
         Assert::same($processed, range(1, 6));
     }
 
-    public function eachPassesKeysThatAreNotArrayKeys(): void
+    public function eachTakesKeysThatAreNotArrayKeys(): void
     {
-        $key = new \stdClass();
-        $keys = [];
+        $items = [];
 
-        each((static fn() => yield $key => 'item')(), static function (string $item, object $key) use (&$keys) {
-            $keys[] = $key;
-        }, 1);
+        each((static fn() => yield new \stdClass() => 'item')(), 1, static function (string $item) use (&$items) {
+            $items[] = $item;
+        });
 
-        Assert::same($keys, [$key]);
+        Assert::same($items, ['item']);
     }
 
     public function eachDoesNotPullAfterFailureOfItemThatDoesNotWait(): void
@@ -228,12 +236,12 @@ final class EachAndMapTest
         $pulled = [];
 
         $exception = thrown(static function () use (&$pulled) {
-            each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
+            each(self::recordPulls(range(1, 5), $pulled), 3, static function (int $item) {
                 match ($item) {
                     1 => delay(1),
                     default => throw new \RuntimeException("item {$item} failed"),
                 };
-            }, 3);
+            });
         });
 
         Assert::same($exception->getMessage(), 'item 2 failed');
@@ -245,7 +253,7 @@ final class EachAndMapTest
         $pulled = [];
 
         $exception = thrown(static function () use (&$pulled) {
-            each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
+            each(self::recordPulls(range(1, 5), $pulled), 2, static function (int $item) {
                 if ($item === 2) {
                     throw new \RuntimeException('item 2 failed');
                 }
@@ -255,11 +263,35 @@ final class EachAndMapTest
                 } catch (Cancelled) {
                     // returns normally, as a sloppy $fn would
                 }
-            }, 2);
+            });
         });
 
         Assert::same($exception->getMessage(), 'item 2 failed');
         Assert::same($pulled, [1, 2]);
+    }
+
+    public function eachDoesNotTakeItemOfArrayAfterFailureWhenFnCatchesCancelled(): void
+    {
+        $taken = [];
+
+        $exception = thrown(static function () use (&$taken) {
+            each(range(1, 5), 2, static function (int $item) use (&$taken) {
+                $taken[] = $item;
+
+                if ($item === 2) {
+                    throw new \RuntimeException('item 2 failed');
+                }
+
+                try {
+                    never();
+                } catch (Cancelled) {
+                    // returns normally, as a sloppy $fn would
+                }
+            });
+        });
+
+        Assert::same($exception->getMessage(), 'item 2 failed');
+        Assert::same($taken, [1, 2]);
     }
 
     public function eachStartsNewWorkerOnceEarlierOnesAreBusyAgain(): void
@@ -268,7 +300,7 @@ final class EachAndMapTest
         $peak = 0;
 
         // The first item does not wait: its worker is free again before the rest are taken.
-        each(range(0, 3), static function (int $item) use (&$running, &$peak) {
+        each(range(0, 3), 3, static function (int $item) use (&$running, &$peak) {
             $peak = max($peak, ++$running);
 
             if ($item > 0) {
@@ -276,7 +308,7 @@ final class EachAndMapTest
             }
 
             --$running;
-        }, 3);
+        });
 
         Assert::same($peak, 3);
     }
@@ -285,40 +317,45 @@ final class EachAndMapTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => each([1, 2], never(...), 2));
+        timeout(1, static fn() => each([1, 2], 2, never(...)));
     }
 
     public function mapReturnsResultsWithKeysInInputOrder(): void
     {
-        $results = map(['x' => 3, 'y' => 1, 'z' => 2], static function (int $ms, string $key) {
+        $results = map(['x' => 3, 'y' => 1, 'z' => 2], 3, static function (int $ms) {
             delay($ms / 1_000);
 
-            return $key . $ms;
-        }, 3);
+            return $ms * 10;
+        });
 
-        Assert::same($results, ['x' => 'x3', 'y' => 'y1', 'z' => 'z2']);
+        Assert::same($results, ['x' => 30, 'y' => 10, 'z' => 20]);
     }
 
     public function mapKeepsInputOrderWhenWorkersTakeItemsOutOfOrder(): void
     {
-        $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], static function (int $ms, string $key) {
+        $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], 2, static function (int $ms) {
             delay($ms / 1_000);
 
-            return $key;
-        }, 2);
+            return $ms;
+        });
 
-        Assert::same($results, ['a' => 'a', 'b' => 'b', 'c' => 'c', 'd' => 'd', 'e' => 'e']);
+        Assert::same($results, ['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1]);
+    }
+
+    public function mapPassesValueOnlyAndAcceptsInternalFunction(): void
+    {
+        Assert::same(map(['a' => 1, 'b' => 22], 2, strval(...)), ['a' => '1', 'b' => '22']);
     }
 
     public function mapOfNothingIsEmpty(): void
     {
-        Assert::same(map([], static fn() => null, 1), []);
+        Assert::same(map([], 1, static fn() => null), []);
     }
 
     public function mapUnderExpiredDeadlineDoesNotReturnPartialResult(): void
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => map([1, 2], never(...), 2));
+        timeout(1, static fn() => map([1, 2], 2, never(...)));
     }
 }

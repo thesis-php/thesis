@@ -236,20 +236,62 @@ final class AllSettledAndSomeTest
 
     public function someIgnoresSuccessesAfterFailure(): void
     {
-        $exception = thrown(static fn() => some(2, [
-            static fn() => throw new \RuntimeException('a'),
-            static fn() => throw new \RuntimeException('b'),
-            static function () {
+        $returned = false;
+
+        $exception = thrown(static function () use (&$returned) {
+            some(2, [
+                static function () {
+                    delay(1);
+
+                    throw new \RuntimeException('a');
+                },
+                static function () {
+                    delay(1);
+
+                    throw new \RuntimeException('b');
+                },
+                static function () use (&$returned) {
+                    try {
+                        never();
+                    } catch (Cancelled) {
+                    }
+
+                    $returned = true;
+
+                    return 'too late';
+                },
+            ]);
+        });
+
+        Assert::true($returned); // the third task has started, and it succeeds once the failure is decided
+        Assert::same($exception->getMessage(), 'a');
+        Assert::same(array_map(static fn(\Throwable $error) => $error->getMessage(), suppressed($exception)), ['b']);
+    }
+
+    public function someIgnoresSuccessesAfterEnoughSucceeded(): void
+    {
+        $returned = false;
+
+        $results = some(1, [
+            'late' => static function () use (&$returned) {
                 try {
                     never();
                 } catch (Cancelled) {
                 }
 
+                $returned = true;
+
                 return 'too late';
             },
-        ]));
+            'winner' => static function () {
+                delay(1);
 
-        Assert::same($exception->getMessage(), 'a');
+                return 'winner';
+            },
+        ]);
+
+        Assert::true($returned);
+        Assert::same($results, ['winner' => 'winner']);
     }
 
     public function someFailsAsSoonAsEnoughSuccessesAreImpossible(): void
@@ -319,7 +361,7 @@ final class AllSettledAndSomeTest
 
     public function someOfNothingIsRejected(): void
     {
-        Expect::exception(\ValueError::class)->withMessage('some() needs at least 1 tasks, got 0.');
+        Expect::exception(\ValueError::class)->withMessage('some() needs at least 1 task, got 0.');
 
         /** @var array<never, callable(): mixed> */
         $nothing = [];

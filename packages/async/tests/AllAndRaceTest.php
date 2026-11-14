@@ -199,20 +199,36 @@ final class AllAndRaceTest
 
     public function raceIgnoresLoserFinishingAfterWinner(): void
     {
-        $winner = race([
-            static function () {
-                delay(1);
+        $loserReturned = false;
 
-                return 'first';
+        $winner = race([
+            static function () use (&$loserReturned) {
+                try {
+                    never();
+                } catch (Cancelled) {
+                }
+
+                $loserReturned = true;
+
+                return 'loser';
             },
             static function () {
                 delay(1);
 
-                return 'second';
+                return 'winner';
             },
         ]);
 
-        Assert::same($winner, 'first');
+        Assert::true($loserReturned);
+        Assert::same($winner, 'winner');
+    }
+
+    public function raceOfNothingIsRejected(): void
+    {
+        Expect::exception(\ValueError::class)->withMessage('race() needs at least 1 task, got 0.');
+
+        /** @phpstan-ignore argument.type, argument.templateType */
+        race([]);
     }
 
     public function raceRethrowsFirstFailureIfEveryoneFailed(): void

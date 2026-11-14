@@ -310,9 +310,9 @@ would throw `TimedOut` and drop the pages that were ready, while one per task ma
 use function Thesis\Async\each;
 use function Thesis\Async\map;
 
-each($urls, crawl(...), concurrency: 20);
+each($urls, 20, crawl(...));
 
-$pages = map($urls, static fn(string $url) => fetch($url), concurrency: 20); // keys and order of $urls
+$pages = map($urls, 20, static fn(string $url) => fetch($url)); // keys and order of $urls
 ```
 
 Items are processed by at most `concurrency` tasks, not by a task per item: a task takes the next item once it is done
@@ -321,7 +321,13 @@ the callable may share a fiber: state kept per fiber (by third-party code, for e
 
 The tasks iterate the items one at a time, so the iterable may itself wait, for example, for the next page of an API.
 The next item is pulled only once a task is free for it, and none is pulled after a failure.
-Keys are passed as they are: a generator may yield objects or repeat them (`map()` needs array keys for its result).
+The callable gets the value only, so a function like `strval(...)` fits. `map()` keeps the keys in its result,
+so it needs array keys; `each()` ignores them: a generator may yield objects or repeat them.
+
+Since the tasks pull the items, a generator runs in their fibers, not in the caller's. It sees the caller's
+[scoped values](#context-of-a-request-scopedvalue), but not the rest of its fiber-local state: a lock the caller holds
+through `synchronized()` is not held there, so a generator that takes the same lock waits for the caller,
+which waits for `each()` — a deadlock.
 
 ### Cleanup: `shield()`
 
@@ -555,10 +561,10 @@ use Thesis\Async\LocalRateLimiter;
 
 $github = new LocalRateLimiter(perSecond: 10, burst: 10);
 
-each($repositories, static function (Repository $repository) use ($github) {
-    $github->wait();
+each($repositories, 5, static function (Repository $repository) use ($github) { // at most 5 at once
+    $github->wait(); // and 10 a second on average
     fetch($repository);
-}, concurrency: 5); // both limits: at most 5 at once, 10 a second on average
+});
 ```
 
 After a pause, `$burst` calls start at once, then one every `1 / $perSecond` seconds. No timer refills the bucket:
@@ -684,7 +690,7 @@ $pages = new Channel(10);
 group(static function (Group $group) use ($urls, $pages) {
     $group->spawn(static function () use ($urls, $pages) {
         try {
-            each($urls, static fn(string $url) => $pages->send(fetch($url)), concurrency: 10);
+            each($urls, 10, static fn(string $url) => $pages->send(fetch($url)));
         } finally {
             $pages->close();
         }
@@ -903,8 +909,8 @@ all([user, orders])              orders fails after 50 ms
 | `allSettled(array<K, callable(): T>): array{array<K, T>, array<K, \Throwable>}` | every result and every failure, nothing is cancelled |
 | `race(non-empty-array<callable(): T>): T` | first success wins, the rest are cancelled and joined |
 | `some(int $count, array<K, callable(): T>): non-empty-array<K, T>` | first `$count` successes win, the rest are cancelled and joined |
-| `each(iterable<K, T>, callable(T, K), int $concurrency)` | bounded concurrency |
-| `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
+| `each(iterable<T>, int $concurrency, callable(T))` | bounded concurrency |
+| `map(iterable<K, T>, int $concurrency, callable(T): R): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
 | `timeoutOr(float $seconds, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
 | `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |

@@ -376,61 +376,7 @@ function allSettled(array $tasks): array
  */
 function some(int $count, array $tasks): array
 {
-    if ($count > \count($tasks)) {
-        throw new \ValueError(\sprintf('some() needs at least %d tasks, got %d.', $count, \count($tasks)));
-    }
-
-    // Once more than this many have failed, $count successes are no longer possible.
-    $tolerated = \count($tasks) - $count;
-    $results = [];
-    $failure = null;
-    $failures = 0;
-
-    group(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
-        foreach ($tasks as $key => $task) {
-            $group->spawn(static function () use ($key, $task, $group, $count, $tolerated, &$results, &$failure, &$failures) {
-                try {
-                    $value = $task();
-                } catch (Cancelled $cancelled) {
-                    throw $cancelled;
-                } catch (\Throwable $error) {
-                    if (\count($results) === $count) {
-                        return;
-                    }
-
-                    if ($failure === null) {
-                        $failure = $error;
-                    } else {
-                        Suppressed::add($failure, $error);
-                    }
-
-                    if (++$failures === $tolerated + 1) {
-                        $group->cancelTasks();
-                    }
-
-                    return;
-                }
-
-                // Successes and failures cannot both be decided: that would take more tasks than there are.
-                if ($failures > $tolerated || \count($results) === $count) {
-                    return;
-                }
-
-                $results[$key] = $value;
-
-                if (\count($results) === $count) {
-                    $group->cancelTasks();
-                }
-            });
-        }
-    });
-
-    if (\count($results) < $count) {
-        /** @var \Throwable $failure */
-        throw $failure;
-    }
-
-    return $results;
+    return Internal\some('some', $count, $tasks);
 }
 
 /**
@@ -445,11 +391,11 @@ function some(int $count, array $tasks): array
  */
 function race(array $tasks): mixed
 {
-    return array_first(some(1, $tasks));
+    return array_first(Internal\some('race', 1, $tasks));
 }
 
 /**
- * Bounded concurrency: calls $fn for every item, at most $concurrency at a time.
+ * Bounded concurrency: calls $fn for every item, at most $concurrency at a time. $fn gets the value, not the key.
  *
  * Items are processed by at most $concurrency tasks, not by a task per item: a task takes the next item
  * once it is done with the previous one, so consecutive calls of $fn may share a fiber. A task is started
@@ -459,17 +405,21 @@ function race(array $tasks): mixed
  * The next item is pulled only once a task is free for it, and never after a failure.
  * The first failure cancels the rest and is rethrown.
  *
+ * Since a task pulls the items, a generator runs in that task's fiber, not in the caller's: it sees the scoped values
+ * of the caller, but not its other fiber-local state. A lock the caller holds through {@see synchronized()}
+ * is not held by the task, so a generator that takes the same lock waits for the caller, which waits for each(): a deadlock.
+ *
  * @api
- * @template K
  * @template T
- * @param iterable<K, T> $items
- * @param callable(T, K): mixed $fn
+ * @param iterable<mixed, T> $items
  * @param positive-int $concurrency
+ * @param callable(T): mixed $fn
  */
-function each(iterable $items, callable $fn, int $concurrency): void
+function each(iterable $items, int $concurrency, callable $fn): void
 {
-    group(static function (Group $group) use ($items, $fn, $concurrency) {
-        new Workers($group, $items, $fn, $concurrency)->start();
+    group(static function (Group $group) use ($items, $concurrency, $fn) {
+        // Not $fn(...) itself: Workers passes the key too, and an internal function rejects an extra argument.
+        Workers::start($group, $items, $concurrency, static fn(mixed $item) => $fn($item));
     });
 }
 
@@ -481,27 +431,30 @@ function each(iterable $items, callable $fn, int $concurrency): void
  * @template T
  * @template R
  * @param iterable<K, T> $items
- * @param callable(T, K): R $fn
  * @param positive-int $concurrency
+ * @param callable(T): R $fn
  * @return array<K, R>
  */
-function map(iterable $items, callable $fn, int $concurrency): array
+function map(iterable $items, int $concurrency, callable $fn): array
 {
     $results = [];
 
-    each(
-        $items,
-        static function (mixed $item, mixed $key) use ($fn, &$results) {
-            /** @var T $item */
-            /** @var K $key */
-            // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
-            $results[$key] = null;
-            $results[$key] = $fn($item, $key);
-        },
-        $concurrency,
-    );
+    group(static function (Group $group) use ($items, $concurrency, $fn, &$results) {
+        Workers::start(
+            $group,
+            $items,
+            $concurrency,
+            static function (mixed $item, mixed $key) use ($fn, &$results) {
+                /** @var T $item */
+                /** @var K $key */
+                // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
+                $results[$key] = null;
+                $results[$key] = $fn($item);
+            },
+        );
+    });
 
-    /** @var array<K, R> Every reserved null has been replaced by a result, or each() has thrown. */
+    /** @var array<K, R> Every reserved null has been replaced by a result, or the group has thrown. */
     return $results;
 }
 

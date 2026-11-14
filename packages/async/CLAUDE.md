@@ -62,11 +62,13 @@ The model, the API and the guarantees are described in `README.md` — read it f
   from a waiting sender, only if that waiter's `resume()` returns `true`; otherwise it goes to the next one or to the buffer.
   So a `send()` that throws `Cancelled` has not delivered, and a `receive()` that throws `Cancelled` has not taken anything.
   Waiting receivers imply an empty buffer; waiting senders imply a full one (or a rendezvous).
-- `each()` runs on `Internal\Workers`: at most `concurrency` tasks, each takes the next item under `synchronized()`
-  (a generator may suspend, and another worker must not resume it meanwhile). An item is pulled when it is taken,
-  never ahead: `next()` before `valid()`, not after `current()`. `take()` checks cancellation after getting the lock,
-  so nothing is pulled after a failure. A new worker is started only when the item just taken leaves no worker free.
-  `map()` stays on top of `each()`: `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
+- `each()` and `map()` run on `Internal\Workers`: at most `concurrency` tasks, each takes the next item under `synchronized()`
+  (a generator may suspend, and another worker must not resume it meanwhile); an array cannot suspend, so it is taken
+  without the lock. An item is pulled when it is taken, never ahead: `next()` before `valid()`, not after `current()`.
+  Taking checks cancellation first (after getting the lock), so nothing is pulled after a failure.
+  A new worker is started only when the item just taken leaves no worker free.
+  The callable gets the value only (`$fn($value)`, so an internal function fits); only `map()` uses the key, for its result.
+  `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
   unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
