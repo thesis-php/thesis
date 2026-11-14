@@ -14,10 +14,14 @@ namespace Thesis\Async;
  */
 final class LocalKeyedSemaphore implements KeyedSemaphore
 {
-    /** @var array<array-key, LocalSemaphore> keys in use */
+    /**
+     * @var array<array-key, LocalSemaphore> keys in use
+     */
     private array $semaphores = [];
 
-    /** @var array<array-key, positive-int> holders and waiters per key in use */
+    /**
+     * @var array<array-key, positive-int> holders and waiters per key in use
+     */
     private array $users = [];
 
     /**

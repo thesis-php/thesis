@@ -25,10 +25,14 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
 {
     private readonly LocalMutex $mutex;
 
-    /** @var float the time the counting started at: when the bucket was last full */
+    /**
+     * @var float the time the counting started at: when the bucket was last full
+     */
     private float $fullAt = -INF;
 
-    /** @var non-negative-int tokens taken since then; the bucket is full again at fullAt + taken / perSecond */
+    /**
+     * @var non-negative-int tokens taken since then; the bucket is full again at fullAt + taken / perSecond
+     */
     private int $taken = 0;
 
     /**
@@ -41,7 +45,10 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
         private readonly int $burst,
     ) {
         if (!($perSecond > 0)) {
-            throw new \ValueError(\sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', is_nan($perSecond) ? 'NAN' : $perSecond));
+            throw new \ValueError(\sprintf(
+                'LocalTokenBucketRateLimiter needs a positive rate, got %s.',
+                is_nan($perSecond) ? 'NAN' : $perSecond,
+            ));
         }
 
         $this->mutex = new LocalMutex();

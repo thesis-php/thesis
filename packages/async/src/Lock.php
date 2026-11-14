@@ -20,7 +20,9 @@ final class Lock
 {
     public private(set) bool $isReleased = false;
 
-    /** @var callable(): void */
+    /**
+     * @var callable(): void
+     */
     private readonly mixed $release;
 
     /**

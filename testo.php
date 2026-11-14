@@ -8,8 +8,15 @@ use Testo\Application\Config\ApplicationConfig;
 use Testo\Application\Config\SuiteConfig;
 
 return new ApplicationConfig(
-    src: [],
+    src: [
+        __DIR__ . '/packages/async/src',
+    ],
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
+        new SuiteConfig(
+            name: 'async',
+            location: [__DIR__ . '/packages/async/tests'],
+            plugins: require __DIR__ . '/packages/async/testo.plugins.php',
+        ),
     ],
 );

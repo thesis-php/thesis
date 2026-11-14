@@ -54,7 +54,15 @@ final class LocalTokenBucketRateLimiterTest
             $limiter->wait();
             $expected = max(0, $call - $burst + 1) / $perSecond;
 
-            Assert::true(abs(now() - $start - $expected) < 1e-9, \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected));
+            Assert::true(
+                abs(now() - $start - $expected) < 1e-9,
+                \sprintf(
+                    'Call %d started at %s instead of %s.',
+                    $call,
+                    now() - $start,
+                    $expected,
+                ),
+            );
         }
 
         assertNoCallbacksLeft();
@@ -178,9 +186,14 @@ final class LocalTokenBucketRateLimiterTest
     #[DataSet([NAN, 'NAN'])]
     public function rateMustBePositive(float $perSecond, string $shown): void
     {
-        $exception = withoutWarnings(static fn() => thrown(static fn() => new LocalTokenBucketRateLimiter($perSecond, 1)));
+        $exception = withoutWarnings(
+            static fn() => thrown(static fn() => new LocalTokenBucketRateLimiter($perSecond, 1)),
+        );
 
         Assert::instanceOf($exception, \ValueError::class);
-        Assert::same($exception->getMessage(), \sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', $shown));
+        Assert::same(
+            $exception->getMessage(),
+            \sprintf('LocalTokenBucketRateLimiter needs a positive rate, got %s.', $shown),
+        );
     }
 }

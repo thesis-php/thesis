@@ -15,10 +15,15 @@ use function Thesis\Async\suspend;
  */
 final class SignalTrapImpl implements SignalTrap
 {
-    /** @var array<int, int> signals received by the process and not yet taken, keyed by themselves, in the order they came */
+    /**
+     * @var array<int, int> signals received by the process and not yet taken,
+     *     keyed by themselves, in the order they came
+     */
     private array $pending = [];
 
-    /** @var WaitQueue<Continuation<?int>> waiting receivers; null wakes them at release */
+    /**
+     * @var WaitQueue<Continuation<?int>> waiting receivers; null wakes them at release
+     */
     private readonly WaitQueue $receivers;
 
     private bool $released = false;
@@ -63,7 +68,9 @@ final class SignalTrapImpl implements SignalTrap
 
     public function receive(): int
     {
-        return $this->take() ?? $this->wait() ?? throw new \LogicException('The signal trap is used after trapSignals() has returned.');
+        return $this->take()
+            ?? $this->wait()
+            ?? throw new \LogicException('The signal trap is used after trapSignals() has returned.');
     }
 
     /**

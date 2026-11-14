@@ -22,7 +22,9 @@ final class TaskImpl implements Task
         get => $this->result->isDone;
     }
 
-    /** @var Deferred<T> */
+    /**
+     * @var Deferred<T>
+     */
     private readonly Deferred $result;
 
     public function __construct(

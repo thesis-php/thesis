@@ -285,7 +285,9 @@ final class OnCancelTest
     public function acceptsCallableThatIsNotClosure(): void
     {
         $recorder = new class {
-            /** @var list<string> */
+            /**
+             * @var list<string>
+             */
             public array $calls = [];
 
             public function __invoke(): void

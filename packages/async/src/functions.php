@@ -138,8 +138,9 @@ function now(): float
  * {@see timeout()} calls, tasks included, since a task inherits the deadline under which its group runs.
  * Inside {@see shield()} outer deadlines are not visible, as outer cancellation is not.
  *
- * For passing the deadline on to where a scope cannot reach: a `statement_timeout` of a database, a header of a remote call.
- * Zero once the deadline has passed, even if the scope is not cancelled yet. Only reads a clock: it never waits or throws.
+ * For passing the deadline on to where a scope cannot reach: a `statement_timeout` of a database, a header of a remote
+ * call. Zero once the deadline has passed, even if the scope is not cancelled yet.
+ * Only reads a clock: it never waits or throws.
  *
  * @api
  */
@@ -202,7 +203,8 @@ function timeout(float $seconds, callable $body): mixed
 }
 
 /**
- * Like {@see timeout()}, but returns $default instead of throwing {@see TimedOut} once its own deadline cuts $body short.
+ * Like {@see timeout()}, but returns $default instead of throwing
+ * {@see TimedOut} once its own deadline cuts $body short.
  *
  * Only this deadline: a {@see TimedOut} of a nested timeout() that $body lets out is not swallowed,
  * and an outer cancellation is rethrown as {@see Cancelled}, as with timeout().
@@ -380,7 +382,11 @@ function allSettled(array $tasks): array
  */
 function some(int $count, array $tasks): array
 {
-    return Internal\some('some', $count, $tasks);
+    return Internal\some(
+        function: 'some',
+        count: $count,
+        tasks: $tasks,
+    );
 }
 
 /**
@@ -395,7 +401,11 @@ function some(int $count, array $tasks): array
  */
 function race(array $tasks): mixed
 {
-    return array_first(Internal\some('race', 1, $tasks));
+    return array_first(Internal\some(
+        function: 'race',
+        count: 1,
+        tasks: $tasks,
+    ));
 }
 
 /**
@@ -411,7 +421,8 @@ function race(array $tasks): mixed
  *
  * Since a task pulls the items, a generator runs in that task's fiber, not in the caller's: it sees the scoped values
  * of the caller, but not its other fiber-local state. A lock the caller holds through {@see synchronized()}
- * is not held by the task, so a generator that takes the same lock waits for the caller, which waits for each(): a deadlock.
+ * is not held by the task, so a generator that takes the same lock waits
+ * for the caller, which waits for each(): a deadlock.
  *
  * @api
  * @template T
@@ -423,7 +434,12 @@ function each(iterable $items, int $concurrency, callable $fn): void
 {
     group(static function (Group $group) use ($items, $concurrency, $fn) {
         // Not $fn(...) itself: Workers passes the key too, and an internal function rejects an extra argument.
-        Workers::start($group, $items, $concurrency, static fn(mixed $item) => $fn($item));
+        Workers::start(
+            group: $group,
+            items: $items,
+            concurrency: $concurrency,
+            fn: static fn(mixed $item) => $fn($item),
+        );
     });
 }
 
@@ -445,13 +461,14 @@ function map(iterable $items, int $concurrency, callable $fn): array
 
     group(static function (Group $group) use ($items, $concurrency, $fn, &$results) {
         Workers::start(
-            $group,
-            $items,
-            $concurrency,
-            static function (mixed $item, mixed $key) use ($fn, &$results) {
+            group: $group,
+            items: $items,
+            concurrency: $concurrency,
+            fn: static function (mixed $item, mixed $key) use ($fn, &$results) {
                 /** @var T $item */
                 /** @var K $key */
-                // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
+                // $fn is called right after its item is taken, in the order of $items:
+                // reserving the key first keeps that order.
                 $results[$key] = null;
                 $results[$key] = $fn($item);
             },
@@ -496,7 +513,12 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
         return $fn();
     }
 
-    return Internal\holding($locks, $semaphore, $semaphore->acquire(), $fn);
+    return Internal\holding(
+        locks: $locks,
+        key: $semaphore,
+        lock: $semaphore->acquire(),
+        fn: $fn,
+    );
 }
 
 /**
@@ -514,7 +536,8 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
  */
 function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $fn): mixed
 {
-    /** @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>> $held locks taken by synchronizedKey(), per fiber */
+    // Locks taken by synchronizedKey(), per fiber.
+    /** @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>> $held */
     static $held = new \WeakMap();
 
     // As in synchronized(), the fiber's key is not kept in a variable: see fiberKey().
@@ -539,7 +562,12 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
         return $fn();
     }
 
-    return Internal\holding($locks, $key, $semaphore->acquire($key), $fn);
+    return Internal\holding(
+        locks: $locks,
+        key: $key,
+        lock: $semaphore->acquire($key),
+        fn: $fn,
+    );
 }
 
 /**
@@ -568,7 +596,8 @@ function awaitSignal(int $signal, int ...$signals): int
  * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
  * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
  *
- * Outside $fn, and before the next tick of the loop, when Revolt installs the handlers, a signal gets the default action.
+ * Outside $fn, and before the next tick of the loop, when Revolt installs
+ * the handlers, a signal gets the default action.
  *
  * @api
  * @template T
@@ -588,8 +617,8 @@ function trapSignals(array $signals, callable $fn): mixed
  * $fn receives a {@see Cancellation} requested while the current scope is cancelled
  * (inside {@see shield()} an outer cancellation does not request it). It is bound to the current scope: do not keep it
  * beyond $fn. If $fn throws {@see CancelledException} while the scope is cancelled, {@see Cancelled} is thrown instead,
- * as from any other wait. Otherwise the exception is the operation's own (say, a `TimeoutCancellation` passed alongside),
- * and it is rethrown as is.
+ * as from any other wait. Otherwise the exception is the operation's own (say, a `TimeoutCancellation` passed
+ * alongside), and it is rethrown as is.
  *
  * Like {@see suspend()}, it throws {@see Cancelled} right away if the scope is already cancelled.
  *

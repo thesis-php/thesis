@@ -63,7 +63,8 @@ The old packages are separate repositories (locally `~/Projects/thesis/<name>`),
 - Several old packages use the bare `Thesis\` namespace (`dic`, `mapper`, `time-span`, `headers`, `transaction`, ...),
   and `bytereader` and `byte-reader` both claim `Thesis\ByteReader\`. The validator requires a unique sub-namespace,
   so each needs a namespace decision before the move.
-- `amphp/*` leaves `require`: the point is a new ecosystem on revolt/event-loop, not a migration of the old one.
+- A package is rewritten on revolt/event-loop, not wrapped around amphp: the point is a new ecosystem,
+  not a migration of the old one. Interop with amphp is an optional bridge (`ampCancellable()` of `async`).
 
 ## Rejected
 

@@ -83,7 +83,7 @@ phpstan: var vendor ## Run static analysis [P=]
 .PHONY: phpstan
 
 deps-analyze: vendor ## Check for unused and shadow dependencies
-	$(RUN) composer-dependency-analyser $(ARGS)
+	$(RUN) composer-dependency-analyser --config=tools/composer-dependency-analyser.php $(ARGS)
 .PHONY: deps-analyze
 
 test: var vendor ## Run tests [P=]

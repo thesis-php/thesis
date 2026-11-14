@@ -8,7 +8,8 @@ use Thesis\Async\ScopedValue;
 
 /**
  * Storage of {@see ScopedValue}s: an immutable map, per fiber, from the spl_object_id() of a value to the value object
- * and what it is bound to. The object is kept next to its binding, so its id cannot be reused while it is bound anywhere.
+ * and what it is bound to. The object is kept next to its binding,
+ * so its id cannot be reused while it is bound anywhere.
  *
  * A separate axis from the scope tree. A task's scope is a child of its group's tasks scope, not of the place
  * where it was spawned, so the values are captured by {@see capture()} in the spawning fiber instead,
@@ -36,7 +37,11 @@ final class Context
      */
     public static function run(array $values, callable $fn): mixed
     {
-        return self::bind($values, self::capture(), $fn);
+        return self::bind(
+            values: $values,
+            previous: self::capture(),
+            fn: $fn,
+        );
     }
 
     /**
@@ -77,7 +82,11 @@ final class Context
         $values = $previous;
         $values[spl_object_id($key)] = [$key, $value];
 
-        return self::bind($values, $previous, $fn);
+        return self::bind(
+            values: $values,
+            previous: $previous,
+            fn: $fn,
+        );
     }
 
     /**

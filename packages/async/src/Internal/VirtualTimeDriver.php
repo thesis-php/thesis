@@ -20,9 +20,10 @@ use Revolt\EventLoop\Suspension;
  * Everything but the timers is the inner driver's: streams and signals are real, and so are the suspensions.
  * While a timer is pending, a pump (a defer of the inner driver) runs on every tick and keeps the inner loop
  * from blocking. Every callback given to this driver counts as activity, when it is given, enabled and when it runs;
- * when there has been none since the previous run of the pump, nothing can run, and the clock jumps. So a stream that is to become ready from outside
- * the process may be jumped past. Without a timer there is no pump, and the inner driver blocks on the streams
- * and signals for real. When nothing at all is left, Revolt ends the loop: a deadlock fails at once.
+ * when there has been none since the previous run of the pump, nothing can run, and the clock jumps. So a stream that
+ * is to become ready from outside the process may be jumped past. Without a timer there is no pump, and the inner
+ * driver blocks on the streams and signals for real. When nothing at all is left,
+ * Revolt ends the loop: a deadlock fails at once.
  *
  * A due timer fires through a defer of its own, as Revolt's timers fire as callbacks of their own:
  * the microtasks queued by one, such as a resumed fiber, run before the next one.
@@ -31,7 +32,9 @@ use Revolt\EventLoop\Suspension;
  */
 final class VirtualTimeDriver implements Driver
 {
-    /** @var array<string, VirtualTimer> */
+    /**
+     * @var array<string, VirtualTimer>
+     */
     private array $timers = [];
 
     /**
@@ -42,28 +45,40 @@ final class VirtualTimeDriver implements Driver
      */
     private \SplMinHeap $queue;
 
-    /** how many entries of the queue are outdated */
+    /**
+     * how many entries of the queue are outdated.
+     */
     private int $outdated = 0;
 
     private int $order = 0;
 
-    /** how many timers are pending: enabled, and not handed to their firing defer yet */
+    /**
+     * how many timers are pending: enabled, and not handed to their firing defer yet.
+     */
     private int $pending = 0;
 
-    /** how many of the pending timers are referenced */
+    /**
+     * how many of the pending timers are referenced.
+     */
     private int $pendingReferenced = 0;
 
     private int $nextId = 0;
 
-    /** how many callbacks of the user have been given or have run: the pump compares it between its runs */
+    /**
+     * how many callbacks of the user have been given or have run: the pump compares it between its runs.
+     */
     private int $activity = 0;
 
     private int $activityAtPump = 0;
 
-    /** the inner defer of the pump, while there is one */
+    /**
+     * the inner defer of the pump, while there is one.
+     */
     private ?string $pumpCallbackId = null;
 
-    /** @var array<string, true> the inner callbacks of this driver: hidden from the identifiers */
+    /**
+     * @var array<string, true> the inner callbacks of this driver: hidden from the identifiers
+     */
     private array $own = [];
 
     /**
@@ -129,13 +144,21 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function delay(float $delay, \Closure $closure): string
     {
-        return $this->schedule($delay, $closure, repeat: false);
+        return $this->schedule(
+            seconds: $delay,
+            callback: $closure,
+            repeat: false,
+        );
     }
 
     #[\Override]
     public function repeat(float $interval, \Closure $closure): string
     {
-        return $this->schedule($interval, $closure, repeat: true);
+        return $this->schedule(
+            seconds: $interval,
+            callback: $closure,
+            repeat: true,
+        );
     }
 
     #[\Override]
@@ -310,13 +333,17 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function isEnabled(string $callbackId): bool
     {
-        return isset($this->timers[$callbackId]) ? $this->timers[$callbackId]->enabled : $this->inner->isEnabled($callbackId);
+        $timer = $this->timers[$callbackId] ?? null;
+
+        return $timer->enabled ?? $this->inner->isEnabled($callbackId);
     }
 
     #[\Override]
     public function isReferenced(string $callbackId): bool
     {
-        return isset($this->timers[$callbackId]) ? $this->timers[$callbackId]->referenced : $this->inner->isReferenced($callbackId);
+        $timer = $this->timers[$callbackId] ?? null;
+
+        return $timer->referenced ?? $this->inner->isReferenced($callbackId);
     }
 
     /**
@@ -343,7 +370,12 @@ final class VirtualTimeDriver implements Driver
 
         // Not like the inner ids, which are letters.
         $callbackId = 'virtual-' . $this->nextId++;
-        $timer = new VirtualTimer($callbackId, $seconds, $callback, $repeat);
+        $timer = new VirtualTimer(
+            callbackId: $callbackId,
+            interval: $seconds,
+            callback: $callback,
+            repeat: $repeat,
+        );
         $this->timers[$callbackId] = $timer;
         $this->enqueue($timer, $this->clock->now() + $seconds);
 
@@ -513,7 +545,8 @@ final class VirtualTimeDriver implements Driver
      */
     private function counted(\Closure $callback): \Closure
     {
-        // A callback given is work to do, even before it runs: code that has just started a pump may give one right after.
+        // A callback given is work to do, even before it runs: code that has
+        // just started a pump may give one right after.
         ++$this->activity;
 
         return function (string $callbackId, mixed ...$args) use ($callback): void {

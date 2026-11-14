@@ -16,7 +16,9 @@ namespace Thesis\Async\Internal;
  */
 final class WaitQueue
 {
-    /** @var array<int, T> keyed by the sequence number; the hot paths compare it with [] instead of calling a method */
+    /**
+     * @var array<int, T> keyed by the sequence number; the hot paths compare it with [] instead of calling a method
+     */
     public private(set) array $items = [];
 
     private int $head = 0;

@@ -39,7 +39,8 @@ final class LocalSlidingWindowRateLimiterTest
 
         $total = now() - $start;
 
-        Assert::same([$firstWindow, $shortestWindow, $total], [0.0, 10.0, 20.0]); // 30.0 or more if a window held fewer calls
+        // The total is 30.0 or more if a window held fewer calls.
+        Assert::same([$firstWindow, $shortestWindow, $total], [0.0, 10.0, 20.0]);
         assertNoCallbacksLeft();
     }
 
@@ -62,7 +63,15 @@ final class LocalSlidingWindowRateLimiterTest
             $limiter->wait();
             $expected = intdiv($call, $limit) * $window;
 
-            Assert::true(abs(now() - $start - $expected) < 1e-9, \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected));
+            Assert::true(
+                abs(now() - $start - $expected) < 1e-9,
+                \sprintf(
+                    'Call %d started at %s instead of %s.',
+                    $call,
+                    now() - $start,
+                    $expected,
+                ),
+            );
         }
 
         assertNoCallbacksLeft();
@@ -186,9 +195,14 @@ final class LocalSlidingWindowRateLimiterTest
     #[DataSet([NAN, 'NAN'])]
     public function windowMustBePositive(float $window, string $shown): void
     {
-        $exception = withoutWarnings(static fn() => thrown(static fn() => new LocalSlidingWindowRateLimiter(1, $window)));
+        $exception = withoutWarnings(
+            static fn() => thrown(static fn() => new LocalSlidingWindowRateLimiter(1, $window)),
+        );
 
         Assert::instanceOf($exception, \ValueError::class);
-        Assert::same($exception->getMessage(), \sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $shown));
+        Assert::same(
+            $exception->getMessage(),
+            \sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $shown),
+        );
     }
 }

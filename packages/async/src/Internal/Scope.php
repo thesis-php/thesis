@@ -10,8 +10,8 @@ use Thesis\Async\Cancelled;
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
  *
- * Only owners cancel a scope: a group (on failure or {@see GroupImpl::cancelTasks()}), a task handle and a timeout timer.
- * That is why a caught {@see Cancelled} needs no payload: the owner tells its own cancellation
+ * Only owners cancel a scope: a group (on failure or {@see GroupImpl::cancelTasks()}), a task handle and a timeout
+ * timer. That is why a caught {@see Cancelled} needs no payload: the owner tells its own cancellation
  * from a foreign one by the state of the tree.
  *
  * Cancellation is propagated eagerly. {@see cancel()} walks the subtree below the scope (a shield stops it)
@@ -36,7 +36,9 @@ final class Scope
      */
     private bool $cancelled = false;
 
-    /** @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id() */
+    /**
+     * @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id()
+     */
     private array $waits = [];
 
     /**
@@ -45,10 +47,14 @@ final class Scope
      */
     private array $callbacks = [];
 
-    /** Set by {@see close()}: a closed scope stores no callbacks. */
+    /**
+     * Set by {@see close()}: a closed scope stores no callbacks.
+     */
     private bool $closed = false;
 
-    /** @var array<int, self> held strongly to deliver cancellation; released by {@see close()} */
+    /**
+     * @var array<int, self> held strongly to deliver cancellation; released by {@see close()}
+     */
     private array $children = [];
 
     /**
@@ -187,8 +193,8 @@ final class Scope
 
     /**
      * Queues $callback through `EventLoop::queue()` once this scope is cancelled, by its owner or through an ancestor.
-     * If it already is, $callback is queued right away. Never synchronously: user code does not run inside {@see cancel()}.
-     * If the queue has not reached it when the scope is closed, {@see close()} calls it itself:
+     * If it already is, $callback is queued right away. Never synchronously: user code does not run inside
+     * {@see cancel()}. If the queue has not reached it when the scope is closed, {@see close()} calls it itself:
      * a callback of a cancelled scope is always called before the scope ends, and never after.
      *
      * Not a way to cancel anything: it only observes. The callback runs in the root scope, with no scoped values.
@@ -208,7 +214,8 @@ final class Scope
 
         $pending = true;
         $id = 0;
-        // Queued once at most, by notify() or right here, and maybe called earlier by close(): only the first call counts.
+        // Queued once at most, by notify() or right here, and maybe called
+        // earlier by close(): only the first call counts.
         $fire = function () use (&$pending, &$id, $callback) {
             if ($pending) {
                 $pending = false;
@@ -254,7 +261,8 @@ final class Scope
                         try {
                             $fire();
                         } catch (\Throwable $error) {
-                            // As if it had been thrown from the queue: to the event loop, not to whoever closes the scope.
+                            // As if it had been thrown from the queue: to the event loop,
+                            // not to whoever closes the scope.
                             EventLoop::queue(static function () use ($error) {
                                 throw $error;
                             });

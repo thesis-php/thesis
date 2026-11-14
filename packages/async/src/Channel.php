@@ -14,20 +14,22 @@ use Thesis\Async\Internal\WaitQueue;
  * Values and waiters are FIFO. A value is handed over to the first waiting receiver directly,
  * like a permit of {@see LocalSemaphore}: a receiver that has been cancelled in the meantime refuses it
  * ({@see Continuation::resume()} returns false), and it goes to the next one or to the buffer.
- * The same with a waiting sender: its value is taken only if its resume() wins. So a send() that throws {@see Cancelled}
- * has not delivered its value, and a receive() that throws {@see Cancelled} has not lost one.
+ * The same with a waiting sender: its value is taken only if its resume() wins. So a send() that throws
+ * {@see Cancelled} has not delivered its value, and a receive() that throws {@see Cancelled} has not lost one.
  *
  * The sender closes the channel: after {@see close()}, send() throws {@see ChannelClosed}, waiting senders are woken
  * with it and their values are not delivered, and receivers get what is left in the buffer before they see it.
- * A producer that failed closes it with the reason: receivers get the reason instead of the end, once the buffer is drained.
+ * A producer that failed closes it with the reason: receivers get the
+ * reason instead of the end, once the buffer is drained.
  *
  * send() and receive() that do not have to wait return immediately, without a cancellation check,
- * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait and never throw:
- * trySend() returns {@see SendResult::Closed} on a closed channel, and tryReceive() returns its default
+ * like {@see Deferred::await()} of a done deferred. {@see trySend()} and {@see tryReceive()} never wait and never
+ * throw: trySend() returns {@see SendResult::Closed} on a closed channel, and tryReceive() returns its default
  * on a closed and drained one, so that the next receive() reports the end.
  *
- * Like Go `len(ch)` and `cap(ch)`, `count($channel)` tells how many values are in the buffer and {@see $capacity} how many fit:
- * for metrics and for deciding whether to shed load. Values of waiting senders are not counted, so a rendezvous always has 0.
+ * Like Go `len(ch)` and `cap(ch)`, `count($channel)` tells how many values are in the buffer and {@see $capacity} how
+ * many fit: for metrics and for deciding whether to shed load. Values of waiting
+ * senders are not counted, so a rendezvous always has 0.
  *
  * Do not wait for several channels with {@see race()}: two receive() calls may get values in the same tick,
  * and race() keeps only one of them.
@@ -38,13 +40,19 @@ use Thesis\Async\Internal\WaitQueue;
  */
 final class Channel implements \IteratorAggregate, \Countable
 {
-    /** @var \SplQueue<T> */
+    /**
+     * @var \SplQueue<T>
+     */
     private readonly \SplQueue $buffer;
 
-    /** @var WaitQueue<Continuation<?array{T}>> resumed with null once the channel is closed */
+    /**
+     * @var WaitQueue<Continuation<?array{T}>> resumed with null once the channel is closed
+     */
     private readonly WaitQueue $receivers;
 
-    /** @var WaitQueue<array{Continuation<null>, T}> */
+    /**
+     * @var WaitQueue<array{Continuation<null>, T}>
+     */
     private readonly WaitQueue $senders;
 
     public private(set) bool $isClosed = false;
@@ -115,7 +123,8 @@ final class Channel implements \IteratorAggregate, \Countable
      */
     private function offer(mixed $value): bool
     {
-        // A waiting receiver means the buffer is empty: a value goes to the buffer only when there is no one to hand it to.
+        // A waiting receiver means the buffer is empty: a value goes to the
+        // buffer only when there is no one to hand it to.
         while ($this->receivers->items !== [] && ($receiver = $this->receivers->shift()) !== null) {
             if ($receiver->resume([$value])) {
                 return true;
@@ -153,8 +162,8 @@ final class Channel implements \IteratorAggregate, \Countable
     /**
      * Does not wait and never throws: for taking what has piled up without delaying the first value, such as a batch.
      *
-     * It returns $default whenever there is no value right now, closed or not: the end, or the reason of {@see close()},
-     * is reported by the next {@see receive()} or `foreach`, so a batch taken before it is not lost.
+     * It returns $default whenever there is no value right now, closed or not: the end, or the reason of
+     * {@see close()}, is reported by the next {@see receive()} or `foreach`, so a batch taken before it is not lost.
      *
      * If a value may be null, pass a $default that is not one of them to tell "nothing" apart:
      * `$value = $channel->tryReceive($none = new \stdClass())`, then compare with `=== $none`.
@@ -175,11 +184,11 @@ final class Channel implements \IteratorAggregate, \Countable
     }
 
     /**
-     * Wakes every waiter: senders get {@see ChannelClosed}, receivers get the end. Values in the buffer stay to be received.
-     * Only the first call counts: a later one is ignored, its reason too.
+     * Wakes every waiter: senders get {@see ChannelClosed}, receivers get the end. Values in the buffer stay to be
+     * received. Only the first call counts: a later one is ignored, its reason too.
      *
-     * @param ?\Throwable $reason why there is nothing more: receivers get it instead of the end once the buffer is drained,
-     *                           the same object every time, as awaiters of a failed {@see Deferred} do
+     * @param ?\Throwable $reason why there is nothing more: receivers get it instead of the end once the buffer
+     *     is drained, the same object every time, as awaiters of a failed {@see Deferred} do
      * @throws \ValueError if $reason is {@see Cancelled}: it would be thrown in receivers whose scope is not cancelled
      */
     public function close(?\Throwable $reason = null): void

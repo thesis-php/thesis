@@ -37,7 +37,7 @@ final class ChannelTest
         });
 
         Assert::same($received, [1, 2, 3, 4, 5]);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function iteratorHasListKeys(): void
@@ -109,7 +109,7 @@ final class ChannelTest
         });
 
         Assert::same($received, [1, 2, 3]);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function sendWithRoomInBufferDoesNotWait(): void
@@ -194,7 +194,7 @@ final class ChannelTest
         });
 
         Assert::same($log, ['receiving', 'value', 'sent']);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function rendezvousSendToWaitingReceiver(): void
@@ -260,7 +260,7 @@ final class ChannelTest
         $channel = new Channel(0);
 
         Assert::same($channel->trySend('value'), SendResult::Full);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function trySendHandsValueToWaitingReceiver(): void
@@ -297,7 +297,7 @@ final class ChannelTest
         $channel = new Channel(1);
 
         Assert::null($channel->tryReceive());
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function tryReceiveOfEmptyChannelReturnsDefault(): void
@@ -338,7 +338,7 @@ final class ChannelTest
             $sender->await();
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function tryReceiveSkipsCancelledRendezvousSender(): void
@@ -355,7 +355,7 @@ final class ChannelTest
             Assert::null($channel->tryReceive());
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function tryReceiveLetsWaitingSenderIntoBuffer(): void
@@ -563,7 +563,7 @@ final class ChannelTest
             Assert::same($channel->trySend('value'), SendResult::Full);
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function receiverCancelledAfterHandoverKeepsValue(): void
@@ -614,7 +614,7 @@ final class ChannelTest
         }));
 
         Assert::instanceOf($exception, TimedOut::class);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
         assertNoCallbacksLeft();
         Assert::same($channel->receive(), 'first');
         Assert::false($this->isBuffered($channel));
@@ -640,7 +640,7 @@ final class ChannelTest
             Assert::instanceOf(thrown($cancelled->await(...)), TaskCancelled::class);
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function cancelledSenderIsSkippedWhenBufferFreesUp(): void
@@ -664,7 +664,7 @@ final class ChannelTest
             Assert::same($channel->receive(), 'next');
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
         Assert::false($this->isBuffered($channel));
     }
 
@@ -676,7 +676,7 @@ final class ChannelTest
         $exception = thrown(static fn() => timeout(1, $channel->receive(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
         assertNoCallbacksLeft();
     }
 
@@ -713,7 +713,7 @@ final class ChannelTest
             }
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function closeEndsWaitingIterator(): void
@@ -754,7 +754,7 @@ final class ChannelTest
             }
         });
 
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
         Assert::same(iterator_to_array($channel), ['buffered']);
     }
 
@@ -776,7 +776,7 @@ final class ChannelTest
         $channel->close();
 
         Assert::same($channel->trySend('value'), SendResult::Closed);
-        $this->assertHoldsNothing($channel);
+        self::assertHoldsNothing($channel);
     }
 
     public function closeIsIdempotent(): void
@@ -952,8 +952,8 @@ final class ChannelTest
             }
         });
 
-        $this->assertHoldsNothing($toReceive);
-        $this->assertHoldsNothing($toSend);
+        self::assertHoldsNothing($toReceive);
+        self::assertHoldsNothing($toSend);
 
         foreach ($values as $value) {
             Assert::false(reaches($toSend, $value));
@@ -964,7 +964,7 @@ final class ChannelTest
      * @template T
      * @param Channel<T> $channel
      */
-    private function assertHoldsNothing(Channel $channel): void
+    private static function assertHoldsNothing(Channel $channel): void
     {
         Assert::same(self::waiters($channel), ['receivers' => [], 'senders' => []]);
     }
@@ -976,7 +976,10 @@ final class ChannelTest
      */
     private static function waiters(Channel $channel): array
     {
-        return (fn(): array => ['receivers' => $this->receivers->items, 'senders' => $this->senders->items])->call($channel);
+        return (fn(): array => [
+            'receivers' => $this->receivers->items,
+            'senders' => $this->senders->items,
+        ])->call($channel);
     }
 
     /**

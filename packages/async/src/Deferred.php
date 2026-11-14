@@ -21,12 +21,16 @@ final class Deferred
 {
     public private(set) bool $isDone = false;
 
-    /** @var ?T */
+    /**
+     * @var ?T
+     */
     private mixed $value = null;
 
     private ?\Throwable $error = null;
 
-    /** @var array<int, Continuation<null>> */
+    /**
+     * @var array<int, Continuation<null>>
+     */
     private array $waiters = [];
 
     /**

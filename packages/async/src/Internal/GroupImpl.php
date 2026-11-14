@@ -26,7 +26,9 @@ final class GroupImpl implements Group
 {
     private ?\Throwable $error = null;
 
-    /** a regular task cut short by an outer cancellation: the work is not done, so group() must not return */
+    /**
+     * a regular task cut short by an outer cancellation: the work is not done, so group() must not return.
+     */
     private ?Cancelled $cancelled = null;
 
     private int $tasks = 0;
@@ -35,7 +37,9 @@ final class GroupImpl implements Group
 
     private bool $closed = false;
 
-    /** @var ?ContinuationImpl<null> */
+    /**
+     * @var ?ContinuationImpl<null>
+     */
     private ?ContinuationImpl $joiner = null;
 
     private function __construct(
@@ -215,7 +219,9 @@ final class GroupImpl implements Group
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();
                 // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
-                $handle->complete($values === [] ? $scope->run($task) : Context::run($values, static fn() => $scope->run($task)));
+                $handle->complete(
+                    $values === [] ? $scope->run($task) : Context::run($values, static fn() => $scope->run($task)),
+                );
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
                     // Cancellation is not a failure: it does not bring the group down.

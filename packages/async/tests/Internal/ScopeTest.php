@@ -65,7 +65,10 @@ final class ScopeTest
         $scope->cancel();
 
         Assert::same(
-            array_map(static fn(Scope $scope) => $scope->isCancelled(), [$scope, $child, $grandchild, $shield, $shielded]),
+            array_map(
+                static fn(Scope $scope) => $scope->isCancelled(),
+                [$scope, $child, $grandchild, $shield, $shielded],
+            ),
             [true, true, true, false, false],
         );
     }

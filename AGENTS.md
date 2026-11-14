@@ -40,7 +40,6 @@ description, layer and dependencies. Generated from the manifests and `monorepo.
 - A package lists monorepo packages it needs in `uses` (and `usesDev`), by directory name.
   The code of a package may only reference namespaces of itself and of its `uses`: `make check` verifies this,
   because the shared autoloader would hide a missing dependency.
-- `amphp/*` is forbidden in `require`. It is allowed in `requireDev` for interop tests.
 
 ## Commands
 
@@ -138,7 +137,7 @@ No packages yet.
 
 Structured concurrency on top of revolt/event-loop.
 
-No packages yet.
+- `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree.
 
 ### io
 

@@ -10,13 +10,6 @@ namespace Thesis\Monorepo\Internal;
 final class Validator
 {
     /**
-     * Package name prefix => why it may not appear in a package's "require".
-     */
-    private const array FORBIDDEN_REQUIRE = [
-        'amphp/' => 'the ecosystem is built on revolt/event-loop only (amphp is fine in requireDev for interop tests)',
-    ];
-
-    /**
      * @var array<string, string> namespace => dir, longest first
      */
     private readonly array $owners;
@@ -191,19 +184,6 @@ final class Validator
                     $package->path(),
                     $name,
                 );
-            }
-        }
-
-        foreach ($manifest->require as $name => $_) {
-            foreach (self::FORBIDDEN_REQUIRE as $prefix => $reason) {
-                if (str_starts_with($name, $prefix)) {
-                    $this->errors[] = \sprintf(
-                        '%s: requires %s, but %s.',
-                        $package->path(),
-                        $name,
-                        $reason,
-                    );
-                }
             }
         }
 

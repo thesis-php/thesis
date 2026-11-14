@@ -22,19 +22,27 @@ final class ContinuationImpl implements Continuation
 
     private int $state = self::PENDING;
 
-    /** @var ?T */
+    /**
+     * @var ?T
+     */
     private mixed $value = null;
 
     private ?\Throwable $error = null;
 
     private bool $interrupted = false;
 
-    /** @var ?Suspension<null> */
+    /**
+     * @var ?Suspension<null>
+     */
     private ?Suspension $suspension = null;
 
     public function resume(mixed $value = null): bool
     {
-        return $this->fire($value, null, false);
+        return $this->fire(
+            value: $value,
+            error: null,
+            interrupted: false,
+        );
     }
 
     public function throw(\Throwable $error): bool
@@ -46,7 +54,11 @@ final class ContinuationImpl implements Continuation
             );
         }
 
-        return $this->fire(null, $error, false);
+        return $this->fire(
+            value: null,
+            error: $error,
+            interrupted: false,
+        );
     }
 
     /**
@@ -55,7 +67,11 @@ final class ContinuationImpl implements Continuation
      */
     public function interrupt(): bool
     {
-        return $this->fire(null, null, true);
+        return $this->fire(
+            value: null,
+            error: null,
+            interrupted: true,
+        );
     }
 
     /**

@@ -77,23 +77,6 @@ final readonly class ValidatorTest
         Assert::same($errors, ['Use one constraint for psr/clock across the monorepo, found: ^1.0 in packages/a; ^1.1 in packages/b.']);
     }
 
-    public static function rejectsAmphpInRequireButNotInRequireDev(): void
-    {
-        $fixture = new Fixture()
-            ->package('io', <<<'PHP'
-                layer: Layer::Io,
-                require: ['amphp/socket' => '^2.0'],
-                requireDev: ['amphp/amp' => '^3.0'],
-                PHP)
-        ;
-
-        $errors = Validator::validate($fixture->load());
-
-        Assert::same($errors, [
-            'packages/io: requires amphp/socket, but the ecosystem is built on revolt/event-loop only (amphp is fine in requireDev for interop tests).',
-        ]);
-    }
-
     public static function rejectsCycle(): void
     {
         $fixture = new Fixture()

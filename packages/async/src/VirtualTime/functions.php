@@ -24,7 +24,8 @@ use Thesis\Async\Internal\VirtualTimeDriver;
  * Must be called in {main}. Afterwards the previous driver and clock are restored, and whatever $fn
  * leaves in the loop is dropped together with the driver. Calls nest: an inner one has a clock of its own.
  * An object that keeps times, such as a rate limiter, must not be shared between two calls that run one after another,
- * or used after the call in the outer clock: each clock goes its own way, and such a time may be in the future of the other.
+ * or used after the call in the outer clock: each clock goes its own way,
+ * and such a time may be in the future of the other.
  *
  * @api
  * @template T
@@ -43,7 +44,9 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     if ($driver === null) {
         $driver = new EventLoop\DriverFactory()->create();
     } elseif ($driver === EventLoop::getDriver() || $driver->isRunning() || $driver->getIdentifiers() !== []) {
-        throw new \LogicException('VirtualTime\run() needs a fresh driver: not the current one, not running and with no callbacks.');
+        throw new \LogicException(
+            'VirtualTime\run() needs a fresh driver: not the current one, not running and with no callbacks.',
+        );
     }
 
     // After a wait in {main}, the loop fiber stays suspended in the middle of a tick, and Revolt refuses

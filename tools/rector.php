@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\Php80\Rector\Class_\StringableForToStringRector;
 use SavinMikhail\AddNamedArgumentsRector\AddNamedArgumentsRector;
 use Thesis\Rector\MoreThanTwoArgumentsStrategy;
@@ -27,5 +28,9 @@ return RectorConfig::configure()
     ])
     ->withSkip([
         StringableForToStringRector::class,
+        // The property is non-negative-int, the parameter is positive-int: promotion would lose the property's type.
+        ClassPropertyAssignToConstructorPromotionRector::class => [
+            $root . '/packages/async/src/LocalSemaphore.php',
+        ],
     ])
 ;

@@ -96,7 +96,8 @@ final class SuppressedTest
             group(static function (Group $group) {
                 $handle = $group->spawn(static fn() => throw new \RuntimeException('failed'));
 
-                $handle->await(); // the task's error is delivered before the body is cancelled: the same object comes back
+                // The task's error is delivered before the body is cancelled: the same object comes back.
+                $handle->await();
             });
         });
 
@@ -245,7 +246,9 @@ final class SuppressedTest
             });
         });
 
-        Assert::string($exception->getMessage())->startsWith('Event loop terminated without resuming the current suspension');
+        Assert::string($exception->getMessage())
+            ->startsWith('Event loop terminated without resuming the current suspension')
+        ;
         Assert::same(suppressed($exception), [$failure]);
 
         // let the orphaned task finish
@@ -264,7 +267,9 @@ final class SuppressedTest
             });
         });
 
-        Assert::string($exception->getMessage())->startsWith('Event loop terminated without resuming the current suspension');
+        Assert::string($exception->getMessage())
+            ->startsWith('Event loop terminated without resuming the current suspension')
+        ;
         Assert::same(suppressed($exception), []);
 
         $never->complete();

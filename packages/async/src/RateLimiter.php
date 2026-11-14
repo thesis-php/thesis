@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 /**
- * Bounds how often calls start: an API that allows 10 requests a second. A {@see Semaphore} bounds how many run at once;
- * the two are independent and often used together.
+ * Bounds how often calls start: an API that allows 10 requests a second. A {@see Semaphore} bounds how many run at
+ * once; the two are independent and often used together.
  *
- * {@see LocalTokenBucketRateLimiter} is the in-process implementation. Others (a bucket in Redis shared by several processes)
- * implement this interface and must keep the contract of {@see wait()}.
+ * {@see LocalTokenBucketRateLimiter} is the in-process implementation. Others (a bucket in Redis shared by several
+ * processes) implement this interface and must keep the contract of {@see wait()}.
  *
  * @api
  */

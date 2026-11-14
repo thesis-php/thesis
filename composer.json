@@ -10,23 +10,44 @@
         }
     ],
     "require": {
-        "php": "^8.5"
+        "php": "^8.5",
+        "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
+        "ext-pcntl": "*",
+        "ext-posix": "*",
         "ext-tokenizer": "*",
+        "amphp/amp": "^3",
+        "internal/container": "^1.1",
         "llm/skills": "^1.17",
         "savinmikhail/add_named_arguments_rector": "^0.1.27",
         "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
+        "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"
     },
+    "replace": {
+        "thesis/async": "self.version"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Async\\": "packages/async/src/"
+        },
+        "files": [
+            "packages/async/src/autoload.files.php"
+        ]
+    },
     "autoload-dev": {
         "psr-4": {
+            "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/"
-        }
+        },
+        "files": [
+            "packages/async/tests/autoload.files.php"
+        ]
     },
     "config": {
         "allow-plugins": {

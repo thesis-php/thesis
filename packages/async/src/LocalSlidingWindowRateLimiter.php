@@ -7,8 +7,8 @@ namespace Thesis\Async;
 /**
  * In-process {@see RateLimiter} with a sliding window: at most $limit calls start within any $window seconds,
  * like .NET `SlidingWindowRateLimiter` with its `PermitLimit` and `Window`.
- * For a server that enforces exactly that, where a {@see LocalTokenBucketRateLimiter} would have to be set to half the rate:
- * a token bucket bounds the average, a window bounds every interval.
+ * For a server that enforces exactly that, where a {@see LocalTokenBucketRateLimiter} would have to be set to half the
+ * rate: a token bucket bounds the average, a window bounds every interval.
  *
  * It keeps the start times of the last $limit calls; a call waits until the oldest of them leaves the window.
  * So after a pause $limit calls start at once, and the next ones follow the pattern of the first window.
@@ -24,10 +24,14 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
 {
     private readonly LocalMutex $mutex;
 
-    /** @var array<non-negative-int, float> start times of the last calls, a ring; a slot is missing until its first call */
+    /**
+     * @var array<non-negative-int, float> start times of the last calls, a ring; a slot is missing until its first call
+     */
     private array $starts = [];
 
-    /** @var non-negative-int the oldest start in the ring */
+    /**
+     * @var non-negative-int the oldest start in the ring
+     */
     private int $oldest = 0;
 
     /**
@@ -40,7 +44,10 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         private readonly float $window,
     ) {
         if (!($window > 0)) {
-            throw new \ValueError(\sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', is_nan($window) ? 'NAN' : $window));
+            throw new \ValueError(\sprintf(
+                'LocalSlidingWindowRateLimiter needs a positive window, got %s.',
+                is_nan($window) ? 'NAN' : $window,
+            ));
         }
 
         $this->mutex = new LocalMutex();

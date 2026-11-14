@@ -994,4 +994,3 @@ Ideas that are not implemented yet.
 ## Prior art
 
 [Trio](https://trio.readthedocs.io/) nurseries and cancel scopes, Kotlin `coroutineScope`, Java `StructuredTaskScope`.
-Design sketches of this and several alternative models live in [`ideas/`](ideas).

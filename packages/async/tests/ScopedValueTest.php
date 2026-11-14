@@ -63,7 +63,10 @@ final class ScopedValueTest
             $value->with(null, $value->isBound(...)),
             $value->with('default', $value->isBound(...)),
             $other->with('other', $value->isBound(...)),
-            $value->with('bound', static fn() => group(static fn(Group $group) => $group->spawn($value->isBound(...))->await())),
+            $value->with(
+                'bound',
+                static fn() => group(static fn(Group $group) => $group->spawn($value->isBound(...))->await()),
+            ),
             $value->isBound(),
         ];
 
@@ -196,11 +199,14 @@ final class ScopedValueTest
         $value = new ScopedValue();
 
         $observed = $value->with('parent', static fn() => group(static function (Group $group) use ($value) {
-            $first = $group->spawn(static fn(): ?string => $value->with('first', static function () use ($value): ?string {
-                delay(2);
+            $first = $group->spawn(static fn(): ?string => $value->with(
+                'first',
+                static function () use ($value): ?string {
+                    delay(2);
 
-                return $value->get();
-            }));
+                    return $value->get();
+                },
+            ));
             $second = $group->spawn(static function () use ($value): ?string {
                 delay(1);
 

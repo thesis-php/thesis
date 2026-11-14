@@ -82,7 +82,7 @@ return new Config()
             'property' => 'multi',
             'other' => 'single',
         ],
-        'phpdoc_list_type' => true,
+        'phpdoc_list_type' => false,
         'phpdoc_no_alias_tag' => ['replacements' => [
             'property-write' => 'property',
             'type' => 'var',
@@ -102,6 +102,8 @@ return new Config()
             'after_heredoc' => true,
             'elements' => ['arguments', 'array_destructuring', 'arrays', 'match', 'parameters'],
         ],
+        // It adds `: void` to closures too, and closures have no return types. PHPStan requires them on methods.
+        'void_return' => false,
         'yoda_style' => ['equal' => false, 'identical' => false, 'less_and_greater' => false],
     ])
 ;

@@ -64,6 +64,10 @@ final readonly class ScopedValue
      */
     public function with(mixed $value, callable $fn): mixed
     {
-        return Context::with($this, $value, $fn);
+        return Context::with(
+            key: $this,
+            value: $value,
+            fn: $fn,
+        );
     }
 }

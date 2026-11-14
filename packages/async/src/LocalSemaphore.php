@@ -7,7 +7,8 @@ namespace Thesis\Async;
 use Thesis\Async\Internal\WaitQueue;
 
 /**
- * In-process {@see Semaphore}: `new LocalSemaphore(1)` is a mutex. Fair: permits go to the waiters in the order they came.
+ * In-process {@see Semaphore}: `new LocalSemaphore(1)` is a mutex. Fair:
+ * permits go to the waiters in the order they came.
  *
  * A released permit is handed over to the first waiter directly instead of being returned to the pool,
  * so a fiber that calls acquire() at the right moment cannot overtake the ones already waiting.
@@ -22,10 +23,14 @@ use Thesis\Async\Internal\WaitQueue;
  */
 final class LocalSemaphore implements Semaphore
 {
-    /** @var non-negative-int */
+    /**
+     * @var non-negative-int
+     */
     private int $permits;
 
-    /** @var WaitQueue<Continuation<null>> */
+    /**
+     * @var WaitQueue<Continuation<null>>
+     */
     private readonly WaitQueue $waiters;
 
     /**

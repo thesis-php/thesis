@@ -23,7 +23,13 @@ use function Thesis\Async\group;
 function some(string $function, int $count, array $tasks): array
 {
     if ($count > \count($tasks)) {
-        throw new \ValueError(\sprintf('%s() needs at least %d %s, got %d.', $function, $count, $count === 1 ? 'task' : 'tasks', \count($tasks)));
+        throw new \ValueError(\sprintf(
+            '%s() needs at least %d %s, got %d.',
+            $function,
+            $count,
+            $count === 1 ? 'task' : 'tasks',
+            \count($tasks),
+        ));
     }
 
     // Once more than this many have failed, $count successes are no longer possible.
@@ -34,7 +40,16 @@ function some(string $function, int $count, array $tasks): array
 
     group(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
         foreach ($tasks as $key => $task) {
-            $group->spawn(static function () use ($key, $task, $group, $count, $tolerated, &$results, &$failure, &$failures) {
+            $group->spawn(static function () use (
+                $key,
+                $task,
+                $group,
+                $count,
+                $tolerated,
+                &$results,
+                &$failure,
+                &$failures,
+            ) {
                 try {
                     $value = $task();
                 } catch (Cancelled $cancelled) {

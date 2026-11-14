@@ -20,7 +20,9 @@ use Amp\CancelledException;
  */
 final class ScopeCancellation implements Cancellation
 {
-    /** @var array<int, \Closure(): void> keyed by appending: PHP never reuses such a key, even after unset() */
+    /**
+     * @var array<int, \Closure(): void> keyed by appending: PHP never reuses such a key, even after unset()
+     */
     private array $unsubscribes = [];
 
     public function __construct(
@@ -28,9 +30,11 @@ final class ScopeCancellation implements Cancellation
     ) {}
 
     /**
+     * Amp\Cancellation documents this signature, but its type is \Closure.
+     *
      * @param \Closure(CancelledException): void $callback
      */
-    #[\Override] // @phpstan-ignore method.childParameterType (Amp\Cancellation documents this signature, but its type is \Closure)
+    #[\Override] // @phpstan-ignore method.childParameterType
     public function subscribe(\Closure $callback): string
     {
         $this->unsubscribes[] = $this->scope->onCancel(static function () use ($callback) {

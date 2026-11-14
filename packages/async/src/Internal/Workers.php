@@ -24,17 +24,23 @@ use function Thesis\Async\synchronized;
  */
 final class Workers
 {
-    /** @var \Generator<K, T> */
+    /**
+     * @var \Generator<K, T>
+     */
     private readonly \Generator $items;
 
-    /** null for an array: taking an item of it never suspends, so no other worker can come in between */
+    /**
+     * null for an array: taking an item of it never suspends, so no other worker can come in between.
+     */
     private readonly ?LocalMutex $mutex;
 
     private bool $started = false;
 
     private int $workers = 0;
 
-    /** workers that are inside $fn */
+    /**
+     * workers that are inside $fn.
+     */
     private int $busy = 0;
 
     /**

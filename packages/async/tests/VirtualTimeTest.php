@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Composer\Autoload\ClassLoader;
 use Revolt\EventLoop;
 use Revolt\EventLoop\CallbackType;
 use Revolt\EventLoop\Driver\StreamSelectDriver;
@@ -147,11 +148,18 @@ final class VirtualTimeTest
     public function advanceThrowsOutsideRun(): void
     {
         // Every test runs inside run(): only another process is outside it.
+        // vendor/ is not next to the package in the monorepo, so Composer tells where it is.
+        $classLoader = new \ReflectionClass(ClassLoader::class)->getFileName();
+        \assert(\is_string($classLoader));
         $code = \sprintf(
             'require %s; try { Thesis\Async\VirtualTime\advance(1); } catch (LogicException $e) { echo $e::class; }',
-            var_export(__DIR__ . '/../vendor/autoload.php', true),
+            var_export(\dirname($classLoader, 2) . '/autoload.php', true),
         );
-        $process = proc_open([PHP_BINARY, '-r', $code], [1 => ['pipe', 'w']], $pipes);
+        $process = proc_open(
+            command: [PHP_BINARY, '-r', $code],
+            descriptor_spec: [1 => ['pipe', 'w']],
+            pipes: $pipes,
+        );
         \assert(\is_resource($process) && isset($pipes[1]));
         $output = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
@@ -192,7 +200,11 @@ final class VirtualTimeTest
     public function streamsAreReal(): void
     {
         /** @var array{resource, resource} $pair */
-        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        $pair = stream_socket_pair(
+            domain: STREAM_PF_UNIX,
+            type: STREAM_SOCK_STREAM,
+            protocol: STREAM_IPPROTO_IP,
+        );
         [$reader, $writer] = $pair;
         $start = now();
 
@@ -549,7 +561,11 @@ final class VirtualTimeTest
     public function callbackReturningValueIsRejectedAsByRevolt(): void
     {
         /** @var array{resource, resource} $pair */
-        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        $pair = stream_socket_pair(
+            domain: STREAM_PF_UNIX,
+            type: STREAM_SOCK_STREAM,
+            protocol: STREAM_IPPROTO_IP,
+        );
         $register = [
             static fn(\Closure $callback) => EventLoop::delay(0, $callback),
             EventLoop::defer(...),
@@ -577,7 +593,11 @@ final class VirtualTimeTest
             EventLoop::setErrorHandler($handler);
             EventLoop::delay(1, static function () {});
 
-            return [EventLoop::getDriver()->getHandle(), EventLoop::getErrorHandler(), EventLoop::getDriver()->__debugInfo()];
+            return [
+                EventLoop::getDriver()->getHandle(),
+                EventLoop::getErrorHandler(),
+                EventLoop::getDriver()->__debugInfo(),
+            ];
         }, $driver);
 
         Assert::same([$handle, $errorHandler], [$driver->getHandle(), $handler]);

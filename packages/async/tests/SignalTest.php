@@ -173,7 +173,9 @@ final class SignalTest
 
     public function trapSignalsGivesNothingToCancelledReceiver(): void
     {
-        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (Group $group) use ($trap) {
+        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (
+            Group $group,
+        ) use ($trap) {
             $cancelled = $group->spawn(static fn() => $trap->receive());
             $other = $group->spawn(static fn() => $trap->receive());
             $group->spawn(static function () use ($cancelled) {
@@ -208,7 +210,9 @@ final class SignalTest
 
     public function trapSignalsHandsSignalOverPastReceiverWhoseWaitIsOver(): void
     {
-        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (Group $group) use ($trap) {
+        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (
+            Group $group,
+        ) use ($trap) {
             $cancelled = $group->spawn(static fn() => $trap->receive());
             $other = $group->spawn(static fn() => $trap->receive());
             delay(1);

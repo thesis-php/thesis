@@ -1,7 +1,11 @@
 # thesis/async
 
-An experimental structured concurrency library on top of `revolt/event-loop`.
+An experimental structured concurrency library on top of `revolt/event-loop`. Layer: `runtime`.
 The model, the API and the guarantees are described in `README.md` — read it first.
+Design sketches of this and several alternative models live in `docs/ideas/async/` of the monorepo.
+
+This file is for agents changing this package. It is not loaded while an agent works in another package,
+so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
 
 ## Invariants that must not be broken
 
@@ -105,7 +109,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
 
 ## Conventions
 
-- Every test runs on virtual time (`VirtualTimePlugin` in `testo.php`, from `tests/Testo`; no attribute is needed): delays are whole seconds
+- Every test runs on virtual time (`VirtualTimePlugin` in `testo.plugins.php`, from `tests/Testo`; no attribute is needed): delays are whole seconds
   (`delay(1)`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted exactly
   (`Assert::same(now() - $start, 20.0)`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
   Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
