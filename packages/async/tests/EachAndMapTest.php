@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -18,7 +19,7 @@ final class EachAndMapTest
         $calls = [];
 
         each(['a' => 1, 'b' => 2, 'c' => 3], static function (int $item, string $key) use (&$calls) {
-            delay(0.001);
+            delay(1);
             $calls[] = $key . $item;
         }, 2);
 
@@ -38,7 +39,7 @@ final class EachAndMapTest
 
         each(range(1, 10), static function () use (&$running, &$peak) {
             $peak = max($peak, ++$running);
-            delay(0.001);
+            delay(1);
             --$running;
         }, $concurrency);
 
@@ -49,14 +50,14 @@ final class EachAndMapTest
     {
         $pages = (static function () {
             foreach ([1, 2, 3] as $page) {
-                delay(0.001); // fetch the next page
+                delay(1); // fetch the next page
                 yield $page;
             }
         })();
         $processed = [];
 
         each($pages, static function (int $page) use (&$processed) {
-            delay(0.002);
+            delay(2);
             $processed[] = $page;
         }, 2);
 
@@ -86,7 +87,7 @@ final class EachAndMapTest
                 try {
                     match ($item) {
                         1 => null,     // frees its slot for item 3 right away
-                        2 => delay(1), // occupies the other slot until the failure
+                        2 => never(), // occupies the other slot until the failure
                         default => throw new \RuntimeException("item {$item} failed"),
                     };
                 } catch (Cancelled $cancelled) {
@@ -132,8 +133,8 @@ final class EachAndMapTest
         // Both workers are busy until item 1 is done, so item 3 waits for that.
         each($items, static function (int $item) use (&$events) {
             match ($item) {
-                1 => delay(0.001),
-                2 => delay(0.002),
+                1 => delay(1),
+                2 => delay(2),
                 default => null,
             };
 
@@ -163,7 +164,7 @@ final class EachAndMapTest
 
         each(range(1, 10), static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
-            delay(0.001);
+            delay(1);
         }, 3);
 
         Assert::same($fibers->count(), 3);
@@ -175,7 +176,7 @@ final class EachAndMapTest
 
         each([1, 2], static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
-            delay(0.001);
+            delay(1);
         }, 100);
 
         Assert::same($fibers->count(), 2);
@@ -196,7 +197,7 @@ final class EachAndMapTest
     {
         $pages = (static function () {
             foreach (range(1, 6) as $page) {
-                delay(0.001);
+                delay(1);
 
                 yield $page;
             }
@@ -229,7 +230,7 @@ final class EachAndMapTest
         $exception = thrown(static function () use (&$pulled) {
             each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
                 match ($item) {
-                    1 => delay(0.001),
+                    1 => delay(1),
                     default => throw new \RuntimeException("item {$item} failed"),
                 };
             }, 3);
@@ -250,7 +251,7 @@ final class EachAndMapTest
                 }
 
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     // returns normally, as a sloppy $fn would
                 }
@@ -271,7 +272,7 @@ final class EachAndMapTest
             $peak = max($peak, ++$running);
 
             if ($item > 0) {
-                delay(0.001);
+                delay(1);
             }
 
             --$running;
@@ -284,7 +285,7 @@ final class EachAndMapTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => each([1, 2], static fn() => delay(1), 2));
+        timeout(1, static fn() => each([1, 2], never(...), 2));
     }
 
     public function mapReturnsResultsWithKeysInInputOrder(): void
@@ -318,6 +319,6 @@ final class EachAndMapTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => map([1, 2], static fn() => delay(1), 2));
+        timeout(1, static fn() => map([1, 2], never(...), 2));
     }
 }

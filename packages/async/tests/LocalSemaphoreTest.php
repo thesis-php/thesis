@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -29,7 +30,7 @@ final class LocalSemaphoreTest
                 $group->spawn(static function () use ($semaphore, &$holders, &$peak) {
                     synchronized($semaphore, static function () use (&$holders, &$peak) {
                         $peak = max($peak, ++$holders);
-                        delay(0.001);
+                        delay(1);
                         --$holders;
                     });
                 });
@@ -49,7 +50,7 @@ final class LocalSemaphoreTest
                 $group->spawn(static function () use ($mutex, $name, &$log) {
                     synchronized($mutex, static function () use ($name, &$log) {
                         $log[] = $name . ' in';
-                        delay(0.001);
+                        delay(1);
                         $log[] = $name . ' out';
                     });
                 });
@@ -63,9 +64,9 @@ final class LocalSemaphoreTest
     {
         $semaphore = new LocalSemaphore(1);
 
-        $lock = timeout(0.001, static function () use ($semaphore) {
+        $lock = timeout(1, static function () use ($semaphore) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -87,12 +88,12 @@ final class LocalSemaphoreTest
                 $group->spawn(static function () use ($semaphore, $i, &$order) {
                     synchronized($semaphore, static function () use ($i, &$order) {
                         $order[] = $i;
-                        delay(0.001);
+                        delay(1);
                     });
                 });
             }
 
-            delay(0.001);
+            delay(1);
             $lock->release();
         });
 
@@ -111,7 +112,7 @@ final class LocalSemaphoreTest
                     $order[] = 'waiter';
                 });
             });
-            delay(0.001);
+            delay(1);
 
             $lock->release(); // the waiter has not run yet
             synchronized($semaphore, static function () use (&$order) {
@@ -130,7 +131,7 @@ final class LocalSemaphoreTest
             $lock = $semaphore->acquire();
             $cancelled = $group->spawn(static fn() => synchronized($semaphore, static fn() => 'cancelled'));
             $next = $group->spawn(static fn() => synchronized($semaphore, static fn() => 'next'));
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
             $lock->release(); // the cancelled waiter is still in the queue: it has not run since
@@ -152,12 +153,12 @@ final class LocalSemaphoreTest
 
                 try {
                     $acquired = true;
-                    delay(1);
+                    never();
                 } finally {
                     $lock->release();
                 }
             });
-            delay(0.001);
+            delay(1);
 
             $lock->release();
             $waiter->cancel();
@@ -174,7 +175,7 @@ final class LocalSemaphoreTest
         $semaphore = new LocalSemaphore(1);
         $lock = $semaphore->acquire();
 
-        $exception = thrown(static fn() => timeout(0.001, $semaphore->acquire(...)));
+        $exception = thrown(static fn() => timeout(1, $semaphore->acquire(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
         Assert::same((fn(): array => $this->waiters)->call($semaphore), []);
@@ -191,7 +192,7 @@ final class LocalSemaphoreTest
         $result = group(static function (Group $group) use ($semaphore) {
             $lock = $semaphore->acquire();
             $group->spawn(static function () use ($lock) {
-                delay(0.001);
+                delay(1);
                 $lock->release();
             });
 

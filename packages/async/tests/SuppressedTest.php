@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use const Thesis\Async\Internal\SUPPRESSED;
 
@@ -49,15 +50,15 @@ final class SuppressedTest
         $exception = thrown(static function () use ($first, &$rollback) {
             group(static function (Group $group) use ($first, &$rollback) {
                 $group->spawn(static function () use ($first) {
-                    delay(0.001);
+                    delay(1);
 
                     throw $first;
                 });
                 $group->spawn(static function () use (&$rollback) {
                     try {
-                        delay(1);
+                        never();
                     } catch (\Throwable $exception) {
-                        shield(static fn() => delay(0.001));
+                        shield(static fn() => delay(1));
 
                         throw $rollback = new \LogicException('rollback failed', previous: $exception);
                     }
@@ -78,7 +79,7 @@ final class SuppressedTest
                 $group->spawn(static fn() => throw new \RuntimeException('task failed'));
 
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     throw $body = new \LogicException('body failed');
                 }
@@ -122,7 +123,7 @@ final class SuppressedTest
                 });
                 $group->spawn(static fn() => $failing->await()); // rethrows $second
 
-                delay(0.001);
+                delay(1);
                 $go->complete(null);
             });
         });
@@ -138,23 +139,23 @@ final class SuppressedTest
         $exception = thrown(static function () use (&$innerSecond) {
             group(static function (Group $group) use (&$innerSecond) {
                 $group->spawn(static function () {
-                    delay(0.001);
+                    delay(1);
 
                     throw new \RuntimeException('outer first');
                 });
                 $group->spawn(static function () use (&$innerSecond) {
                     group(static function (Group $group) use (&$innerSecond) {
-                        $group->spawn(static fn() => delay(1));
+                        $group->spawn(never(...));
                         $group->spawn(static function () {
                             try {
-                                delay(1);
+                                never();
                             } catch (Cancelled) {
                                 throw new \LogicException('inner first');
                             }
                         });
                         $group->spawn(static function () use (&$innerSecond) {
                             try {
-                                delay(1);
+                                never();
                             } catch (Cancelled) {
                                 throw $innerSecond = new \LogicException('inner second');
                             }
@@ -182,7 +183,7 @@ final class SuppressedTest
             group(static function (Group $group) use ($never, $failure) {
                 $group->spawn(static fn() => shield($never->await(...)));
                 $group->spawn(static function () use ($failure) {
-                    delay(0.001);
+                    delay(1);
 
                     throw $failure;
                 });
@@ -246,7 +247,7 @@ function failAtOnce(\Throwable ...$errors): void
             });
         }
 
-        delay(0.001);
+        delay(1);
         $go->complete(null);
     });
 }

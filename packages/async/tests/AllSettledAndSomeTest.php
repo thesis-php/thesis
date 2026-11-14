@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\elapsed;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -20,12 +21,12 @@ final class AllSettledAndSomeTest
 
         [$results, $errors] = allSettled([
             'slow' => static function () {
-                delay(0.003);
+                delay(3);
 
                 return 1;
             },
             'late failure' => static function () use ($second) {
-                delay(0.002);
+                delay(2);
 
                 throw $second;
             },
@@ -55,7 +56,7 @@ final class AllSettledAndSomeTest
                 throw new \RuntimeException('failed');
             },
             static function () use (&$events) {
-                delay(0.002);
+                delay(2);
                 $events[] = 'other finished';
             },
         ]);
@@ -89,17 +90,17 @@ final class AllSettledAndSomeTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => allSettled([static fn() => delay(1)]));
+        timeout(1, static fn() => allSettled([never(...)]));
     }
 
     public function allSettledThrowsCancelledEvenIfTaskTurnsItIntoFailure(): void
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => allSettled([
+        timeout(1, static fn() => allSettled([
             static function () {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     throw new \RuntimeException('connection reset');
                 }
@@ -110,8 +111,8 @@ final class AllSettledAndSomeTest
     public function allSettledWithTimeoutPerTaskKeepsWhatIsReady(): void
     {
         [$results, $errors] = allSettled([
-            'fast' => static fn() => timeout(0.05, static fn() => 'fast'),
-            'slow' => static fn() => timeout(0.001, static fn() => delay(1)),
+            'fast' => static fn() => timeout(50, static fn() => 'fast'),
+            'slow' => static fn() => timeout(1, never(...)),
         ]);
 
         Assert::same($results, ['fast' => 'fast']);
@@ -123,17 +124,17 @@ final class AllSettledAndSomeTest
     {
         $results = some(2, [
             'slow' => static function () {
-                delay(0.02);
+                delay(20);
 
                 return 'slow';
             },
             'medium' => static function () {
-                delay(0.003);
+                delay(3);
 
                 return 'medium';
             },
             'fast' => static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'fast';
             },
@@ -146,7 +147,7 @@ final class AllSettledAndSomeTest
     {
         $results = some(2, [
             'a' => static function () {
-                delay(0.002);
+                delay(2);
 
                 return 'a';
             },
@@ -162,15 +163,15 @@ final class AllSettledAndSomeTest
 
         some(1, [
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'winner';
             },
             static function () use (&$loserCleanedUp) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
-                    shield(static fn() => delay(0.003));
+                    shield(static fn() => delay(3));
                     $loserCleanedUp = true;
                 }
             },
@@ -199,12 +200,12 @@ final class AllSettledAndSomeTest
         $results = some(2, [
             'down' => static fn() => throw new \RuntimeException('down'),
             'a' => static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'a';
             },
             'b' => static function () {
-                delay(0.002);
+                delay(2);
 
                 return 'b';
             },
@@ -217,13 +218,13 @@ final class AllSettledAndSomeTest
     {
         $results = some(1, [
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'winner';
             },
             static function () {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     throw new \RuntimeException('connection reset');
                 }
@@ -240,7 +241,7 @@ final class AllSettledAndSomeTest
             static fn() => throw new \RuntimeException('b'),
             static function () {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                 }
 
@@ -257,25 +258,25 @@ final class AllSettledAndSomeTest
         $second = new \LogicException('second');
 
         $exception = null;
-        $ms = elapsed(static function () use ($first, $second, &$exception) {
+        $elapsed = elapsed(static function () use ($first, $second, &$exception) {
             $exception = thrown(static fn() => some(2, [
                 static function () use ($first) {
-                    delay(0.001);
+                    delay(1);
 
                     throw $first;
                 },
                 static function () use ($second) {
-                    delay(0.002);
+                    delay(2);
 
                     throw $second;
                 },
-                static fn() => delay(1),
+                never(...),
             ]));
         });
 
         Assert::same($exception, $first);
         Assert::same(suppressed($first), [$second]);
-        Assert::true($ms < 500);
+        Assert::same($elapsed, 2.0); // the third task is not waited for
     }
 
     public function someSuppressesFailuresOfTasksBeingCancelled(): void
@@ -285,13 +286,13 @@ final class AllSettledAndSomeTest
 
         $exception = thrown(static fn() => some(2, [
             static function () use ($first) {
-                delay(0.001);
+                delay(1);
 
                 throw $first;
             },
             static function () use ($reset) {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     throw $reset;
                 }
@@ -306,7 +307,7 @@ final class AllSettledAndSomeTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => some(1, [static fn() => delay(1), static fn() => delay(1)]));
+        timeout(1, static fn() => some(1, [never(...), never(...)]));
     }
 
     public function someOfMoreThanThereAreIsRejected(): void

@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -14,7 +15,7 @@ final class IsCancelledTest
     public function isFalseInHealthyScope(): void
     {
         Assert::false(isCancelled());
-        Assert::false(timeout(1, isCancelled(...)));
+        Assert::false(timeout(1_000, isCancelled(...)));
     }
 
     public function isTrueInCancelledScope(): void
@@ -22,11 +23,11 @@ final class IsCancelledTest
         $observed = [];
 
         thrown(static function () use (&$observed) {
-            timeout(0.001, static function () use (&$observed) {
+            timeout(1, static function () use (&$observed) {
                 $observed[] = isCancelled();
 
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     $observed[] = isCancelled();
                 }
@@ -41,11 +42,11 @@ final class IsCancelledTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(0.001, static function () use (&$observed) {
+            timeout(1, static function () use (&$observed) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
-                    $observed = timeout(1, isCancelled(...));
+                    $observed = timeout(1_000, isCancelled(...));
                 }
             });
         });
@@ -60,13 +61,13 @@ final class IsCancelledTest
         group(static function (Group $group) use (&$observed) {
             $task = $group->spawn(static function () use (&$observed) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     $observed = isCancelled();
                 }
             });
 
-            delay(0.001);
+            delay(1);
             $task->cancel();
         });
 
@@ -78,9 +79,9 @@ final class IsCancelledTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(0.001, static function () use (&$observed) {
+            timeout(1, static function () use (&$observed) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     $observed = shield(isCancelled(...));
                 }

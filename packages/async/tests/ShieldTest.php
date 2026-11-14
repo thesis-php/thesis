@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -21,12 +22,12 @@ final class ShieldTest
         $cleanedUp = false;
 
         $exception = thrown(static function () use (&$cleanedUp) {
-            timeout(0.001, static function () use (&$cleanedUp) {
+            timeout(1, static function () use (&$cleanedUp) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
-                        delay(0.005);
+                        delay(5);
                         $cleanedUp = true;
                     });
                 }
@@ -42,14 +43,14 @@ final class ShieldTest
         $cleanedUp = false;
 
         thrown(static function () use (&$cleanedUp) {
-            timeout(0.001, static function () use (&$cleanedUp) {
+            timeout(1, static function () use (&$cleanedUp) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
                         group(static function (Group $group) use (&$cleanedUp) {
                             $group->spawn(static function () use (&$cleanedUp) {
-                                delay(0.005);
+                                delay(5);
                                 $cleanedUp = true;
                             });
                         });
@@ -68,16 +69,16 @@ final class ShieldTest
         $exception = thrown(static function () use (&$cleanedUp) {
             group(static function (Group $group) use (&$cleanedUp) {
                 $group->spawn(static function () {
-                    delay(0.001);
+                    delay(1);
 
                     throw new \RuntimeException('task failed');
                 });
 
                 try {
-                    delay(1);
+                    never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
-                        delay(0.005);
+                        delay(5);
                         $cleanedUp = true;
                     });
                 }
@@ -91,14 +92,14 @@ final class ShieldTest
     public function outerCancellationIsVisibleAgainAfterShield(): void
     {
         $exception = thrown(static function () {
-            timeout(0.001, static function () {
+            timeout(1, static function () {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                 }
 
-                shield(static fn() => delay(0.001));
-                delay(1);
+                shield(static fn() => delay(1));
+                never();
             });
         });
 
@@ -108,7 +109,7 @@ final class ShieldTest
     public function deadlineInsideShieldStillWorks(): void
     {
         $exception = thrown(static function () {
-            shield(static fn() => timeout(0.001, static fn() => delay(1)));
+            shield(static fn() => timeout(1, never(...)));
         });
 
         Assert::instanceOf($exception, TimedOut::class);
@@ -119,11 +120,11 @@ final class ShieldTest
         $inner = null;
 
         thrown(static function () use (&$inner) {
-            timeout(0.001, static function () use (&$inner) {
+            timeout(1, static function () use (&$inner) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
-                    $inner = thrown(static fn() => shield(static fn() => timeout(0.001, static fn() => delay(1))));
+                    $inner = thrown(static fn() => shield(static fn() => timeout(1, never(...))));
                 }
             });
         });

@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -54,7 +55,7 @@ final class SignalTest
         Expect::exception(TimedOut::class);
 
         try {
-            timeout(0.001, static fn() => awaitSignal(SIGUSR1));
+            timeout(1, static fn() => awaitSignal(SIGUSR1));
         } finally {
             assertNoCallbacksLeft();
         }
@@ -85,7 +86,7 @@ final class SignalTest
         group(static function (Group $group) use (&$events) {
             $group->daemon(static function () use (&$events) {
                 try {
-                    delay(10); // a server that never stops by itself
+                    never(); // a server that never stops by itself
                 } finally {
                     $events[] = 'server stopped';
                 }
@@ -120,9 +121,9 @@ final class SignalTest
         $received = trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
             self::kill(SIGUSR1); // nobody receives yet: pending
             self::kill(SIGUSR1); // merged with the pending one, and the process survives
-            delay(0.001); // the handler runs at the next tick
+            delay(1); // the handler runs at the next tick
             $received = $trap->receive();
-            $nothingMore = thrown(static fn() => timeout(0.005, $trap->receive(...)));
+            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
 
             return $received;
         });
@@ -154,7 +155,7 @@ final class SignalTest
             $group->daemon(static function () use (&$reloads) {
                 trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$reloads) {
                     foreach ($trap as $_) {
-                        delay(0.005); // the next signal comes during this reload
+                        delay(5); // the next signal comes during this reload
                         ++$reloads;
                     }
                 });
@@ -162,7 +163,7 @@ final class SignalTest
 
             self::kill(SIGUSR1);
             self::kill(SIGUSR1);
-            delay(0.02);
+            delay(20);
         });
 
         Assert::same($reloads, 2);
@@ -175,7 +176,7 @@ final class SignalTest
             $cancelled = $group->spawn(static fn() => $trap->receive());
             $other = $group->spawn(static fn() => $trap->receive());
             $group->spawn(static function () use ($cancelled) {
-                delay(0.001);
+                delay(1);
                 $cancelled->cancel();
                 posix_kill(posix_getpid(), SIGUSR1);
             });
@@ -209,7 +210,7 @@ final class SignalTest
 
                     $events[] = 'trap released';
                 });
-                delay(0.001); // the receiver waits
+                delay(1); // the receiver waits
             });
         });
 
@@ -227,7 +228,7 @@ final class SignalTest
                 $trap->receive();
             });
 
-            $nothingMore = thrown(static fn() => timeout(0.005, $trap->receive(...)));
+            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
         });
 
         Assert::instanceOf($nothingMore, TimedOut::class);
@@ -237,7 +238,7 @@ final class SignalTest
     {
         trapSignals([SIGUSR1], static function (SignalTrap $trap) {
             try {
-                timeout(0.001, $trap->receive(...));
+                timeout(1, $trap->receive(...));
             } catch (TimedOut) {
             }
 
@@ -266,7 +267,7 @@ final class SignalTest
      */
     private static function kill(int $signal): void
     {
-        delay(0.001);
+        delay(1);
         posix_kill(posix_getpid(), $signal);
     }
 }

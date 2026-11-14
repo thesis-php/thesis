@@ -9,13 +9,14 @@ use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\never;
 
 #[Test]
 final class LocalRateLimiterTest
 {
     public function burstStartsAtOnceThenOneEveryInterval(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 100, burst: 3);
+        $limiter = new LocalRateLimiter(perSecond: 1, burst: 3);
         $start = now();
 
         $limiter->wait();
@@ -27,16 +28,13 @@ final class LocalRateLimiterTest
         $limiter->wait();
         $fifth = now() - $start;
 
-        // From the start, not from the previous call: a late wake-up leaves the rest of its token to the next one.
-        Assert::float($burst)->lessThan(0.005);
-        Assert::float($fourth)->greaterThan(0.009)->lessThan(0.03);
-        Assert::float($fifth)->greaterThan(0.019)->lessThan(0.04);
+        Assert::same([$burst, $fourth, $fifth], [0.0, 1.0, 2.0]);
         assertNoCallbacksLeft();
     }
 
     public function waitersGetTokensInOrderOfArrival(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 1_000, burst: 1);
+        $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
         $limiter->wait();
         $log = [];
 
@@ -56,9 +54,9 @@ final class LocalRateLimiterTest
     {
         $limiter = new LocalRateLimiter(perSecond: 1, burst: 1);
 
-        $thrown = timeout(0.001, static function () use ($limiter) {
+        $thrown = timeout(1, static function () use ($limiter) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -76,21 +74,21 @@ final class LocalRateLimiterTest
 
     public function cancelledSleeperTakesNoToken(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 50, burst: 1);
+        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
         $start = now();
 
-        $result = timeoutOr(0.003, $limiter->wait(...), 'timed out');
+        $result = timeoutOr(1, $limiter->wait(...), 'timed out');
         $limiter->wait();
 
         Assert::same($result, 'timed out');
-        Assert::float(now() - $start)->greaterThan(0.019)->lessThan(0.035); // 0.04 if the cancelled wait counted
+        Assert::same(now() - $start, 2.0); // 4.0 if the cancelled wait counted
         assertNoCallbacksLeft();
     }
 
     public function cancelledQueuedWaiterTakesNoToken(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 50, burst: 1);
+        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
         $start = now();
 
@@ -106,23 +104,22 @@ final class LocalRateLimiterTest
 
                 return now() - $start;
             });
-            delay(0.001);
+            delay(1);
 
             $queued->cancel();
 
             return [$sleeper->await(), $last->await()];
         });
 
-        Assert::float($at[0])->greaterThan(0.019);
-        Assert::float($at[1])->greaterThan(0.039)->lessThan(0.055); // 0.06 if the cancelled wait counted
+        Assert::same($at, [2.0, 4.0]); // 6.0 last if the cancelled wait counted
     }
 
     public function idleRefillIsCappedAtBurst(): void
     {
-        $limiter = new LocalRateLimiter(perSecond: 50, burst: 2);
+        $limiter = new LocalRateLimiter(perSecond: 0.5, burst: 2);
         $limiter->wait();
         $limiter->wait();
-        delay(0.1);
+        delay(10);
         $start = now();
 
         $limiter->wait();
@@ -131,8 +128,7 @@ final class LocalRateLimiterTest
         $limiter->wait();
         $third = now() - $start;
 
-        Assert::float($afterBurst)->lessThan(0.01);
-        Assert::float($third)->greaterThan(0.019);
+        Assert::same([$afterBurst, $third], [0.0, 2.0]);
     }
 
     #[DataSet([0.0])]

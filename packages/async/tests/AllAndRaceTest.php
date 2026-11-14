@@ -7,6 +7,7 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -16,13 +17,13 @@ final class AllAndRaceTest
     {
         $results = all([
             'slow' => static function () {
-                delay(0.003);
+                delay(3);
 
                 return 1;
             },
             7 => static fn() => 2,
             'medium' => static function () {
-                delay(0.001);
+                delay(1);
 
                 return 3;
             },
@@ -46,12 +47,12 @@ final class AllAndRaceTest
         all([
             static function () use (&$events) {
                 $events[] = 'a started';
-                delay(0.02);
+                delay(20);
                 $events[] = 'a finished';
             },
             static function () use (&$events) {
                 $events[] = 'b started';
-                delay(0.001);
+                delay(1);
                 $events[] = 'b finished';
             },
         ]);
@@ -67,7 +68,7 @@ final class AllAndRaceTest
             all([
                 static function () use (&$events) {
                     try {
-                        delay(1);
+                        never();
                     } catch (Cancelled $cancelled) {
                         $events[] = 'other cancelled';
 
@@ -75,7 +76,7 @@ final class AllAndRaceTest
                     }
                 },
                 static function () {
-                    delay(0.001);
+                    delay(1);
 
                     throw new \RuntimeException('failed');
                 },
@@ -90,12 +91,12 @@ final class AllAndRaceTest
     {
         $winner = race([
             static function () {
-                delay(0.02);
+                delay(20);
 
                 return 'slow';
             },
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'fast';
             },
@@ -129,15 +130,15 @@ final class AllAndRaceTest
 
         race([
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'winner';
             },
             static function () use (&$loserCleanedUp) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
-                    shield(static fn() => delay(0.003));
+                    shield(static fn() => delay(3));
                     $loserCleanedUp = true;
                 }
             },
@@ -167,7 +168,7 @@ final class AllAndRaceTest
                 throw new \RuntimeException('primary is down');
             },
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'replica';
             },
@@ -180,13 +181,13 @@ final class AllAndRaceTest
     {
         $winner = race([
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'winner';
             },
             static function () {
                 try {
-                    delay(1);
+                    never();
                 } catch (Cancelled) {
                     throw new \RuntimeException('connection reset');
                 }
@@ -200,12 +201,12 @@ final class AllAndRaceTest
     {
         $winner = race([
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'first';
             },
             static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'second';
             },
@@ -220,12 +221,12 @@ final class AllAndRaceTest
 
         race([
             static function () {
-                delay(0.001);
+                delay(1);
 
                 throw new \RuntimeException('first');
             },
             static function () {
-                delay(0.02);
+                delay(20);
 
                 throw new \LogicException('second');
             },
@@ -240,7 +241,7 @@ final class AllAndRaceTest
         $exception = thrown(static fn() => race([
             static fn() => throw $first,
             static function () use ($second) {
-                delay(0.001);
+                delay(1);
 
                 throw $second;
             },
@@ -254,7 +255,7 @@ final class AllAndRaceTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static fn() => race([static fn() => delay(1), static fn() => delay(1)]));
+        timeout(1, static fn() => race([never(...), never(...)]));
     }
 
     public function raceAcceptsAnyKeys(): void

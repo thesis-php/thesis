@@ -9,6 +9,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -53,9 +54,9 @@ final class ChannelTest
         /** @var Channel<string> */
         $channel = new Channel(1);
 
-        timeout(0.001, static function () use ($channel) {
+        timeout(1, static function () use ($channel) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -71,9 +72,9 @@ final class ChannelTest
         $channel = new Channel(1);
         $channel->send('value');
 
-        $value = timeout(0.001, static function () use ($channel) {
+        $value = timeout(1, static function () use ($channel) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -96,11 +97,11 @@ final class ChannelTest
                 $channel->send('b');
                 $log[] = 'sent b';
             });
-            delay(0.001);
+            delay(1);
 
             $log[] = 'receiving';
             $log[] = $channel->receive();
-            delay(0.001);
+            delay(1);
             $log[] = $channel->receive();
         });
 
@@ -111,7 +112,7 @@ final class ChannelTest
     {
         /** @var Channel<string> */
         $channel = new Channel(1);
-        EventLoop::delay(0.001, static function () use ($channel) {
+        EventLoop::delay(1, static function () use ($channel) {
             $channel->trySend('value');
         });
 
@@ -129,7 +130,7 @@ final class ChannelTest
                 $channel->send('value');
                 $log[] = 'sent';
             });
-            delay(0.001);
+            delay(1);
 
             $log[] = 'receiving';
             $log[] = $channel->receive();
@@ -146,7 +147,7 @@ final class ChannelTest
 
         $value = group(static function (Group $group) use ($channel) {
             $receiver = $group->spawn($channel->receive(...));
-            delay(0.001);
+            delay(1);
 
             $channel->send('value');
 
@@ -182,7 +183,7 @@ final class ChannelTest
 
         $value = group(static function (Group $group) use ($channel) {
             $receiver = $group->spawn($channel->receive(...));
-            delay(0.001);
+            delay(1);
 
             Assert::true($channel->trySend('value'));
 
@@ -228,9 +229,9 @@ final class ChannelTest
         /** @var Channel<string> */
         $channel = new Channel(1);
 
-        $value = timeout(0.001, static function () use ($channel) {
+        $value = timeout(1, static function () use ($channel) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -247,7 +248,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel) {
             $sender = $group->spawn(static fn() => $channel->send('value'));
-            delay(0.001);
+            delay(1);
 
             Assert::same($channel->tryReceive(), 'value');
             $sender->await();
@@ -263,7 +264,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel) {
             $cancelled = $group->spawn(static fn() => $channel->send('cancelled'));
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
 
@@ -281,7 +282,7 @@ final class ChannelTest
         group(static function (Group $group) use ($channel) {
             $channel->send('first');
             $sender = $group->spawn(static fn() => $channel->send('second'));
-            delay(0.001);
+            delay(1);
 
             Assert::same($channel->tryReceive(), 'first');
             $sender->await();
@@ -312,7 +313,7 @@ final class ChannelTest
                     $log[] = $name . $channel->receive();
                 });
             }
-            delay(0.001);
+            delay(1);
 
             for ($i = 1; $i <= 3; ++$i) {
                 $channel->send($i);
@@ -335,7 +336,7 @@ final class ChannelTest
                     $channel->send($name);
                 });
             }
-            delay(0.001);
+            delay(1);
 
             return [$channel->receive(), $channel->receive(), $channel->receive(), $channel->receive()];
         });
@@ -358,12 +359,12 @@ final class ChannelTest
                     $log[] = 'sent ' . $name;
                 });
             }
-            delay(0.001);
+            delay(1);
 
             $log[] = $channel->receive();
-            delay(0.001);
+            delay(1);
             $log[] = $channel->receive();
-            delay(0.001);
+            delay(1);
             $log[] = $channel->receive();
         });
 
@@ -378,7 +379,7 @@ final class ChannelTest
         group(static function (Group $group) use ($channel) {
             $cancelled = $group->spawn($channel->receive(...));
             $next = $group->spawn($channel->receive(...));
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
             $channel->send('value'); // the cancelled receiver is still in the queue: it has not run since
@@ -395,7 +396,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel) {
             $cancelled = $group->spawn($channel->receive(...));
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
             $channel->send('value');
@@ -413,7 +414,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel) {
             $cancelled = $group->spawn($channel->receive(...));
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
 
@@ -432,9 +433,9 @@ final class ChannelTest
         group(static function (Group $group) use ($channel, &$received) {
             $receiver = $group->spawn(static function () use ($channel, &$received) {
                 $received = $channel->receive();
-                delay(1);
+                never();
             });
-            delay(0.001);
+            delay(1);
 
             $channel->send('value');
             $receiver->cancel();
@@ -451,11 +452,11 @@ final class ChannelTest
         $channel = new Channel(0);
 
         // Both callbacks run in the same tick, the send first: the value wins over the deadline.
-        EventLoop::delay(0.001, static function () use ($channel) {
+        EventLoop::delay(1, static function () use ($channel) {
             Assert::true($channel->trySend('value'));
         });
 
-        $value = timeout(0.001, $channel->receive(...));
+        $value = timeout(1, $channel->receive(...));
 
         Assert::same($value, 'value');
     }
@@ -466,7 +467,7 @@ final class ChannelTest
         $channel = new Channel(1);
         $channel->send('first');
 
-        $exception = thrown(static fn() => timeout(0.001, static function () use ($channel) {
+        $exception = thrown(static fn() => timeout(1, static function () use ($channel) {
             $channel->send('second');
         }));
 
@@ -489,7 +490,7 @@ final class ChannelTest
             $group->spawn(static function () use ($channel) {
                 $channel->send('next');
             });
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel(); // the cancelled sender is still in the queue: it has not run since
 
@@ -513,7 +514,7 @@ final class ChannelTest
             $group->spawn(static function () use ($channel) {
                 $channel->send('next');
             });
-            delay(0.001);
+            delay(1);
 
             $cancelled->cancel();
 
@@ -530,7 +531,7 @@ final class ChannelTest
         /** @var Channel<string> */
         $channel = new Channel(1);
 
-        $exception = thrown(static fn() => timeout(0.001, $channel->receive(...)));
+        $exception = thrown(static fn() => timeout(1, $channel->receive(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
         $this->assertHoldsNothing($channel);
@@ -561,7 +562,7 @@ final class ChannelTest
                 $group->spawn(static fn() => thrown($channel->receive(...))),
                 $group->spawn(static fn() => thrown($channel->receive(...))),
             ];
-            delay(0.001);
+            delay(1);
 
             $channel->close();
 
@@ -580,7 +581,7 @@ final class ChannelTest
 
         $received = group(static function (Group $group) use ($channel) {
             $receiver = $group->spawn(static fn() => iterator_to_array($channel));
-            delay(0.001);
+            delay(1);
 
             $channel->send('value');
             $channel->close();
@@ -602,7 +603,7 @@ final class ChannelTest
                 $group->spawn(static fn() => thrown(static fn() => $channel->send('a'))),
                 $group->spawn(static fn() => thrown(static fn() => $channel->send('b'))),
             ];
-            delay(0.001);
+            delay(1);
 
             $channel->close();
 
@@ -680,7 +681,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel, $reason) {
             $receiver = $group->spawn(static fn() => thrown($channel->receive(...)));
-            delay(0.001);
+            delay(1);
 
             $channel->close($reason);
 
@@ -716,7 +717,7 @@ final class ChannelTest
 
         group(static function (Group $group) use ($channel, $reason) {
             $sender = $group->spawn(static fn() => thrown(static fn() => $channel->send('waiting')));
-            delay(0.001);
+            delay(1);
 
             $channel->close($reason);
 
@@ -796,11 +797,11 @@ final class ChannelTest
                 $references[] = \WeakReference::create($value);
 
                 try {
-                    timeout(0.001, static fn() => $channel->send($value));
+                    timeout(1, static fn() => $channel->send($value));
                 } catch (TimedOut) {
                 }
             });
-            delay(0.002);
+            delay(2);
 
             $receiver->cancel();
         });

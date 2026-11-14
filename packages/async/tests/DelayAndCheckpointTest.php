@@ -8,26 +8,23 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
-use function Thesis\Async\Tests\busy;
 use function Thesis\Async\Tests\elapsed;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
 final class DelayAndCheckpointTest
 {
-    public function delayWaitsAtLeastGivenTime(): void
+    public function delayWaitsGivenTime(): void
     {
-        $elapsed = elapsed(static fn() => delay(0.02));
-
-        Assert::numeric($elapsed)->greaterThanOrEqual(19);
+        Assert::same(elapsed(static fn() => delay(20)), 20.0);
         assertNoCallbacksLeft();
     }
 
     public function delayIsCancellable(): void
     {
-        $elapsed = elapsed(static fn() => timeout(0.001, static fn() => delay(10)));
-
-        Assert::numeric($elapsed)->lessThan(1_000);
+        Assert::same(elapsed(static fn() => timeout(1, static fn() => delay(10_000))), 1.0);
         assertNoCallbacksLeft();
     }
 
@@ -37,11 +34,11 @@ final class DelayAndCheckpointTest
 
         group(static function (Group $group) use (&$events) {
             $group->spawn(static function () use (&$events) {
-                delay(0.02);
+                delay(20);
                 $events[] = 'slow';
             });
             $group->spawn(static function () use (&$events) {
-                delay(0.001);
+                delay(1);
                 $events[] = 'fast';
             });
         });
@@ -60,9 +57,9 @@ final class DelayAndCheckpointTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static function () {
+        timeout(1, static function () {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -91,17 +88,18 @@ final class DelayAndCheckpointTest
         $iterations = 0;
 
         $exception = thrown(static function () use (&$iterations) {
-            timeout(0.005, static function () use (&$iterations) {
+            timeout(5, static function () use (&$iterations) {
                 while ($iterations < 1_000) {
                     ++$iterations;
-                    busy(0.001);
+                    advance(1);
                     checkpoint();
                 }
             });
         });
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::int($iterations)->lessThan(100);
+        // The deadline passes in the fifth iteration, but its checkpoint is resumed before the timer fires.
+        Assert::same($iterations, 6);
         assertNoCallbacksLeft();
     }
 }

@@ -30,7 +30,7 @@ final class LocalKeyedSemaphoreTest
                 $group->spawn(static function () use ($semaphore, $key, &$holders, &$peak) {
                     synchronizedKey($semaphore, $key, static function () use ($key, &$holders, &$peak) {
                         $peak[$key] = max($peak[$key], ++$holders[$key]);
-                        delay(0.001);
+                        delay(1);
                         --$holders[$key];
                     });
                 });
@@ -46,7 +46,7 @@ final class LocalKeyedSemaphoreTest
         $mutex = new LocalKeyedMutex();
         $lock = $mutex->acquire('a');
 
-        $result = timeout(0.01, static fn() => synchronizedKey($mutex, 'b', static fn() => 'b while a is held'));
+        $result = timeout(10, static fn() => synchronizedKey($mutex, 'b', static fn() => 'b while a is held'));
 
         Assert::same($result, 'b while a is held');
         $lock->release();
@@ -57,7 +57,7 @@ final class LocalKeyedSemaphoreTest
         $mutex = new LocalKeyedMutex();
         $lock = $mutex->acquire('a');
 
-        $exception = thrown(static fn() => timeout(0.001, static fn() => $mutex->acquire('a')));
+        $exception = thrown(static fn() => timeout(1, static fn() => $mutex->acquire('a')));
 
         Assert::instanceOf($exception, TimedOut::class);
         $lock->release();
@@ -75,12 +75,12 @@ final class LocalKeyedSemaphoreTest
                 $group->spawn(static function () use ($semaphore, $i, &$order) {
                     synchronizedKey($semaphore, 'a', static function () use ($i, &$order) {
                         $order[] = $i;
-                        delay(0.001);
+                        delay(1);
                     });
                 });
             }
 
-            delay(0.001);
+            delay(1);
             $lock->release();
         });
 
@@ -94,7 +94,7 @@ final class LocalKeyedSemaphoreTest
         group(static function (Group $group) use ($semaphore) {
             $lock = $semaphore->acquire('a');
             $waiter = $group->spawn(static fn() => $semaphore->acquire('a'));
-            delay(0.001);
+            delay(1);
 
             $lock->release(); // handed over: the key is still in use
             Assert::same(self::users($semaphore), ['a' => 1]);
@@ -110,7 +110,7 @@ final class LocalKeyedSemaphoreTest
         $semaphore = new LocalKeyedSemaphore(1);
         $lock = $semaphore->acquire('a');
 
-        $exception = thrown(static fn() => timeout(0.001, static fn() => $semaphore->acquire('a')));
+        $exception = thrown(static fn() => timeout(1, static fn() => $semaphore->acquire('a')));
 
         Assert::instanceOf($exception, TimedOut::class);
         Assert::same(self::users($semaphore), ['a' => 1]);
@@ -133,11 +133,11 @@ final class LocalKeyedSemaphoreTest
         $mutex = new LocalKeyedMutex();
         $lock = $mutex->acquire('1');
 
-        $exception = thrown(static fn() => timeout(0.001, static fn() => $mutex->acquire('1')));
+        $exception = thrown(static fn() => timeout(1, static fn() => $mutex->acquire('1')));
 
         Assert::instanceOf($exception, TimedOut::class);
         $lock->release();
-        timeout(0.001, static fn() => $mutex->acquire('1'))->release();
+        timeout(1, static fn() => $mutex->acquire('1'))->release();
     }
 
     public function synchronizedKeyIsReentrantPerKey(): void
@@ -145,7 +145,7 @@ final class LocalKeyedSemaphoreTest
         $mutex = new LocalKeyedMutex();
         $nested = false;
 
-        timeout(0.01, static function () use ($mutex, &$nested) {
+        timeout(10, static function () use ($mutex, &$nested) {
             synchronizedKey($mutex, 'a', static function () use ($mutex, &$nested) {
                 synchronizedKey($mutex, 'a', static function () use ($mutex, &$nested) {
                     synchronizedKey($mutex, 'b', static function () use (&$nested) {
@@ -166,7 +166,7 @@ final class LocalKeyedSemaphoreTest
         $exception = thrown(static fn() => synchronizedKey($mutex, 'a', static fn() => throw $failure));
 
         Assert::same($exception, $failure);
-        timeout(0.001, static fn() => $mutex->acquire('a'))->release();
+        timeout(1, static fn() => $mutex->acquire('a'))->release();
     }
 
     public function synchronizedKeyInTaskIsNotReentrant(): void
@@ -181,7 +181,7 @@ final class LocalKeyedSemaphoreTest
                         $log[] = 'task';
                     });
                 });
-                delay(0.001);
+                delay(1);
                 $log[] = 'body';
             });
         });

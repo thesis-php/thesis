@@ -6,8 +6,9 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
-use function Thesis\Async\Tests\busy;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
 final class RemainingTest
@@ -20,68 +21,65 @@ final class RemainingTest
 
     public function isTimeLeftUnderTimeout(): void
     {
-        $remaining = timeout(1, static function () {
-            delay(0.01);
+        $remaining = timeout(1_000, static function () {
+            delay(10);
 
             return remaining();
         });
 
-        Assert::float($remaining)->greaterThan(0.5)->lessThan(0.991);
+        Assert::same($remaining, 990.0);
     }
 
     public function decreasesWhileTimeGoesBy(): void
     {
-        [$before, $after] = timeout(1, static function () {
+        [$before, $after] = timeout(1_000, static function () {
             $before = remaining();
-            busy(0.002);
+            advance(2);
 
             return [$before, remaining()];
         });
 
-        Assert::float($before)->lessThan(1.0);
-        Assert::float($after)->lessThan((float) $before - 0.001);
+        Assert::same([$before, $after], [1_000.0, 998.0]);
     }
 
     public function nestedTimeoutWithLaterDeadlineShowsParentOne(): void
     {
-        $remaining = timeout(0.5, static fn() => timeout(10, remaining(...)));
+        $remaining = timeout(500, static fn() => timeout(10_000, remaining(...)));
 
-        Assert::float($remaining)->greaterThan(0.4)->lessThan(0.501);
+        Assert::same($remaining, 500.0);
     }
 
     public function nestedTimeoutWithEarlierDeadlineShowsItsOwn(): void
     {
-        [$inner, $outer] = timeout(10, static fn() => [timeout(0.5, remaining(...)), remaining()]);
+        [$inner, $outer] = timeout(10_000, static fn() => [timeout(500, remaining(...)), remaining()]);
 
-        Assert::float($inner)->greaterThan(0.4)->lessThan(0.501);
-        Assert::float($outer)->greaterThan(9.9);
+        Assert::same([$inner, $outer], [500.0, 10_000.0]);
     }
 
     public function isNullInsideShield(): void
     {
-        $remaining = timeout(1, static fn() => shield(remaining(...)));
+        $remaining = timeout(1_000, static fn() => shield(remaining(...)));
 
         Assert::null($remaining);
     }
 
     public function timeoutInsideShieldShowsOnlyItsOwn(): void
     {
-        $remaining = timeout(0.5, static fn() => shield(static fn() => timeout(10, remaining(...))));
+        $remaining = timeout(500, static fn() => shield(static fn() => timeout(10_000, remaining(...))));
 
-        Assert::float($remaining)->greaterThan(9.9);
+        Assert::same($remaining, 10_000.0);
     }
 
     public function taskSeesDeadlineOfItsGroup(): void
     {
-        [$task, $daemon] = timeout(0.5, static fn() => group(static function (Group $group) {
+        [$task, $daemon] = timeout(500, static fn() => group(static function (Group $group) {
             $daemon = $group->daemon(remaining(...));
             $task = $group->spawn(remaining(...));
 
             return [$task->await(), $daemon->await()];
         }));
 
-        Assert::float($task)->greaterThan(0.4)->lessThan(0.501);
-        Assert::float($daemon)->greaterThan(0.4)->lessThan(0.501);
+        Assert::same([$task, $daemon], [500.0, 500.0]);
     }
 
     public function isZeroOnceDeadlinePassedBeforeTimerFired(): void
@@ -89,10 +87,10 @@ final class RemainingTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(0.001, static function () use (&$observed) {
-                busy(0.002);
+            timeout(1, static function () use (&$observed) {
+                advance(2);
                 $observed = [remaining(), isCancelled()];
-                delay(1);
+                never();
             });
         });
 
@@ -101,7 +99,7 @@ final class RemainingTest
 
     public function isGoneAfterTimeoutReturns(): void
     {
-        timeout(1, static fn() => null);
+        timeout(1_000, static fn() => null);
 
         Assert::null(remaining());
     }

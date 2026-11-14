@@ -148,7 +148,7 @@ final class ScopedValueTest
 
         $observed = $value->with('request', static fn() => group(static function (Group $group) use ($value) {
             $task = $group->spawn(static function () use ($value): ?string {
-                delay(0.001);
+                delay(1);
 
                 return $value->get();
             });
@@ -197,16 +197,16 @@ final class ScopedValueTest
 
         $observed = $value->with('parent', static fn() => group(static function (Group $group) use ($value) {
             $first = $group->spawn(static fn(): ?string => $value->with('first', static function () use ($value): ?string {
-                delay(0.002);
+                delay(2);
 
                 return $value->get();
             }));
             $second = $group->spawn(static function () use ($value): ?string {
-                delay(0.001);
+                delay(1);
 
                 return $value->get();
             });
-            delay(0.001);
+            delay(1);
             $inBody = $value->get();
 
             return [$first->await(), $second->await(), $inBody, $value->get()];
@@ -234,7 +234,7 @@ final class ScopedValueTest
         /** @var ScopedValue<?string> */
         $value = new ScopedValue();
 
-        $observed = $value->with('bound', static fn() => timeout(1, static fn() => shield($value->get(...))));
+        $observed = $value->with('bound', static fn() => timeout(1_000, static fn() => shield($value->get(...))));
 
         Assert::same($observed, 'bound');
     }

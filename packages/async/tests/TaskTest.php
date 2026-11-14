@@ -7,8 +7,9 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
-use function Thesis\Async\Tests\busy;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
 final class TaskTest
@@ -17,7 +18,7 @@ final class TaskTest
     {
         $result = group(static function (Group $group) {
             $task = $group->spawn(static function () {
-                delay(0.001);
+                delay(1);
 
                 return 'result';
             });
@@ -32,7 +33,7 @@ final class TaskTest
     {
         $result = group(static function (Group $group) {
             $task = $group->spawn(static fn() => 'result');
-            delay(0.001);
+            delay(1);
             Assert::true($task->isDone);
 
             return [$task->await(), $task->await()];
@@ -44,7 +45,7 @@ final class TaskTest
     public function isDoneOnlyAfterTaskFinished(): void
     {
         group(static function (Group $group) {
-            $task = $group->spawn(static fn() => delay(0.001));
+            $task = $group->spawn(static fn() => delay(1));
             Assert::false($task->isDone);
 
             $task->await();
@@ -61,7 +62,7 @@ final class TaskTest
         $exception = thrown(static function () use ($failure, &$awaited) {
             group(static function (Group $group) use ($failure, &$awaited) {
                 $task = $group->spawn(static function () use ($failure) {
-                    delay(0.001);
+                    delay(1);
 
                     throw $failure;
                 });
@@ -77,8 +78,8 @@ final class TaskTest
     public function awaitOfCancelledTaskThrowsTaskCancelled(): void
     {
         $exception = group(static function (Group $group) {
-            $task = $group->spawn(static fn() => delay(1));
-            delay(0.001);
+            $task = $group->spawn(never(...));
+            delay(1);
             $task->cancel();
 
             return thrown(static fn() => $task->await());
@@ -92,9 +93,9 @@ final class TaskTest
     public function awaitOfTaskCancelledWhileAwaitedThrowsTaskCancelled(): void
     {
         $exception = group(static function (Group $group) {
-            $task = $group->spawn(static fn() => delay(1));
+            $task = $group->spawn(never(...));
             $group->spawn(static function () use ($task) {
-                delay(0.001);
+                delay(1);
                 $task->cancel();
             });
 
@@ -109,7 +110,7 @@ final class TaskTest
         Expect::exception(TaskCancelled::class);
 
         group(static function (Group $group) {
-            $task = $group->spawn(static fn() => delay(1));
+            $task = $group->spawn(never(...));
             $task->cancel();
             $task->await();
         });
@@ -120,17 +121,17 @@ final class TaskTest
         $awaited = null;
 
         thrown(static function () use (&$awaited) {
-            timeout(0.001, static function () use (&$awaited) {
+            timeout(1, static function () use (&$awaited) {
                 group(static function (Group $group) use (&$awaited) {
-                    $task = $group->spawn(static fn() => delay(1));
-                    busy(0.005);
+                    $task = $group->spawn(never(...));
+                    advance(5);
 
                     try {
-                        delay(1); // the deadline cancels both the task and the body
+                        never(); // the deadline cancels both the task and the body
                     } catch (Cancelled) {
                     }
 
-                    shield(static fn() => delay(0.002)); // let the task finish as cancelled
+                    shield(static fn() => delay(2)); // let the task finish as cancelled
                     Assert::true($task->isDone);
 
                     $awaited = thrown(static fn() => $task->await());
@@ -147,11 +148,11 @@ final class TaskTest
 
         group(static function (Group $group) use (&$taskFinished) {
             $task = $group->spawn(static function () use (&$taskFinished) {
-                delay(0.02);
+                delay(20);
                 $taskFinished = true;
             });
 
-            $exception = thrown(static fn() => timeout(0.001, static fn() => $task->await()));
+            $exception = thrown(static fn() => timeout(1, static fn() => $task->await()));
 
             Assert::instanceOf($exception, TimedOut::class);
             Assert::false($task->isDone);
@@ -164,7 +165,7 @@ final class TaskTest
     {
         $results = group(static function (Group $group) {
             $task = $group->spawn(static function () {
-                delay(0.002);
+                delay(2);
 
                 return 'result';
             });
@@ -183,9 +184,9 @@ final class TaskTest
     public function cancelAffectsOnlyThisTask(): void
     {
         $results = group(static function (Group $group) {
-            $cancelled = $group->spawn(static fn() => delay(1));
+            $cancelled = $group->spawn(never(...));
             $sibling = $group->spawn(static function () {
-                delay(0.002);
+                delay(2);
 
                 return 'sibling';
             });
@@ -201,7 +202,7 @@ final class TaskTest
     {
         $result = group(static function (Group $group) {
             $task = $group->spawn(static fn() => 'result');
-            delay(0.001);
+            delay(1);
             $task->cancel();
 
             return $task->await();

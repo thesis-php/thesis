@@ -20,6 +20,7 @@
         "amphp/pipeline": "^1.2",
         "amphp/sync": "^2.3",
         "infection/infection": "^0.35.10",
+        "internal/container": "^1.1",
         "llm/skills": "^1.17",
         "testo/assert": "^0.1.17",
         "testo/bridge-infection": "^0.1.9",

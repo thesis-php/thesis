@@ -755,6 +755,46 @@ The cancellation is bound to the current scope: do not keep it beyond the callab
 The cancellation costs nothing until amphp subscribes to it. A subscription removed by amphp is never called,
 even if the cancellation has already happened, so it cannot wake a fiber that has moved on to another wait.
 
+### Tests on virtual time: `VirtualTime\run()`
+
+Code with long deadlines is hard to test on real time: a heartbeat every 30 seconds, a backoff up to a minute.
+`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at zero and stands still
+while code runs; when nothing can run, it jumps to the nearest timer. So an hour of waiting is over at once,
+timers fire exactly in the order of their deadlines, and durations can be asserted exactly:
+
+```php
+use Thesis\Async\VirtualTime;
+use function Thesis\Async\now;
+
+VirtualTime\run(static function () {
+    $start = now();
+    $client = new Client(new AlwaysFailingSocket());
+
+    try {
+        $client->connect(); // 5 attempts with a backoff of 1, 2, 4, 8 and 16 seconds
+    } catch (ConnectionFailed) {
+    }
+
+    assert(now() - $start === 31.0);
+});
+```
+
+CPU work takes no time on this clock: `VirtualTime\advance($seconds)` moves it forward without yielding,
+as busy code would.
+A deadline passes then, but its timer fires only at the next suspension, as after a loop that blocked the event loop.
+A deadlock fails at once instead of hanging: there is no timer to jump to, and Revolt ends the loop.
+
+Streams and signals stay real, on the driver that `EventLoop\DriverFactory` creates (`REVOLT_DRIVER` chooses it),
+or on one passed as `run($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,
+so nothing from outside runs on virtual time, and it is dropped with whatever `$fn` leaves in it. They are polled on every tick, and only timers are waited for virtually,
+so a stream that becomes ready from outside the process may be jumped past.
+While `run()` runs, its clock is the clock of the library, bound by `run()` itself rather than found through the driver:
+`now()`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
+
+The tests of this library run this way: a plugin for [Testo](https://github.com/php-testo/testo) in `tests/Testo`,
+`VirtualTimePlugin`, runs every test of the suite in its own `run()`, and the `#[VirtualTime]` attribute does the same
+for a class or a test. It is to become a package of its own.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build queues, locks and I/O on it and they are cancellable for free:
@@ -872,6 +912,7 @@ all([user, orders])              orders fails after 50 ms
 | `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
+| `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(float $seconds)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
 
 ## Limitations
 
@@ -890,6 +931,11 @@ all([user, orders])              orders fails after 50 ms
 Ideas that are not implemented yet.
 
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
+- **`Time\Duration` of PHP 8.6.** To think over: accept `float|Duration` where a duration is passed in (`delay()`, `timeout()`,
+  `timeoutOr()`, the rate limiters), so that a value from the Polling API needs no conversion, while `delay(1)` stays short;
+  keep `float` where time comes out (`now()`, `remaining()`), since deadlines are computed with it.
+  Then also decide whether to require PHP 8.6 or support 8.5 with a stub for static analysis.
+- **A package for `VirtualTimePlugin` and `#[VirtualTime]`**: the Testo plugin lives in `tests/Testo` for now.
 
 ## Prior art
 

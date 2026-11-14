@@ -8,16 +8,17 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
-use function Thesis\Async\Tests\busy;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Async\VirtualTime\advance;
 
 #[Test]
 final class TimeoutTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeout(1, static function () {
-            delay(0.001);
+        $result = timeout(1_000, static function () {
+            delay(1);
 
             return 'result';
         });
@@ -28,11 +29,11 @@ final class TimeoutTest
 
     public function throwsTimedOutWhenDeadlineExpires(): void
     {
-        $exception = thrown(static fn() => timeout(0.001, static fn() => delay(1)));
+        $exception = thrown(static fn() => timeout(1, never(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same($exception->seconds, 0.001);
-        Assert::same($exception->getMessage(), 'Timed out after 0.001 seconds.');
+        Assert::same($exception->seconds, 1.0);
+        Assert::same($exception->getMessage(), 'Timed out after 1 seconds.');
         Assert::instanceOf($exception->getPrevious(), Cancelled::class);
         assertNoCallbacksLeft();
     }
@@ -45,7 +46,7 @@ final class TimeoutTest
             $exception = thrown(static function () use ($seconds, &$ran) {
                 timeout($seconds, static function () use (&$ran) {
                     $ran = true;
-                    delay(1);
+                    never();
                 });
             });
 
@@ -67,11 +68,11 @@ final class TimeoutTest
     {
         $inner = null;
         $outer = thrown(static function () use (&$inner) {
-            timeout(0.001, static function () use (&$inner) {
+            timeout(1, static function () use (&$inner) {
                 try {
-                    delay(1);
+                    never();
                 } finally {
-                    $inner = thrown(static fn() => timeout(-1, static fn() => delay(1)));
+                    $inner = thrown(static fn() => timeout(-1, never(...)));
                 }
             });
         });
@@ -85,9 +86,9 @@ final class TimeoutTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(0.001, static function () {
+        timeout(1, static function () {
             group(static function (Group $group) {
-                $group->spawn(static fn() => delay(1));
+                $group->spawn(never(...));
             });
         });
     }
@@ -97,8 +98,8 @@ final class TimeoutTest
         $inner = null;
 
         $outer = thrown(static function () use (&$inner) {
-            timeout(0.001, static function () use (&$inner) {
-                $inner = thrown(static fn() => timeout(10, static fn() => delay(1)));
+            timeout(1, static function () use (&$inner) {
+                $inner = thrown(static fn() => timeout(10, never(...)));
 
                 throw $inner;
             });
@@ -106,7 +107,7 @@ final class TimeoutTest
 
         Assert::instanceOf($inner, Cancelled::class);
         Assert::instanceOf($outer, TimedOut::class);
-        Assert::same($outer->seconds, 0.001);
+        Assert::same($outer->seconds, 1.0);
     }
 
     public function outerCancellationOutranksExpiredInnerDeadline(): void
@@ -114,11 +115,11 @@ final class TimeoutTest
         $inner = null;
 
         $outer = thrown(static function () use (&$inner) {
-            timeout(0.001, static function () use (&$inner) {
+            timeout(1, static function () use (&$inner) {
                 $inner = thrown(static function () {
-                    timeout(0.002, static function () {
-                        busy(0.005); // both deadlines expire before anyone looks
-                        delay(1);
+                    timeout(2, static function () {
+                        advance(5); // both deadlines expire before anyone looks
+                        never();
                     });
                 });
 
@@ -128,7 +129,7 @@ final class TimeoutTest
 
         Assert::instanceOf($inner, Cancelled::class);
         Assert::instanceOf($outer, TimedOut::class);
-        Assert::same($outer->seconds, 0.001);
+        Assert::same($outer->seconds, 1.0);
     }
 
     public function passesForeignCancellationThrough(): void
@@ -138,12 +139,12 @@ final class TimeoutTest
         $exception = thrown(static function () use (&$seen) {
             group(static function (Group $group) use (&$seen) {
                 $group->spawn(static function () {
-                    delay(0.001);
+                    delay(1);
 
                     throw new \RuntimeException('task failed');
                 });
 
-                $seen = thrown(static fn() => timeout(10, static fn() => delay(1)));
+                $seen = thrown(static fn() => timeout(10, never(...)));
             });
         });
 
@@ -155,7 +156,7 @@ final class TimeoutTest
     {
         Expect::exception(\LogicException::class)->withMessage('failure');
 
-        timeout(1, static function () {
+        timeout(1_000, static function () {
             throw new \LogicException('failure');
         });
     }
@@ -164,9 +165,9 @@ final class TimeoutTest
     {
         Expect::exception(\RuntimeException::class)->withMessage('connection reset');
 
-        timeout(0.001, static function () {
+        timeout(1, static function () {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
                 throw new \RuntimeException('connection reset');
             }
@@ -175,9 +176,9 @@ final class TimeoutTest
 
     public function valueReturnedAfterDeadlineWins(): void
     {
-        $result = timeout(0.001, static function () {
+        $result = timeout(1, static function () {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -189,15 +190,15 @@ final class TimeoutTest
 
     public function restoresCurrentScope(): void
     {
-        thrown(static fn() => timeout(0.001, static fn() => delay(1)));
+        thrown(static fn() => timeout(1, never(...)));
 
-        delay(0.001); // would throw if the expired scope stayed current
+        delay(1); // would throw if the expired scope stayed current
 
         group(static function (Group $group) {
             $group->spawn(static function () {
-                thrown(static fn() => timeout(0.001, static fn() => delay(1)));
+                thrown(static fn() => timeout(1, never(...)));
 
-                delay(0.001);
+                delay(1);
             });
         });
 

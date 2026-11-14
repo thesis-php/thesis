@@ -73,6 +73,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`hrtime`, `INF` if none),
   the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the clock;
   `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
+- `Internal\Scope::now()` is the only clock of the library (`now()`, deadlines, the rate limiters): never call `hrtime()`
+  or `microtime()` elsewhere. Within `VirtualTime\run()`, it reads `Internal\Scope::$virtualClock`, bound by `run()`:
+  never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on `Scope`, not on
+  `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The clock is not read in `suspend()`.
 - `ScopedValue`s live outside the scope tree, in `Internal\Context`: an immutable array per fiber, copied by `with()`.
   A task's scope is a child of the group, not of the spawn site, so `GroupImpl::start()` captures the values
   in the spawning fiber and the task runs with them. A shield does not hide values. A task that inherits nothing
@@ -83,6 +87,11 @@ The model, the API and the guarantees are described in `README.md` — read it f
 
 ## Conventions
 
+- Every test runs on virtual time (`VirtualTimePlugin` in `testo.php`, from `tests/Testo`; no attribute is needed): delays are whole seconds
+  (`delay(1)`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted exactly
+  (`Assert::same(now() - $start, 20.0)`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
+  Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
+  Real time is only for what virtual time cannot model.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,

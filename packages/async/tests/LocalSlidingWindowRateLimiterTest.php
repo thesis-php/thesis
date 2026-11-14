@@ -9,20 +9,20 @@ use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\never;
 
 #[Test]
 final class LocalSlidingWindowRateLimiterTest
 {
     public function atMostCallsStartWithinAnyWindow(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 3, seconds: 0.01);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 3, seconds: 10);
         $start = now();
         /** @var \SplQueue<float> $window the starts of the last 3 calls */
         $window = new \SplQueue();
         $firstWindow = 0.0;
         $shortestWindow = INF;
 
-        // Asserted after the loop: the first assertion loads classes, and on a slow file system that takes longer than a window.
         for ($i = 0; $i < 9; ++$i) {
             $limiter->wait();
             $at = now();
@@ -38,18 +38,16 @@ final class LocalSlidingWindowRateLimiterTest
 
         $total = now() - $start;
 
-        Assert::float($firstWindow)->lessThan(0.005);
-        Assert::float($shortestWindow)->greaterThan(0.01);
-        Assert::float($total)->lessThan(0.06); // 0.08 or more if a window held fewer calls
+        Assert::same([$firstWindow, $shortestWindow, $total], [0.0, 10.0, 20.0]); // 30.0 or more if a window held fewer calls
         assertNoCallbacksLeft();
     }
 
     public function fullWindowIsAvailableAfterPause(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 2, seconds: 0.02);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 2, seconds: 20);
         $limiter->wait();
         $limiter->wait();
-        delay(0.04);
+        delay(40);
         $start = now();
 
         $limiter->wait();
@@ -58,13 +56,12 @@ final class LocalSlidingWindowRateLimiterTest
         $limiter->wait();
         $third = now() - $start;
 
-        Assert::float($afterWindow)->lessThan(0.01);
-        Assert::float($third)->greaterThan(0.019);
+        Assert::same([$afterWindow, $third], [0.0, 20.0]);
     }
 
     public function waitersGetTurnsInOrderOfArrival(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 0.001);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1);
         $limiter->wait();
         $log = [];
 
@@ -82,11 +79,11 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function waitWithRoomInWindowDoesNotSuspend(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 1_000);
 
-        $thrown = timeout(0.001, static function () use ($limiter) {
+        $thrown = timeout(1, static function () use ($limiter) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 
@@ -104,21 +101,21 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function cancelledSleeperCountsNoCall(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 0.02);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 20);
         $limiter->wait();
         $start = now();
 
-        $result = timeoutOr(0.003, $limiter->wait(...), 'timed out');
+        $result = timeoutOr(3, $limiter->wait(...), 'timed out');
         $limiter->wait();
 
         Assert::same($result, 'timed out');
-        Assert::float(now() - $start)->greaterThan(0.019)->lessThan(0.035); // 0.04 if the cancelled wait counted
+        Assert::same(now() - $start, 20.0); // 40.0 if the cancelled wait counted
         assertNoCallbacksLeft();
     }
 
     public function cancelledQueuedWaiterCountsNoCall(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 0.02);
+        $limiter = new LocalSlidingWindowRateLimiter(calls: 1, seconds: 20);
         $limiter->wait();
         $start = now();
 
@@ -134,15 +131,14 @@ final class LocalSlidingWindowRateLimiterTest
 
                 return now() - $start;
             });
-            delay(0.001);
+            delay(1);
 
             $queued->cancel();
 
             return [$sleeper->await(), $last->await()];
         });
 
-        Assert::float($at[0])->greaterThan(0.019);
-        Assert::float($at[1])->greaterThan(0.039)->lessThan(0.055); // 0.06 if the cancelled wait counted
+        Assert::same($at, [20.0, 40.0]); // 60.0 last if the cancelled wait counted
     }
 
     #[DataSet([0.0])]

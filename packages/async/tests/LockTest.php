@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -31,13 +32,13 @@ final class LockTest
     {
         $released = false;
         $lock = new Lock(static function () use (&$released) {
-            delay(0.001); // a round trip to the server that holds a distributed lock
+            delay(1); // a round trip to the server that holds a distributed lock
             $released = true;
         });
 
-        timeout(0.001, static function () use ($lock) {
+        timeout(1, static function () use ($lock) {
             try {
-                delay(1);
+                never();
             } catch (Cancelled) {
             }
 

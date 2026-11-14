@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -37,7 +38,7 @@ final class SynchronizedTest
     {
         $semaphore = self::semaphore();
 
-        $exception = thrown(static fn() => timeout(0.001, static fn() => synchronized($semaphore, static fn() => delay(1))));
+        $exception = thrown(static fn() => timeout(1, static fn() => synchronized($semaphore, never(...))));
 
         Assert::instanceOf($exception, TimedOut::class);
         Assert::same($semaphore->releases, 1);
@@ -127,7 +128,7 @@ final class SynchronizedTest
                         $log[] = 'task';
                     });
                 });
-                delay(0.001);
+                delay(1);
                 $log[] = 'body';
             });
         });

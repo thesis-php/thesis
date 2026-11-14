@@ -24,6 +24,13 @@ use Thesis\Async\Cancelled;
 final class Scope
 {
     /**
+     * The clock of {@see now()} while `Thesis\Async\VirtualTime\run()` runs, bound by it.
+     * Here, not found through the event loop driver, which may be decorated;
+     * and here, not on {@see VirtualClock}, so that the class is loaded only if `run()` is used.
+     */
+    public static ?VirtualClock $virtualClock = null;
+
+    /**
      * This scope or a visible ancestor is cancelled: set by {@see notify()} and inherited on creation.
      * One flag is enough, because it never goes back: whoever cancelled the scope, its subtree has been notified.
      */
@@ -231,10 +238,12 @@ final class Scope
 
     /**
      * Monotonic, in seconds: the clock Revolt's timers run on. The only clock of the library: `Thesis\Async\now()` too.
+     * Within `Thesis\Async\VirtualTime\run()`, {@see $virtualClock} instead. Not on the hot path of a wait:
+     * only a deadline, {@see remaining()} and the rate limiters read the clock.
      */
     public static function now(): float
     {
-        return hrtime(true) / 1e9;
+        return self::$virtualClock?->now() ?? hrtime(true) / 1e9;
     }
 
     private function notify(): void

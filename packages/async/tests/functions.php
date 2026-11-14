@@ -4,12 +4,30 @@ declare(strict_types=1);
 
 /**
  * Helpers shared by the tests. Every test runs in {main}: the library drives the Revolt loop from there itself.
+ * Every test runs on virtual time (VirtualTimePlugin in testo.php): durations are exact, and CPU work takes none.
  */
 
 namespace Thesis\Async\Tests;
 
 use Revolt\EventLoop;
 use Testo\Assert;
+use Thesis\Async\Continuation;
+use function Thesis\Async\now;
+use function Thesis\Async\suspend;
+
+/**
+ * A wait that only a cancellation ends. It registers nothing, so it does not keep the loop alive:
+ * if the cancellation never comes, Revolt ends the loop with "Event loop terminated without resuming".
+ */
+function never(): never
+{
+    suspend(
+        /** @param Continuation<null> $_ */
+        static fn(Continuation $_) => static function () {},
+    );
+
+    throw new \LogicException('A wait without an event source has returned.');
+}
 
 /**
  * For tests that have to inspect side effects after an expected exception.
@@ -29,21 +47,21 @@ function thrown(callable $fn): \Throwable
 }
 
 /**
- * Runs $fn, ignoring what it throws, and measures how long it took.
+ * Runs $fn, ignoring what it throws, and measures how long it took on the clock of deadlines.
  *
  * @param callable(): mixed $fn
- * @return float milliseconds
+ * @return float seconds
  */
 function elapsed(callable $fn): float
 {
-    $start = hrtime(true);
+    $start = now();
 
     try {
         $fn();
     } catch (\Throwable) {
     }
 
-    return (hrtime(true) - $start) / 1e6;
+    return now() - $start;
 }
 
 /**
@@ -52,14 +70,4 @@ function elapsed(callable $fn): float
 function assertNoCallbacksLeft(): void
 {
     Assert::same(EventLoop::getIdentifiers(), []);
-}
-
-/**
- * Burns CPU without yielding to the event loop.
- */
-function busy(float $seconds): void
-{
-    $until = hrtime(true) + (int) ($seconds * 1e9);
-
-    while (hrtime(true) < $until);
 }
