@@ -208,7 +208,21 @@ try {
 ```
 
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,
-and an outer cancellation always outranks a deadline.
+and an outer cancellation always outranks a deadline. A deadline that is zero or negative has already passed:
+the closure runs, but its first wait throws.
+
+When running out of time is an expected outcome, `timeoutOr()` returns a default instead of throwing:
+
+```php
+use function Thesis\Async\timeoutOr;
+
+$recommendations = timeoutOr(0.3, static fn() => fetchRecommendations($userId), default: []);
+```
+
+It is not `try { timeout() } catch (TimedOut)`: that would also swallow a `TimedOut` of a nested `timeout()`
+that the closure lets out. `timeoutOr()` gives the default only when its own deadline cut the closure short.
+
+`now()` is the monotonic clock of deadlines, for one computed ahead: `$at = now() + 5`, later `timeout($at - now(), ...)`.
 
 `remaining()` tells how many seconds are left until the nearest deadline, or `null` if there is none,
 so the deadline can be passed on to where a scope cannot reach: a database, a remote call.
@@ -534,7 +548,7 @@ messages delivered to a subscription, stages of a pipeline. `send()` waits while
 ```php
 use Thesis\Async\Channel;
 use Thesis\Async\ChannelClosed;
-use Thesis\Async\TimedOut;
+use function Thesis\Async\timeoutOr;
 
 /** @var Channel<Event> */
 $events = new Channel(1000);
@@ -547,12 +561,12 @@ group(static function (Group $group) use ($events, $server) {
 
             try {
                 // Up to 100 events or 1 second. A value that arrives together with the deadline is not lost.
-                timeout(1, static function () use ($events, &$batch) {
+                timeoutOr(1, static function () use ($events, &$batch) {
                     while (\count($batch) < 100) {
                         $batch[] = $events->receive();
                     }
                 });
-            } catch (TimedOut|ChannelClosed) {
+            } catch (ChannelClosed) {
             }
 
             store($batch);
@@ -797,7 +811,9 @@ all([user, orders])              orders fails after 50 ms
 | `each(iterable<K, T>, callable(T, K), int $concurrency)` | bounded concurrency |
 | `map(iterable<K, T>, callable(T, K): R, int $concurrency): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
+| `timeoutOr(float $seconds, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
 | `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |
+| `now(): float` | monotonic seconds, the clock of deadlines |
 | `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |

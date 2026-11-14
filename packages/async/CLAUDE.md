@@ -11,6 +11,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Cancellation is level-triggered: while a scope is cancelled, every `suspend()` in it throws `Cancelled`.
 - `Cancelled extends \Error` and carries nothing. Whose cancellation it is, is decided by the state of the scope tree
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
+  `timeoutOr()` decides the same way, in the shared `Internal\Expired::run()`, never by catching `TimedOut`:
+  that would swallow a `TimedOut` of a nested `timeout()`. A deadline `<= 0` cancels the scope at once, without a timer.
 - `Cancelled` is thrown only where the current scope is cancelled. Awaiting a cancelled task from a healthy scope
   throws `TaskCancelled` (a regular exception). `Deferred::fail()`, `Channel::close()` and `Continuation::throw()` reject `Cancelled`
   with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`.

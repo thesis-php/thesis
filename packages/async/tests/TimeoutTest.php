@@ -37,6 +37,50 @@ final class TimeoutTest
         assertNoCallbacksLeft();
     }
 
+    public function expiredDeadlineThrowsOnFirstWait(): void
+    {
+        foreach ([0.0, -1.0] as $seconds) {
+            $ran = false;
+
+            $exception = thrown(static function () use ($seconds, &$ran) {
+                timeout($seconds, static function () use (&$ran) {
+                    $ran = true;
+                    delay(1);
+                });
+            });
+
+            Assert::true($ran);
+            Assert::instanceOf($exception, TimedOut::class);
+            Assert::same($exception->seconds, $seconds);
+            Assert::same(remaining(), null);
+            assertNoCallbacksLeft();
+        }
+    }
+
+    public function expiredDeadlineReturnsResultOfBodyThatDoesNotWait(): void
+    {
+        Assert::same(timeout(-1, static fn() => remaining()), 0.0);
+        assertNoCallbacksLeft();
+    }
+
+    public function expiredDeadlineDoesNotClaimOuterCancellation(): void
+    {
+        $inner = null;
+        $outer = thrown(static function () use (&$inner) {
+            timeout(0.001, static function () use (&$inner) {
+                try {
+                    delay(1);
+                } finally {
+                    $inner = thrown(static fn() => timeout(-1, static fn() => delay(1)));
+                }
+            });
+        });
+
+        Assert::instanceOf($inner, Cancelled::class);
+        Assert::instanceOf($outer, TimedOut::class);
+        assertNoCallbacksLeft();
+    }
+
     public function coversNestedGroups(): void
     {
         Expect::exception(TimedOut::class);

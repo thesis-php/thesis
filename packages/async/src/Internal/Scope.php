@@ -230,9 +230,9 @@ final class Scope
     }
 
     /**
-     * Monotonic, in seconds: the clock Revolt's timers run on.
+     * Monotonic, in seconds: the clock Revolt's timers run on. The only clock of the library: `Thesis\Async\now()` too.
      */
-    private static function now(): float
+    public static function now(): float
     {
         return hrtime(true) / 1e9;
     }

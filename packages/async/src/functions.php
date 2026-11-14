@@ -8,6 +8,7 @@ use Amp\Cancellation;
 use Amp\CancelledException;
 use Revolt\EventLoop;
 use Thesis\Async\Internal\ContinuationImpl;
+use Thesis\Async\Internal\Expired;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\ScopeCancellation;
@@ -133,6 +134,17 @@ function remaining(): ?float
 }
 
 /**
+ * Monotonic time in seconds, on the clock of deadlines and Revolt's timers: for measuring and for deadlines
+ * computed ahead, `timeout($at - now(), ...)`. Not wall-clock time: only differences make sense.
+ *
+ * @api
+ */
+function now(): float
+{
+    return Scope::now();
+}
+
+/**
  * Failures that happened in the groups $error was rethrown from, but were not rethrown themselves:
  * a group rethrows only its first failure. For example, a sibling task that failed at the same time,
  * or a rollback that failed while a task was being cancelled because of $error.
@@ -228,6 +240,8 @@ function group(callable $body): mixed
  *
  * An outer cancellation outranks the deadline: if both happened, {@see Cancelled} is thrown, not {@see TimedOut}.
  *
+ * A deadline that is zero or negative has already passed: $body still runs, but its first wait throws.
+ *
  * @api
  * @template T
  * @param callable(): T $body
@@ -236,25 +250,34 @@ function group(callable $body): mixed
  */
 function timeout(float $seconds, callable $body): mixed
 {
-    $parent = Scope::current();
-    $scope = new Scope($parent, timeout: $seconds);
-    $timer = EventLoop::delay($seconds, static function () use ($scope) {
-        $scope->cancel();
-    });
+    $result = Expired::run($seconds, $body);
 
-    try {
-        return $scope->run($body);
-    } catch (Cancelled $cancelled) {
-        // Only the timer cancels this scope, so if the parent is not cancelled, the deadline is the reason.
-        if ($scope->isCancelled() && !$parent->isCancelled()) {
-            throw new TimedOut($seconds, $cancelled);
-        }
-
-        throw $cancelled;
-    } finally {
-        EventLoop::cancel($timer);
-        $scope->close();
+    if ($result instanceof Expired) {
+        throw new TimedOut($seconds, $result->cancelled);
     }
+
+    return $result;
+}
+
+/**
+ * Like {@see timeout()}, but returns $default instead of throwing {@see TimedOut} once its own deadline cuts $body short.
+ *
+ * Only this deadline: a {@see TimedOut} of a nested timeout() that $body lets out is not swallowed,
+ * and an outer cancellation is rethrown as {@see Cancelled}, as with timeout().
+ * Whatever $body has done before the deadline stays done: collect partial results by reference.
+ *
+ * @api
+ * @template T
+ * @template D
+ * @param callable(): T $body
+ * @param D $default
+ * @return T|D
+ */
+function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
+{
+    $result = Expired::run($seconds, $body);
+
+    return $result instanceof Expired ? $default : $result;
 }
 
 /**
