@@ -82,7 +82,10 @@ final class GroupImpl implements Group
         try {
             $group->join();
         } finally {
-            // The tasks and daemons scopes are only reachable through the body scope: they go away with it.
+            // Each child holds its parent and is held by it: closing all three breaks the cycle,
+            // so a group is freed by refcounting, without waiting for the cycle collector.
+            $daemonsScope->close();
+            $tasksScope->close();
             $bodyScope->close();
         }
 

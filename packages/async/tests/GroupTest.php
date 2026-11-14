@@ -716,4 +716,40 @@ final class GroupTest
 
         Assert::same($children($root), []);
     }
+
+    public function scopesGoAwayWithoutCycleCollector(): void
+    {
+        $references = [];
+        $gc = gc_enabled();
+        gc_disable();
+
+        try {
+            group(static function (Group $group) use (&$references) {
+                $parent = static function (): Scope {
+                    $parent = (fn(): ?Scope => $this->parent)->call(Scope::current());
+                    \assert($parent !== null);
+
+                    return $parent;
+                };
+                $references['body'] = \WeakReference::create(Scope::current());
+                $group->spawn(static function () use (&$references, $parent) {
+                    $references['tasks'] = \WeakReference::create($parent());
+                });
+                $group->daemon(static function () use (&$references, $parent) {
+                    $references['daemons'] = \WeakReference::create($parent());
+                });
+                delay(1);
+            });
+        } finally {
+            if ($gc) {
+                gc_enable();
+            }
+        }
+
+        Assert::count($references, 3);
+
+        foreach ($references as $reference) {
+            Assert::null($reference->get());
+        }
+    }
 }

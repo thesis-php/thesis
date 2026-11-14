@@ -70,8 +70,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   The callable gets the value only (`$fn($value)`, so an internal function fits); only `map()` uses the key, for its result.
   `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
-- A parent scope holds its children strongly: every created `Internal\Scope` must be closed with `close()`,
-  unless it is only reachable through a scope that is closed at the same time (the tasks and daemons scopes of a group).
+- A parent scope holds its children strongly and a child holds its parent: every created `Internal\Scope` must be closed
+  with `close()`, the tasks and daemons scopes of a group too, or they form a cycle that only the cycle collector frees.
 - `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note on `CURRENT_SCOPE`).
   Per-fiber state (`CURRENT_SCOPE`, `CONTEXT`, the locks of `synchronized()`) is a plain
   `WeakMap` keyed by `Internal\fiberKey()`; call it again instead of keeping the key in a variable across a call
