@@ -188,6 +188,44 @@ final class SignalTest
         assertNoCallbacksLeft();
     }
 
+    public function trapSignalsHandlesRepeatedNumberOnce(): void
+    {
+        $nothingMore = null;
+
+        $received = trapSignals([SIGUSR1, SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
+            self::kill(SIGUSR1);
+            $received = $trap->receive();
+            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
+
+            return $received;
+        });
+
+        Assert::same($received, SIGUSR1);
+        Assert::instanceOf($nothingMore, TimedOut::class);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsHandsSignalOverPastReceiverWhoseWaitIsOver(): void
+    {
+        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (Group $group) use ($trap) {
+            $cancelled = $group->spawn(static fn() => $trap->receive());
+            $other = $group->spawn(static fn() => $trap->receive());
+            delay(1);
+
+            // The loop runs the cancelled fiber, which leaves the queue, before the next signal callback:
+            // only a signal caught right after the cancellation, in the same tick, meets a receiver that refuses it.
+            $cancelled->cancel();
+            (fn() => $this->catch(SIGUSR1))->call($trap);
+
+            Assert::instanceOf(thrown($cancelled->await(...)), TaskCancelled::class);
+
+            return timeout(1, $other->await(...));
+        }));
+
+        Assert::same($received, SIGUSR1);
+        assertNoCallbacksLeft();
+    }
+
     public function trapIsReleasedAfterward(): void
     {
         $trap = trapSignals([SIGUSR1], static fn(SignalTrap $trap): SignalTrap => $trap);

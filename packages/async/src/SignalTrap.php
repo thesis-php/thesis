@@ -49,7 +49,8 @@ final class SignalTrap implements \IteratorAggregate
         $callbackIds = [];
 
         try {
-            foreach ($signals as $signal) {
+            // A repeated number would get two handlers, and one signal would be received twice.
+            foreach (array_unique($signals) as $signal) {
                 $callbackIds[] = EventLoop::onSignal($signal, $callback);
             }
 
