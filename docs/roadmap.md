@@ -54,8 +54,12 @@ Packages like `amqp`, `nats`, `pgmq` need servers in their tests.
 
 The old packages are separate repositories (locally `~/Projects/thesis/<name>`), mostly built on amphp.
 
-- Import with history: `git filter-repo --to-subdirectory-filter packages/<name>` in a clone, then merge it here
-  with `--allow-unrelated-histories`. Then replace its composer.json with `package.php` and run `make sync`.
+- Import with history: `git filter-repo --to-subdirectory-filter packages/<name>` in a clone, then
+  `git fetch <clone> main` and `git cherry-pick $(git rev-list --reverse FETCH_HEAD)` onto `main`: the history stays
+  linear, without a merge commit. Then, in one commit, delete the standalone repository files (Makefile, tool configs,
+  CI, CHANGELOG, composer.json), add `package.php` and `AGENTS.md`, run `make sync`, and bring the code to the rules
+  of the monorepo (`make check`, line length, closures without return types): the old `ignoreErrors` of PHPStan
+  do not come along, fix the types instead.
 - Start from the lowest layers (`primitive`, `runtime`, `io`), move protocols as they are rethought.
 - Split an old `CLAUDE.md`: invariants for those who change the package go to its `AGENTS.md`,
   rules for those who use it go to `README.md` or a skill in `packages/<name>/skills/` (users of `async` must not

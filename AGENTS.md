@@ -152,7 +152,7 @@ Structured concurrency on top of revolt/event-loop.
 
 Streams, sockets, files, processes.
 
-No packages yet.
+- `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
 
 ### protocol
 

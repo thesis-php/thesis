@@ -10,6 +10,7 @@ use Testo\Application\Config\SuiteConfig;
 return new ApplicationConfig(
     src: [
         __DIR__ . '/packages/async/src',
+        __DIR__ . '/packages/io/src',
     ],
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
@@ -18,5 +19,6 @@ return new ApplicationConfig(
             location: [__DIR__ . '/packages/async/tests'],
             plugins: require __DIR__ . '/packages/async/testo.plugins.php',
         ),
+        new SuiteConfig(name: 'io', location: [__DIR__ . '/packages/io/tests']),
     ],
 );

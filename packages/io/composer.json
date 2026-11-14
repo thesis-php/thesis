@@ -10,11 +10,10 @@
         }
     ],
     "require": {
-        "php-64bit": "^8.5"
+        "php": "^8.5",
+        "php-64bit": "*"
     },
     "require-dev": {
-        "llm/skills": "^1.17",
-        "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
@@ -33,10 +32,6 @@
         }
     },
     "config": {
-        "allow-plugins": {
-            "llm/skills": true
-        },
-        "lock": false,
         "sort-packages": true
     }
 }

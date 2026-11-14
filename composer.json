@@ -11,6 +11,7 @@
     ],
     "require": {
         "php": "^8.5",
+        "php-64bit": "*",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
@@ -24,16 +25,20 @@
         "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
+        "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
+        "testo/lifecycle": "^0.1.9",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"
     },
     "replace": {
-        "thesis/async": "self.version"
+        "thesis/async": "self.version",
+        "thesis/io": "self.version"
     },
     "autoload": {
         "psr-4": {
-            "Thesis\\Async\\": "packages/async/src/"
+            "Thesis\\Async\\": "packages/async/src/",
+            "Thesis\\Io\\": "packages/io/src/"
         },
         "files": [
             "packages/async/src/autoload.files.php"
@@ -42,6 +47,7 @@
     "autoload-dev": {
         "psr-4": {
             "Thesis\\Async\\": "packages/async/tests/",
+            "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/"
         },
