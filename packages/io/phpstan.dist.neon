@@ -20,3 +20,12 @@ parameters:
     reportAnyTypeWideningInVarTag: true
     reportPossiblyNonexistentConstantArrayOffset: true
     reportPossiblyNonexistentGeneralArrayOffset: true
+
+    ignoreErrors:
+        # data providers in tests yield closures of different signatures, precise generator types add nothing there
+        -
+            identifier: generator.valueType
+            path: tests/*
+        -
+            identifier: missingType.callable
+            path: tests/*
