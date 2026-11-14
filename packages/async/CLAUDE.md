@@ -8,6 +8,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Every wait goes through `suspend()`. Do not call `EventLoop::getSuspension()` directly in new code
   (the only exception is `Internal\ContinuationImpl::park()`).
 - The `$unregister` returned from `suspend()`'s `$register` is always called once the wait is over, whatever ended it.
+  Only a `\Closure` is called: a Revolt callback id is a string and may be callable (`"die"`).
 - Cancellation is level-triggered: while a scope is cancelled, every `suspend()` in it throws `Cancelled`.
 - `Cancelled extends \Error` and carries nothing. Whose cancellation it is, is decided by the state of the scope tree
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
@@ -16,7 +17,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   A `NAN` deadline or delay throws `\ValueError`; `delay(<= 0)` is `delay(0)`.
 - `Cancelled` is thrown only where the current scope is cancelled. Awaiting a cancelled task from a healthy scope
   throws `TaskCancelled` (a regular exception). `Deferred::fail()`, `Channel::close()` and `Continuation::throw()` reject `Cancelled`
-  with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`.
+  with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`. A `Cancelled` that escapes a task
+  or a group body whose scope is not cancelled (caught elsewhere and rethrown) fails the group as a `LogicException`.
 - Only owners cancel scopes: a group (failure, `Group::cancelTasks()`), `Task::cancel()`, the `timeout()` timer.
   There is no public scope object and no public way to cancel an arbitrary scope — do not add one.
   `onCancel()` does not break this: it only observes the cancellation of the current scope.
@@ -49,7 +51,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   `allSettled()` never records `Cancelled` as an outcome: it cancels nothing, so a cancelled task means the caller is cancelled.
 - Every other failure of a group is recorded by `GroupImpl::fail()` through `Internal\Suppressed`: a `WeakMap` from the rethrown
   error to the list of the others. The rethrown error is never changed (no wrapper, no `previous`); the same object
-  is recorded at most once and never under itself. When a join gives up on a deadlock, the group's failure
+  is recorded at most once and never under itself; recording an error under one from its own tree drops the edge back,
+  so the tree stays acyclic and everything stays reachable from the rethrown error. When a join gives up on a deadlock, the group's failure
   is recorded under Revolt's error, unless it is the same deadlock from an earlier round.
 - `Channel` hands values over like `LocalSemaphore` hands permits: a value goes to a waiting receiver, or is taken
   from a waiting sender, only if that waiter's `resume()` returns `true`; otherwise it goes to the next one or to the buffer.

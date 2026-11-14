@@ -155,6 +155,47 @@ final class SynchronizedTest
         Assert::true($nested);
     }
 
+    public function failedReleaseDoesNotKeepFiberHolder(): void
+    {
+        $semaphore = new class implements Semaphore {
+            public int $acquires = 0;
+
+            public function acquire(): Lock
+            {
+                ++$this->acquires;
+
+                return new Lock(static fn() => throw new \RuntimeException('release failed'));
+            }
+        };
+
+        $exception = thrown(static fn() => synchronized($semaphore, static fn() => null));
+        Assert::same($exception->getMessage(), 'release failed');
+
+        // not reentrant any more: the fiber holds nothing, so the lock is taken again
+        thrown(static fn() => synchronized($semaphore, static fn() => null));
+        Assert::same($semaphore->acquires, 2);
+    }
+
+    public function failedReleaseDoesNotKeepFiberHolderOfKey(): void
+    {
+        $semaphore = new class implements KeyedSemaphore {
+            public int $acquires = 0;
+
+            public function acquire(string $key): Lock
+            {
+                ++$this->acquires;
+
+                return new Lock(static fn() => throw new \RuntimeException('release failed'));
+            }
+        };
+
+        $exception = thrown(static fn() => synchronizedKey($semaphore, 'key', static fn() => null));
+        Assert::same($exception->getMessage(), 'release failed');
+
+        thrown(static fn() => synchronizedKey($semaphore, 'key', static fn() => null));
+        Assert::same($semaphore->acquires, 2);
+    }
+
     /**
      * @return Semaphore&object{acquires: int, releases: int}
      */

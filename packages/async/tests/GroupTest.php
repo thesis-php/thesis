@@ -438,20 +438,36 @@ final class GroupTest
 
     public function outerCancellationReportsFirstTaskCutShort(): void
     {
-        $exception = thrown(static function () {
-            timeout(1, static function () {
-                group(static function (Group $group) {
-                    $group->spawn(static fn() => suspend(static function (Continuation $continuation) {}));
-                    $group->spawn(never(...));
+        /** @var ?Cancelled $first */
+        $first = null;
+
+        $exception = thrown(static function () use (&$first) {
+            timeout(1, static function () use (&$first) {
+                group(static function (Group $group) use (&$first) {
+                    // spawned first, but cut short last: it unwinds after a cleanup
+                    $group->spawn(static function () {
+                        try {
+                            never();
+                        } finally {
+                            shield(static fn() => delay(1));
+                        }
+                    });
+                    $group->spawn(static function () use (&$first) {
+                        try {
+                            never();
+                        } catch (Cancelled $cancelled) {
+                            $first = $cancelled;
+
+                            throw $cancelled;
+                        }
+                    });
                 });
             });
         });
 
         Assert::instanceOf($exception, TimedOut::class);
-        $cancelled = $exception->getPrevious();
-        Assert::instanceOf($cancelled, Cancelled::class);
-        // the first task waited in suspend() directly, the second one through delay()
-        Assert::notSame($cancelled->getTrace()[2]['function'] ?? null, 'Thesis\Async\delay');
+        Assert::instanceOf($first, Cancelled::class);
+        Assert::same($exception->getPrevious(), $first);
     }
 
     public function everyTaskKeepsItsOwnScope(): void
@@ -508,6 +524,38 @@ final class GroupTest
             'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
         );
         Assert::same($exception->getPrevious(), $foreign);
+    }
+
+    public function cancelledRethrownOutsideItsScopeFromBodyFailsGroup(): void
+    {
+        $foreign = thrown(static fn() => timeout(1, never(...)))->getPrevious();
+        Assert::instanceOf($foreign, Cancelled::class);
+        $events = [];
+
+        $exception = thrown(static function () use ($foreign, &$events) {
+            group(static function (Group $group) use ($foreign, &$events) {
+                $group->spawn(static function () use (&$events) {
+                    try {
+                        never();
+                    } catch (Cancelled $cancelled) {
+                        $events[] = 'task cancelled';
+
+                        throw $cancelled;
+                    }
+                });
+                delay(1);
+
+                throw $foreign;
+            });
+        });
+
+        Assert::instanceOf($exception, \LogicException::class);
+        Assert::same(
+            $exception->getMessage(),
+            'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
+        );
+        Assert::same($exception->getPrevious(), $foreign);
+        Assert::same($events, ['task cancelled']);
     }
 
     public function foreignCallbackFailureInMainCancelsAndJoinsTasks(): void

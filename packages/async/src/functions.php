@@ -20,16 +20,17 @@ use function Thesis\Async\Internal\fiberKey;
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
  *
  * $register receives the {@see Continuation} of this wait and registers it wherever the event comes from
- * (timer, stream watcher, wait queue). It may return $unregister that undoes the registration.
+ * (timer, stream watcher, wait queue). It may return $unregister, a closure that undoes the registration.
  * $unregister is always called once the wait is over, whatever ended it,
- * so it must be harmless for a source that has already fired.
+ * so it must be harmless for a source that has already fired. Anything but a closure is ignored:
+ * not even a callable string is called, since a Revolt callback id may be one ("dl", "die").
  *
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
  *
  * @api
  * @template T
- * @param callable(Continuation<T>): ((callable(): void)|void) $register
+ * @param callable(Continuation<T>): ((\Closure(): void)|void) $register
  * @return T
  * @throws Cancelled
  */
@@ -50,8 +51,8 @@ function suspend(callable $register): mixed
         $scope->unsubscribe($continuation);
 
         // Anything else means there is nothing to undo: $register returned nothing,
-        // or it is an arrow function that returned the bool of Continuation::resume().
-        if (\is_callable($unregister)) {
+        // or it is an arrow function that returned the bool of Continuation::resume() or a Revolt callback id.
+        if ($unregister instanceof \Closure) {
             $unregister();
         }
     }
@@ -541,8 +542,10 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
     try {
         return $fn();
     } finally {
-        $locks[$semaphore]->release();
+        // Forgotten before the release: if it throws, the fiber must not stay a holder that takes no lock.
+        $lock = $locks[$semaphore];
         unset($locks[$semaphore]);
+        $lock->release();
     }
 }
 
@@ -591,8 +594,10 @@ function synchronizedKey(KeyedSemaphore $semaphore, string $key, callable $fn): 
     try {
         return $fn();
     } finally {
-        $locks[$key]->release();
+        // As in synchronized(): forgotten before the release, which may throw.
+        $lock = $locks[$key];
         unset($locks[$key]);
+        $lock->release();
     }
 }
 

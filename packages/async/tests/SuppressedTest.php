@@ -132,6 +132,61 @@ final class SuppressedTest
         Assert::same(suppressed($exception), [$second]);
     }
 
+    public function errorsAreNeverSuppressedUnderEachOther(): void
+    {
+        /** @var Deferred<null> */
+        $shared = new Deferred();
+        $a = new \RuntimeException('a');
+        /** @var ?\RuntimeException $b */
+        $b = null;
+
+        $exception = thrown(static function () use ($shared, $a, &$b) {
+            group(static function (Group $group) use ($shared, $a, &$b) {
+                $group->spawn(static fn() => $shared->await()); // a fails the outer group first
+                $group->spawn(static function () use ($shared, &$b) {
+                    group(static function (Group $inner) use ($shared, &$b) {
+                        $inner->spawn(static function () use (&$b) {
+                            delay(1);
+
+                            throw $b = new \RuntimeException('b');
+                        });
+                        $inner->spawn(static function () use ($shared) {
+                            try {
+                                never();
+                            } finally {
+                                shield(static fn() => $shared->await()); // a is suppressed under b
+                            }
+                        });
+                    });
+                });
+
+                delay(2);
+                $shared->fail($a);
+            });
+        });
+
+        Assert::same($exception, $a);
+        Assert::instanceOf($b, \RuntimeException::class);
+        Assert::same(suppressed($a), [$b]);
+        // the error rethrown keeps every other one in its tree, without a cycle back to itself
+        Assert::same(suppressed($b), []);
+    }
+
+    public function errorIsNeverSuppressedUnderItsOwnDescendant(): void
+    {
+        $a = new \RuntimeException('a');
+        $b = new \RuntimeException('b');
+        $c = new \RuntimeException('c');
+        Internal\Suppressed::add($b, $c);
+        Internal\Suppressed::add($c, $a);
+
+        Internal\Suppressed::add($a, $b);
+
+        Assert::same(suppressed($a), [$b]);
+        Assert::same(suppressed($b), [$c]);
+        Assert::same(suppressed($c), []);
+    }
+
     public function nestedGroupsGiveTree(): void
     {
         $innerSecond = null;

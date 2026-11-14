@@ -64,6 +64,22 @@ final class SuspendTest
         });
     }
 
+    public function onlyClosureReturnedByRegisterIsCalled(): void
+    {
+        // A Revolt callback id is a string, and a string may be callable: "dl", "die".
+        // gc_disable() stands for them: harmless, and its effect is visible.
+        // @phpstan-ignore argument.type (the type rules it out, code without types does not)
+        suspend(static function (Continuation $continuation) {
+            $continuation->resume();
+
+            return 'gc_disable';
+        });
+
+        $enabled = gc_enabled();
+        gc_enable();
+        Assert::true($enabled);
+    }
+
     public function continuationIsOneShot(): void
     {
         $results = [];

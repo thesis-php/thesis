@@ -190,7 +190,8 @@ try {
 ```
 
 Nobody sees them unless asked, so ask where errors are logged. Nested groups give a tree: an error that left an inner group
-has suppressed errors of its own. The list goes away with the error it belongs to.
+has suppressed errors of its own. It stays a tree even if one error reaches both groups (a failed `Deferred` awaited
+in each): an error is never suppressed under one from its own list. The list goes away with the error it belongs to.
 
 ### Deadlines: `timeout()`
 
@@ -823,6 +824,9 @@ function readable(mixed $stream): void
 }
 ```
 
+Only a closure is taken for `$unregister`: anything else `$register` returns is ignored, so an arrow function may return
+whatever its expression gives (a Revolt callback id is a string, and `"die"` is callable).
+
 `Continuation::resume()` returns `false` if the continuation has already fired. A channel uses it to keep a value that was not delivered.
 `Continuation::throw()` rejects `Cancelled` with `\ValueError`, for the same reason as `Deferred::fail()`:
 the waiting scope is not cancelled.
@@ -874,6 +878,8 @@ all([user, orders])              orders fails after 50 ms
 - **No lost values.** If an event and a cancellation happen together, the event wins and the value is returned; `Cancelled` is thrown at the next wait.
 - **Cancelling a task is not a failure.** `Task::cancel()` stops one task and leaves its group alive.
 - **`Cancelled` only where the scope is cancelled.** Awaiting a cancelled task throws `TaskCancelled` instead.
+  A `Cancelled` caught elsewhere and rethrown from a task or a group body whose scope is not cancelled
+  fails the group as a `LogicException`.
 - **No work after cancellation.** A task cancelled before it started never runs: a `race()` won synchronously does not even start the others.
 - **No leaked registrations.** The `$unregister` of `suspend()` always runs.
 
@@ -912,7 +918,7 @@ all([user, orders])              orders fails after 50 ms
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
-| `suspend(callable(Continuation<T>): ?callable(): void): T` | the suspension point |
+| `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |
 | `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |

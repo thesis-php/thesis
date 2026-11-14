@@ -9,7 +9,7 @@ namespace Thesis\Async\Internal;
  *
  * The rethrown error itself is not touched: neither its type nor its `previous` changes, so `catch` by type
  * works as before. Its entry goes away with it. Nested groups give a tree by themselves: the error of an inner group
- * leaves it with its own list and is recorded in the outer one as any other failure.
+ * leaves it with its own list and is recorded in the outer one as any other failure. It stays a tree: see detach().
  *
  * @internal
  */
@@ -27,6 +27,9 @@ final class Suppressed
         $suppressed = SUPPRESSED;
         // An object, not a list: neither a lookup nor a copy per add, so thousands of failures stay linear.
         $errors = $suppressed[$first] ?? null;
+        // $error may already hold $first: one failed Deferred awaited from an inner and an outer group
+        // is recorded under the inner group's error, which then reaches the outer group after it.
+        self::detach($suppressed, $error, $first);
 
         if ($errors === null) {
             /** @var \SplObjectStorage<\Throwable, null> */
@@ -35,6 +38,36 @@ final class Suppressed
         }
 
         $errors->offsetSet($error);
+    }
+
+    /**
+     * Removes $error from the tree under $root, so that recording $root under $error makes no cycle:
+     * $error is the one rethrown, and everything stays reachable from it. A leaf costs one lookup.
+     *
+     * @param \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed
+     */
+    private static function detach(\WeakMap $suppressed, \Throwable $root, \Throwable $error): void
+    {
+        /** @var \SplObjectStorage<\Throwable, null> */
+        $visited = new \SplObjectStorage();
+        $stack = [$root];
+
+        while (($node = array_pop($stack)) !== null) {
+            $errors = $suppressed[$node] ?? null;
+
+            if ($errors === null) {
+                continue;
+            }
+
+            $errors->offsetUnset($error);
+
+            foreach ($errors as $child) {
+                if (!$visited->offsetExists($child)) {
+                    $visited->offsetSet($child);
+                    $stack[] = $child;
+                }
+            }
+        }
     }
 
     /**

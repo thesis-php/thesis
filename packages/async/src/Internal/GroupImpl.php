@@ -61,12 +61,22 @@ final class GroupImpl implements Group
 
         try {
             $result = $bodyScope->run(static fn() => $body($group));
-        } catch (Cancelled $cancelled) {
-            // Either an outer cancellation or a consequence of a task failure. The tasks see it through the tree,
-            // so there is nothing to cancel here: it is rethrown after join(), unless a failure takes precedence.
-            $group->cancelled = $cancelled;
         } catch (\Throwable $error) {
-            $group->fail($error);
+            if ($error instanceof Cancelled && $bodyScope->isCancelled()) {
+                // Either an outer cancellation or a consequence of a task failure. The tasks see it through the tree,
+                // so there is nothing to cancel here: it is rethrown after join(), unless a failure takes precedence.
+                $group->cancelled = $error;
+            } else {
+                if ($error instanceof Cancelled) {
+                    // Not this group's: rethrown as is, it would leave a healthy scope as a cancellation.
+                    $error = new \LogicException(
+                        'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
+                        previous: $error,
+                    );
+                }
+
+                $group->fail($error);
+            }
         }
 
         try {
