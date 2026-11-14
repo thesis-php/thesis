@@ -22,8 +22,11 @@ interface Task
     public function cancel(): void;
 
     /**
-     * Does not suspend if the task is already done: its result is returned even in a cancelled scope,
+     * Does not suspend if the task is already done: its outcome is returned or thrown as is even in a cancelled scope,
      * so it is not a cancellation point then, and it does not yield to the event loop.
+     *
+     * A {@see TaskCancelled} does not tell a cancelled task from one that failed with the TaskCancelled
+     * of another task it awaited and let through, as with Kotlin's and Java's cancellation exceptions.
      *
      * @return T
      * @throws Cancelled if the awaiting scope is cancelled

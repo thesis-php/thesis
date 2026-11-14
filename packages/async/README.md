@@ -158,8 +158,10 @@ It is sticky: a task spawned afterwards never runs, its handle is done as soon a
 and awaiting it throws `TaskCancelled`.
 
 Awaiting a cancelled task throws `TaskCancelled`, a regular exception: the awaiting code is not cancelled,
-it has just lost a dependency. Awaiting a task that is already done returns its result without suspending:
-it is not a cancellation point then and does not yield to the event loop.
+it has just lost a dependency. A task that let through the `TaskCancelled` of another task it awaited
+throws it too: as in Kotlin and Java, the two cannot be told apart. Awaiting a task that is already done returns
+its result, or throws its failure or `TaskCancelled`, without suspending: it is not a cancellation point then,
+even in a cancelled scope, and does not yield to the event loop.
 
 If an outer cancellation cuts a task short, `group()` throws `Cancelled` even if the body never awaited that task:
 a group never pretends that its work is done.
@@ -531,7 +533,9 @@ A waiter cancelled after the handover keeps the permit, as with any wait: its ne
 
 `Mutex` and `Semaphore` are interfaces, so the permits may live elsewhere: a Redis key, a Postgres advisory lock.
 An implementation supplies the callable that returns the permit, and `Lock` calls it under `shield()`:
-a release that has to wait still can in `finally` of a cancelled scope.
+a release that has to wait still can in `finally` of a cancelled scope. Such a lock is released explicitly:
+an unreleased `Lock` releases itself in its destructor, which may run while the engine destroys a fiber,
+and a wait there throws `FiberError`.
 
 When the resources are many and not known in advance — a user, an order, a file — take a lock per key.
 `KeyedMutex` and `KeyedSemaphore` take the key in `acquire()`, and `synchronizedKey()` is `synchronized()` for one key:

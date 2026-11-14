@@ -116,7 +116,7 @@ final class TaskTest
         });
     }
 
-    public function awaitInCancelledScopeThrowsCancelledEvenIfTaskWasCancelled(): void
+    public function awaitOfFinishedCancelledTaskInCancelledScopeThrowsTaskCancelled(): void
     {
         $awaited = null;
 
@@ -134,12 +134,38 @@ final class TaskTest
                     shield(static fn() => delay(2)); // let the task finish as cancelled
                     Assert::true($task->isDone);
 
+                    // Not a cancellation point: the outcome of a finished task is returned as is.
                     $awaited = thrown(static fn() => $task->await());
                 });
             });
         });
 
-        Assert::instanceOf($awaited, Cancelled::class);
+        Assert::instanceOf($awaited, TaskCancelled::class);
+    }
+
+    public function awaiterCancelledAfterCancelledTaskWokeItThrowsCancelled(): void
+    {
+        $caught = null;
+
+        group(static function (Group $group) use (&$caught) {
+            $task = $group->spawn(never(...));
+            /** @var Deferred<Task<never>> */
+            $second = new Deferred();
+            // Woken first, it cancels the second awaiter, which has already been woken and not run yet.
+            $group->spawn(static function () use ($task, $second) {
+                thrown(static fn() => $task->await());
+                $second->await()->cancel();
+            });
+            $second->complete($group->spawn(static function () use ($task, &$caught) {
+                $caught = thrown(static fn() => $task->await());
+
+                throw $caught;
+            }));
+            delay(1);
+            $task->cancel();
+        });
+
+        Assert::instanceOf($caught, Cancelled::class);
     }
 
     public function awaitIsCancellable(): void
