@@ -49,7 +49,7 @@ $payload = $buffer->read(16);  // exactly 16 bytes
 $header = $buffer->peek(4);    // does not advance the cursor
 $buffer->skip(2);
 $nested = $buffer->slice(32);  // next 32 bytes as a separate Buffer, e.g. a nested message
-$left = count($buffer);        // number of unread bytes
+$left = $buffer->count();      // number of unread bytes; count($buffer) works too, but is slower
 ```
 
 Reading past the end throws `Thesis\Io\UnexpectedEof` and leaves the cursor where it was.
@@ -108,11 +108,18 @@ $payload = $in->read($size);
 Line-based protocols:
 
 ```php
-$in->fillUntil($socket, "\r\n"); // throws \OverflowException if no delimiter within 64 KiB
-$line = $in->readUntil("\r\n");   // the bytes before the delimiter, or null if it is not buffered
+// the bytes before the delimiter, or null if the delimiter is not buffered yet
+$line = $in->readUntil("\r\n");
+
+if ($line === null) {
+    // read from the socket only when the buffered bytes do not contain a whole line
+    $in->fillUntil($socket, "\r\n"); // throws \OverflowException if no delimiter within 64 KiB
+    $line = $in->readUntil("\r\n");
+}
 ```
 
 `Stream` adapts any blocking PHP stream resource to `Reader`, `Writer` and `Closer`.
+It raises the PHP stream chunk size to 64 KiB, so that a single read from a socket is not capped at 8 KiB.
 
 ## Supported types
 
