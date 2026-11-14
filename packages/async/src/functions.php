@@ -211,17 +211,17 @@ function timeout(float $seconds, callable $body): mixed
  * Whatever $body has done before the deadline stays done: collect partial results by reference.
  *
  * If $body may return $default itself (null, for example), pass a $default it never returns to tell the expiry apart:
- * `$result = timeoutOr(1, $expired = new \stdClass(), $body)`, then compare with `=== $expired`.
+ * `$result = timeoutOr(1, $body, default: $expired = new \stdClass())`, then compare with `=== $expired`.
  *
  * @api
  * @template T
  * @template D
- * @param D $default returned if the deadline cuts $body short
  * @param callable(): T $body
+ * @param D $default returned if the deadline cuts $body short
  * @return T|D
  * @throws \ValueError if $seconds is NAN, before $body runs
  */
-function timeoutOr(float $seconds, mixed $default, callable $body): mixed
+function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
 {
     $result = Expired::run($seconds, $body);
 

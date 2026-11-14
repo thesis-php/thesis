@@ -127,7 +127,7 @@ final class LocalTokenBucketRateLimiterTest
         $limiter->wait();
         $start = now();
 
-        $result = timeoutOr(1, 'timed out', $limiter->wait(...));
+        $result = timeoutOr(1, $limiter->wait(...), default: 'timed out');
         $limiter->wait();
 
         Assert::same($result, 'timed out');

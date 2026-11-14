@@ -216,12 +216,13 @@ and an outer cancellation always outranks a deadline. A deadline that is zero or
 the closure runs, but its first wait throws. A `NAN` deadline is a bug and throws `\ValueError` before the closure runs.
 `delay()` of zero or less waits as `delay(0)`, as in Go and Python: until the next tick, a cancellation point all the same.
 
-When running out of time is an expected outcome, `timeoutOr()` returns a default instead of throwing:
+When running out of time is an expected outcome, `timeoutOr()` returns a default instead of throwing,
+`null` unless given:
 
 ```php
 use function Thesis\Async\timeoutOr;
 
-$recommendations = timeoutOr(0.3, [], static fn() => fetchRecommendations($userId));
+$recommendations = timeoutOr(0.3, static fn() => fetchRecommendations($userId), default: []);
 ```
 
 It is not `try { timeout() } catch (TimedOut)`: that would also swallow a `TimedOut` of a nested `timeout()`
@@ -231,7 +232,7 @@ If the closure may return the default itself (`null`, for example), pass a defau
 as with [`Channel::tryReceive()`](#producers-and-consumers-channel):
 
 ```php
-$user = timeoutOr(0.3, $expired = new \stdClass(), static fn() => findUser($userId)); // ?User
+$user = timeoutOr(0.3, static fn() => findUser($userId), default: $expired = new \stdClass()); // ?User
 
 if ($user === $expired) {
     // the deadline, not a missing user
@@ -627,7 +628,7 @@ group(static function (Group $group) use ($events, $server) {
 
             try {
                 // Up to 100 events or 1 second. A value that arrives together with the deadline is not lost.
-                timeoutOr(1, null, static function () use ($events, &$batch) {
+                timeoutOr(1, static function () use ($events, &$batch) {
                     while (\count($batch) < 100) {
                         $batch[] = $events->receive();
                     }
@@ -942,7 +943,7 @@ all([user, orders])              orders fails after 50 ms
 | `each(iterable<T>, int $concurrency, callable(T))` | bounded concurrency |
 | `map(iterable<K, T>, int $concurrency, callable(T): R): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
-| `timeoutOr(float $seconds, D $default, callable(): T): T\|D` | deadline for a subtree, `$default` once it expires |
+| `timeoutOr(float $seconds, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
 | `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |
 | `now(): float` | monotonic seconds, the clock of deadlines |
 | `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |

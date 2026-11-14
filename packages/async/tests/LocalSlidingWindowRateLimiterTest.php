@@ -153,7 +153,7 @@ final class LocalSlidingWindowRateLimiterTest
         $limiter->wait();
         $start = now();
 
-        $result = timeoutOr(3, 'timed out', $limiter->wait(...));
+        $result = timeoutOr(3, $limiter->wait(...), default: 'timed out');
         $limiter->wait();
 
         Assert::same($result, 'timed out');
