@@ -146,16 +146,17 @@ final class VirtualTimeTest
 
     public function advanceThrowsOutsideRun(): void
     {
-        $clock = Internal\Scope::$virtualClock;
-        Internal\Scope::$virtualClock = null;
+        // Every test runs inside run(): only another process is outside it.
+        $code = \sprintf(
+            'require %s; try { Thesis\Async\VirtualTime\advance(1); } catch (LogicException $e) { echo $e::class; }',
+            var_export(__DIR__ . '/../vendor/autoload.php', true),
+        );
+        $process = proc_open([PHP_BINARY, '-r', $code], [1 => ['pipe', 'w']], $pipes);
+        \assert(\is_resource($process) && isset($pipes[1]));
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
 
-        try {
-            $exception = thrown(static fn() => advance(1));
-        } finally {
-            Internal\Scope::$virtualClock = $clock;
-        }
-
-        Assert::instanceOf($exception, \LogicException::class);
+        Assert::same([$output, proc_close($process)], [\LogicException::class, 0]);
     }
 
     public function clockIsClockOfLibrary(): void

@@ -34,7 +34,7 @@ final class SuppressedTest
         $second = new \LogicException('second');
         $third = new \LogicException('third');
 
-        $exception = thrown(static fn() => failAtOnce(new \RuntimeException('first'), $second, $third));
+        $exception = thrown(static fn() => self::failAtOnce(new \RuntimeException('first'), $second, $third));
 
         Assert::instanceOf($exception, \RuntimeException::class);
         Assert::same($exception->getMessage(), 'first');
@@ -286,26 +286,26 @@ final class SuppressedTest
 
         Assert::null($reference->get());
     }
-}
 
-/**
- * The tasks are woken in the same tick, before any has failed: a later failure is not caused by the first.
- */
-function failAtOnce(\Throwable ...$errors): void
-{
-    group(static function (Group $group) use ($errors) {
-        /** @var Deferred<null> */
-        $go = new Deferred();
+    /**
+     * The tasks are woken in the same tick, before any has failed: a later failure is not caused by the first.
+     */
+    private static function failAtOnce(\Throwable ...$errors): void
+    {
+        group(static function (Group $group) use ($errors) {
+            /** @var Deferred<null> */
+            $go = new Deferred();
 
-        foreach ($errors as $error) {
-            $group->spawn(static function () use ($go, $error) {
-                $go->await();
+            foreach ($errors as $error) {
+                $group->spawn(static function () use ($go, $error) {
+                    $go->await();
 
-                throw $error;
-            });
-        }
+                    throw $error;
+                });
+            }
 
-        delay(1);
-        $go->complete(null);
-    });
+            delay(1);
+            $go->complete(null);
+        });
+    }
 }

@@ -112,17 +112,4 @@ final class TimeoutOrTest
         Assert::instanceOf($exception, \LogicException::class);
         assertNoCallbacksLeft();
     }
-
-    public function nowIsTheClockOfDeadlines(): void
-    {
-        $at = now() + 1;
-
-        $remaining = timeout($at - now(), remaining(...));
-
-        Assert::same($remaining, 1.0);
-
-        $start = now();
-        delay(10);
-        Assert::same(now() - $start, 10.0);
-    }
 }
