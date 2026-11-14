@@ -71,3 +71,65 @@ function assertNoCallbacksLeft(): void
 {
     Assert::same(EventLoop::getIdentifiers(), []);
 }
+
+/**
+ * Whether $target is reachable from $from through strong references: properties, array items, the elements
+ * of SPL containers, and the bound object and variables of closures. Weak references and fibers' stacks are not walked.
+ *
+ * A leak test that drops its own references and expects a WeakReference to clear depends on the environment:
+ * Xdebug's develop mode keeps the arguments of the stack of the last thrown exceptions. This one does not.
+ */
+function reaches(object $from, object $target): bool
+{
+    /** @var \SplObjectStorage<object, null> */
+    $visited = new \SplObjectStorage();
+    /** @var list<mixed> */
+    $stack = [$from];
+
+    while ($stack !== []) {
+        $node = array_pop($stack);
+
+        if (\is_array($node)) {
+            array_push($stack, ...array_values($node));
+
+            continue;
+        }
+
+        if (!\is_object($node) || $visited->offsetExists($node)) {
+            continue;
+        }
+
+        if ($node === $target) {
+            return true;
+        }
+
+        $visited->offsetSet($node);
+
+        if ($node instanceof \WeakReference || $node instanceof \WeakMap) {
+            continue;
+        }
+
+        if ($node instanceof \Closure) {
+            $function = new \ReflectionFunction($node);
+            $stack[] = $function->getClosureThis();
+            array_push($stack, ...array_values($function->getStaticVariables()));
+
+            continue;
+        }
+
+        if ($node instanceof \SplObjectStorage) {
+            foreach ($node as $object) {
+                $stack[] = $object;
+                $stack[] = $node[$object];
+            }
+        } elseif ($node instanceof \SplDoublyLinkedList || $node instanceof \SplHeap || $node instanceof \ArrayObject) {
+            foreach (clone $node as $item) {
+                $stack[] = $item;
+            }
+        }
+
+        array_push($stack, ...array_values(get_mangled_object_vars($node)));
+    }
+
+    return false;
+}

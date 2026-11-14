@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
+use function Thesis\Async\Tests\reaches;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -848,24 +849,22 @@ final class ChannelTest
         $toReceive = new Channel(0);
         /** @var Channel<\stdClass> */
         $toSend = new Channel(0);
-        $references = [];
+        $values = [new \stdClass(), new \stdClass()];
 
-        group(static function (Group $group) use ($toReceive, $toSend, &$references) {
+        group(static function (Group $group) use ($toReceive, $toSend, $values) {
             $handles = [
                 $group->spawn($toReceive->receive(...)),
                 $group->spawn($toReceive->receive(...)),
             ];
 
-            foreach ([1, 2] as $_) {
-                $value = new \stdClass();
-                $references[] = \WeakReference::create($value);
+            foreach ($values as $value) {
                 $handles[] = $group->spawn(static fn() => $toSend->send($value));
             }
-            unset($value);
             delay(1);
 
             Assert::same(\count((fn(): array => $this->receivers->items)->call($toReceive)), 2);
             Assert::same(\count((fn(): array => $this->senders->items)->call($toSend)), 2);
+            Assert::true(reaches($toSend, $values[0]));
 
             foreach ($handles as $handle) {
                 $handle->cancel();
@@ -875,8 +874,8 @@ final class ChannelTest
         $this->assertHoldsNothing($toReceive);
         $this->assertHoldsNothing($toSend);
 
-        foreach ($references as $reference) {
-            Assert::null($reference->get());
+        foreach ($values as $value) {
+            Assert::false(reaches($toSend, $value));
         }
     }
 

@@ -6,9 +6,9 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Internal\Suppressed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
-use const Thesis\Async\Internal\SUPPRESSED;
 
 #[Test]
 final class SuppressedTest
@@ -177,10 +177,10 @@ final class SuppressedTest
         $a = new \RuntimeException('a');
         $b = new \RuntimeException('b');
         $c = new \RuntimeException('c');
-        Internal\Suppressed::add($b, $c);
-        Internal\Suppressed::add($c, $a);
+        Suppressed::add($b, $c);
+        Suppressed::add($c, $a);
 
-        Internal\Suppressed::add($a, $b);
+        Suppressed::add($a, $b);
 
         Assert::same(suppressed($a), [$b]);
         Assert::same(suppressed($b), [$c]);
@@ -273,15 +273,18 @@ final class SuppressedTest
 
     public function entryGoesAwayWithError(): void
     {
-        $count = \count(SUPPRESSED);
+        // Never thrown: Xdebug's develop mode keeps the last thrown exceptions, and the entry would stay with them.
+        $first = new \RuntimeException('first');
+        $second = new \RuntimeException('second');
+        Suppressed::add($first, $second);
+        $reference = \WeakReference::create($second);
+        unset($second);
 
-        $exception = thrown(static fn() => failAtOnce(new \RuntimeException('first'), new \RuntimeException('second')));
+        Assert::same(suppressed($first), [$reference->get()]);
 
-        Assert::same(\count(SUPPRESSED), $count + 1);
+        unset($first);
 
-        unset($exception);
-
-        Assert::same(\count(SUPPRESSED), $count);
+        Assert::null($reference->get());
     }
 }
 
