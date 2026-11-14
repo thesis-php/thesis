@@ -28,6 +28,12 @@ The model, the API and the guarantees are described in `README.md` — read it f
   Not `EventLoop::queue()` either: microtasks run before timers.
   The flag check alone is the internal `Scope::throwIfCancelled()`.
 - If the event source fires before the cancellation, `suspend()` returns the value instead of throwing.
+- A signal never cancels a scope by itself: a shutdown is a group whose body returns after `awaitSignal()`.
+  `trapSignals()` holds referenced Revolt callbacks while its callable runs; `awaitSignal()` is a trap around one `receive()`,
+  so a signal outside the wait gets the default action (a second Ctrl+C kills the process).
+  `SignalTrap` is not a queue and not a `Channel`: like the OS, at most one pending signal per number, in the order
+  they first came, so a repeated signal never pushes out another one. It hands a signal over like `Channel` hands a value:
+  only to a receiver whose `resume()` returns `true`, otherwise to the next one or to pending.
 - `Group::join()` is uncancellable. Unstructured spawn (`async()`) is absent on purpose — do not add it.
   `spawn()` on a group whose `group()` has returned throws `LogicException`.
 - `Group::cancelTasks()` cancels the tasks and daemons, not the body, and it is sticky: a task spawned afterwards

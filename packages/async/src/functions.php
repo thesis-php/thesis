@@ -166,6 +166,46 @@ function delay(float $seconds): void
 }
 
 /**
+ * Waits for one of the signals and returns the one received: SIGINT or SIGTERM for a graceful shutdown.
+ * Cancellable like any other wait. Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ *
+ * The handlers exist only while it waits: a signal that comes before (Revolt installs them at the next tick
+ * of the loop) or after gets the default action, so a second Ctrl+C kills the process even if the shutdown hangs.
+ * To keep handling a signal, such as SIGHUP to reload, use {@see trapSignals()}.
+ *
+ * @api
+ * @param positive-int $signal
+ * @param positive-int ...$signals
+ * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+ */
+function awaitSignal(int $signal, int ...$signals): int
+{
+    return trapSignals(
+        signals: [$signal, ...$signals],
+        fn: static fn(SignalTrap $trap) => $trap->receive(),
+    );
+}
+
+/**
+ * Catches the signals while $fn runs, instead of their default action, and $fn receives them from the trap:
+ * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
+ * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ *
+ * Outside $fn, and before the next tick of the loop, when Revolt installs the handlers, a signal gets the default action.
+ *
+ * @api
+ * @template T
+ * @param non-empty-array<positive-int> $signals
+ * @param callable(SignalTrap): T $fn
+ * @return T
+ * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+ */
+function trapSignals(array $signals, callable $fn): mixed
+{
+    return SignalTrap::trap($signals, $fn);
+}
+
+/**
  * Runs $body and does not return until every task started in the group is finished.
  *
  * Tasks are started through the event loop's microtask queue: they begin to run at the body's next wait

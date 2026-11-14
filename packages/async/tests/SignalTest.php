@@ -1,0 +1,272 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Thesis\Async;
+
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
+use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\thrown;
+
+#[Test]
+final class SignalTest
+{
+    public function awaitSignalReturnsSignalReceived(): void
+    {
+        $signal = group(static function (Group $group) {
+            $group->spawn(static fn() => self::kill(SIGUSR1));
+
+            return awaitSignal(SIGUSR1);
+        });
+
+        Assert::same($signal, SIGUSR1);
+        assertNoCallbacksLeft();
+    }
+
+    public function awaitSignalReturnsWhichOfSignalsWasReceived(): void
+    {
+        $signal = group(static function (Group $group) {
+            $group->spawn(static fn() => self::kill(SIGUSR2));
+
+            return awaitSignal(SIGUSR1, SIGUSR2);
+        });
+
+        Assert::same($signal, SIGUSR2);
+        assertNoCallbacksLeft();
+    }
+
+    public function awaitSignalWakesEveryWaiter(): void
+    {
+        $signals = all([
+            static fn() => awaitSignal(SIGUSR1),
+            static fn() => awaitSignal(SIGUSR2, SIGUSR1),
+            static fn() => self::kill(SIGUSR1),
+        ]);
+
+        Assert::same($signals, [SIGUSR1, SIGUSR1, null]);
+        assertNoCallbacksLeft();
+    }
+
+    public function awaitSignalIsCancellable(): void
+    {
+        Expect::exception(TimedOut::class);
+
+        try {
+            timeout(0.001, static fn() => awaitSignal(SIGUSR1));
+        } finally {
+            assertNoCallbacksLeft();
+        }
+    }
+
+    public function awaitSignalWaitsAgainForNextSignal(): void
+    {
+        $received = [];
+
+        group(static function (Group $group) use (&$received) {
+            $group->spawn(static function () {
+                self::kill(SIGUSR1);
+                self::kill(SIGUSR2);
+            });
+
+            $received[] = awaitSignal(SIGUSR1);
+            $received[] = awaitSignal(SIGUSR2);
+        });
+
+        Assert::same($received, [SIGUSR1, SIGUSR2]);
+        assertNoCallbacksLeft();
+    }
+
+    public function awaitSignalShutsDownGroup(): void
+    {
+        $events = [];
+
+        group(static function (Group $group) use (&$events) {
+            $group->daemon(static function () use (&$events) {
+                try {
+                    delay(10); // a server that never stops by itself
+                } finally {
+                    $events[] = 'server stopped';
+                }
+            });
+            $group->spawn(static fn() => self::kill(SIGUSR1));
+
+            awaitSignal(SIGUSR1);
+            $events[] = 'signal received';
+        });
+
+        Assert::same($events, ['signal received', 'server stopped']);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsCatchesEverySignal(): void
+    {
+        $received = trapSignals([SIGUSR1, SIGUSR2], static function (SignalTrap $trap) {
+            self::kill(SIGUSR1);
+            self::kill(SIGUSR2);
+
+            return [$trap->receive(), $trap->receive()];
+        });
+
+        Assert::same($received, [SIGUSR1, SIGUSR2]);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsMergesSignalThatComesAgain(): void
+    {
+        $nothingMore = null;
+
+        $received = trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
+            self::kill(SIGUSR1); // nobody receives yet: pending
+            self::kill(SIGUSR1); // merged with the pending one, and the process survives
+            delay(0.001); // the handler runs at the next tick
+            $received = $trap->receive();
+            $nothingMore = thrown(static fn() => timeout(0.005, $trap->receive(...)));
+
+            return $received;
+        });
+
+        Assert::same($received, SIGUSR1);
+        Assert::instanceOf($nothingMore, TimedOut::class);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsDoesNotLoseSignalBehindRepeatedOne(): void
+    {
+        $received = trapSignals([SIGUSR1, SIGUSR2], static function (SignalTrap $trap) {
+            self::kill(SIGUSR1);
+            self::kill(SIGUSR1);
+            self::kill(SIGUSR2);
+
+            return [$trap->receive(), $trap->receive()];
+        });
+
+        Assert::same($received, [SIGUSR1, SIGUSR2]);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsKeepsSignalThatComesDuringReload(): void
+    {
+        $reloads = 0;
+
+        group(static function (Group $group) use (&$reloads) {
+            $group->daemon(static function () use (&$reloads) {
+                trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$reloads) {
+                    foreach ($trap as $_) {
+                        delay(0.005); // the next signal comes during this reload
+                        ++$reloads;
+                    }
+                });
+            });
+
+            self::kill(SIGUSR1);
+            self::kill(SIGUSR1);
+            delay(0.02);
+        });
+
+        Assert::same($reloads, 2);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsGivesNothingToCancelledReceiver(): void
+    {
+        $received = trapSignals([SIGUSR1], static fn(SignalTrap $trap): int => group(static function (Group $group) use ($trap) {
+            $cancelled = $group->spawn(static fn() => $trap->receive());
+            $other = $group->spawn(static fn() => $trap->receive());
+            $group->spawn(static function () use ($cancelled) {
+                delay(0.001);
+                $cancelled->cancel();
+                posix_kill(posix_getpid(), SIGUSR1);
+            });
+
+            return $other->await();
+        }));
+
+        Assert::same($received, SIGUSR1);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapIsReleasedAfterward(): void
+    {
+        $trap = trapSignals([SIGUSR1], static fn(SignalTrap $trap): SignalTrap => $trap);
+
+        Assert::same(iterator_to_array($trap), []);
+        Expect::exception(\LogicException::class);
+        $trap->receive();
+    }
+
+    public function releaseWakesWaitingReceiver(): void
+    {
+        $events = [];
+
+        group(static function (Group $group) use (&$events) {
+            trapSignals([SIGUSR1], static function (SignalTrap $trap) use ($group, &$events) {
+                $group->spawn(static function () use ($trap, &$events) {
+                    foreach ($trap as $_) {
+                        $events[] = 'signal';
+                    }
+
+                    $events[] = 'trap released';
+                });
+                delay(0.001); // the receiver waits
+            });
+        });
+
+        Assert::same($events, ['trap released']);
+        assertNoCallbacksLeft();
+    }
+
+    public function signalTakenByWaitingReceiverIsNotPending(): void
+    {
+        $nothingMore = null;
+
+        trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
+            group(static function (Group $group) use ($trap) {
+                $group->spawn(static fn() => self::kill(SIGUSR1));
+                $trap->receive();
+            });
+
+            $nothingMore = thrown(static fn() => timeout(0.005, $trap->receive(...)));
+        });
+
+        Assert::instanceOf($nothingMore, TimedOut::class);
+    }
+
+    public function trapHoldsNoReceiversAfterWaitsAreOver(): void
+    {
+        trapSignals([SIGUSR1], static function (SignalTrap $trap) {
+            try {
+                timeout(0.001, $trap->receive(...));
+            } catch (TimedOut) {
+            }
+
+            Assert::same((fn(): array => $this->receivers)->call($trap), []);
+        });
+    }
+
+    public function trapSignalsRemovesHandlersOnFailure(): void
+    {
+        Expect::exception(\LogicException::class)->withMessage('failure');
+
+        try {
+            trapSignals([SIGUSR1], static function () {
+                throw new \LogicException('failure');
+            });
+        } finally {
+            assertNoCallbacksLeft();
+        }
+    }
+
+    /**
+     * Sent after the waiters have had a tick of the loop: Revolt installs handlers then,
+     * and a signal sent before gets the default action and kills the test run.
+     *
+     * @param positive-int $signal
+     */
+    private static function kill(int $signal): void
+    {
+        delay(0.001);
+        posix_kill(posix_getpid(), $signal);
+    }
+}

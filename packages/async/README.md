@@ -285,6 +285,40 @@ try {
 }
 ```
 
+### Shutdown and reload: `awaitSignal()` and `trapSignals()`
+
+A signal does not cancel anything by itself. `awaitSignal()` waits for one of the signals and returns the one received,
+so a graceful shutdown is a group whose body returns once the signal comes: the daemons are cancelled and joined.
+`trapSignals()` catches signals for as long as its callable runs, for those that come again and again.
+
+```php
+use Thesis\Async\Group;
+use Thesis\Async\SignalTrap;
+use function Thesis\Async\awaitSignal;
+use function Thesis\Async\group;
+use function Thesis\Async\trapSignals;
+
+group(static function (Group $group) use ($server, $config) {
+    $group->daemon(static fn() => $server->serve()); // stops its own way on cancellation: see shield()
+
+    $group->daemon(static fn() => trapSignals([SIGHUP], static function (SignalTrap $signals) use ($config) {
+        foreach ($signals as $_) {
+            $config->reload();
+        }
+    }));
+
+    awaitSignal(SIGINT, SIGTERM);
+});
+```
+
+The two differ in when a signal gets its default action, which for most signals is to kill the process.
+`awaitSignal()` handles them only while it waits, so a second Ctrl+C kills the process if the shutdown hangs.
+`trapSignals()` handles them until it returns, so a SIGHUP that comes during `reload()` waits in the trap.
+Like the OS, a trap keeps at most one pending signal per number: ten SIGHUPs during a reload ask for one more.
+
+Revolt installs the handlers at the next tick of the event loop. Both are waits like any other: cancellable,
+and they keep the event loop running. They need a driver that supports signals: ext-pcntl, ext-ev or ext-uv.
+
 ### CPU-bound loops: `checkpoint()`
 
 A loop that never waits starves the event loop: timers, including `timeout()` deadlines, cannot fire,
@@ -733,6 +767,8 @@ all([user, orders])              orders fails after 50 ms
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(float $seconds)` | cancellable sleep |
+| `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
+| `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
@@ -757,7 +793,6 @@ all([user, orders])              orders fails after 50 ms
 
 Ideas that are not implemented yet.
 
-- **`select` over several channels**: an atomic choice of the first channel that has a value.
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
 
 ## Prior art
