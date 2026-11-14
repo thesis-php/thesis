@@ -22,15 +22,15 @@ final class VirtualTimer
     public int $order = 0;
 
     /** the inner defer that fires the timer once it is due */
-    public ?string $firing = null;
+    public ?string $firingCallbackId = null;
 
     /**
-     * @param \Closure(string): mixed $closure
+     * @param \Closure(string): mixed $callback
      */
     public function __construct(
-        public readonly string $id,
+        public readonly string $callbackId,
         public readonly float $interval,
-        public readonly \Closure $closure,
+        public readonly \Closure $callback,
         public readonly bool $repeat,
     ) {}
 }

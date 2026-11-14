@@ -492,16 +492,7 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
         return $fn();
     }
 
-    $locks[$semaphore] = $semaphore->acquire();
-
-    try {
-        return $fn();
-    } finally {
-        // Forgotten before the release: if it throws, the fiber must not stay a holder that takes no lock.
-        $lock = $locks[$semaphore];
-        unset($locks[$semaphore]);
-        $lock->release();
-    }
+    return Internal\holding($locks, $semaphore, $semaphore->acquire(), $fn);
 }
 
 /**
@@ -544,16 +535,7 @@ function synchronizedKey(KeyedSemaphore $semaphore, string $key, callable $fn): 
         return $fn();
     }
 
-    $locks[$key] = $semaphore->acquire($key);
-
-    try {
-        return $fn();
-    } finally {
-        // As in synchronized(): forgotten before the release, which may throw.
-        $lock = $locks[$key];
-        unset($locks[$key]);
-        $lock->release();
-    }
+    return Internal\holding($locks, $key, $semaphore->acquire($key), $fn);
 }
 
 /**

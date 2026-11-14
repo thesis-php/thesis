@@ -35,8 +35,8 @@ final class VirtualTimeDriver implements Driver
     private array $timers = [];
 
     /**
-     * @var \SplMinHeap<array{float, int, string}> [expiration, order, id]; an entry is valid while its order
-     * is the timer's: {@see enqueue()} gives a new one, {@see disable()} outdates it. The id, not the timer:
+     * @var \SplMinHeap<array{float, int, string}> [expiration, order, callback id]; an entry is valid while its order
+     * is the timer's: {@see enqueue()} gives a new one, {@see disable()} outdates it. The callback id, not the timer:
      * an outdated entry stays until it reaches the top or {@see compact()} drops it, and must not keep the closure
      * of a cancelled timer.
      */
@@ -60,7 +60,8 @@ final class VirtualTimeDriver implements Driver
 
     private int $activityAtPump = 0;
 
-    private ?string $pump = null;
+    /** the inner defer of the pump, while there is one */
+    private ?string $pumpCallbackId = null;
 
     /** @var array<string, true> the inner callbacks of this driver: hidden from the identifiers */
     private array $own = [];
@@ -140,19 +141,19 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function onReadable(mixed $stream, \Closure $closure): string
     {
-        return $this->inner->onReadable($stream, $this->countedWith($closure));
+        return $this->inner->onReadable($stream, $this->counted($closure));
     }
 
     #[\Override]
     public function onWritable(mixed $stream, \Closure $closure): string
     {
-        return $this->inner->onWritable($stream, $this->countedWith($closure));
+        return $this->inner->onWritable($stream, $this->counted($closure));
     }
 
     #[\Override]
     public function onSignal(int $signal, \Closure $closure): string
     {
-        return $this->inner->onSignal($signal, $this->countedWith($closure));
+        return $this->inner->onSignal($signal, $this->counted($closure));
     }
 
     #[\Override]
@@ -200,11 +201,11 @@ final class VirtualTimeDriver implements Driver
         if ($timer->enabled) {
             $timer->enabled = false;
 
-            if ($timer->firing !== null) {
+            if ($timer->firingCallbackId !== null) {
                 // Its entry is already extracted.
-                $this->inner->cancel($timer->firing);
-                unset($this->own[$timer->firing]);
-                $timer->firing = null;
+                $this->inner->cancel($timer->firingCallbackId);
+                unset($this->own[$timer->firingCallbackId]);
+                $timer->firingCallbackId = null;
             } else {
                 // Outdates its entry in the queue.
                 ++$timer->order;
@@ -231,8 +232,8 @@ final class VirtualTimeDriver implements Driver
         if (!$timer->referenced) {
             $timer->referenced = true;
 
-            if ($timer->firing !== null) {
-                $this->inner->reference($timer->firing);
+            if ($timer->firingCallbackId !== null) {
+                $this->inner->reference($timer->firingCallbackId);
             } elseif ($timer->enabled) {
                 ++$this->pendingReferenced;
                 $this->updatePump();
@@ -254,8 +255,8 @@ final class VirtualTimeDriver implements Driver
         if ($timer->referenced) {
             $timer->referenced = false;
 
-            if ($timer->firing !== null) {
-                $this->inner->unreference($timer->firing);
+            if ($timer->firingCallbackId !== null) {
+                $this->inner->unreference($timer->firingCallbackId);
             } elseif ($timer->enabled) {
                 --$this->pendingReferenced;
                 $this->updatePump();
@@ -332,21 +333,21 @@ final class VirtualTimeDriver implements Driver
     }
 
     /**
-     * @param \Closure(string): mixed $closure
+     * @param \Closure(string): mixed $callback
      */
-    private function schedule(float $seconds, \Closure $closure, bool $repeat): string
+    private function schedule(float $seconds, \Closure $callback, bool $repeat): string
     {
         if ($seconds < 0) {
             throw new \Error(\sprintf('%s must be greater than or equal to zero', $repeat ? 'Interval' : 'Delay'));
         }
 
         // Not like the inner ids, which are letters.
-        $id = 'virtual-' . $this->nextId++;
-        $timer = new VirtualTimer($id, $seconds, $closure, $repeat);
-        $this->timers[$id] = $timer;
+        $callbackId = 'virtual-' . $this->nextId++;
+        $timer = new VirtualTimer($callbackId, $seconds, $callback, $repeat);
+        $this->timers[$callbackId] = $timer;
         $this->enqueue($timer, $this->clock->now() + $seconds);
 
-        return $id;
+        return $callbackId;
     }
 
     /**
@@ -356,7 +357,7 @@ final class VirtualTimeDriver implements Driver
     {
         $timer->expiration = $expiration;
         $timer->order = ++$this->order;
-        $this->queue->insert([$expiration, $timer->order, $timer->id]);
+        $this->queue->insert([$expiration, $timer->order, $timer->callbackId]);
         ++$this->pending;
 
         if ($timer->referenced) {
@@ -410,33 +411,33 @@ final class VirtualTimeDriver implements Driver
     private function updatePump(): void
     {
         if ($this->pending === 0) {
-            if ($this->pump !== null) {
-                $this->inner->cancel($this->pump);
-                unset($this->own[$this->pump]);
-                $this->pump = null;
+            if ($this->pumpCallbackId !== null) {
+                $this->inner->cancel($this->pumpCallbackId);
+                unset($this->own[$this->pumpCallbackId]);
+                $this->pumpCallbackId = null;
             }
 
             return;
         }
 
-        if ($this->pump === null) {
+        if ($this->pumpCallbackId === null) {
             $this->activityAtPump = $this->activity;
-            $this->pump = $this->inner->defer($this->pump(...));
-            $this->own[$this->pump] = true;
+            $this->pumpCallbackId = $this->inner->defer($this->pump(...));
+            $this->own[$this->pumpCallbackId] = true;
         }
 
         if ($this->pendingReferenced > 0) {
-            $this->inner->reference($this->pump);
+            $this->inner->reference($this->pumpCallbackId);
         } else {
-            $this->inner->unreference($this->pump);
+            $this->inner->unreference($this->pumpCallbackId);
         }
     }
 
     private function pump(): void
     {
-        \assert($this->pump !== null);
-        unset($this->own[$this->pump]);
-        $this->pump = null;
+        \assert($this->pumpCallbackId !== null);
+        unset($this->own[$this->pumpCallbackId]);
+        $this->pumpCallbackId = null;
 
         $idle = $this->activity === $this->activityAtPump;
         $this->activityAtPump = $this->activity;
@@ -460,8 +461,8 @@ final class VirtualTimeDriver implements Driver
     private function next(): ?VirtualTimer
     {
         while (!$this->queue->isEmpty()) {
-            [, $order, $id] = $this->queue->top();
-            $timer = $this->timers[$id] ?? null;
+            [, $order, $callbackId] = $this->queue->top();
+            $timer = $this->timers[$callbackId] ?? null;
 
             if ($timer !== null && $timer->order === $order) {
                 return $timer;
@@ -478,68 +479,48 @@ final class VirtualTimeDriver implements Driver
     {
         // Its entry is extracted: until the defer runs, the timer is neither due nor pending.
         $this->leave($timer);
-        $timer->firing = $this->inner->defer(function () use ($timer): void {
-            \assert($timer->firing !== null);
-            unset($this->own[$timer->firing]);
-            $timer->firing = null;
+        $timer->firingCallbackId = $this->inner->defer(function () use ($timer): void {
+            \assert($timer->firingCallbackId !== null);
+            unset($this->own[$timer->firingCallbackId]);
+            $timer->firingCallbackId = null;
             ++$this->activity;
 
             if ($timer->repeat) {
                 $this->enqueue($timer, $this->clock->now() + $timer->interval);
             } else {
-                unset($this->timers[$timer->id]);
+                unset($this->timers[$timer->callbackId]);
                 $this->updatePump();
             }
 
             // Revolt rejects a callback that returns a value: a timer of this driver is no exception.
-            if (($timer->closure)($timer->id) !== null) {
-                throw InvalidCallbackError::nonNullReturn($timer->id, $timer->closure);
+            if (($timer->callback)($timer->callbackId) !== null) {
+                throw InvalidCallbackError::nonNullReturn($timer->callbackId, $timer->callback);
             }
         });
-        $this->own[$timer->firing] = true;
+        $this->own[$timer->firingCallbackId] = true;
 
         if (!$timer->referenced) {
-            $this->inner->unreference($timer->firing);
+            $this->inner->unreference($timer->firingCallbackId);
         }
     }
 
     /**
      * The wrapper returns none, so the inner driver would let a callback that returns a value pass:
-     * it is rejected here, as Revolt does.
+     * it is rejected here, as Revolt does. A callback of a stream or a signal also gets the stream or the signal.
      *
-     * @param \Closure(string): mixed $closure
-     * @return \Closure(string): void
+     * @param (\Closure(string): mixed)|(\Closure(string, never): mixed) $callback
+     * @return \Closure(string, mixed...): void
      */
-    private function counted(\Closure $closure): \Closure
+    private function counted(\Closure $callback): \Closure
     {
         // A callback given is work to do, even before it runs: code that has just started a pump may give one right after.
         ++$this->activity;
 
-        return function (string $callbackId) use ($closure): void {
+        return function (string $callbackId, mixed ...$args) use ($callback): void {
             ++$this->activity;
 
-            if ($closure($callbackId) !== null) {
-                throw InvalidCallbackError::nonNullReturn($callbackId, $closure);
-            }
-        };
-    }
-
-    /**
-     * {@see counted()} for a callback of a stream or a signal.
-     *
-     * @template T
-     * @param \Closure(string, T): mixed $closure
-     * @return \Closure(string, T): void
-     */
-    private function countedWith(\Closure $closure): \Closure
-    {
-        ++$this->activity;
-
-        return function (string $callbackId, mixed $arg) use ($closure): void {
-            ++$this->activity;
-
-            if ($closure($callbackId, $arg) !== null) {
-                throw InvalidCallbackError::nonNullReturn($callbackId, $closure);
+            if ($callback($callbackId, ...$args) !== null) {
+                throw InvalidCallbackError::nonNullReturn($callbackId, $callback);
             }
         };
     }
