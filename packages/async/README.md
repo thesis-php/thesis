@@ -840,7 +840,7 @@ a rate limiter shared by two `run()`s one after another, or used again outside, 
 
 The tests of this library run this way: a plugin for [Testo](https://github.com/php-testo/testo) in `tests/Testo`,
 `VirtualTimePlugin`, runs every test of the suite in its own `run()`, and the `#[VirtualTime]` attribute does the same
-for a class or a test. It is to become a package of its own.
+for a class or a test. It is not shipped with the package and not part of its API: it is to become a package of its own.
 
 ### Your own primitives: `suspend()`
 

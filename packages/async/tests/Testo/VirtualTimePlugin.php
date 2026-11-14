@@ -11,8 +11,6 @@ use Thesis\Async\Testo\Internal\VirtualTimeInterceptor;
 
 /**
  * Runs every test of the suite as {@see VirtualTime} does. A test that has the attribute as well is not wrapped twice.
- *
- * @api
  */
 final readonly class VirtualTimePlugin implements PluginConfigurator
 {
