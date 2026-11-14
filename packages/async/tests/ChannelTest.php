@@ -50,6 +50,67 @@ final class ChannelTest
         Assert::same(iterator_to_array($channel), ['a', 'b']);
     }
 
+    public function iterationBrokenOffTakesNothingMore(): void
+    {
+        /** @var Channel<int> */
+        $channel = new Channel(3);
+        $channel->send(1);
+        $channel->send(2);
+        $channel->send(3);
+        $channel->close();
+        $received = [];
+
+        foreach ($channel as $value) {
+            $received[] = $value;
+
+            break;
+        }
+
+        Assert::same($received, [1]);
+
+        foreach ($channel as $value) {
+            $received[] = $value;
+        }
+
+        Assert::same($received, [1, 2, 3]);
+    }
+
+    public function iterationBrokenOffWhileWaitingCanBeResumed(): void
+    {
+        /** @var Channel<int> */
+        $channel = new Channel(0);
+
+        $received = group(static function (Group $group) use ($channel) {
+            $group->spawn(static function () use ($channel) {
+                foreach ([1, 2, 3] as $value) {
+                    $channel->send($value);
+                }
+                $channel->close();
+            });
+
+            $iterator = $channel->getIterator();
+            $received = [];
+
+            foreach ($iterator as $value) {
+                $received[] = $value;
+
+                break;
+            }
+
+            $iterator->next(); // the same generator goes on waiting for the next value
+
+            while ($iterator->valid()) {
+                $received[] = $iterator->current();
+                $iterator->next();
+            }
+
+            return $received;
+        });
+
+        Assert::same($received, [1, 2, 3]);
+        $this->assertHoldsNothing($channel);
+    }
+
     public function sendWithRoomInBufferDoesNotWait(): void
     {
         /** @var Channel<string> */

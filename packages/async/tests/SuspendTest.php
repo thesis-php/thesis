@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
@@ -177,6 +178,28 @@ final class SuspendTest
         });
 
         Assert::same($calls, 1);
+    }
+
+    public function callsUnregisterWhenEventLoopThrowsInMain(): void
+    {
+        $calls = 0;
+
+        $exception = thrown(static function () use (&$calls) {
+            suspend(static function (Continuation $_) use (&$calls) {
+                // In {main}, the wait runs the event loop, so this throws out of the wait.
+                EventLoop::defer(static function () {
+                    throw new \RuntimeException('foreign');
+                });
+
+                return static function () use (&$calls) {
+                    ++$calls;
+                };
+            });
+        });
+
+        Assert::instanceOf($exception, UncaughtThrowable::class);
+        Assert::same($calls, 1);
+        assertNoCallbacksLeft();
     }
 
     public function cancellationInterruptsWait(): void

@@ -352,6 +352,30 @@ final class EachAndMapTest
         Assert::same(map([], 1, static fn() => null), []);
     }
 
+    public function mapFailsWithFirstFailureAndCancelsTheRest(): void
+    {
+        $events = [];
+
+        $exception = thrown(static function () use (&$events) {
+            map([1, 2, 3], 2, static function (int $item) use (&$events) {
+                try {
+                    match ($item) {
+                        1 => never(),
+                        default => throw new \RuntimeException("item {$item} failed"),
+                    };
+                } catch (Cancelled $cancelled) {
+                    $events[] = "{$item} cancelled";
+
+                    throw $cancelled;
+                }
+            });
+        });
+
+        Assert::instanceOf($exception, \RuntimeException::class);
+        Assert::same($exception->getMessage(), 'item 2 failed');
+        Assert::same($events, ['1 cancelled']);
+    }
+
     public function mapUnderExpiredDeadlineDoesNotReturnPartialResult(): void
     {
         Expect::exception(TimedOut::class);

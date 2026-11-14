@@ -87,6 +87,13 @@ final class AllAndRaceTest
         Assert::same($events, ['other cancelled']);
     }
 
+    public function allIsCancellable(): void
+    {
+        Expect::exception(TimedOut::class);
+
+        timeout(1, static fn() => all([never(...), never(...)]));
+    }
+
     public function raceReturnsFirstSuccess(): void
     {
         $winner = race([
