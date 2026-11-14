@@ -258,8 +258,13 @@ each($urls, crawl(...), concurrency: 20);
 $pages = map($urls, static fn(string $url) => fetch($url), concurrency: 20); // keys and order of $urls
 ```
 
-The items are iterated in the calling fiber, so the iterable may itself wait, for example, for the next page of an API.
-The next item is pulled only once a slot is free for it, and none is pulled after a failure.
+Items are processed by at most `concurrency` tasks, not by a task per item: a task takes the next item once it is done
+with the previous one, and a new task is started only when an item finds the running ones busy. So consecutive calls of
+the callable may share a fiber: state kept per fiber (by third-party code, for example) is not reset between items.
+
+The tasks iterate the items one at a time, so the iterable may itself wait, for example, for the next page of an API.
+The next item is pulled only once a task is free for it, and none is pulled after a failure.
+Keys are passed as they are: a generator may yield objects or repeat them (`map()` needs array keys for its result).
 
 ### Cleanup: `shield()`
 
@@ -657,7 +662,6 @@ all([user, orders])              orders fails after 50 ms
 
 ## Limitations
 
-- `each()` and `map()` start a fiber per item, not per worker.
 - Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope
   unless it runs under `ampCancellable()` and is given its cancellation: otherwise it behaves as if shielded until it returns.
 - The amphp bridge lives in this package for now, so `amphp/amp` is a dependency.

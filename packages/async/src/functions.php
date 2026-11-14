@@ -12,6 +12,7 @@ use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\ScopeCancellation;
 use Thesis\Async\Internal\Suppressed;
+use Thesis\Async\Internal\Workers;
 use function Thesis\Async\Internal\fiberKey;
 
 /**
@@ -321,8 +322,12 @@ function race(array $fns): mixed
 /**
  * Bounded concurrency: calls $fn for every item, at most $concurrency at a time.
  *
- * $items is iterated in the calling fiber, so a generator may suspend (for example, to fetch the next page).
- * The next item is pulled only once a slot is free for it, and never after a failure.
+ * Items are processed by at most $concurrency tasks, not by a task per item: a task takes the next item
+ * once it is done with the previous one, so consecutive calls of $fn may share a fiber. A task is started
+ * only when an item finds the running ones busy.
+ *
+ * $items is iterated by these tasks, one at a time, so a generator may suspend (for example, to fetch the next page).
+ * The next item is pulled only once a task is free for it, and never after a failure.
  * The first failure cancels the rest and is rethrown.
  *
  * @api
@@ -335,31 +340,7 @@ function race(array $fns): mixed
 function each(iterable $items, callable $fn, int $concurrency): void
 {
     group(static function (Group $group) use ($items, $fn, $concurrency) {
-        $body = Scope::current();
-        $slots = new LocalSemaphore($concurrency);
-        $slot = $slots->acquire();
-
-        foreach ($items as $key => $item) {
-            // A task cancelled before it started never runs, and its slot is returned by Lock::__destruct().
-            // It does not matter: only a cancelled group cancels tasks here, and then the body acquires no more.
-            $group->spawn(static function () use ($fn, $item, $key, $slot) {
-                try {
-                    $fn($item, $key);
-                } finally {
-                    $slot->release();
-                }
-            });
-
-            // The slot is waited for here, before foreach advances $items: an item is not pulled
-            // until it can start (the iterable may be a queue, a cursor or a paginated API).
-            $slot = $slots->acquire();
-
-            // A failing task frees its slot before it fails the group, and an event wins over cancellation,
-            // so the wait above returns normally even though the body is cancelled by now. Nothing more is pulled then.
-            $body->throwIfCancelled();
-        }
-
-        $slot->release();
+        new Workers($group, $items, $fn, $concurrency)->start();
     });
 }
 
@@ -428,7 +409,7 @@ function map(iterable $items, callable $fn, int $concurrency): array
         static function (mixed $item, mixed $key) use ($fn, &$results) {
             /** @var T $item */
             /** @var K $key */
-            // Tasks start in the order of $items: reserving the key first keeps that order in the result.
+            // $fn is called right after its item is taken, in the order of $items: reserving the key first keeps that order.
             $results[$key] = null;
             $results[$key] = $fn($item, $key);
         },

@@ -45,7 +45,7 @@ final class EachAndMapTest
         Assert::same($peak, min($concurrency, 10));
     }
 
-    public function eachIteratesInCallingFiberSoGeneratorMaySuspend(): void
+    public function eachIteratesGeneratorThatSuspends(): void
     {
         $pages = (static function () {
             foreach ([1, 2, 3] as $page) {
@@ -129,10 +129,13 @@ final class EachAndMapTest
             }
         })();
 
+        // Both workers are busy until item 1 is done, so item 3 waits for that.
         each($items, static function (int $item) use (&$events) {
-            if ($item === 2) {
-                delay(0.001);
-            }
+            match ($item) {
+                1 => delay(0.001),
+                2 => delay(0.002),
+                default => null,
+            };
 
             $events[] = "{$item} done";
         }, 2);
@@ -154,6 +157,129 @@ final class EachAndMapTest
         }
     }
 
+    public function eachProcessesItemsInConcurrencyFibers(): void
+    {
+        $fibers = new \SplObjectStorage(); // holds the fibers, so a dead one cannot pass its id to a new one
+
+        each(range(1, 10), static function () use ($fibers) {
+            $fibers->offsetSet(\Fiber::getCurrent());
+            delay(0.001);
+        }, 3);
+
+        Assert::same($fibers->count(), 3);
+    }
+
+    public function eachStartsNoMoreFibersThanItemsNeed(): void
+    {
+        $fibers = new \SplObjectStorage();
+
+        each([1, 2], static function () use ($fibers) {
+            $fibers->offsetSet(\Fiber::getCurrent());
+            delay(0.001);
+        }, 100);
+
+        Assert::same($fibers->count(), 2);
+    }
+
+    public function eachProcessesItemsThatDoNotWaitInOneFiber(): void
+    {
+        $fibers = new \SplObjectStorage();
+
+        each(range(1, 10), static function () use ($fibers) {
+            $fibers->offsetSet(\Fiber::getCurrent());
+        }, 3);
+
+        Assert::same($fibers->count(), 1);
+    }
+
+    public function eachDoesNotResumeGeneratorSuspendedByAnotherWorker(): void
+    {
+        $pages = (static function () {
+            foreach (range(1, 6) as $page) {
+                delay(0.001);
+
+                yield $page;
+            }
+        })();
+        $processed = [];
+
+        each($pages, static function (int $page) use (&$processed) {
+            $processed[] = $page; // takes no time: every worker is back for the next page while the generator waits
+        }, 3);
+
+        Assert::same($processed, range(1, 6));
+    }
+
+    public function eachPassesKeysThatAreNotArrayKeys(): void
+    {
+        $key = new \stdClass();
+        $keys = [];
+
+        each((static fn() => yield $key => 'item')(), static function (string $item, object $key) use (&$keys) {
+            $keys[] = $key;
+        }, 1);
+
+        Assert::same($keys, [$key]);
+    }
+
+    public function eachDoesNotPullAfterFailureOfItemThatDoesNotWait(): void
+    {
+        $pulled = [];
+
+        $exception = thrown(static function () use (&$pulled) {
+            each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
+                match ($item) {
+                    1 => delay(0.001),
+                    default => throw new \RuntimeException("item {$item} failed"),
+                };
+            }, 3);
+        });
+
+        Assert::same($exception->getMessage(), 'item 2 failed');
+        Assert::same($pulled, [1, 2]);
+    }
+
+    public function eachDoesNotPullAfterFailureWhenFnCatchesCancelled(): void
+    {
+        $pulled = [];
+
+        $exception = thrown(static function () use (&$pulled) {
+            each(self::recordPulls(range(1, 5), $pulled), static function (int $item) {
+                if ($item === 2) {
+                    throw new \RuntimeException('item 2 failed');
+                }
+
+                try {
+                    delay(1);
+                } catch (Cancelled) {
+                    // returns normally, as a sloppy $fn would
+                }
+            }, 2);
+        });
+
+        Assert::same($exception->getMessage(), 'item 2 failed');
+        Assert::same($pulled, [1, 2]);
+    }
+
+    public function eachStartsNewWorkerOnceEarlierOnesAreBusyAgain(): void
+    {
+        $running = 0;
+        $peak = 0;
+
+        // The first item does not wait: its worker is free again before the rest are taken.
+        each(range(0, 3), static function (int $item) use (&$running, &$peak) {
+            $peak = max($peak, ++$running);
+
+            if ($item > 0) {
+                delay(0.001);
+            }
+
+            --$running;
+        }, 3);
+
+        Assert::same($peak, 3);
+    }
+
     public function eachIsCancellable(): void
     {
         Expect::exception(TimedOut::class);
@@ -170,6 +296,17 @@ final class EachAndMapTest
         }, 3);
 
         Assert::same($results, ['x' => 'x3', 'y' => 'y1', 'z' => 'z2']);
+    }
+
+    public function mapKeepsInputOrderWhenWorkersTakeItemsOutOfOrder(): void
+    {
+        $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], static function (int $ms, string $key) {
+            delay($ms / 1_000);
+
+            return $key;
+        }, 2);
+
+        Assert::same($results, ['a' => 'a', 'b' => 'b', 'c' => 'c', 'd' => 'd', 'e' => 'e']);
     }
 
     public function mapOfNothingIsEmpty(): void
