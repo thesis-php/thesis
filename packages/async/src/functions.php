@@ -12,6 +12,7 @@ use Thesis\Async\Internal\Expired;
 use Thesis\Async\Internal\GroupImpl;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\ScopeCancellation;
+use Thesis\Async\Internal\SignalTrapImpl;
 use Thesis\Async\Internal\Suppressed;
 use Thesis\Async\Internal\Workers;
 use function Thesis\Async\Internal\fiberKey;
@@ -578,7 +579,7 @@ function awaitSignal(int $signal, int ...$signals): int
  */
 function trapSignals(array $signals, callable $fn): mixed
 {
-    return SignalTrap::trap($signals, $fn);
+    return SignalTrapImpl::trap($signals, $fn);
 }
 
 /**

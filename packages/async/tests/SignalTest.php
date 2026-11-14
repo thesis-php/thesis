@@ -7,6 +7,7 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Async\Internal\SignalTrapImpl;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
@@ -215,6 +216,7 @@ final class SignalTest
             // The loop runs the cancelled fiber, which leaves the queue, before the next signal callback:
             // only a signal caught right after the cancellation, in the same tick, meets a receiver that refuses it.
             $cancelled->cancel();
+            \assert($trap instanceof SignalTrapImpl);
             (fn() => $this->catch(SIGUSR1))->call($trap);
 
             Assert::instanceOf(thrown($cancelled->await(...)), TaskCancelled::class);
@@ -280,6 +282,7 @@ final class SignalTest
             } catch (TimedOut) {
             }
 
+            \assert($trap instanceof SignalTrapImpl);
             Assert::same((fn(): array => $this->receivers->items)->call($trap), []);
         });
     }
