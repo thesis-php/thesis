@@ -23,14 +23,18 @@ final class Suppressed
         }
 
         // A constant cannot be written to by offset, its object can.
-        /** @var \WeakMap<\Throwable, list<\Throwable>> $suppressed */
+        /** @var \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed */
         $suppressed = SUPPRESSED;
-        $list = $suppressed[$first] ?? [];
+        // An object, not a list: neither a lookup nor a copy per add, so thousands of failures stay linear.
+        $errors = $suppressed[$first] ?? null;
 
-        if (!\in_array($error, $list, true)) {
-            $list[] = $error;
-            $suppressed[$first] = $list;
+        if ($errors === null) {
+            /** @var \SplObjectStorage<\Throwable, null> */
+            $errors = new \SplObjectStorage();
+            $suppressed[$first] = $errors;
         }
+
+        $errors->offsetSet($error);
     }
 
     /**
@@ -38,10 +42,11 @@ final class Suppressed
      */
     public static function of(\Throwable $error): array
     {
-        /** @var \WeakMap<\Throwable, list<\Throwable>> $suppressed */
+        /** @var \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed */
         $suppressed = SUPPRESSED;
+        $errors = $suppressed[$error] ?? null;
 
-        return $suppressed[$error] ?? [];
+        return $errors === null ? [] : iterator_to_array($errors, false);
     }
 }
 
@@ -49,6 +54,6 @@ final class Suppressed
  * Declared next to the class: it is read only by Suppressed, so loading the class defines it.
  *
  * @internal
- * @var \WeakMap<\Throwable, list<\Throwable>>
+ * @var \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> in the order of addition
  */
 const SUPPRESSED = new \WeakMap();
