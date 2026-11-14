@@ -14,7 +14,8 @@ interface Reader
      *
      * @param positive-int $max
      * @return non-empty-string
-     * @throws UnexpectedEof
+     * @throws UnexpectedEof at the end of the stream
+     * @throws ReadFailed if the read fails for another reason
      */
     public function read(int $max): string;
 }

@@ -33,8 +33,12 @@ final readonly class Stream implements Reader, Writer, Closer
         error_clear_last();
         $bytes = @fread($this->stream, $max);
 
-        if ($bytes === false || $bytes === '') {
-            throw new UnexpectedEof(error_get_last()['message'] ?? 'Unexpected end of stream.');
+        if ($bytes === false) {
+            throw new ReadFailed(error_get_last()['message'] ?? 'Failed to read from stream.');
+        }
+
+        if ($bytes === '') {
+            throw new UnexpectedEof('Unexpected end of stream.');
         }
 
         return $bytes;

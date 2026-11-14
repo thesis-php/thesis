@@ -18,7 +18,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - 64-bit PHP is required (`php-64bit`): `int` is int64. `readUint64()` throws `\OverflowException` above
   `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
 - Marks of `reserve()` are absolute positions, invalidated by `fill()`, `flush()` and `drain()`.
-- `Reader::read()` returns 1 to `$max` bytes and throws `UnexpectedEof` at the end, `Writer::write()` writes all bytes,
+- `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end and `ReadFailed` on any other failure
+  (a reset is not an end: a protocol may treat an EOF between messages as a clean close), `Writer::write()` writes all bytes,
   `Closer::close()` is idempotent.
 
 ## Tests

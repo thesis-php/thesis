@@ -97,6 +97,17 @@ final class StreamTest
         $stream->write('abc');
     }
 
+    public function throwsOnFailedRead(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'thesis-io-');
+        \assert(\is_string($file));
+        $this->file = $file;
+        $stream = new Stream(self::open($file, 'w'));
+        Expect::exception(ReadFailed::class)->withMessageContaining('Bad file descriptor');
+
+        $stream->read(1);
+    }
+
     public function closesStream(): void
     {
         $handle = self::open('php://memory', 'r');

@@ -81,7 +81,8 @@ $buffer->readVarint();
 
 ### Streams
 
-`Reader::read(int $max)` returns from 1 to `$max` bytes and throws `UnexpectedEof` at the end of the stream,
+`Reader::read(int $max)` returns from 1 to `$max` bytes, throws `UnexpectedEof` at the end of the stream
+and `ReadFailed` if the read fails otherwise (a connection reset),
 `Writer::write(string $bytes)` writes all the bytes. `Buffer` turns them into exact, buffered reads and batched writes:
 
 ```php
