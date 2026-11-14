@@ -282,6 +282,27 @@ final class OnCancelTest
         Assert::false($called);
     }
 
+    public function acceptsCallableThatIsNotClosure(): void
+    {
+        $recorder = new class {
+            /** @var list<string> */
+            public array $calls = [];
+
+            public function __invoke(): void
+            {
+                $this->calls[] = 'invokable';
+            }
+        };
+
+        thrown(static fn() => timeout(1, static function () use ($recorder) {
+            onCancel($recorder);
+
+            never();
+        }));
+
+        Assert::same($recorder->calls, ['invokable']);
+    }
+
     public function isNotCalledAfterScopeHasEnded(): void
     {
         $called = false;

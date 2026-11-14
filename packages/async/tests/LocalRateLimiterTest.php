@@ -118,7 +118,7 @@ final class LocalRateLimiterTest
         $limiter->wait();
         $start = now();
 
-        $result = timeoutOr(1, $limiter->wait(...), 'timed out');
+        $result = timeoutOr(1, 'timed out', $limiter->wait(...));
         $limiter->wait();
 
         Assert::same($result, 'timed out');

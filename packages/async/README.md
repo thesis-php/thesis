@@ -221,7 +221,7 @@ When running out of time is an expected outcome, `timeoutOr()` returns a default
 ```php
 use function Thesis\Async\timeoutOr;
 
-$recommendations = timeoutOr(0.3, static fn() => fetchRecommendations($userId), default: []);
+$recommendations = timeoutOr(0.3, [], static fn() => fetchRecommendations($userId));
 ```
 
 It is not `try { timeout() } catch (TimedOut)`: that would also swallow a `TimedOut` of a nested `timeout()`
@@ -615,7 +615,7 @@ group(static function (Group $group) use ($events, $server) {
 
             try {
                 // Up to 100 events or 1 second. A value that arrives together with the deadline is not lost.
-                timeoutOr(1, static function () use ($events, &$batch) {
+                timeoutOr(1, null, static function () use ($events, &$batch) {
                     while (\count($batch) < 100) {
                         $batch[] = $events->receive();
                     }
@@ -926,7 +926,7 @@ all([user, orders])              orders fails after 50 ms
 | `each(iterable<T>, int $concurrency, callable(T))` | bounded concurrency |
 | `map(iterable<K, T>, int $concurrency, callable(T): R): array<K, R>` | bounded concurrency with results |
 | `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
-| `timeoutOr(float $seconds, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
+| `timeoutOr(float $seconds, D $default, callable(): T): T\|D` | deadline for a subtree, `$default` once it expires |
 | `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |
 | `now(): float` | monotonic seconds, the clock of deadlines |
 | `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |
@@ -944,7 +944,7 @@ all([user, orders])              orders fails after 50 ms
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
-| `onCancel(\Closure(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
+| `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |
 | `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |

@@ -113,12 +113,12 @@ function isCancelled(): bool
  * the callback is dropped and never called, so unsubscribing is optional then.
  *
  * @api
- * @param \Closure(): void $callback
+ * @param callable(): void $callback
  * @return \Closure(): void unsubscribe, idempotent
  */
-function onCancel(\Closure $callback): \Closure
+function onCancel(callable $callback): \Closure
 {
-    return Scope::current()->onCancel($callback);
+    return Scope::current()->onCancel($callback(...));
 }
 
 /**
@@ -210,12 +210,12 @@ function timeout(float $seconds, callable $body): mixed
  * @api
  * @template T
  * @template D
- * @param callable(): T $body
  * @param D $default
+ * @param callable(): T $body
  * @return T|D
  * @throws \ValueError if $seconds is NAN, before $body runs
  */
-function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
+function timeoutOr(float $seconds, mixed $default, callable $body): mixed
 {
     $result = Expired::run($seconds, $body);
 
