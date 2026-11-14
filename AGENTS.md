@@ -77,8 +77,13 @@ the whole monorepo is for the final check.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
-- A call with more than two arguments puts them one per line with a trailing comma. `make rector` names them
-  (`tools/rector/MoreThanTwoArgumentsStrategy.php`), but does not wrap the lines.
+- A call with more than two arguments puts them one per line with a trailing comma.
+- Don't neglect named arguments where they help reading: a flag or a bare literal (`strict: true`, `limit: 3`),
+  neighbours that are easy to swap (`actual:`/`expected:`), a call of our own code with many parameters,
+  a data object built field by field (a DTO, a manifest), a rarely used function whose parameters nobody remembers
+  (`proc_open()`, `stream_socket_pair()`). Where the call already reads well, skip them:
+  `substr($bytes, $offset, $length)`. Rejected: a mechanical rule like "name every argument of a call with more
+  than two", it is noise around the standard library.
 - A multiline chain of method calls ends with `;` on its own line, so a call is added or removed without touching
   the previous line. `make fixer` enforces it.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type

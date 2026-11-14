@@ -60,7 +60,11 @@ final class GroupImpl implements Group
         $bodyScope = new Scope(Scope::current());
         $tasksScope = new Scope($bodyScope);
         $daemonsScope = new Scope($tasksScope);
-        $group = new self($bodyScope, $tasksScope, $daemonsScope);
+        $group = new self(
+            bodyScope: $bodyScope,
+            tasksScope: $tasksScope,
+            daemonsScope: $daemonsScope,
+        );
         $result = null;
 
         try {

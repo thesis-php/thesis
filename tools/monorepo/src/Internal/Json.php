@@ -26,7 +26,7 @@ final readonly class Json
     {
         try {
             $value = json_decode(
-                json: $content,
+                $content,
                 associative: true,
                 flags: JSON_THROW_ON_ERROR,
             );

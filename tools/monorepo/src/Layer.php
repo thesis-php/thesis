@@ -47,8 +47,8 @@ enum Layer: string
     private function rank(): int
     {
         return (int) array_search(
-            needle: $this,
-            haystack: self::cases(),
+            $this,
+            self::cases(),
             strict: true,
         );
     }

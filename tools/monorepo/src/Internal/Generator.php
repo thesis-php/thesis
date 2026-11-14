@@ -264,9 +264,9 @@ final readonly class Generator
         }
 
         $before = substr(
-            string: $agents,
-            offset: 0,
-            length: $start,
+            $agents,
+            0,
+            $start,
         );
 
         return $before

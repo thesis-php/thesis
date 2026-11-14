@@ -14,7 +14,6 @@ return new Config(
     requireDev: [
         'ext-tokenizer' => '*',
         'llm/skills' => '^1.17',
-        'savinmikhail/add_named_arguments_rector' => '^0.1.27',
         'symfony/console' => '^8.0',
         'symfony/var-dumper' => '^8.0',
         'testo/assert' => '^0.1.17',

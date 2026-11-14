@@ -67,7 +67,12 @@ final class Workers
      */
     public static function start(Group $group, iterable $items, int $concurrency, \Closure $fn): void
     {
-        new self($group, $items, $concurrency, $fn)->spawn();
+        new self(
+            group: $group,
+            items: $items,
+            concurrency: $concurrency,
+            fn: $fn,
+        )->spawn();
     }
 
     private function spawn(): void

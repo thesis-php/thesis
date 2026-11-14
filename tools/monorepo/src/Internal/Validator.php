@@ -206,8 +206,8 @@ final class Validator
             }
 
             $runtime = \in_array(
-                needle: $dir,
-                haystack: $manifest->uses,
+                $dir,
+                $manifest->uses,
                 strict: true,
             );
 
@@ -239,8 +239,8 @@ final class Validator
                 $owner = $this->ownerOf($reference->name);
 
                 $isAllowed = $owner === null || \in_array(
-                    needle: $owner,
-                    haystack: $allowed,
+                    $owner,
+                    $allowed,
                     strict: true,
                 );
 
@@ -296,8 +296,8 @@ final class Validator
         }
 
         $position = array_search(
-            needle: $dir,
-            haystack: $stack,
+            $dir,
+            $stack,
             strict: true,
         );
 

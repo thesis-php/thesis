@@ -70,12 +70,12 @@ fixer-check: var ## Check code style [P=]
 	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php --path-mode=intersection --diff --dry-run $(ARGS) $(PATHS)
 .PHONY: fixer-check
 
-rector: var vendor ## Apply Rector rules [P=]
-	$(RUN) vendor/bin/rector process --config=tools/rector.php $(ARGS) $(PATHS)
+rector: var ## Apply Rector rules [P=]
+	$(RUN) rector process --config=tools/rector.php $(ARGS) $(PATHS)
 .PHONY: rector
 
-rector-check: var vendor ## Check Rector rules [P=]
-	$(RUN) vendor/bin/rector process --config=tools/rector.php --dry-run $(ARGS) $(PATHS)
+rector-check: var ## Check Rector rules [P=]
+	$(RUN) rector process --config=tools/rector.php --dry-run $(ARGS) $(PATHS)
 .PHONY: rector-check
 
 phpstan: var vendor ## Run static analysis [P=]
