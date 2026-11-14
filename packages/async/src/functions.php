@@ -389,6 +389,56 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
 }
 
 /**
+ * {@see synchronized()} for one key of a {@see KeyedSemaphore}: runs $fn holding a permit of $key
+ * and releases it whatever $fn ends with.
+ *
+ * Reentrant within a fiber per key: inside synchronizedKey() on the same semaphore and key, $fn runs right away;
+ * another key of the same semaphore is acquired as usual.
+ *
+ * @api
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ * @throws Cancelled if the scope is cancelled while waiting for the lock
+ */
+function synchronizedKey(KeyedSemaphore $semaphore, string $key, callable $fn): mixed
+{
+    /** @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>> $held locks taken by synchronizedKey(), per fiber */
+    static $held = new \WeakMap();
+
+    // As in synchronized(), the fiber's key is not kept in a variable: see fiberKey().
+    $semaphores = $held[fiberKey()] ?? null;
+
+    if ($semaphores === null) {
+        /** @var \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>> */
+        $semaphores = new \WeakMap();
+        $held[fiberKey()] = $semaphores;
+    }
+
+    // An object, not an array: the locks are added and removed after acquire() may have suspended.
+    $locks = $semaphores[$semaphore] ?? null;
+
+    if ($locks === null) {
+        /** @var \ArrayObject<array-key, Lock> */
+        $locks = new \ArrayObject();
+        $semaphores[$semaphore] = $locks;
+    }
+
+    if (isset($locks[$key])) {
+        return $fn();
+    }
+
+    $locks[$key] = $semaphore->acquire($key);
+
+    try {
+        return $fn();
+    } finally {
+        $locks[$key]->release();
+        unset($locks[$key]);
+    }
+}
+
+/**
  * {@see each()} that collects the results. Keys are preserved, and so is the order of $items.
  *
  * @api

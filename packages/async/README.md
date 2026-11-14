@@ -435,6 +435,24 @@ A waiter cancelled after the handover keeps the permit, as with any wait: its ne
 An implementation supplies the callable that returns the permit, and `Lock` calls it under `shield()`:
 a release that has to wait still can in `finally` of a cancelled scope.
 
+When the resources are many and not known in advance — a user, an order, a file — take a lock per key.
+`KeyedMutex` and `KeyedSemaphore` take the key in `acquire()`, and `synchronizedKey()` is `synchronized()` for one key:
+
+```php
+use Thesis\Async\LocalKeyedMutex;
+use function Thesis\Async\synchronizedKey;
+
+$accounts = new LocalKeyedMutex();
+
+synchronizedKey($accounts, $accountId, static function () use ($accountId, $amount) {
+    $balance = loadBalance($accountId);     // waits
+    storeBalance($accountId, $balance - $amount);
+}); // other accounts do not wait for this one
+```
+
+Within a key they behave as `Mutex` and `Semaphore`: fair, cancellable, reentrant under `synchronizedKey()` per key.
+`LocalKeyedSemaphore` keeps a key only while someone holds or waits for it, so keys that come from outside do not pile up.
+
 ### Producers and consumers: `Channel`
 
 A bounded queue between fibers that live on their own: request handlers and one writer that stores events in batches,
@@ -676,6 +694,8 @@ all([user, orders])              orders fails after 50 ms
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
+| `KeyedMutex extends KeyedSemaphore`: `acquire(string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
+| `synchronizedKey(KeyedSemaphore, string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
 | `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): bool`, `receive(): T`, `close()`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
