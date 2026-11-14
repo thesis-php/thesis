@@ -13,6 +13,7 @@
         "php": "^8.5"
     },
     "require-dev": {
+        "llm/skills": "^1.17",
         "symfony/var-dumper": "^8.0",
         "testo/testo": "^0.10.29"
     },
@@ -28,6 +29,9 @@
     },
     "config": {
         "lock": false,
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "llm/skills": true
+        }
     }
 }
