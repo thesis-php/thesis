@@ -66,6 +66,10 @@ skills ship with the package and reach its users through llm/skills.
   `noDelay` is on by default, and the backlog is 511, as in nginx.
 - Happy Eyeballs is a group of attempts reporting to a `Channel` sized for all of them, so no attempt waits to report;
   sockets that connect in the same tick as the winner are drained and closed in `finally`.
+- A value of a protocol or a file keeps its unit in the internal object that mirrors it: the TTL of
+  `Internal\Dns\Response` and `DnsResolver::MAX_TTL` are seconds as on the wire, the timeout of
+  `Internal\Dns\SystemConfig` is seconds as in resolv.conf. They become a `Duration` where they leave it
+  (`sec($ttl)`); every other time inside is int nanoseconds (`Server` backoff, `Connector::ATTEMPT_DELAY`).
 - `Socket` is a final class, not an interface: protocol tests use `socketPair()`, decorators wrap `Reader`/`Writer`.
 - `enableTls()` is explicit and `accept()` does no handshake: a slow client must not stall the accept loop,
   and plaintext-first protocols need the upgrade anyway.

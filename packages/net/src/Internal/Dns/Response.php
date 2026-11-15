@@ -12,7 +12,7 @@ final readonly class Response
     /**
      * @param int<0, 15> $rcode
      * @param list<non-empty-string> $addresses of the type asked for, CNAME chains followed by the server
-     * @param non-negative-int $ttl the smallest of $addresses, 0 if there are none
+     * @param non-negative-int $ttl the smallest of $addresses in seconds, as on the wire; 0 if there are none
      */
     public function __construct(
         public bool $truncated,

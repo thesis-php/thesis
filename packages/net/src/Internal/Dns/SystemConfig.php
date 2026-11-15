@@ -96,7 +96,7 @@ final readonly class SystemConfig
      * @param array<non-empty-string, non-empty-list<non-empty-string>> $hosts
      * @param list<non-empty-string> $search
      * @param int<0, 15> $ndots
-     * @param int<1, 30> $timeout
+     * @param int<1, 30> $timeout in seconds, as in resolv.conf
      * @param int<1, 5> $attempts
      */
     public function __construct(

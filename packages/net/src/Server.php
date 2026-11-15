@@ -8,7 +8,7 @@ use Thesis\Async\Cancelled;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
-use function Thesis\Time\sec;
+use function Thesis\Time\ns;
 
 /**
  * A listening socket, created by {@see listen()} or {@see listenUnix()}.
@@ -19,10 +19,10 @@ final class Server
 {
     /**
      * Pause after an accept that fails although a connection is pending: the process may be out of file descriptors,
-     * and retrying at once would spin. Doubles up to {@see MAX_BACKOFF}.
+     * and retrying at once would spin. Doubles up to {@see MAX_BACKOFF}. In nanoseconds.
      */
-    private const float MIN_BACKOFF = 0.005;
-    private const float MAX_BACKOFF = 1.0;
+    private const int MIN_BACKOFF = 5_000_000;
+    private const int MAX_BACKOFF = 1_000_000_000;
 
     /**
      * Accepts that find a connection at once before one yields, so that a flood of connections
@@ -100,9 +100,10 @@ final class Server
             if ($woken) {
                 // Readable, but nothing to accept: another fiber has taken it, or accept() itself fails.
                 $woken = false;
-                $backoff = min(self::MIN_BACKOFF * 2 ** $failures++, self::MAX_BACKOFF);
+                // The shift is capped: past MAX_BACKOFF anyway, and an int must not overflow.
+                $backoff = min(self::MIN_BACKOFF << min($failures++, 30), self::MAX_BACKOFF);
 
-                if (!$this->watcher->delay(sec($backoff))) {
+                if (!$this->watcher->delay(ns($backoff))) {
                     return null;
                 }
             } elseif ($this->watcher->readable()) {

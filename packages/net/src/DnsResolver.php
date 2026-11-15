@@ -32,6 +32,7 @@ final class DnsResolver implements Resolver
 
     /**
      * A day, as most resolvers cap it: a record with a huge TTL must not stay in a long-running process for good.
+     * In seconds, as the TTLs on the wire.
      */
     private const int MAX_TTL = 86_400;
 
@@ -330,6 +331,7 @@ final class DnsResolver implements Resolver
             unset($this->cache[array_key_first($this->cache)]);
         }
 
-        $this->cache[$name] = new Cached(addresses: $addresses, expiresAt: Instant::now()->add(sec(min($ttl, self::MAX_TTL))));
+        $expiresAt = Instant::now()->add(sec(min($ttl, self::MAX_TTL)));
+        $this->cache[$name] = new Cached(addresses: $addresses, expiresAt: $expiresAt);
     }
 }

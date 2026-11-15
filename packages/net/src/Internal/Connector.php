@@ -11,7 +11,7 @@ use Thesis\Net\ConnectFailed;
 use Thesis\Net\Socket;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
-use function Thesis\Time\sec;
+use function Thesis\Time\ns;
 
 /**
  * @internal
@@ -20,8 +20,9 @@ final readonly class Connector
 {
     /**
      * How long an attempt has before the next address is tried alongside, as RFC 8305 (Happy Eyeballs) recommends.
+     * In nanoseconds.
      */
-    private const float ATTEMPT_DELAY = 0.25;
+    private const int ATTEMPT_DELAY = 250_000_000;
 
     /**
      * @param non-empty-list<non-empty-string> $ips
@@ -88,7 +89,7 @@ final readonly class Connector
                     while ($running > 0) {
                         $outcome = $i === $last
                             ? $outcomes->receive()
-                            : timeoutOr(sec(self::ATTEMPT_DELAY), $outcomes->receive(...));
+                            : timeoutOr(ns(self::ATTEMPT_DELAY), $outcomes->receive(...));
 
                         if ($outcome === null) {
                             break;
