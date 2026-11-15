@@ -16,110 +16,191 @@ use Testo\Test;
 final class BufferEncodingTest
 {
     /**
-     * @return iterable<string, array{\Closure(Buffer, int|float): Buffer, \Closure(Buffer): (int|float), int|float, string, string}>
+     * @return iterable<string, array{
+     *     \Closure(Buffer): Buffer,
+     *     \Closure(Buffer): (int|float),
+     *     int|float,
+     *     string,
+     *     string,
+     * }>
      */
     public static function fixedSizeValues(): iterable
     {
-        $int8 = [static fn(Buffer $b, int $v): Buffer => $b->writeInt8($v), static fn(Buffer $b): int => $b->readInt8()];
-        yield 'int8 min' => [...$int8, -128, '80', '80'];
-        yield 'int8 -1' => [...$int8, -1, 'ff', 'ff'];
-        yield 'int8 0' => [...$int8, 0, '00', '00'];
-        yield 'int8 max' => [...$int8, 127, '7f', '7f'];
-
-        $uint8 = [static fn(Buffer $b, int $v): Buffer => $b->writeUint8($v), static fn(Buffer $b): int => $b->readUint8()];
-        yield 'uint8 0' => [...$uint8, 0, '00', '00'];
-        yield 'uint8 128' => [...$uint8, 128, '80', '80'];
-        yield 'uint8 max' => [...$uint8, 255, 'ff', 'ff'];
-
-        $int16 = [static fn(Buffer $b, int $v): Buffer => $b->writeInt16($v), static fn(Buffer $b): int => $b->readInt16()];
-        yield 'int16 min' => [...$int16, -32_768, '8000', '0080'];
-        yield 'int16 -2' => [...$int16, -2, 'fffe', 'feff'];
-        yield 'int16 0' => [...$int16, 0, '0000', '0000'];
-        yield 'int16 258' => [...$int16, 258, '0102', '0201'];
-        yield 'int16 max' => [...$int16, 32_767, '7fff', 'ff7f'];
-
-        $uint16 = [static fn(Buffer $b, int $v): Buffer => $b->writeUint16($v), static fn(Buffer $b): int => $b->readUint16()];
-        yield 'uint16 0' => [...$uint16, 0, '0000', '0000'];
-        yield 'uint16 258' => [...$uint16, 258, '0102', '0201'];
-        yield 'uint16 32768' => [...$uint16, 32_768, '8000', '0080'];
-        yield 'uint16 max' => [...$uint16, 65_535, 'ffff', 'ffff'];
-
-        $int32 = [static fn(Buffer $b, int $v): Buffer => $b->writeInt32($v), static fn(Buffer $b): int => $b->readInt32()];
-        yield 'int32 min' => [...$int32, -2_147_483_648, '80000000', '00000080'];
-        yield 'int32 -2' => [...$int32, -2, 'fffffffe', 'feffffff'];
-        yield 'int32 0' => [...$int32, 0, '00000000', '00000000'];
-        yield 'int32 16909060' => [...$int32, 16_909_060, '01020304', '04030201'];
-        yield 'int32 max' => [...$int32, 2_147_483_647, '7fffffff', 'ffffff7f'];
-
-        $uint32 = [static fn(Buffer $b, int $v): Buffer => $b->writeUint32($v), static fn(Buffer $b): int => $b->readUint32()];
-        yield 'uint32 0' => [...$uint32, 0, '00000000', '00000000'];
-        yield 'uint32 16909060' => [...$uint32, 16_909_060, '01020304', '04030201'];
-        yield 'uint32 2147483648' => [...$uint32, 2_147_483_648, '80000000', '00000080'];
-        yield 'uint32 max' => [...$uint32, 4_294_967_295, 'ffffffff', 'ffffffff'];
-
-        $int64 = [static fn(Buffer $b, int $v): Buffer => $b->writeInt64($v), static fn(Buffer $b): int => $b->readInt64()];
-        yield 'int64 min' => [...$int64, PHP_INT_MIN, '8000000000000000', '0000000000000080'];
-        yield 'int64 -2' => [...$int64, -2, 'fffffffffffffffe', 'feffffffffffffff'];
-        yield 'int64 0' => [...$int64, 0, '0000000000000000', '0000000000000000'];
-        yield 'int64 72623859790382856' => [...$int64, 0x01_02_03_04_05_06_07_08, '0102030405060708', '0807060504030201'];
-        yield 'int64 max' => [...$int64, PHP_INT_MAX, '7fffffffffffffff', 'ffffffffffffff7f'];
-
-        $uint64 = [
-            static function (Buffer $b, int $v): Buffer {
-                \assert($v >= 0);
-
-                return $b->writeUint64($v);
-            },
-            static fn(Buffer $b): int => $b->readUint64(),
+        $int8 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeInt8($v),
+            static fn(Buffer $b) => $b->readInt8(),
+            $v,
+            $big,
+            $little,
         ];
-        yield 'uint64 0' => [...$uint64, 0, '0000000000000000', '0000000000000000'];
-        yield 'uint64 72623859790382856' => [...$uint64, 0x01_02_03_04_05_06_07_08, '0102030405060708', '0807060504030201'];
-        yield 'uint64 PHP_INT_MAX' => [...$uint64, PHP_INT_MAX, '7fffffffffffffff', 'ffffffffffffff7f'];
+        yield 'int8 min' => $int8(-128, '80', '80');
+        yield 'int8 -1' => $int8(-1, 'ff', 'ff');
+        yield 'int8 0' => $int8(0, '00', '00');
+        yield 'int8 max' => $int8(127, '7f', '7f');
 
-        $float = [static fn(Buffer $b, float $v): Buffer => $b->writeFloat($v), static fn(Buffer $b): float => $b->readFloat()];
-        yield 'float 0' => [...$float, 0.0, '00000000', '00000000'];
-        yield 'float 1.5' => [...$float, 1.5, '3fc00000', '0000c03f'];
-        yield 'float -2.25' => [...$float, -2.25, 'c0100000', '000010c0'];
+        $uint8 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeUint8($v),
+            static fn(Buffer $b) => $b->readUint8(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'uint8 0' => $uint8(0, '00', '00');
+        yield 'uint8 128' => $uint8(128, '80', '80');
+        yield 'uint8 max' => $uint8(255, 'ff', 'ff');
 
-        $double = [static fn(Buffer $b, float $v): Buffer => $b->writeDouble($v), static fn(Buffer $b): float => $b->readDouble()];
-        yield 'double 0' => [...$double, 0.0, '0000000000000000', '0000000000000000'];
-        yield 'double 1.5' => [...$double, 1.5, '3ff8000000000000', '000000000000f83f'];
-        yield 'double -0.1' => [...$double, -0.1, 'bfb999999999999a', '9a9999999999b9bf'];
+        $int16 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeInt16($v),
+            static fn(Buffer $b) => $b->readInt16(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'int16 min' => $int16(-32_768, '8000', '0080');
+        yield 'int16 -2' => $int16(-2, 'fffe', 'feff');
+        yield 'int16 0' => $int16(0, '0000', '0000');
+        yield 'int16 258' => $int16(258, '0102', '0201');
+        yield 'int16 max' => $int16(32_767, '7fff', 'ff7f');
+
+        $uint16 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeUint16($v),
+            static fn(Buffer $b) => $b->readUint16(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'uint16 0' => $uint16(0, '0000', '0000');
+        yield 'uint16 258' => $uint16(258, '0102', '0201');
+        yield 'uint16 32768' => $uint16(32_768, '8000', '0080');
+        yield 'uint16 max' => $uint16(65_535, 'ffff', 'ffff');
+
+        $int32 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeInt32($v),
+            static fn(Buffer $b) => $b->readInt32(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'int32 min' => $int32(-2_147_483_648, '80000000', '00000080');
+        yield 'int32 -2' => $int32(-2, 'fffffffe', 'feffffff');
+        yield 'int32 0' => $int32(0, '00000000', '00000000');
+        yield 'int32 16909060' => $int32(16_909_060, '01020304', '04030201');
+        yield 'int32 max' => $int32(2_147_483_647, '7fffffff', 'ffffff7f');
+
+        $uint32 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeUint32($v),
+            static fn(Buffer $b) => $b->readUint32(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'uint32 0' => $uint32(0, '00000000', '00000000');
+        yield 'uint32 16909060' => $uint32(16_909_060, '01020304', '04030201');
+        yield 'uint32 2147483648' => $uint32(2_147_483_648, '80000000', '00000080');
+        yield 'uint32 max' => $uint32(4_294_967_295, 'ffffffff', 'ffffffff');
+
+        $int64 = static fn(int $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeInt64($v),
+            static fn(Buffer $b) => $b->readInt64(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'int64 min' => $int64(PHP_INT_MIN, '8000000000000000', '0000000000000080');
+        yield 'int64 -2' => $int64(-2, 'fffffffffffffffe', 'feffffffffffffff');
+        yield 'int64 0' => $int64(0, '0000000000000000', '0000000000000000');
+        yield 'int64 72623859790382856' => $int64(0x01_02_03_04_05_06_07_08, '0102030405060708', '0807060504030201');
+        yield 'int64 max' => $int64(PHP_INT_MAX, '7fffffffffffffff', 'ffffffffffffff7f');
+
+        $uint64 = static function (int $v, string $big, string $little) {
+            \assert($v >= 0);
+
+            return [
+                static fn(Buffer $b) => $b->writeUint64($v),
+                static fn(Buffer $b) => $b->readUint64(),
+                $v,
+                $big,
+                $little,
+            ];
+        };
+        yield 'uint64 0' => $uint64(0, '0000000000000000', '0000000000000000');
+        yield 'uint64 72623859790382856' => $uint64(0x01_02_03_04_05_06_07_08, '0102030405060708', '0807060504030201');
+        yield 'uint64 PHP_INT_MAX' => $uint64(PHP_INT_MAX, '7fffffffffffffff', 'ffffffffffffff7f');
+
+        $float = static fn(float $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeFloat($v),
+            static fn(Buffer $b) => $b->readFloat(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'float 0' => $float(0.0, '00000000', '00000000');
+        yield 'float 1.5' => $float(1.5, '3fc00000', '0000c03f');
+        yield 'float -2.25' => $float(-2.25, 'c0100000', '000010c0');
+
+        $double = static fn(float $v, string $big, string $little) => [
+            static fn(Buffer $b) => $b->writeDouble($v),
+            static fn(Buffer $b) => $b->readDouble(),
+            $v,
+            $big,
+            $little,
+        ];
+        yield 'double 0' => $double(0.0, '0000000000000000', '0000000000000000');
+        yield 'double 1.5' => $double(1.5, '3ff8000000000000', '000000000000f83f');
+        yield 'double -0.1' => $double(-0.1, 'bfb999999999999a', '9a9999999999b9bf');
     }
 
     /**
-     * @param \Closure(Buffer, int|float): Buffer $write
+     * @param \Closure(Buffer): Buffer $write
+     * @param \Closure(Buffer): (int|float) $read
      */
     #[DataProvider('fixedSizeValues')]
-    public function writesBigEndian(\Closure $write, \Closure $read, int|float $value, string $big, string $little): void
-    {
+    public function writesBigEndian(
+        \Closure $write,
+        \Closure $read,
+        int|float $value,
+        string $big,
+        string $little,
+    ): void {
         $buffer = new Buffer(Order::Big);
 
-        $result = $write($buffer, $value);
+        $result = $write($buffer);
 
         Assert::same($result, $buffer);
         Assert::same(bin2hex($buffer->drain()), $big);
     }
 
     /**
-     * @param \Closure(Buffer, int|float): Buffer $write
+     * @param \Closure(Buffer): Buffer $write
+     * @param \Closure(Buffer): (int|float) $read
      */
     #[DataProvider('fixedSizeValues')]
-    public function writesLittleEndian(\Closure $write, \Closure $read, int|float $value, string $big, string $little): void
-    {
+    public function writesLittleEndian(
+        \Closure $write,
+        \Closure $read,
+        int|float $value,
+        string $big,
+        string $little,
+    ): void {
         $buffer = new Buffer(Order::Little);
 
-        $write($buffer, $value);
+        $write($buffer);
 
         Assert::same(bin2hex($buffer->drain()), $little);
     }
 
     /**
+     * @param \Closure(Buffer): Buffer $write
      * @param \Closure(Buffer): (int|float) $read
      */
     #[DataProvider('fixedSizeValues')]
-    public function readsBigEndian(\Closure $write, \Closure $read, int|float $value, string $big, string $little): void
-    {
+    public function readsBigEndian(
+        \Closure $write,
+        \Closure $read,
+        int|float $value,
+        string $big,
+        string $little,
+    ): void {
         $buffer = new Buffer(Order::Big, Hex::bytes($big . 'aa'));
 
         $result = $read($buffer);
@@ -129,11 +210,17 @@ final class BufferEncodingTest
     }
 
     /**
+     * @param \Closure(Buffer): Buffer $write
      * @param \Closure(Buffer): (int|float) $read
      */
     #[DataProvider('fixedSizeValues')]
-    public function readsLittleEndian(\Closure $write, \Closure $read, int|float $value, string $big, string $little): void
-    {
+    public function readsLittleEndian(
+        \Closure $write,
+        \Closure $read,
+        int|float $value,
+        string $big,
+        string $little,
+    ): void {
         $buffer = new Buffer(Order::Little, Hex::bytes($little . 'aa'));
 
         $result = $read($buffer);
