@@ -8,6 +8,7 @@ use Thesis\Net\Certificate;
 use Thesis\Net\ClientTls;
 use Time\Duration;
 use Uri\WhatWg\Url;
+use function Thesis\Amqp\Internal\address;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -33,6 +34,7 @@ final readonly class Config
      * @param int<0, 4294967295> $frameMax 0 to take the limit of the server
      * @param ?string $connectionName shown in the management UI of RabbitMQ
      * @param bool $reconnect whether a lost connection is opened again, with a backoff from 100 ms to 30 s
+     * @throws \InvalidArgumentException if a host is malformed
      */
     public function __construct(
         public array $hosts = ['localhost'],
@@ -50,6 +52,10 @@ final readonly class Config
         public ?string $connectionName = null,
         public bool $reconnect = true,
     ) {
+        // Checked now, not on a reconnect in a daemon, where it would fail the group of the application.
+        foreach ($hosts as $host) {
+            address($host, 0);
+        }
         $this->heartbeat = $heartbeat ?? sec(60);
         $this->connectTimeout = $connectTimeout ?? sec(30);
     }

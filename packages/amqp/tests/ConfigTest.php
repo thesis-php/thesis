@@ -94,6 +94,26 @@ final class ConfigTest
         Config::fromUri('amqp://localhost?heartbeat=-1');
     }
 
+    public function rejectsAMalformedHost(): void
+    {
+        Expect
+            ::exception(\InvalidArgumentException::class)
+            ->withMessage('The host "a:b:c" is malformed: use host, host:port or [ipv6]:port.')
+        ;
+
+        new Config(hosts: ['localhost', 'a:b:c']);
+    }
+
+    public function rejectsAPortAbove65535(): void
+    {
+        Expect
+            ::exception(\InvalidArgumentException::class)
+            ->withMessage('The port of the host "localhost:70000" is greater than 65535.')
+        ;
+
+        new Config(hosts: ['localhost:70000']);
+    }
+
     public function rejectsAnUnknownMechanism(): void
     {
         Expect::exception(\InvalidArgumentException::class)->withMessage('Unknown auth mechanism "magic".');

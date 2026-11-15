@@ -71,7 +71,8 @@ Without confirms, `publish()` returns once the message is written.
 with the message then. It needs confirms, otherwise a return could not be told apart from a success.
 
 `Message` is immutable, a modified copy is made with `clone`:
-`clone($message, ['headers' => [...$message->headers, 'attempt' => 2]])`.
+`clone($message, ['headers' => ['attempt' => 2] + $message->headers])` (`+` keeps numeric header names,
+a spread would renumber them).
 A property that is null is not sent. `expiration` is a `Duration`.
 
 `publishBatch()` publishes many messages with a few writes and, with confirms, waits for all of them:
@@ -86,7 +87,8 @@ try {
         $bodies,
     ));
 } catch (PublishBatchFailed $failed) {
-    // $failed->nacked are the Publish refused, $failed->returned the MessageReturned; the others are confirmed.
+    // $failed->nacked are the Publish refused, $failed->returned the mandatory ones that no queue took;
+    // the others are confirmed.
 }
 ```
 

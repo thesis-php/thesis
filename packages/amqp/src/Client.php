@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace Thesis\Amqp;
 
 use Thesis\Amqp\Internal\Connection;
+use Thesis\Async\Backoff;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
+use Thesis\Async\Instant;
 use Thesis\Async\TimedOut;
 use Thesis\Io\IoException;
+use function Thesis\Amqp\Internal\address;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Net\connect;
-use function Thesis\Time\ns;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
+use function Thesis\Time\toNs;
 
 /**
  * A connection to RabbitMQ that reconnects. A passive object until {@see run()} (ADR 0001):
@@ -39,9 +44,6 @@ use function Thesis\Time\ns;
  */
 final class Client
 {
-    private const int MIN_BACKOFF_NS = 100_000_000;
-    private const int MAX_BACKOFF_NS = 30_000_000_000;
-
     private bool $running = false;
 
     private bool $closing = false;
@@ -86,8 +88,23 @@ final class Client
             throw new \LogicException('The client is running already.');
         }
 
-        $connection = $this->connect();
+        // Before the first wait: a concurrent run() must not open a second connection.
         $this->running = true;
+
+        try {
+            $connection = $this->connect();
+        } catch (\Throwable $exception) {
+            $this->running = false;
+
+            throw $exception;
+        }
+
+        if ($this->closing) {
+            $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
+
+            return;
+        }
+
         $this->up($connection);
         $group->daemon(fn() => $this->supervise($connection));
     }
@@ -106,11 +123,12 @@ final class Client
 
             try {
                 return $connection->openChannel();
-            } catch (ConnectionClosed $exception) {
-                if ($this->closing || !$this->config->reconnect) {
+            } catch (AmqpException $exception) {
+                // Lost while opening the channel: the next connection will do. Any other failure is thrown,
+                // retrying it on a live connection would spin.
+                if ($connection->closed === null || $this->closing || !$this->config->reconnect) {
                     throw $exception;
                 }
-                // Lost while opening the channel: the next connection will do.
             }
         }
     }
@@ -146,6 +164,10 @@ final class Client
             throw new \LogicException('The client is not running: call run() first.');
         }
 
+        if ($this->closing) {
+            throw new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess);
+        }
+
         $connection = $this->connection;
 
         if ($connection !== null && $connection->closed === null) {
@@ -165,7 +187,10 @@ final class Client
 
     private function supervise(Connection $connection): void
     {
+        $backoff = new Backoff(initial: ms(100), max: sec(30));
+
         while (true) {
+            $openedAt = Instant::now();
             $connection->run();
 
             if ($this->closing) {
@@ -178,7 +203,13 @@ final class Client
                 return;
             }
 
-            $connection = $this->reconnect();
+            // Only a connection that has lived starts the backoff anew: a broker that accepts and drops at once
+            // (a limit of connections, a node going down) must not be retried every 100 ms.
+            if (toNs(Instant::now()->since($openedAt)) > toNs(sec(30))) {
+                $backoff->reset();
+            }
+
+            $connection = $this->reconnect($backoff);
 
             if ($connection === null) {
                 return;
@@ -191,23 +222,29 @@ final class Client
     /**
      * @return ?Connection null if the client is closed meanwhile
      */
-    private function reconnect(): ?Connection
+    private function reconnect(Backoff $backoff): ?Connection
     {
-        $backoff = self::MIN_BACKOFF_NS;
-
         while (true) {
-            // Full jitter: clients that lost one broker do not come back to it all at once.
-            timeoutOr(ns(random_int(intdiv($backoff, 2), $backoff)), $this->stopped->await(...));
+            timeoutOr($backoff->next(), $this->stopped->await(...));
 
             if ($this->closing) {
                 return null;
             }
 
             try {
-                return $this->connect();
+                $connection = $this->connect();
             } catch (ConnectionFailed) {
-                $backoff = min(self::MAX_BACKOFF_NS, $backoff * 2);
+                continue;
             }
+
+            // close() has come during the handshake: it could not see this connection.
+            if ($this->closing) { // @phpstan-ignore if.alwaysFalse (close() runs while connect() waits)
+                $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
+
+                return null;
+            }
+
+            return $connection;
         }
     }
 
@@ -221,7 +258,7 @@ final class Client
         $last = null;
 
         foreach ($this->config->hosts as $host) {
-            [$name, $port] = self::address($host, $defaultPort);
+            [$name, $port] = address($host, $defaultPort);
 
             try {
                 return timeout(
@@ -238,25 +275,5 @@ final class Client
             message: 'Failed to connect to RabbitMQ. ' . implode(' ', $failures),
             previous: $last,
         );
-    }
-
-    /**
-     * @param non-empty-string $host
-     * @return array{non-empty-string, int<0, 65535>}
-     */
-    private static function address(string $host, int $defaultPort): array
-    {
-        if (preg_match('~^(\[[^]]+]|[^:]+)(?::(\d+))?$~', $host, $parts) !== 1) {
-            throw new \InvalidArgumentException(
-                message: "The host \"{$host}\" is malformed: use host, host:port or [ipv6]:port.",
-            );
-        }
-
-        /** @var non-empty-string $name */
-        $name = $parts[1];
-        /** @var int<0, 65535> $port */
-        $port = isset($parts[2]) ? min(65535, (int) $parts[2]) : $defaultPort;
-
-        return [$name, $port];
     }
 }

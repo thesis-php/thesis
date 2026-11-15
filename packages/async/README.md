@@ -948,6 +948,33 @@ public function read(): string
 It yields before the operation, so a `pace()` that throws `Cancelled` leaves the operation undone.
 It is a cancellation point only when it yields: the other calls only count.
 
+### Delays between attempts: `Backoff`
+
+`Backoff` computes the delays between attempts: from `$initial`, doubled after each one, up to `$max`.
+With jitter (the default), a delay is a random one between half and all of it, so that clients that failed at once
+do not come back at once either. It does not wait: wait as the attempts require, with `delay()`,
+`StreamWatcher::delay()` or a `timeoutOr()` that a close ends.
+
+```php
+use Thesis\Async\Backoff;
+use function Thesis\Async\delay;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
+
+$backoff = new Backoff(initial: ms(100), max: sec(30));
+
+while (true) {
+    try {
+        return connect();
+    } catch (ConnectionFailed) {
+        delay($backoff->next());
+    }
+}
+```
+
+`reset()` starts again from `$initial` after a success. `jitter: false` gives the exact delays,
+and a seeded `Random\Randomizer` makes the jitter repeatable in tests.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build queues, locks and I/O on it and they are cancellable for free:
@@ -1066,6 +1093,7 @@ all([user, orders])              orders fails after 50 ms
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
+| `Backoff(Duration $initial, Duration $max, bool $jitter = true, ?Randomizer)`: `next(): Duration`, `reset()` | delays between attempts, doubled up to `$max` |
 | `Pacer(int $perTick)`: `pace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
 | `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(Duration): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |

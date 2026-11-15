@@ -166,6 +166,74 @@ final class ClientTest
         });
     }
 
+    public function roundsAHeartbeatUnderASecondUp(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            $tuneOk = $group->spawn(static function () use ($server) {
+                $peer = $server->accept();
+                $peer->start();
+
+                return $peer->tune(heartbeat: 60);
+            });
+            new Client($server->config(heartbeat: ms(300)))->run($group);
+
+            Assert::same($tuneOk->await()->heartbeat, 1);
+        });
+    }
+
+    public function throwsWhenEveryChannelIsOpen(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            $peer = $group->spawn(static function () use ($server) {
+                $peer = $server->accept();
+                $peer->handshake(channelMax: 1);
+
+                return $peer;
+            });
+            $client = new Client($server->config(reconnect: true));
+            $client->run($group);
+            openChannel($group, $client, $peer->await());
+
+            Expect
+                ::exception(ChannelClosed::class)
+                ->withMessage('No channel can open: all 1 channels of the connection are open.')
+            ;
+
+            $client->channel();
+        });
+    }
+
+    public function closeDuringAReconnectLeavesNoConnection(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            [$client, $peer] = connect($group, $server, $server->config(reconnect: true));
+            $peer->socket->close();
+
+            $peer = $server->accept();
+            $peer->start();
+            $closed = $group->spawn($client->close(...));
+            delay(ms(10));
+            $peer->tune();
+            $closed->await();
+
+            try {
+                $peer->frame();
+                Assert::fail('The client must close the connection it opened during close().');
+            } catch (IoException) {
+            }
+
+            Expect::exception(ConnectionClosed::class)->withMessage('The client is closed.');
+
+            $client->channel();
+        });
+    }
+
     public function throwsWhenUsedBeforeRun(): void
     {
         Expect::exception(\LogicException::class)->withMessage('The client is not running: call run() first.');

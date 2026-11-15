@@ -204,6 +204,68 @@ final class ChannelTest
         });
     }
 
+    public function dropsAnAckThatAMultipleAckCovers(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $broker = $group->spawn(static function () use ($peer, $id) {
+                $consume = $peer->expect(BasicConsume::class);
+                $peer->send($id, new BasicConsumeOk($consume->consumerTag));
+
+                for ($tag = 1; $tag <= 3; ++$tag) {
+                    $peer->sendContent($id, new BasicDeliver($consume->consumerTag, $tag, false, '', 'q'), "m{$tag}");
+                }
+
+                $ack = $peer->expect(BasicAck::class);
+                Assert::same($ack->deliveryTag, 3);
+                $cancel = $peer->expect(BasicCancel::class);
+                $peer->send($id, new BasicCancelOk($cancel->consumerTag));
+            });
+
+            $consumer = $channel->consume('q');
+            $deliveries = [];
+
+            foreach ($consumer as $delivery) {
+                $deliveries[] = $delivery;
+
+                if (\count($deliveries) === 3) {
+                    $delivery->ack(multiple: true);
+                    $deliveries[0]->ack();
+                    $consumer->cancel();
+                }
+            }
+
+            $broker->await();
+        });
+    }
+
+    public function publishBatchReportsANackThatComesWhileTheBatchIsWritten(): void
+    {
+        self::withConfirms(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $body = str_repeat('x', 1_048_576);
+            $publishes = array_map(static fn() => new Publish(new Message($body)), range(1, 16));
+            $group->spawn(static function () use ($peer, $id) {
+                // The rest of the batch waits in the socket meanwhile.
+                $peer->expect(BasicPublish::class);
+                $peer->expectMessage();
+                $peer->send($id, new BasicNack(1, false, false));
+
+                for ($i = 2; $i <= 16; ++$i) {
+                    $peer->expect(BasicPublish::class);
+                    $peer->expectMessage();
+                }
+
+                $peer->send($id, new BasicAck(16, true));
+            });
+
+            try {
+                $channel->publishBatch($publishes);
+                Assert::fail('The batch must fail.');
+            } catch (PublishBatchFailed $failed) {
+                Assert::same($failed->nacked, [$publishes[0]]);
+            }
+        });
+    }
+
     public function consumerThrowsWhenTheServerCancelsIt(): void
     {
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {

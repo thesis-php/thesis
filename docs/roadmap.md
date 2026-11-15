@@ -61,8 +61,7 @@ of its package, and a step that is done is deleted from here.
    Integration tests against services in `compose.yaml` (rabbitmq, nats,
    postgres, memcached, ...) and a convention for a package to declare the service it needs.
 2. **`amqp`**, the reference client of ADR 0001. Then an ADR on what protocol clients share: framing, reconnects
-   with a backoff, configuration from a DSN, `ConnectionFailed`/`ConnectionClosed`. A common backoff goes
-   to `async` after the second client, not before.
+   with a backoff (`Async\Backoff`), configuration from a DSN, `ConnectionFailed`/`ConnectionClosed`.
 3. **Protocol clients** on `net` and `io`: `nats` (the second client), `rabbitmq-stream`, `memcached`
    (the first user of the pool), `nsq` (TCP first, lookupd after HTTP), `cassandra`, `mongodb`
    (check what the old repository has; probably from scratch).

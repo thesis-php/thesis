@@ -61,3 +61,28 @@ function message(string $body, BasicProperties $properties): Message
         appId: $properties->appId,
     );
 }
+
+/**
+ * @internal
+ * @param non-empty-string $host `host`, `host:port` or `[ipv6]:port`
+ * @param int<0, 65535> $defaultPort
+ * @return array{non-empty-string, int<0, 65535>}
+ * @throws \InvalidArgumentException if $host is malformed
+ */
+function address(string $host, int $defaultPort): array
+{
+    if (preg_match('~^(\[[^]]+]|[^:]+)(?::(\d{1,5}))?$~D', $host, $parts) !== 1) {
+        throw new \InvalidArgumentException("The host \"{$host}\" is malformed: use host, host:port or [ipv6]:port.");
+    }
+
+    $port = isset($parts[2]) ? (int) $parts[2] : $defaultPort;
+
+    if ($port < 0 || $port > 65535) {
+        throw new \InvalidArgumentException("The port of the host \"{$host}\" is greater than 65535.");
+    }
+
+    /** @var non-empty-string $name */
+    $name = $parts[1];
+
+    return [$name, $port];
+}

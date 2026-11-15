@@ -12,8 +12,8 @@ namespace Thesis\Amqp;
 final class PublishBatchFailed extends AmqpException
 {
     /**
-     * @param list<Publish> $nacked
-     * @param list<MessageReturned> $returned
+     * @param list<Publish> $nacked refused by the broker
+     * @param list<Publish> $returned mandatory, and routed to no queue
      */
     public function __construct(
         public readonly array $nacked,

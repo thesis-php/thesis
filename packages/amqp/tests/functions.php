@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Thesis\Amqp;
 
+use Testo\Core\Exception\SkipTest;
 use Thesis\Async\Group;
+use function Thesis\Async\group;
+use function Thesis\Async\shield;
+use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
 
 /**
  * Runs a client of $config in $group against the next connection to $server, after a handshake.
@@ -45,4 +50,35 @@ function closeClient(Group $group, Client $client, FakePeer $peer): void
 {
     $group->spawn($peer->acceptClose(...));
     $client->close();
+}
+
+/**
+ * Runs $test with a client of the RabbitMQ of compose.yaml (`make up`), closed afterwards.
+ * Skips the test if the broker is not up, except in CI.
+ *
+ * @param callable(Client, Group): void $test
+ */
+function withRabbitMq(callable $test): void
+{
+    $uri = getenv('AMQP_URI');
+    $config = Config::fromUri(\is_string($uri) && $uri !== '' ? $uri : 'amqp://thesis:thesis@localhost:5672/');
+    $client = new Client($config);
+
+    try {
+        group(static function (Group $group) use ($client, $test) {
+            $client->run($group);
+
+            try {
+                $test($client, $group);
+            } finally {
+                shield(static fn() => timeout(sec(5), $client->close(...)));
+            }
+        });
+    } catch (ConnectionFailed $exception) {
+        if (getenv('CI') === '' || getenv('CI') === false) {
+            throw new SkipTest("RabbitMQ is not up (make up): {$exception->getMessage()}");
+        }
+
+        throw $exception;
+    }
 }

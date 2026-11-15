@@ -6,6 +6,9 @@ services:
     environment:
       IN_CONTAINER: true
       HISTFILE: /workspace/var/.docker_history
+      # Integration tests skip a service that is not up (make up), and fail instead in CI.
+      CI: ${CI:-}
+      AMQP_URI: amqp://thesis:thesis@rabbitmq:5672/
     volumes:
       - .:/workspace
       - ~/.composer/cache:/composer/cache
@@ -20,3 +23,15 @@ services:
       SPLIT_REMOTE: ${SPLIT_REMOTE:-}
     volumes:
       - .:/workspace
+
+  rabbitmq:
+    image: rabbitmq:4.1-alpine
+    environment:
+      # guest may connect only from localhost, the tests connect from the php container.
+      RABBITMQ_DEFAULT_USER: thesis
+      RABBITMQ_DEFAULT_PASS: thesis
+    healthcheck:
+      test: rabbitmq-diagnostics --quiet ping
+      interval: 2s
+      timeout: 5s
+      retries: 30

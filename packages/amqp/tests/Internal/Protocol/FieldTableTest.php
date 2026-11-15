@@ -30,6 +30,13 @@ final class FieldTableTest
         Assert::equals(self::roundTrip($table), $table);
     }
 
+    public function readsAShortLastEntry(): void
+    {
+        $table = ['long' => 'value', 'null' => null, 'bools' => [true, true, true], 'x' => true];
+
+        Assert::same(self::roundTrip($table), $table);
+    }
+
     public function writesAnEmptyArrayAsATable(): void
     {
         $buffer = new Buffer();

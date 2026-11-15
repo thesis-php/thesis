@@ -7,6 +7,7 @@ namespace Thesis\Amqp\Internal;
 use Thesis\Amqp\AmqpException;
 use Thesis\Amqp\AuthMechanism;
 use Thesis\Amqp\Channel;
+use Thesis\Amqp\ChannelClosed;
 use Thesis\Amqp\Config;
 use Thesis\Amqp\ConnectionClosed;
 use Thesis\Amqp\Internal\Protocol\ConnectionBlocked;
@@ -77,6 +78,11 @@ final class Connection
     private bool $sent = false;
 
     /**
+     * Writes in progress: while one waits for the socket, a heartbeat would only queue behind it.
+     */
+    private int $writing = 0;
+
+    /**
      * Set while the server blocks publishing (a resource alarm): publishes wait for it.
      *
      * @var ?Deferred<null>
@@ -126,8 +132,10 @@ final class Connection
             $channelMax = self::negotiate($config->channelMax, $tune->channelMax);
             /** @var int<0, 4294967295> $frameMax */
             $frameMax = self::negotiate($config->frameMax, $tune->frameMax);
+            // Rounded up: a heartbeat under a second must not become 0, which takes the interval of the server.
+            $seconds = toSec($config->heartbeat, \RoundingMode::PositiveInfinity);
             /** @var int<0, 65535> $heartbeat */
-            $heartbeat = self::negotiate(min(65535, max(0, toSec($config->heartbeat))), $tune->heartbeat);
+            $heartbeat = self::negotiate(min(65535, max(0, $seconds)), $tune->heartbeat);
             self::sendDirectly($socket, new ConnectionTuneOk($channelMax, $frameMax, $heartbeat));
 
             self::sendDirectly($socket, new ConnectionOpen($config->vhost));
@@ -193,6 +201,8 @@ final class Connection
             });
         } catch (ProtocolError $error) {
             $this->fail($error);
+        } catch (ConnectionClosed) {
+            // A reply of the reader itself (close-ok, cancel-ok, flow-ok) has found the connection lost: terminated.
         } catch (IoException $exception) {
             $this->terminate(new ConnectionClosed(
                 message: "The connection is lost: {$exception->getMessage()}",
@@ -251,6 +261,7 @@ final class Connection
     public function write(string $bytes): void
     {
         $this->ensureOpen();
+        ++$this->writing;
 
         try {
             $this->socket->write($bytes);
@@ -261,6 +272,8 @@ final class Connection
             ));
 
             $this->ensureOpen();
+        } finally {
+            --$this->writing;
         }
 
         $this->sent = true;
@@ -414,19 +427,7 @@ final class Connection
         while ($this->closed === null) {
             delay($halfInterval);
 
-            if (!$this->sent) {
-                $buffer = new Buffer();
-                Frames::heartbeat($buffer);
-
-                try {
-                    $this->write($buffer->drain());
-                } catch (ConnectionClosed) {
-                    return;
-                }
-            }
-
-            $this->sent = false;
-
+            // Checked before the heartbeat is written: that write may wait for a peer that is gone.
             if ($this->received) {
                 $silentHalves = 0;
             } elseif (++$silentHalves >= 4) {
@@ -441,6 +442,19 @@ final class Connection
             }
 
             $this->received = false;
+
+            if (!$this->sent && $this->writing === 0) {
+                $buffer = new Buffer();
+                Frames::heartbeat($buffer);
+
+                try {
+                    $this->write($buffer->drain());
+                } catch (ConnectionClosed) {
+                    return;
+                }
+            }
+
+            $this->sent = false;
         }
     }
 
@@ -460,7 +474,10 @@ final class Connection
             }
         }
 
-        throw new ConnectionClosed("All {$this->channelMax} channels of the connection are open.");
+        throw new ChannelClosed(
+            message: "No channel can open: all {$this->channelMax} channels of the connection are open.",
+            replyCode: null,
+        );
     }
 
     /**
@@ -474,7 +491,8 @@ final class Connection
     private static function expect(Socket $socket, Buffer $in, string $class): Method
     {
         while (true) {
-            [$channel, $frame] = self::readFrame($socket, $in, 0);
+            // Bounded before the limit is negotiated: a peer that is not a broker must not make us buffer 4 GiB.
+            [$channel, $frame] = self::readFrame($socket, $in, Frames::DEFAULT_MAX);
 
             if ($frame === null) {
                 continue;

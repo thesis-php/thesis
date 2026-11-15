@@ -48,17 +48,39 @@ final readonly class FakePeer
         int $frameMax = 131_072,
         int $heartbeat = 0,
     ): ConnectionStartOk {
+        $startOk = $this->start($mechanisms);
+        $this->tune($channelMax, $frameMax, $heartbeat);
+
+        return $startOk;
+    }
+
+    /**
+     * The first half of the handshake.
+     */
+    public function start(string $mechanisms = 'PLAIN AMQPLAIN'): ConnectionStartOk
+    {
         $this->in->fill($this->socket, 8);
         Assert::same($this->in->read(8), Frames::PROTOCOL_HEADER);
-
         $this->send(0, new ConnectionStart(0, 9, ['product' => 'FakeServer'], $mechanisms, 'en_US'));
-        $startOk = $this->expect(ConnectionStartOk::class);
+
+        return $this->expect(ConnectionStartOk::class);
+    }
+
+    /**
+     * The second half of the handshake: what the client has chosen.
+     *
+     * @param int<0, 65535> $channelMax
+     * @param int<0, 4294967295> $frameMax
+     * @param int<0, 65535> $heartbeat
+     */
+    public function tune(int $channelMax = 2047, int $frameMax = 131_072, int $heartbeat = 0): ConnectionTuneOk
+    {
         $this->send(0, new ConnectionTune($channelMax, $frameMax, $heartbeat));
-        $this->expect(ConnectionTuneOk::class);
+        $tuneOk = $this->expect(ConnectionTuneOk::class);
         $this->expect(ConnectionOpen::class);
         $this->send(0, new ConnectionOpenOk());
 
-        return $startOk;
+        return $tuneOk;
     }
 
     /**

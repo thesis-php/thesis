@@ -58,7 +58,8 @@ function writeLongString(Buffer $buffer, string $value): void
  */
 function readTable(Buffer $buffer): array
 {
-    $end = $buffer->count() - $buffer->readUint32();
+    $length = $buffer->readUint32();
+    $end = $buffer->count() - $length;
     $table = [];
 
     while ($buffer->count() > $end) {
@@ -162,7 +163,8 @@ function writeInt(Buffer $buffer, int $value): void
  */
 function readArray(Buffer $buffer): array
 {
-    $end = $buffer->count() - $buffer->readUint32();
+    $length = $buffer->readUint32();
+    $end = $buffer->count() - $length;
     $values = [];
 
     while ($buffer->count() > $end) {

@@ -45,9 +45,7 @@ final class Delivery
      */
     public function ack(bool $multiple = false): void
     {
-        if ($this->settle()) {
-            ($this->settle)(new BasicAck($this->deliveryTag, $multiple));
-        }
+        $this->settle(new BasicAck($this->deliveryTag, $multiple));
     }
 
     /**
@@ -57,9 +55,7 @@ final class Delivery
      */
     public function nack(bool $multiple = false, bool $requeue = true): void
     {
-        if ($this->settle()) {
-            ($this->settle)(new BasicNack($this->deliveryTag, $multiple, $requeue));
-        }
+        $this->settle(new BasicNack($this->deliveryTag, $multiple, $requeue));
     }
 
     /**
@@ -68,9 +64,7 @@ final class Delivery
      */
     public function reject(bool $requeue = true): void
     {
-        if ($this->settle()) {
-            ($this->settle)(new BasicReject($this->deliveryTag, $requeue));
-        }
+        $this->settle(new BasicReject($this->deliveryTag, $requeue));
     }
 
     /**
@@ -87,14 +81,26 @@ final class Delivery
         ($this->reply)(clone($message, ['correlationId' => $this->message->correlationId]), $replyTo);
     }
 
-    private function settle(): bool
+    /**
+     * Settled before the send, so that a second call while the first one waits sends nothing:
+     * if the send fails, the delivery is not settled.
+     *
+     * @throws AmqpException
+     */
+    private function settle(BasicAck|BasicNack|BasicReject $method): void
     {
         if ($this->isSettled) {
-            return false;
+            return;
         }
 
         $this->isSettled = true;
 
-        return true;
+        try {
+            ($this->settle)($method);
+        } catch (\Throwable $exception) {
+            $this->isSettled = false;
+
+            throw $exception;
+        }
     }
 }

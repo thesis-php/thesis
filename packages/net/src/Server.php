@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
+use Thesis\Async\Backoff;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
-use function Thesis\Time\ns;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 /**
  * A listening socket, created by {@see listen()} or {@see listenUnix()}.
@@ -17,13 +19,6 @@ use function Thesis\Time\ns;
  */
 final class Server
 {
-    /**
-     * Pause after an accept that fails although a connection is pending: the process may be out of file descriptors,
-     * and retrying at once would spin. Doubles up to {@see MAX_BACKOFF}. In nanoseconds.
-     */
-    private const int MIN_BACKOFF = 5_000_000;
-    private const int MAX_BACKOFF = 1_000_000_000;
-
     /**
      * Accepts that find a connection at once before one yields, so that a flood of connections
      * does not starve the ones already accepted.
@@ -87,7 +82,7 @@ final class Server
     public function accept(): ?Socket
     {
         $this->pacer->pace();
-        $failures = 0;
+        $backoff = null;
         $woken = false;
 
         while ($this->stream !== null) {
@@ -99,12 +94,11 @@ final class Server
 
             if ($woken) {
                 // Readable, but nothing to accept: another fiber has taken it, or accept() itself fails.
+                // The process may be out of file descriptors, and retrying at once would spin.
                 $woken = false;
-                // The shift is capped: past MAX_BACKOFF anyway, and an int must not overflow.
-                $backoff = min(self::MIN_BACKOFF << min($failures, 30), self::MAX_BACKOFF);
-                ++$failures;
+                $backoff ??= new Backoff(initial: ms(5), max: sec(1), jitter: false);
 
-                if (!$this->watcher->delay(ns($backoff))) {
+                if (!$this->watcher->delay($backoff->next())) {
                     return null;
                 }
             } elseif ($this->watcher->readable()) {

@@ -392,7 +392,8 @@ final class Channel
         $this->noAck[$tag] = $noAck;
 
         try {
-            $this->call(
+            // Shielded: a consumer started for a caller that is gone would take messages nobody reads.
+            shield(fn() => $this->call(
                 new BasicConsume(
                     queue: $queue,
                     consumerTag: $tag,
@@ -403,8 +404,8 @@ final class Channel
                     arguments: $arguments,
                 ),
                 BasicConsumeOk::class,
-            );
-        } catch (AmqpException $exception) {
+            ));
+        } catch (\Throwable $exception) {
             unset($this->consumers[$tag], $this->noAck[$tag]);
 
             throw $exception;
@@ -420,7 +421,8 @@ final class Channel
      */
     public function get(string $queue, bool $noAck = false): ?Delivery
     {
-        $delivery = $this->call(new BasicGet($queue, $noAck), BasicGetOk::class, BasicGetEmpty::class);
+        // Shielded: a delivery that nobody receives would stay unacknowledged until the channel closes.
+        $delivery = shield(fn() => $this->call(new BasicGet($queue, $noAck), BasicGetOk::class, BasicGetEmpty::class));
         \assert($delivery === null || $delivery instanceof Delivery);
 
         return $delivery;
@@ -454,7 +456,8 @@ final class Channel
             return;
         }
 
-        $this->call(new ConfirmSelect(nowait: false), ConfirmSelectOk::class);
+        // Shielded: a mode the broker has turned on and the channel does not know of would break every publish.
+        shield(fn() => $this->call(new ConfirmSelect(nowait: false), ConfirmSelectOk::class));
         $this->confirming = true;
     }
 
@@ -489,6 +492,7 @@ final class Channel
             $buffer = new Buffer();
             $this->encodePublish($buffer, $message, $exchange, $routingKey, mandatory: false);
             $this->connection->awaitUnblocked();
+            $this->ensureOpen();
             $this->connection->write($buffer->drain());
 
             return;
@@ -496,22 +500,24 @@ final class Channel
 
         $this->connection->awaitUnblocked();
         $confirm = synchronized($this->publishMutex, function () use ($message, $exchange, $routingKey, $mandatory) {
+            // The wait for the mutex may have outlived the channel.
+            $this->ensureOpen();
             $returnId = null;
 
             if ($mandatory) {
                 $returnId = bin2hex(random_bytes(8));
-                $message = clone($message, ['headers' => [...$message->headers, self::RETURN_HEADER => $returnId]]);
+                $message = self::withReturnId($message, $returnId);
             }
 
             $buffer = new Buffer();
             $this->encodePublish($buffer, $message, $exchange, $routingKey, $mandatory);
-            $tag = $this->expectConfirms([$returnId]);
-            $this->writeConfirmed($buffer->drain(), $tag);
+            [[, $confirm]] = $this->expectConfirms([[null, $returnId]]);
+            $this->writeConfirmed($buffer->drain(), count: 1);
 
-            return $this->unconfirmed[$tag] ?? null;
+            return $confirm;
         });
 
-        $confirm?->await();
+        $confirm->await();
     }
 
     /**
@@ -532,8 +538,24 @@ final class Channel
 
         /** @var \SplQueue<array{Publish, Deferred<null>}> $pending */
         $pending = new \SplQueue();
+        /** @var list<Publish> $nacked */
         $nacked = [];
+        /** @var list<Publish> $returned */
         $returned = [];
+        // Other failures propagate: then the fate of the rest is unknown.
+        $awaitUntil = static function (int $window) use ($pending, &$nacked, &$returned) {
+            while ($pending->count() > $window) {
+                [$publish, $confirm] = $pending->dequeue();
+
+                try {
+                    $confirm->await();
+                } catch (PublishNacked) {
+                    $nacked[] = $publish;
+                } catch (MessageReturned) {
+                    $returned[] = $publish;
+                }
+            }
+        };
         $buffer = new Buffer();
         /** @var list<array{Publish, ?string}> $chunk with the return id of a mandatory message */
         $chunk = [];
@@ -548,7 +570,7 @@ final class Channel
                 }
 
                 $returnId = bin2hex(random_bytes(8));
-                $message = clone($message, ['headers' => [...$message->headers, self::RETURN_HEADER => $returnId]]);
+                $message = self::withReturnId($message, $returnId);
             }
 
             $this->encodePublish($buffer, $message, $publish->exchange, $publish->routingKey, $publish->mandatory);
@@ -563,9 +585,7 @@ final class Channel
             }
             $chunk = [];
 
-            while ($pending->count() > self::BATCH_WINDOW) {
-                self::collect($pending->dequeue(), $nacked, $returned);
-            }
+            $awaitUntil(self::BATCH_WINDOW);
         }
 
         if ($chunk !== []) {
@@ -574,9 +594,7 @@ final class Channel
             }
         }
 
-        while (!$pending->isEmpty()) {
-            self::collect($pending->dequeue(), $nacked, $returned);
-        }
+        $awaitUntil(0);
 
         if ($nacked !== [] || $returned !== []) {
             throw new PublishBatchFailed($nacked, $returned);
@@ -597,7 +615,8 @@ final class Channel
             return;
         }
 
-        $this->call(new TxSelect(), TxSelectOk::class);
+        // Shielded, as confirmSelect().
+        shield(fn() => $this->call(new TxSelect(), TxSelectOk::class));
         $this->transactional = true;
     }
 
@@ -638,8 +657,12 @@ final class Channel
             $result = $fn($this);
         } catch (\Throwable $exception) {
             if (!$this->isClosed) {
-                // Shielded: a cancelled $fn must not leave its publishes to the next commit.
-                shield($this->txRollback(...));
+                try {
+                    // Shielded: a cancelled $fn must not leave its publishes to the next commit.
+                    shield($this->txRollback(...));
+                } catch (AmqpException) {
+                    // The channel is closed meanwhile, and the transaction with it: $exception is what matters.
+                }
             }
 
             throw $exception;
@@ -903,19 +926,23 @@ final class Channel
     }
 
     /**
-     * @param non-empty-list<?string> $returnIds one per message, in the order of publishing
-     * @return positive-int the delivery tag of the first message, the others follow it
+     * The confirms are taken now, not looked up after the write: the reader may settle one while the write waits.
+     *
+     * @template T
+     * @param non-empty-list<array{T, ?string}> $publishes with the return id of a mandatory message,
+     *     in the order of publishing
+     * @return non-empty-list<array{T, Deferred<null>}>
      */
-    private function expectConfirms(array $returnIds): int
+    private function expectConfirms(array $publishes): array
     {
-        $first = $this->publishTag + 1;
-        \assert($first > 0);
+        $confirms = [];
 
-        foreach ($returnIds as $returnId) {
+        foreach ($publishes as [$publish, $returnId]) {
             $tag = ++$this->publishTag;
             /** @var Deferred<null> $confirm */
             $confirm = new Deferred();
             $this->unconfirmed[$tag] = $confirm;
+            $confirms[] = [$publish, $confirm];
 
             if ($returnId !== null) {
                 $this->returnIds[$tag] = $returnId;
@@ -923,21 +950,23 @@ final class Channel
             }
         }
 
-        return $first;
+        return $confirms;
     }
 
     /**
-     * Gives the tags from $first back if nothing reached the server: the next publish takes them.
+     * Gives the last $count tags back if nothing reached the server: the next publish takes them.
      *
-     * @param positive-int $first
+     * @param positive-int $count
      * @throws AmqpException
      */
-    private function writeConfirmed(string $bytes, int $first): void
+    private function writeConfirmed(string $bytes, int $count): void
     {
         try {
             $this->connection->write($bytes);
         } catch (\Throwable $exception) {
             if ($this->connection->isIntact()) {
+                $first = $this->publishTag - $count + 1;
+
                 for ($tag = $first; $tag <= $this->publishTag; ++$tag) {
                     $this->forgetConfirm($tag);
                 }
@@ -957,6 +986,7 @@ final class Channel
     private function writeBatch(string $bytes, array $chunk): array
     {
         if (!$this->confirming) {
+            $this->ensureOpen();
             $this->connection->write($bytes);
 
             return [];
@@ -964,49 +994,20 @@ final class Channel
 
         return synchronized($this->publishMutex, function () use ($bytes, $chunk) {
             $this->ensureOpen();
-            $first = $this->expectConfirms(array_column($chunk, 1));
-            $this->writeConfirmed($bytes, $first);
-            $pending = [];
+            $confirms = $this->expectConfirms($chunk);
+            $this->writeConfirmed($bytes, \count($confirms));
 
-            foreach ($chunk as $index => [$publish]) {
-                $pending[] = [$publish, $this->unconfirmed[$first + $index] ?? self::confirmed()];
-            }
-
-            return $pending;
+            return $confirms;
         });
     }
 
     /**
-     * @param array{Publish, Deferred<null>} $pending
-     * @param list<Publish> $nacked
-     * @param list<MessageReturned> $returned
-     * @throws AmqpException other than PublishNacked and MessageReturned: then the fate of the rest is unknown
+     * The id goes first, so that a header of the same name does not replace it; `+` keeps numeric header names,
+     * which a spread would renumber.
      */
-    private static function collect(array $pending, array &$nacked, array &$returned): void
+    private static function withReturnId(Message $message, string $returnId): Message
     {
-        [$publish, $confirm] = $pending;
-
-        try {
-            $confirm->await();
-        } catch (PublishNacked) {
-            $nacked[] = $publish;
-        } catch (MessageReturned $exception) {
-            $returned[] = $exception;
-        }
-    }
-
-    /**
-     * A confirm that came before the publish was registered: possible only if the write suspended.
-     *
-     * @return Deferred<null>
-     */
-    private static function confirmed(): Deferred
-    {
-        /** @var Deferred<null> $deferred */
-        $deferred = new Deferred();
-        $deferred->complete();
-
-        return $deferred;
+        return clone($message, ['headers' => [self::RETURN_HEADER => $returnId] + $message->headers]);
     }
 
     private function confirm(int $tag, bool $multiple, bool $nacked): void
@@ -1062,11 +1063,19 @@ final class Channel
             return;
         }
 
+        $settledUpTo = $this->settledUpTo;
+
         if (!$method instanceof BasicReject && $method->multiple) {
             $this->settledUpTo = $method->deliveryTag;
         }
 
-        $this->connection->send($this->id, $method);
+        try {
+            $this->connection->send($this->id, $method);
+        } catch (\Throwable $exception) {
+            $this->settledUpTo = $settledUpTo;
+
+            throw $exception;
+        }
     }
 
     /**

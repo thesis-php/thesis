@@ -145,6 +145,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   and awaited by everyone. A `Once` would have to pick one of them and invites the lazy connect of a client
   that ADR 0001 rejects. Shared DNS queries in thesis/net need the second meaning, dic singletons are dic's own.
   Revisit when two packages repeat the same pattern with the same meaning of cancellation.
+- `Backoff` computes the delays and does not wait: the wait of each user ends differently (`StreamWatcher::delay()`
+  that `close()` ends in thesis/net, a `timeoutOr()` that `Client::close()` ends in thesis/amqp).
+  Rejected: a `retry(callable, Backoff)`, it would fix the wait and which failures are retried.
+  The jitter takes between half and all of a delay ("equal jitter"), not from zero ("full jitter"):
+  a reconnect right after a loss is a storm, and a floor keeps the attempts paced.
 
 ## Conventions
 
