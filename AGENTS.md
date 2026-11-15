@@ -127,6 +127,12 @@ the whole monorepo is for the final check.
 - Named typed properties instead of id-indexed arrays (`$this->values[0]`). Use an array only for genuinely dynamic sets.
 - `readonly` wherever possible: `final readonly class` for immutable classes, `readonly` on individual properties
   for partially mutable ones.
+- No setters: writing a value is assigning a property. A property anyone may change with nothing to check
+  is plain `public` (`$clock->now = $time`, not `$clock->set($time)`), one that changes only inside is
+  `public private(set)` instead of a getter, one that never changes is `readonly`. A `set` hook is only
+  for checking or normalizing on write. A method is for an operation with a meaning of its own
+  (`advance($duration)`), for writing that waits (it may suspend the fiber) or returns something,
+  and where an interface requires it.
 - Every top-level symbol (class, interface, trait, enum, function, constant) in `src/` is marked either `@api`
   or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
   (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
