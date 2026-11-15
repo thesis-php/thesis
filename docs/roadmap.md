@@ -96,6 +96,11 @@ of its package, and a step that is done is deleted from here.
 
 - Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
   or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
+- Run the tests on several Revolt drivers in CI (`REVOLT_DRIVER`, passed through `compose.yaml`): the image has
+  ext-uv, so `DriverFactory` picks `UvDriver` and `StreamSelectDriver`, the default of most users, is never tested.
+  The drivers differ in signals (pcntl or native), closed or re-registered streams and the order of callbacks
+  in a tick; `VirtualTimeDriver` leaves streams and signals to the inner driver. First `StreamSelectDriver`
+  and `UvDriver`, then `EvDriver` (needs ext-ev in the image); `EventDriver` probably not.
 
 ## Open questions
 
