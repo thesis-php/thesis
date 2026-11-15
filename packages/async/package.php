@@ -38,7 +38,7 @@ return new Manifest(
         new RectorSkip(
             rule: ClassPropertyAssignToConstructorPromotionRector::class,
             paths: ['src/LocalSemaphore.php'],
-            reason: 'The property is non-negative-int, the parameter is positive-int: promotion would lose the property\'s type.',
+            reason: "The property is non-negative-int, the parameter is positive-int: promotion would lose the property's type.",
         ),
     ],
 );

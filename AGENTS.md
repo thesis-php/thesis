@@ -94,8 +94,8 @@ the whole monorepo is for the final check.
 - Lines are at most 120 characters, comments and tests included. The only exception is a line that cannot be wrapped:
   a single string literal (an exception message, an expected error) or a URL.
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
-  first-class callables (`f(...)`) instead of wrapper closures, `Uri\WhatWg\Url` instead of `parse_url()`
-  or a URL library.
+  first-class callables (`f(...)`) instead of wrapper closures, a variadic parameter (`...$args`) instead of
+  `func_get_args()`, `Uri\WhatWg\Url` instead of `parse_url()` or a URL library.
 - A duration in a public API (a timeout, a delay, a TTL, an interval) is `Time\Duration`, created and converted
   with the functions of `thesis/time` (`sec(5)`, `ms(250)`, `toSecFloat()`). Never a bare `int`/`float` of seconds
   or milliseconds, and never `float|Duration`: the unit of a number is only a convention, and a union can be widened

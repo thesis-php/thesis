@@ -92,7 +92,7 @@ function withRabbitMq(callable $test): void
         });
     } catch (ConnectionFailed $exception) {
         if (getenv('CI') === '' || getenv('CI') === false) {
-            throw new SkipTest("RabbitMQ is not up (make up): {$exception->getMessage()}");
+            throw new SkipTest("RabbitMQ is not up (make up): {$exception->getMessage()}", previous: $exception);
         }
 
         throw $exception;

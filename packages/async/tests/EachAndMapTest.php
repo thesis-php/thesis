@@ -19,9 +19,9 @@ final class EachAndMapTest
     {
         $calls = [];
 
-        each(['a' => 1, 'b' => 2, 'c' => 3], 2, static function () use (&$calls) {
+        each(['a' => 1, 'b' => 2, 'c' => 3], 2, static function (...$args) use (&$calls) {
             delay(sec(1));
-            $calls[] = \func_get_args();
+            $calls[] = $args;
         });
 
         Assert::same($calls, [[1], [2], [3]]);

@@ -92,7 +92,7 @@ final class TlsTest
     public function rejectsACertificateForAnotherName(): void
     {
         $client = new ClientTls(peerName: 'other.test', caFile: certificate('server.test')->certFile);
-        Expect::exception(TlsFailed::class)->withMessageContaining('did not match expected name `other.test\'');
+        Expect::exception(TlsFailed::class)->withMessageContaining("did not match expected name `other.test'");
 
         self::handshake(self::server('server.test'), $client);
     }
