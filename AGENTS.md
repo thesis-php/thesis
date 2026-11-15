@@ -93,6 +93,11 @@ the whole monorepo is for the final check.
   `self::bytes($random, min: 0, max: 40)`. Otherwise its arguments go one per line with a trailing comma,
   and every argument is named, so the names form a column. The exception is a call whose arguments go
   to a variadic parameter (`\sprintf()`, `...$args`): PHP cannot name them.
+- `_` in a numeric literal groups a magnitude, it is placed by hand (the fixer rule put it everywhere: `2_026`).
+  A decimal integer of 5 digits and more is grouped by thousands (`10_000`, `65_536`, `1_048_576`), a shorter one
+  is not (`1000`, `3600`, `8192`). A hex literal of up to 4 digits has no `_` (`0xFFFF`, `0x8000`), a longer one
+  is grouped by bytes (`0x7F_FF_FF_FF`, `0x01_02_03_04`). Never in a number that names something rather than
+  counts (a year, a port, a protocol code: `$port <= 65535`) and never in a fraction.
 - Don't neglect named arguments where they help reading: a flag or a bare literal (`strict: true`, `limit: 3`),
   neighbours that are easy to swap (`actual:`/`expected:`), a call of our own code with many parameters,
   a data object built field by field (a DTO, a manifest), a rarely used function whose parameters nobody remembers

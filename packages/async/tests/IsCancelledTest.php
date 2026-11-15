@@ -15,7 +15,7 @@ final class IsCancelledTest
     public function isFalseInHealthyScope(): void
     {
         Assert::false(isCancelled());
-        Assert::false(timeout(1_000, isCancelled(...)));
+        Assert::false(timeout(1000, isCancelled(...)));
     }
 
     public function isTrueInCancelledScope(): void
@@ -46,7 +46,7 @@ final class IsCancelledTest
                 try {
                     never();
                 } finally {
-                    $observed = timeout(1_000, isCancelled(...));
+                    $observed = timeout(1000, isCancelled(...));
                 }
             });
         });

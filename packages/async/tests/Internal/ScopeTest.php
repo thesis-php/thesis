@@ -21,7 +21,7 @@ final class ScopeTest
     {
         $root = Scope::current();
 
-        timeout(1_000, static fn() => delay(1));
+        timeout(1000, static fn() => delay(1));
         group(static fn() => null);
 
         Assert::same(Scope::current(), $root);
@@ -46,7 +46,7 @@ final class ScopeTest
         $inFiber = null;
 
         $fiber = new \Fiber(static function () use (&$inFiber) {
-            timeout(1_000, static fn() => null);
+            timeout(1000, static fn() => null);
             $inFiber = Scope::current();
         });
         $fiber->start();

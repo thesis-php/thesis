@@ -32,7 +32,7 @@ final class FakeDns
         $name = stream_socket_get_name($udp, false);
         \assert($name !== false);
         $port = (int) substr($name, (int) strrpos($name, ':') + 1);
-        \assert($port > 0 && $port <= 65_535);
+        \assert($port > 0 && $port <= 65535);
         $tcp = listen('127.0.0.1', $port);
         stream_set_blocking($udp, false);
         $address = new InetAddress(ip: '127.0.0.1', port: $port);
@@ -158,7 +158,7 @@ final class FakeDns
 
         return new Buffer()
             ->writeUint16($id)
-            ->writeUint16(0x81_80 | ($truncated ? 0x02_00 : 0) | $zone->rcode)
+            ->writeUint16(0x8180 | ($truncated ? 0x0200 : 0) | $zone->rcode)
             ->writeUint16(1)
             ->writeUint16(\count($records))
             ->writeUint16(0)
@@ -173,7 +173,7 @@ final class FakeDns
     {
         // 0xC00C points to the name of the question
         return new Buffer()
-            ->writeUint16(0xC0_0C)
+            ->writeUint16(0xC00C)
             ->writeUint16($type)
             ->writeUint16(1)
             ->writeUint32($ttl)

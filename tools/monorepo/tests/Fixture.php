@@ -32,7 +32,7 @@ final readonly class Fixture
     /**
      * @param string $arguments named arguments of Manifest after the description and the license year, as PHP code
      */
-    public function package(string $dir, string $arguments = '', int $licenseSince = 2_026): self
+    public function package(string $dir, string $arguments = '', int $licenseSince = 2026): self
     {
         $this->file("packages/{$dir}/package.php", <<<PHP
             <?php

@@ -34,7 +34,7 @@ final class SocketTest
         $client->write(str_repeat('x', 100_000));
         delay(0.01);
 
-        Assert::true(\strlen($server->read(65_536)) > 8_192);
+        Assert::true(\strlen($server->read(65_536)) > 8192);
     }
 
     public function transfersLargePayloadsBothWaysAtOnce(): void
@@ -68,7 +68,7 @@ final class SocketTest
     public function readsThatNeverWaitStillLetOtherCallbacksRun(): void
     {
         [$left, $right] = socketPair();
-        $left->write(str_repeat('x', 1_000));
+        $left->write(str_repeat('x', 1000));
         $progress = new \stdClass();
         $progress->reads = 0;
         $progress->readsWhenTicked = null;
@@ -76,11 +76,11 @@ final class SocketTest
             $progress->readsWhenTicked = $progress->reads;
         });
 
-        for (; $progress->reads < 1_000; ++$progress->reads) {
+        for (; $progress->reads < 1000; ++$progress->reads) {
             $right->read(1);
         }
 
-        Assert::true(\is_int($progress->readsWhenTicked) && $progress->readsWhenTicked < 1_000);
+        Assert::true(\is_int($progress->readsWhenTicked) && $progress->readsWhenTicked < 1000);
     }
 
     public function throwsUnexpectedEofOnceThePeerHasClosedAndEverythingIsRead(): void

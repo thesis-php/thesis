@@ -240,7 +240,7 @@ final class ScopedValueTest
         /** @var ScopedValue<?string> */
         $value = new ScopedValue();
 
-        $observed = $value->with('bound', static fn() => timeout(1_000, static fn() => shield($value->get(...))));
+        $observed = $value->with('bound', static fn() => timeout(1000, static fn() => shield($value->get(...))));
 
         Assert::same($observed, 'bound');
     }

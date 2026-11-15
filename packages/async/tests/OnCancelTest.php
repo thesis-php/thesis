@@ -333,7 +333,7 @@ final class OnCancelTest
         };
         $reference = \WeakReference::create($callback);
 
-        timeout(1_000, static function () use ($callback) {
+        timeout(1000, static function () use ($callback) {
             onCancel($callback);
         });
         unset($callback);

@@ -57,7 +57,7 @@ final class BufferIoTest
     public function fillKeepsUnreadBytesAfterCompaction(): void
     {
         $data = random_bytes(200_000);
-        $reader = new ChunkedReader(substr($data, 70_000), chunkSize: 1_000);
+        $reader = new ChunkedReader(substr($data, 70_000), chunkSize: 1000);
         $buffer = new Buffer(bytes: substr($data, 0, 70_000));
         $buffer->read(69_990);
 

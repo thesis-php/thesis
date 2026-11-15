@@ -20,9 +20,9 @@ final readonly class Message
     public const int NOERROR = 0;
     public const int NXDOMAIN = 3;
     private const int CLASS_IN = 1;
-    private const int FLAG_RESPONSE = 0x80_00;
-    private const int FLAG_TRUNCATED = 0x02_00;
-    private const int FLAG_RECURSION_DESIRED = 0x01_00;
+    private const int FLAG_RESPONSE = 0x8000;
+    private const int FLAG_TRUNCATED = 0x0200;
+    private const int FLAG_RECURSION_DESIRED = 0x0100;
 
     /**
      * @param int<0, 65535> $id

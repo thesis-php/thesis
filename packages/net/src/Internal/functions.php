@@ -80,7 +80,7 @@ function address(string|false $name, bool $unix): Address
     $ip = trim(substr($name, 0, $colon), '[]');
     \assert($ip !== '');
     $port = (int) substr($name, $colon + 1);
-    \assert($port >= 0 && $port <= 65_535);
+    \assert($port >= 0 && $port <= 65535);
 
     return new InetAddress(ip: $ip, port: $port);
 }

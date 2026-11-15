@@ -60,7 +60,7 @@ final class AmpCancellableTest
 
     public function ownCancellationOfOperationIsRethrownAsIs(): void
     {
-        $exception = thrown(static fn() => timeout(1_000, static fn() => ampCancellable(
+        $exception = thrown(static fn() => timeout(1000, static fn() => ampCancellable(
             static fn() => ampDelay(10_000, cancellation: new TimeoutCancellation(1)),
         )));
 
@@ -88,7 +88,7 @@ final class AmpCancellableTest
         $exception = thrown(static function () use (&$events) {
             timeout(1, static function () use (&$events) {
                 try {
-                    ampCancellable(static fn($cancellation) => ampDelay(1_000, cancellation: $cancellation));
+                    ampCancellable(static fn($cancellation) => ampDelay(1000, cancellation: $cancellation));
                 } finally {
                     shield(static function () use (&$events) {
                         ampCancellable(static fn($cancellation) => ampDelay(5, cancellation: $cancellation));

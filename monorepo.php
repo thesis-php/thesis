@@ -10,7 +10,7 @@ return new Config(
     version: '^0.1',
     description: 'Thesis: an asynchronous PHP ecosystem',
     copyrightHolder: 'Valentin Udaltsov',
-    licenseSince: 2_026,
+    licenseSince: 2026,
     authors: [
         ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],
         ['name' => 'Valentin Udaltsov', 'email' => 'udaltsov.valentin@gmail.com'],

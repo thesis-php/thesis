@@ -48,9 +48,9 @@ final class VirtualTimeTest
         $start = now();
         $realStart = hrtime(true);
 
-        delay(3_600);
+        delay(3600);
 
-        Assert::same(now() - $start, 3_600.0);
+        Assert::same(now() - $start, 3600.0);
         Assert::int(hrtime(true) - $realStart)->lessThan(1_000_000_000);
     }
 
@@ -596,13 +596,13 @@ final class VirtualTimeTest
     {
         $start = now();
         $fired = [];
-        EventLoop::delay(3_600, static function () use ($start, &$fired) {
+        EventLoop::delay(3600, static function () use ($start, &$fired) {
             $fired[] = now() - $start;
         });
         $timers = [];
 
-        for ($i = 0; $i < 1_000; ++$i) {
-            $timers[] = EventLoop::delay(3_600, static function () {});
+        for ($i = 0; $i < 1000; ++$i) {
+            $timers[] = EventLoop::delay(3600, static function () {});
         }
 
         foreach ($timers as $timer) {
@@ -615,9 +615,9 @@ final class VirtualTimeTest
 
         Assert::int($queue->count())->lessThan(100);
 
-        delay(3_600);
+        delay(3600);
 
-        Assert::same($fired, [3_600.0]);
+        Assert::same($fired, [3600.0]);
     }
 
     #[VirtualTime]

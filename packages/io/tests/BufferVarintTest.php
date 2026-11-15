@@ -103,7 +103,7 @@ final class BufferVarintTest
         $buffer = new Buffer();
         $values = [];
 
-        for ($i = 0; $i < 1_000; ++$i) {
+        for ($i = 0; $i < 1000; ++$i) {
             $values[] = $random->getInt(PHP_INT_MIN, PHP_INT_MAX) >> $random->getInt(0, 63);
         }
 

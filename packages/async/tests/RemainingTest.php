@@ -21,7 +21,7 @@ final class RemainingTest
 
     public function isTimeLeftUnderTimeout(): void
     {
-        $remaining = timeout(1_000, static function () {
+        $remaining = timeout(1000, static function () {
             delay(10);
 
             return remaining();
@@ -32,14 +32,14 @@ final class RemainingTest
 
     public function decreasesWhileTimeGoesBy(): void
     {
-        [$before, $after] = timeout(1_000, static function () {
+        [$before, $after] = timeout(1000, static function () {
             $before = remaining();
             advance(2);
 
             return [$before, remaining()];
         });
 
-        Assert::same([$before, $after], [1_000.0, 998.0]);
+        Assert::same([$before, $after], [1000.0, 998.0]);
     }
 
     public function nestedTimeoutWithLaterDeadlineShowsParentOne(): void
@@ -58,7 +58,7 @@ final class RemainingTest
 
     public function isNullInsideShield(): void
     {
-        $remaining = timeout(1_000, static fn() => shield(remaining(...)));
+        $remaining = timeout(1000, static fn() => shield(remaining(...)));
 
         Assert::null($remaining);
     }
@@ -99,7 +99,7 @@ final class RemainingTest
 
     public function isGoneAfterTimeoutReturns(): void
     {
-        timeout(1_000, static fn() => null);
+        timeout(1000, static fn() => null);
 
         Assert::null(remaining());
     }

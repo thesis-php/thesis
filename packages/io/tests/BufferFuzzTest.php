@@ -120,8 +120,8 @@ final class BufferFuzzTest
 
         // slices must be independent buffers of the same order
         foreach ($slices as [$slice, $referenceSlice]) {
-            $slice->writeUint16(0x01_02)->writeUvarint(300);
-            $referenceSlice->writeUint16(0x01_02)->writeUvarint(300);
+            $slice->writeUint16(0x0102)->writeUvarint(300);
+            $referenceSlice->writeUint16(0x0102)->writeUvarint(300);
             Assert::same(
                 actual: bin2hex($slice->drain()),
                 expected: bin2hex($referenceSlice->drain()),
@@ -204,8 +204,8 @@ final class BufferFuzzTest
             'write' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->write($bytes),
             'writeInt8' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt8(($int & 0xFF) - 0x80),
             'writeUint8' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint8($int & 0xFF),
-            'writeInt16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt16(($int & 0xFF_FF) - 0x80_00),
-            'writeUint16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint16($int & 0xFF_FF),
+            'writeInt16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt16(($int & 0xFFFF) - 0x8000),
+            'writeUint16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint16($int & 0xFFFF),
             'writeInt32' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt32(($int & 0xFF_FF_FF_FF) - 0x80_00_00_00),
             'writeUint32' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint32($int & 0xFF_FF_FF_FF),
             'writeInt64' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt64($int),

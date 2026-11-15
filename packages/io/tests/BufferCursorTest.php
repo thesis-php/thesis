@@ -132,7 +132,7 @@ final class BufferCursorTest
         $slice = $buffer->slice(2);
 
         Assert::same($slice->order, Order::Little);
-        Assert::same($slice->readUint16(), 0x01_02);
+        Assert::same($slice->readUint16(), 0x0102);
         Assert::count($slice, 0);
         Assert::same($buffer->drain(), "\xEE");
     }

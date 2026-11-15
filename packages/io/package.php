@@ -6,7 +6,7 @@ use Thesis\Monorepo\Manifest;
 
 return new Manifest(
     description: 'Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.',
-    licenseSince: 2_026,
+    licenseSince: 2026,
     require: [
         'php-64bit' => '*',
     ],

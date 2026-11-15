@@ -19,7 +19,7 @@ final class TimeoutTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeout(1_000, static function () {
+        $result = timeout(1000, static function () {
             delay(1);
 
             return 'result';
@@ -173,7 +173,7 @@ final class TimeoutTest
     {
         Expect::exception(\LogicException::class)->withMessage('failure');
 
-        timeout(1_000, static function () {
+        timeout(1000, static function () {
             throw new \LogicException('failure');
         });
     }

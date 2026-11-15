@@ -26,7 +26,7 @@ use function Thesis\Net\Internal\lastError;
  */
 final class DnsResolver implements Resolver
 {
-    private const int MAX_CACHED = 1_024;
+    private const int MAX_CACHED = 1024;
 
     /**
      * A day, as most resolvers cap it: a record with a huge TTL must not stay in a long-running process for good.
@@ -188,7 +188,7 @@ final class DnsResolver implements Resolver
 
         for ($attempt = 0; $attempt < $this->attempts; ++$attempt) {
             foreach ($this->nameservers as $nameserver) {
-                $request = Message::query(random_int(0, 0xFF_FF), $name, $type);
+                $request = Message::query(random_int(0, 0xFFFF), $name, $type);
 
                 try {
                     $response = timeoutOr($this->timeout, static fn() => self::udp($nameserver, $request));

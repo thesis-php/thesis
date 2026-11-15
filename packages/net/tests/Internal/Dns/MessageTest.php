@@ -14,7 +14,7 @@ final class MessageTest
 {
     public function encodesAQuery(): void
     {
-        $query = Message::query(0xAB_CD, 'db.test', Message::AAAA);
+        $query = Message::query(0xABCD, 'db.test', Message::AAAA);
 
         Assert::same(bin2hex($query), 'abcd01000001000000000000026462047465737400001c0001');
     }
@@ -45,7 +45,7 @@ final class MessageTest
                 // A 10.0.0.2, ttl 30
                 . 'c00c000100010000001e00040a000002',
             ),
-            query: Message::query(0xAB_CD, 'db.test', Message::A),
+            query: Message::query(0xABCD, 'db.test', Message::A),
         );
 
         Assert::same($response?->rcode, Message::NOERROR);

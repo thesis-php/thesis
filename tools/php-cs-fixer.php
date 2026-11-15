@@ -72,7 +72,6 @@ return new Config()
         'no_superfluous_phpdoc_tags' => ['remove_inheritdoc' => true],
         'no_trailing_whitespace_in_string' => false,
         'nullable_type_declaration_for_default_null_value' => true,
-        'numeric_literal_separator' => ['strategy' => 'use_separator', 'override_existing' => true],
         'ordered_class_elements' => ['order' => ['use_trait']],
         'ordered_imports' => ['imports_order' => ['class', 'function', 'const']],
         'ordered_types' => ['sort_algorithm' => 'none'],

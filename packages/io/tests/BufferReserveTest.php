@@ -70,8 +70,8 @@ final class BufferReserveTest
         $uint16 = static function (Buffer $b, int $v): void {
             $b->patchUint16(1, $v);
         };
-        yield 'uint16' => [$uint16, 2, 0x01_02, '0102', '0201'];
-        yield 'uint16 max' => [$uint16, 2, 0xFF_FF, 'ffff', 'ffff'];
+        yield 'uint16' => [$uint16, 2, 0x0102, '0102', '0201'];
+        yield 'uint16 max' => [$uint16, 2, 0xFFFF, 'ffff', 'ffff'];
 
         $uint32 = static function (Buffer $b, int $v): void {
             $b->patchUint32(1, $v);
@@ -124,7 +124,7 @@ final class BufferReserveTest
         $buffer->read(2);
         $mark = $buffer->reserve(2);
 
-        $buffer->patchUint16($mark, 0x01_02);
+        $buffer->patchUint16($mark, 0x0102);
 
         Assert::same(bin2hex($buffer->drain()), '630102');
     }

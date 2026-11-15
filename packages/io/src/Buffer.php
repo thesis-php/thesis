@@ -210,7 +210,7 @@ final class Buffer implements \Countable
 
         return (($this->big
             ? \ord($this->bytes[$o]) << 8 | $b
-            : $b << 8 | \ord($this->bytes[$o])) ^ 0x80_00) - 0x80_00;
+            : $b << 8 | \ord($this->bytes[$o])) ^ 0x8000) - 0x8000;
     }
 
     /**
@@ -429,7 +429,7 @@ final class Buffer implements \Countable
 
     public function writeInt16(int $v): self
     {
-        \assert($v >= -0x80_00 && $v <= 0x7F_FF, \sprintf('Expected an int16 value, got %d.', $v));
+        \assert($v >= -0x8000 && $v <= 0x7FFF, \sprintf('Expected an int16 value, got %d.', $v));
         // chr() is faster than pack() for 2 bytes
         $this->bytes .= $this->big
             ? \chr($v >> 8 & 0xFF) . \chr($v & 0xFF)
@@ -440,7 +440,7 @@ final class Buffer implements \Countable
 
     public function writeUint16(int $v): self
     {
-        \assert($v >= 0 && $v <= 0xFF_FF, \sprintf('Expected a uint16 value, got %d.', $v));
+        \assert($v >= 0 && $v <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $v));
         // chr() is faster than pack() for 2 bytes
         $this->bytes .= $this->big
             ? \chr($v >> 8 & 0xFF) . \chr($v & 0xFF)
@@ -510,7 +510,7 @@ final class Buffer implements \Countable
                 return $this;
             }
 
-            if ($v < 0x40_00) {
+            if ($v < 0x4000) {
                 $this->bytes .= \chr($v & 0x7F | 0x80) . \chr($v >> 7);
 
                 return $this;
@@ -590,7 +590,7 @@ final class Buffer implements \Countable
      */
     public function patchUint16(int $mark, int $v): void
     {
-        \assert($v >= 0 && $v <= 0xFF_FF, \sprintf('Expected a uint16 value, got %d.', $v));
+        \assert($v >= 0 && $v <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $v));
         \assert($mark + 2 <= \strlen($this->bytes), 'Invalid mark.');
 
         if ($this->big) {

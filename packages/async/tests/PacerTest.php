@@ -93,7 +93,7 @@ final class PacerTest
             timeout(1, static function () use ($pacer, &$operations) {
                 untilCancelled();
 
-                while ($operations < 1_000) {
+                while ($operations < 1000) {
                     $pacer->pace();
                     ++$operations;
                 }

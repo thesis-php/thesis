@@ -493,7 +493,7 @@ final class GroupTest
         $elapsed = elapsed(static function () {
             group(static function (Group $group) {
                 $handle = $group->spawn(static function () {
-                    timeout(1_000, static fn() => null);
+                    timeout(1000, static fn() => null);
                     never(); // still waits in the task's scope
                 });
                 delay(1);
@@ -701,14 +701,14 @@ final class GroupTest
 
         group(static function (Group $group) use ($onlyChild) {
             $body = Scope::current();
-            timeout(1_000, static fn() => null);
+            timeout(1000, static fn() => null);
             thrown(static fn() => timeout(1, never(...)));
             shield(static fn() => null);
             $group->spawn(static fn() => null);
             $group->spawn(never(...))->cancel();
             $group->daemon(static fn() => null);
             $group->spawn(static function () {
-                timeout(1_000, static fn() => delay(1));
+                timeout(1000, static fn() => delay(1));
                 shield(static fn() => delay(1));
             })->await();
             delay(1);

@@ -6,7 +6,7 @@ use Thesis\Monorepo\Manifest;
 
 return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
-    licenseSince: 2_026,
+    licenseSince: 2026,
     require: [
         'revolt/event-loop' => '^1.0.9',
     ],

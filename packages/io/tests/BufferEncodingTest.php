@@ -244,7 +244,7 @@ final class BufferEncodingTest
         $buffer = new Buffer(bytes: Hex::bytes('0102030405060708090a0b0c0d0e0f'));
 
         Assert::same($buffer->readUint8(), 0x01);
-        Assert::same($buffer->readUint16(), 0x02_03);
+        Assert::same($buffer->readUint16(), 0x0203);
         Assert::same($buffer->readUint32(), 0x04_05_06_07);
         Assert::same($buffer->readInt64(), 0x08_09_0A_0B_0C_0D_0E_0F);
         Assert::count($buffer, 0);
@@ -256,7 +256,7 @@ final class BufferEncodingTest
 
         $buffer->writeFloat(0.1);
 
-        Assert::same($buffer->readFloat(), 0.100_000_001_490_116_12);
+        Assert::same($buffer->readFloat(), 0.10000000149011612);
     }
 
     /**

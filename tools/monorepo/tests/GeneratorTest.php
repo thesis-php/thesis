@@ -70,7 +70,7 @@ final readonly class GeneratorTest
 
     public static function writesLicenseFromTheYearOfManifest(): void
     {
-        $fixture = new Fixture()->package('bytes', licenseSince: 2_024);
+        $fixture = new Fixture()->package('bytes', licenseSince: 2024);
 
         $files = Generator::generate($fixture->load());
 

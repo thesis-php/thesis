@@ -15,7 +15,7 @@ final class TimeoutOrTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeoutOr(seconds: 1_000, body: static function () {
+        $result = timeoutOr(seconds: 1000, body: static function () {
             delay(1);
 
             return 'result';
@@ -115,7 +115,7 @@ final class TimeoutOrTest
 
     public function passesFailureThrough(): void
     {
-        $exception = thrown(static fn() => timeoutOr(1_000, static fn() => throw new \LogicException('failure')));
+        $exception = thrown(static fn() => timeoutOr(1000, static fn() => throw new \LogicException('failure')));
 
         Assert::instanceOf($exception, \LogicException::class);
         assertNoCallbacksLeft();

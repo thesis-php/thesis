@@ -131,7 +131,7 @@ final class DelayAndCheckpointTest
 
         $exception = thrown(static function () use (&$iterations) {
             timeout(5, static function () use (&$iterations) {
-                while ($iterations < 1_000) {
+                while ($iterations < 1000) {
                     ++$iterations;
                     advance(1);
                     checkpoint();

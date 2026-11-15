@@ -125,7 +125,7 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function waitWithRoomInWindowDoesNotSuspend(): void
     {
-        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 1_000);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: 1000);
 
         $thrown = timeout(1, static function () use ($limiter) {
             untilCancelled();
