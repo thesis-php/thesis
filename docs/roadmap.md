@@ -101,6 +101,10 @@ of its package, and a step that is done is deleted from here.
   The drivers differ in signals (pcntl or native), closed or re-registered streams and the order of callbacks
   in a tick; `VirtualTimeDriver` leaves streams and signals to the inner driver. First `StreamSelectDriver`
   and `UvDriver`, then `EvDriver` (needs ext-ev in the image); `EventDriver` probably not.
+- Links between packages in a README (`[thesis/async](../async/README.md)` in `amqp`, `async`, `io`, `net`)
+  work only in the monorepo: the split repository and Packagist have no `../async`. Replace them all at once
+  with links to the repositories of the packages (`https://github.com/thesis-php/async`), and make `bin/monorepo`
+  check that a README links no path outside its package.
 
 ## Open questions
 
