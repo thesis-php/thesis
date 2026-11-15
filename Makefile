@@ -7,6 +7,8 @@ COMPOSER ?= $(RUN) composer
 
 # (P=<name> narrows the quality tools and the tests to packages/<name>)
 P ?=
+# (REF is the branch or the tag to split)
+REF ?= $(shell git symbolic-ref --quiet HEAD)
 PATHS = $(if $(P),packages/$(P),bin/monorepo monorepo.php tools packages)
 
 # Container
@@ -46,6 +48,10 @@ sync: vendor ## Regenerate files derived from the manifests, then update the loc
 	$(COMPOSER) update --minimal-changes
 	@touch vendor
 .PHONY: sync
+
+split: ## Split packages/* of REF into thesis-php/<name>, pushes only with SPLIT_REMOTE [REF=]
+	$(DOCKER_COMPOSE) run --rm --build split tools/split/split.sh $(REF)
+.PHONY: split
 
 # Quality
 
