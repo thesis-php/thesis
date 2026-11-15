@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Helpers shared by the tests. Every test runs in {main}: the library drives the Revolt loop from there itself.
- * Every test runs on virtual time (VirtualTimePlugin in testo.php): durations are exact, and CPU work takes none.
+ * Every test runs on virtual time (VirtualTimePlugin in testo.plugins.php): durations are exact, and CPU work takes none.
  */
 
 namespace Thesis\Async\Tests;

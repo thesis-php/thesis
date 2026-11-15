@@ -2,15 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Async\Testo;
+namespace Thesis\Testo;
 
 use Internal\Container\Container;
 use Testo\Common\PluginConfigurator;
 use Testo\Pipeline\InterceptorCollector;
-use Thesis\Async\Testo\Internal\VirtualTimeInterceptor;
+use Thesis\Testo\Internal\VirtualTimeInterceptor;
 
 /**
  * Runs every test of the suite as {@see VirtualTime} does. A test that has the attribute as well is not wrapped twice.
+ *
+ * @api
  */
 final readonly class VirtualTimePlugin implements PluginConfigurator
 {

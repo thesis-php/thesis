@@ -12,6 +12,7 @@ return new ApplicationConfig(
         __DIR__ . '/packages/async/src',
         __DIR__ . '/packages/io/src',
         __DIR__ . '/packages/net/src',
+        __DIR__ . '/packages/testo/src',
         __DIR__ . '/packages/time/src',
     ],
     suites: [
@@ -24,6 +25,7 @@ return new ApplicationConfig(
         ),
         new SuiteConfig(name: 'io', location: [__DIR__ . '/packages/io/tests']),
         new SuiteConfig(name: 'net', location: [__DIR__ . '/packages/net/tests']),
+        new SuiteConfig(name: 'testo', location: [__DIR__ . '/packages/testo/tests']),
         new SuiteConfig(name: 'time', location: [__DIR__ . '/packages/time/tests']),
     ],
 );

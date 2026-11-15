@@ -874,9 +874,9 @@ While `run()` runs, its clock is the clock of the library, bound by `run()` itse
 Each `run()` has a clock of its own, so an object that keeps times must not outlive the `run()` it was used in:
 a rate limiter shared by two `run()`s one after another, or used again outside, may see a time from the future of its clock.
 
-The tests of this library run this way: a plugin for [Testo](https://github.com/php-testo/testo) in `tests/Testo`,
-`VirtualTimePlugin`, runs every test of the suite in its own `run()`, and the `#[VirtualTime]` attribute does the same
-for a class or a test. It is not shipped with the package and not part of its API: it is to become a package of its own.
+For [Testo](https://github.com/php-testo/testo), [thesis/testo](https://github.com/thesis-php/testo) runs tests
+this way: its `VirtualTimePlugin` runs every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute
+does the same for a class or a test. The tests of this library run on it.
 
 ### Streams: `StreamWatcher`
 
@@ -1094,7 +1094,6 @@ all([user, orders])              orders fails after 50 ms
 Ideas that are not implemented yet.
 
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
-- **A package for `VirtualTimePlugin` and `#[VirtualTime]`**: the Testo plugin lives in `tests/Testo` for now.
 
 ## Prior art
 

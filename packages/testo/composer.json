@@ -1,0 +1,42 @@
+{
+    "name": "thesis/testo",
+    "description": "Testo plugins for thesis packages: tests on the virtual time of thesis/async.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "internal/container": "^1.1",
+        "testo/testo": "^0.10.29",
+        "thesis/async": "^2.0"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "thesis/time": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Testo\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Testo\\": "tests/"
+        }
+    }
+}

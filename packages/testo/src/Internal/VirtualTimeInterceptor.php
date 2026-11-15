@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Async\Testo\Internal;
+namespace Thesis\Testo\Internal;
 
 use Testo\Core\Context\TestInfo;
 use Testo\Core\Context\TestResult;

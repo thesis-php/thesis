@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-use Thesis\Async\Testo\VirtualTimePlugin;
+use Thesis\Testo\VirtualTimePlugin;
 
 return [new VirtualTimePlugin()];

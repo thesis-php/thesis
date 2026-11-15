@@ -15,7 +15,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Internal\VirtualTimeDriver;
-use Thesis\Async\Testo\VirtualTime;
+use Thesis\Testo\VirtualTime;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\secondsSince;

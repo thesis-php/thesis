@@ -22,8 +22,10 @@
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
+        "internal/container": "^1.1",
         "psr/clock": "^1.0",
-        "revolt/event-loop": "^1.0.9"
+        "revolt/event-loop": "^1.0.9",
+        "testo/testo": "^0.10.29"
     },
     "require-dev": {
         "ext-intl": "*",
@@ -32,7 +34,6 @@
         "ext-sockets": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
-        "internal/container": "^1.1",
         "llm/skills": "^1.17",
         "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
@@ -40,13 +41,13 @@
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
         "testo/lifecycle": "^0.1.9",
-        "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29"
+        "testo/test": "^0.1.8"
     },
     "replace": {
         "thesis/async": "self.version",
         "thesis/io": "self.version",
         "thesis/net": "self.version",
+        "thesis/testo": "self.version",
         "thesis/time": "self.version"
     },
     "autoload": {
@@ -54,6 +55,7 @@
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
+            "Thesis\\Testo\\": "packages/testo/src/",
             "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
@@ -70,6 +72,7 @@
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
+            "Thesis\\Testo\\": "packages/testo/tests/",
             "Thesis\\Time\\": "packages/time/tests/"
         },
         "files": [
