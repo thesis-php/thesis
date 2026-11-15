@@ -49,6 +49,7 @@
     "replace": {
         "thesis/amqp": "self.version",
         "thesis/async": "self.version",
+        "thesis/exceptionally": "self.version",
         "thesis/io": "self.version",
         "thesis/net": "self.version",
         "thesis/phpstan-extension": "self.version",
@@ -57,6 +58,7 @@
     },
     "autoload": {
         "psr-4": {
+            "Thesis\\": "packages/exceptionally/src/",
             "Thesis\\Amqp\\": "packages/amqp/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Io\\": "packages/io/src/",
@@ -68,12 +70,14 @@
         "files": [
             "packages/amqp/src/autoload.files.php",
             "packages/async/src/autoload.files.php",
+            "packages/exceptionally/src/autoload.files.php",
             "packages/net/src/autoload.files.php",
             "packages/time/src/autoload.files.php"
         ]
     },
     "autoload-dev": {
         "psr-4": {
+            "Thesis\\": "packages/exceptionally/tests/",
             "Thesis\\Amqp\\": "packages/amqp/tests/",
             "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
@@ -87,6 +91,7 @@
         "files": [
             "packages/amqp/tests/autoload.files.php",
             "packages/async/tests/autoload.files.php",
+            "packages/exceptionally/tests/autoload.files.php",
             "packages/net/tests/autoload.files.php",
             "packages/time/tests/autoload.files.php"
         ]

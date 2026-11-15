@@ -11,6 +11,7 @@ return new ApplicationConfig(
     src: [
         __DIR__ . '/packages/amqp/src',
         __DIR__ . '/packages/async/src',
+        __DIR__ . '/packages/exceptionally/src',
         __DIR__ . '/packages/io/src',
         __DIR__ . '/packages/net/src',
         __DIR__ . '/packages/phpstan-extension/src',
@@ -26,6 +27,7 @@ return new ApplicationConfig(
             location: [__DIR__ . '/packages/async/tests'],
             plugins: require __DIR__ . '/packages/async/testo.plugins.php',
         ),
+        new SuiteConfig(name: 'exceptionally', location: [__DIR__ . '/packages/exceptionally/tests']),
         new SuiteConfig(name: 'io', location: [__DIR__ . '/packages/io/tests']),
         new SuiteConfig(name: 'net', location: [__DIR__ . '/packages/net/tests']),
         new SuiteConfig(name: 'testo-plugin', location: [__DIR__ . '/packages/testo-plugin/tests']),

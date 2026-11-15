@@ -11,6 +11,8 @@ return [
         'packages/net/src' => ['ext-intl', 'ext-sockets'],
     ],
     'fixer' => [
+        // error_suppression puts @ before trigger_error() of E_USER_DEPRECATED, the tests need it unsuppressed.
+        'packages/exceptionally/tests/functions.php',
         // final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.
         'packages/time/polyfill/TimeException.php',
     ],

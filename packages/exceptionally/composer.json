@@ -1,0 +1,45 @@
+{
+    "name": "thesis/exceptionally",
+    "description": "Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\": "src/"
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\": "tests/"
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
+    }
+}

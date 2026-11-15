@@ -8,6 +8,7 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 - `packages/<name>/` is one package, published as `thesis/<name>` after the split. It holds `package.php` (the manifest),
   `src/`, `tests/`, `README.md`, `AGENTS.md`, `LICENSE` and optionally `skills/`. Without `tests/`
   (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite and no `autoload-dev`.
+  A package that continues an older repository of the same name keeps its `CHANGELOG.md` there (`exceptionally`).
   A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
@@ -134,6 +135,12 @@ the whole monorepo is for the final check.
 - State that only one function needs (a memoized value, a cache, a lazily created instance) is a `static` variable
   inside that function, not a static property: it sits next to the only code that uses it, and since PHP 8.3
   it is initialized with any expression. A static property is only for state shared by several methods.
+- Per-fiber state is keyed by `\Fiber::getCurrent()` (and an object of its own for {main}), and the key is
+  never kept in a local variable across code that may suspend: the fiber's stack then references the fiber
+  itself, a cycle, and a fiber suspended there outlives its last reference, with all it holds, until the cycle
+  collector runs. Get the key again every time it is needed, in `finally` too. A test catches it: start a fiber
+  that suspends inside, drop it, assert that its `\WeakReference` is null
+  (`fiberSuspendedInsideGoesAwayWithLastReference`).
 - No return types on closures and arrow functions: `static fn() => new X()`, not `static fn(): X => new X()`.
 - Named typed properties instead of id-indexed arrays (`$this->values[0]`). Use an array only for genuinely dynamic sets.
 - `readonly` wherever possible: `final readonly class` for immutable classes, `readonly` on individual properties
@@ -190,6 +197,7 @@ its `types/` fixtures fail in `make phpstan` otherwise.
 
 - `amqp`: AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects. Requires: async, io, net, time.
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree. Requires: time.
+- `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
