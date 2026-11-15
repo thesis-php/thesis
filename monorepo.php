@@ -16,6 +16,9 @@ return new Config(
         ['name' => 'Valentin Udaltsov', 'email' => 'udaltsov.valentin@gmail.com'],
         ['name' => 'Contributors', 'homepage' => 'https://github.com/thesis-php/thesis/graphs/contributors'],
     ],
+    platform: [
+        'php-64bit' => '*',
+    ],
     requireDev: [
         'composer/semver' => '^3.4',
         'llm/skills' => '^1.17',

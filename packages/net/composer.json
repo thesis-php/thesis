@@ -19,6 +19,7 @@
     ],
     "require": {
         "php": "^8.5",
+        "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
         "thesis/async": "^2.0",

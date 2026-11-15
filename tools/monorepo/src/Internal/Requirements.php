@@ -52,7 +52,8 @@ final class Requirements
     {
         $requirements = new self();
         $config = $monorepo->config;
-        $requirements->add(Monorepo::CONFIG, ['php' => $config->php, ...$config->require], runtime: true);
+        $require = ['php' => $config->php, ...$config->platform, ...$config->require];
+        $requirements->add(Monorepo::CONFIG, $require, runtime: true);
         $requirements->add(Monorepo::CONFIG, $config->requireDev, runtime: false);
 
         foreach ($monorepo->packages as $package) {

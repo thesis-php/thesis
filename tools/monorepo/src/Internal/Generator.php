@@ -91,7 +91,11 @@ final readonly class Generator
             'license' => 'MIT',
             'type' => 'library',
             'authors' => $config->authors,
-            'require' => self::sortRequire(['php' => $config->php, ...$this->versioned($manifest->require)]),
+            'require' => self::sortRequire([
+                'php' => $config->php,
+                ...$config->platform,
+                ...$this->versioned($manifest->require),
+            ]),
             'require-dev' => self::sortRequire($this->versioned($manifest->requireDev)),
             'conflict' => self::sortRequire($manifest->conflict),
             'suggest' => self::sortRequire($manifest->suggest),

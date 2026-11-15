@@ -19,6 +19,8 @@ final readonly class Config
      * @param non-empty-string $copyrightHolder in LICENSE of the root and of every package
      * @param positive-int $licenseSince the first year of the copyright in the root LICENSE
      * @param list<array{name: string, email?: string, homepage?: string}> $authors authors of every package
+     * @param array<non-empty-string, non-empty-string> $platform platform packages every package requires
+     *     besides php (php-64bit, ext-*)
      * @param array<non-empty-string, non-empty-string> $require dependencies of the root itself, not of a package
      * @param array<non-empty-string, non-empty-string> $requireDev tools of the root, not of a package
      * @param array<non-empty-string, non-empty-string> $autoloadDev psr-4 prefix => directory,
@@ -32,6 +34,7 @@ final readonly class Config
         public string $copyrightHolder,
         public int $licenseSince,
         public array $authors = [],
+        public array $platform = [],
         public array $require = [],
         public array $requireDev = [],
         public array $autoloadDev = [],

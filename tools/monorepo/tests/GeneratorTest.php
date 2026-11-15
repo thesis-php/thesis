@@ -57,6 +57,32 @@ final readonly class GeneratorTest
         ]);
     }
 
+    public static function requiresPlatformOfConfigInEveryComposerJson(): void
+    {
+        $fixture = new Fixture()
+            ->file('monorepo.php', <<<'PHP'
+                <?php
+
+                return new Thesis\Monorepo\Config(
+                    php: '^8.5',
+                    version: '^0.1',
+                    description: 'Fixture.',
+                    copyrightHolder: 'Fixture',
+                    licenseSince: 2026,
+                    platform: ['php-64bit' => '*'],
+                );
+                PHP)
+            ->package('bytes', "require: ['ext-bcmath' => '*']")
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $require = static fn(string $path) => Json::decode($files[$path] ?? '', $path)['require'] ?? null;
+        $expected = ['php' => '^8.5', 'php-64bit' => '*', 'ext-bcmath' => '*'];
+        Assert::same($require('packages/bytes/composer.json'), $expected);
+        Assert::same($require('composer.json'), $expected);
+    }
+
     public static function writesCatalogBetweenMarkers(): void
     {
         $fixture = self::fixture();

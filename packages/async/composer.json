@@ -19,6 +19,7 @@
     ],
     "require": {
         "php": "^8.5",
+        "php-64bit": "*",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
