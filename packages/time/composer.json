@@ -1,0 +1,51 @@
+{
+    "name": "thesis/time",
+    "description": "Functions for Time\\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "psr/clock": "^1.0"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/codecov": "^0.2.5",
+        "testo/data": "^0.1.10",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Time\\": "src/"
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Time\\": "tests/"
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

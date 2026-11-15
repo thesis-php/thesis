@@ -17,6 +17,8 @@ return new Config()
         Finder
             ::create()
             ->in([$root . '/tools', $root . '/packages'])
+            // final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.
+            ->notPath('time/polyfill/TimeException.php')
             ->append([
                 $root . '/bin/monorepo',
                 $root . '/monorepo.php',

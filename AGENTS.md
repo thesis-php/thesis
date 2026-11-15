@@ -156,5 +156,6 @@ in the same change. Atomic changes across packages are the reason this is a mono
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree.
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io.
+- `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.
 
 <!-- packages:end -->

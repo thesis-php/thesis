@@ -22,6 +22,7 @@
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
+        "psr/clock": "^1.0",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
@@ -45,17 +46,20 @@
     "replace": {
         "thesis/async": "self.version",
         "thesis/io": "self.version",
-        "thesis/net": "self.version"
+        "thesis/net": "self.version",
+        "thesis/time": "self.version"
     },
     "autoload": {
         "psr-4": {
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Io\\": "packages/io/src/",
-            "Thesis\\Net\\": "packages/net/src/"
+            "Thesis\\Net\\": "packages/net/src/",
+            "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
             "packages/async/src/autoload.files.php",
-            "packages/net/src/autoload.files.php"
+            "packages/net/src/autoload.files.php",
+            "packages/time/src/autoload.files.php"
         ]
     },
     "autoload-dev": {
@@ -65,11 +69,13 @@
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
-            "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/"
+            "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
+            "Thesis\\Time\\": "packages/time/tests/"
         },
         "files": [
             "packages/async/tests/autoload.files.php",
-            "packages/net/tests/autoload.files.php"
+            "packages/net/tests/autoload.files.php",
+            "packages/time/tests/autoload.files.php"
         ]
     },
     "config": {
