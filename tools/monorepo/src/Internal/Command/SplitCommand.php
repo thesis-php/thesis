@@ -10,6 +10,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Thesis\Monorepo\Internal\Git\Git;
+use Thesis\Monorepo\Internal\GitHub\Api;
+use Thesis\Monorepo\Internal\GitHub\Repositories;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Split\Remote;
 use Thesis\Monorepo\Internal\Split\Split;
@@ -22,10 +24,12 @@ final readonly class SplitCommand
 {
     /**
      * @param ?string $remote SPLIT_REMOTE, null to print the splits without pushing them
+     * @param ?Api $api GITHUB_TOKEN, required for a push: it tells which repositories are splits
      */
     public function __construct(
         private string $root,
         private ?string $remote,
+        private ?Api $api,
     ) {}
 
     public function __invoke(
@@ -56,14 +60,40 @@ final readonly class SplitCommand
             return Command::SUCCESS;
         }
 
+        if ($this->api === null) {
+            $io->error('Set GITHUB_TOKEN to push: only the repositories that are splits get a push.');
+
+            return Command::FAILURE;
+        }
+
         $pushes = [];
+        $failed = [];
 
         foreach ($split->commits as $package => $commit) {
+            try {
+                $isSplit = Repositories::isSplit($this->api, $package);
+            } catch (MonorepoException $exception) {
+                $io->writeln(\sprintf('%s: %s', $package, $exception->getMessage()), OutputInterface::OUTPUT_RAW);
+                $failed[] = $package;
+
+                continue;
+            }
+
+            if (!$isSplit) {
+                $io->writeln(\sprintf(
+                    '%s: %s/%s is not a split: it has no rulesets of the split, run make github first.',
+                    $package,
+                    Repositories::ORGANIZATION,
+                    $package,
+                ));
+                $failed[] = $package;
+
+                continue;
+            }
+
             // Never forced: a split that cannot fast-forward fails instead of rewriting a published history.
             $pushes[$package] = ['push', $remote->url($package), $commit . ':' . $split->ref];
         }
-
-        $failed = [];
 
         foreach ($git->with($remote->env)->runAll($pushes) as $package => $result) {
             // Raw: the output of git is not markup of the console.

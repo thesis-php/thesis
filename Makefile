@@ -54,8 +54,8 @@ sync: vendor ## Regenerate files derived from the manifests, then update the loc
 	@touch vendor
 .PHONY: sync
 
-split: vendor ## Split packages/* of REF into thesis-php/<name>, pushes only with SPLIT_REMOTE [REF=]
-	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE php) bin/monorepo split "$$REF"
+split: vendor ## Split packages/* of REF into thesis-php/<name>, pushes only with SPLIT_REMOTE and GITHUB_TOKEN [REF=]
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN php) bin/monorepo split "$$REF"
 .PHONY: split
 
 github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs GITHUB_TOKEN [ARGS=--dry-run]

@@ -11,10 +11,19 @@ use Testo\Assert;
 use Testo\Test;
 use Thesis\Monorepo\Internal\Command\SplitCommand;
 use Thesis\Monorepo\Internal\Split\Split;
+use Thesis\Monorepo\Tests\GitHub\FakeApi;
 
 #[Test]
 final readonly class SplitCommandTest
 {
+    /**
+     * The repositories of a and b are splits: they have a ruleset of the split.
+     */
+    private const array SPLITS = [
+        'repos/thesis-php/a/rulesets' => [['id' => 1, 'name' => 'read-only branches']],
+        'repos/thesis-php/b/rulesets' => [['id' => 1, 'name' => 'read-only branches']],
+    ];
+
     public static function printsSplitsWithoutRemote(): void
     {
         $repository = self::repository();
@@ -81,6 +90,46 @@ final readonly class SplitCommandTest
         Assert::same($remotes->head('b', 'refs/heads/main'), $other->head());
     }
 
+    /**
+     * An older package of the same name has no main, so the push would create it instead of failing.
+     */
+    public static function skipsRepositoryThatIsNotSplitAndPushesTheOthers(): void
+    {
+        $repository = self::repository();
+        $remotes = self::remotes('a', 'b');
+        $other = new Repository();
+        $other->commit('Older b', ['B.php' => 'other']);
+        $other->git->run(['push', '--quiet', 'file://' . $remotes->dir . '/b.git', 'main:1.0.x']);
+
+        [$code, $output] = self::run(
+            repository: $repository,
+            ref: 'refs/heads/main',
+            remote: 'file://' . $remotes->dir,
+            api: new FakeApi(['repos/thesis-php/a/rulesets' => self::SPLITS['repos/thesis-php/a/rulesets']]),
+        );
+
+        Assert::same($code, Command::FAILURE);
+        Assert::true(str_contains($output, 'thesis-php/b is not a split: it has no rulesets of the split'));
+        Assert::true(str_contains($output, 'The push of b failed.'));
+        Assert::same(
+            actual: $remotes->head('a', 'refs/heads/main'),
+            expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
+        );
+        Assert::same($remotes->head('b', 'refs/heads/main'), null);
+    }
+
+    public static function failsWithoutApiWhenPushing(): void
+    {
+        $repository = self::repository();
+        $remotes = self::remotes('a', 'b');
+
+        [$code, $output] = self::run($repository, 'refs/heads/main', remote: 'file://' . $remotes->dir, api: null);
+
+        Assert::same($code, Command::FAILURE);
+        Assert::true(str_contains($output, 'Set GITHUB_TOKEN'));
+        Assert::same($remotes->head('a', 'refs/heads/main'), null);
+    }
+
     public static function failsOnInvalidRefWithoutPushing(): void
     {
         $repository = self::repository();
@@ -96,10 +145,14 @@ final readonly class SplitCommandTest
     /**
      * @return array{int, string} the exit code and the output
      */
-    private static function run(Repository $repository, string $ref, ?string $remote): array
-    {
+    private static function run(
+        Repository $repository,
+        string $ref,
+        ?string $remote,
+        ?FakeApi $api = new FakeApi(self::SPLITS),
+    ): array {
         $application = new Application();
-        $application->addCommand(new SplitCommand($repository->dir, $remote));
+        $application->addCommand(new SplitCommand($repository->dir, $remote, $api));
         $tester = new CommandTester($application->find('split'));
         $code = $tester->execute(['ref' => $ref], ['decorated' => false]);
 

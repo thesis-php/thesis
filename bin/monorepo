@@ -7,6 +7,7 @@ use Symfony\Component\Console\Application;
 use Thesis\Monorepo\Internal\Command\GitHubCommand;
 use Thesis\Monorepo\Internal\Command\SplitCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
+use Thesis\Monorepo\Internal\GitHub\HttpApi;
 
 $root = dirname(__DIR__);
 
@@ -17,6 +18,11 @@ $application->addCommand(new SyncCommand($root));
 $application->addCommand(new GitHubCommand($root));
 // https://x-access-token:<token>@github.com/thesis-php in CI, unset to only print the splits.
 $remote = getenv('SPLIT_REMOTE');
-$application->addCommand(new SplitCommand($root, $remote === false || $remote === '' ? null : $remote));
+$token = getenv('GITHUB_TOKEN');
+$application->addCommand(new SplitCommand(
+    root: $root,
+    remote: $remote === false || $remote === '' ? null : $remote,
+    api: $token === false || $token === '' ? null : new HttpApi($token),
+));
 
 exit($application->run());

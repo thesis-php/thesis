@@ -35,10 +35,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
       # Even when github failed for some repositories: the others get their splits, the job fails anyway.
-      # A push to a repository that is not a split fails by itself, it is never forced.
+      # A repository without the rulesets of the split gets no push: an older package of the same name lacks main,
+      # so a push would create it. A push is never forced.
       # The ref goes through the environment, not into the script: a tag name may hold ; $ ` and quotes.
       - if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: make split
         env:
           REF: ${{ github.ref }}
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php

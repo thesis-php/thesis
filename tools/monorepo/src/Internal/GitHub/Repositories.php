@@ -52,6 +52,15 @@ final class Repositories
         return $repositories;
     }
 
+    /**
+     * Whether thesis-php/<dir> is a split, so the split may push to it. An older package of the same name has
+     * no rulesets of the split, and a push of a branch it lacks (main) would create it instead of failing.
+     */
+    public static function isSplit(Api $api, string $dir): bool
+    {
+        return self::hasSplitRulesets(self::rulesetIds($api, self::ORGANIZATION . '/' . $dir));
+    }
+
     private function __construct(
         private readonly Api $api,
         private readonly bool $dryRun,
@@ -72,10 +81,10 @@ final class Repositories
             $created .= ', the redirect to ' . $fullName . ' is gone';
         }
 
-        $rulesets = $actual === null ? [] : $this->rulesetIds($repository);
+        $rulesets = $actual === null ? [] : self::rulesetIds($this->api, $repository);
 
         // A repository of the same name may be an older package that is not a split: it must not be taken over.
-        if ($actual !== null && array_intersect_key($rulesets, self::desiredRulesets()) === []) {
+        if ($actual !== null && !self::hasSplitRulesets($rulesets)) {
             throw new MonorepoException(\sprintf(
                 '%s exists, but is not a split of %s: it has no rulesets of the split. '
                     . 'Rename or delete it, or add the rulesets by hand to take it over.',
@@ -163,17 +172,25 @@ final class Repositories
      * @param non-empty-string $repository
      * @return array<string, int> name => id
      */
-    private function rulesetIds(string $repository): array
+    private static function rulesetIds(Api $api, string $repository): array
     {
         $ids = [];
 
-        foreach ($this->api->get(\sprintf('repos/%s/rulesets', $repository)) ?? [] as $ruleset) {
+        foreach ($api->get(\sprintf('repos/%s/rulesets', $repository)) ?? [] as $ruleset) {
             if (\is_array($ruleset) && \is_string($ruleset['name'] ?? null) && \is_int($ruleset['id'] ?? null)) {
                 $ids[$ruleset['name']] = $ruleset['id'];
             }
         }
 
         return $ids;
+    }
+
+    /**
+     * @param array<string, int> $ids name => id
+     */
+    private static function hasSplitRulesets(array $ids): bool
+    {
+        return array_intersect_key($ids, self::desiredRulesets()) !== [];
     }
 
     /**
