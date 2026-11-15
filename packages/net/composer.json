@@ -21,8 +21,8 @@
         "php": "^8.5",
         "ext-filter": "*",
         "ext-openssl": "*",
-        "thesis/async": "^0.1",
-        "thesis/io": "^0.1"
+        "thesis/async": "^2.0",
+        "thesis/io": "^2.0"
     },
     "require-dev": {
         "ext-intl": "*",
