@@ -26,6 +26,8 @@ return RectorConfig
     ->withPhpSets()
     ->withSkip([
         StringableForToStringRector::class,
+        // Generated, see php-cs-fixer.php.
+        __DIR__ . '/manifests.php',
         ...$skipped,
     ])
 ;
