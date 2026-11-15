@@ -8,6 +8,10 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Amqp\Internal\Frames;
+use Thesis\Amqp\Internal\Protocol\BasicAck;
+use Thesis\Amqp\Internal\Protocol\BasicPublish;
+use Thesis\Amqp\Internal\Protocol\ConfirmSelect;
+use Thesis\Amqp\Internal\Protocol\ConfirmSelectOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionClose;
 use Thesis\Amqp\Internal\Protocol\ConnectionCloseOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionStart;
@@ -231,6 +235,56 @@ final class ClientTest
             Expect::exception(ConnectionClosed::class)->withMessage('The client is closed.');
 
             $client->channel();
+        });
+    }
+
+    public function closeWaitsForTheConfirmsOfThePublishesInFlight(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            [$client, $peer] = connect($group, $server);
+            [$channel, $id] = openChannel($group, $client, $peer);
+            $group->spawn(static function () use ($peer, $id) {
+                $peer->expect(ConfirmSelect::class);
+                $peer->send($id, new ConfirmSelectOk());
+            });
+            $channel->confirmSelect();
+            $publish = $group->spawn(static fn() => $channel->publish(new Message('in flight')));
+            $peer->expect(BasicPublish::class);
+            $peer->expectMessage();
+
+            $closed = false;
+            $close = $group->spawn(static function () use ($client, &$closed) {
+                $client->close();
+                $closed = true;
+            });
+            delay(ms(10));
+            Assert::false($closed);
+
+            $peer->send($id, new BasicAck(1, false));
+            $publish->await();
+            $peer->acceptClose();
+            $close->await();
+        });
+    }
+
+    public function channelWaitsForTheConnectionWhileReconnecting(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            [$client, $peer] = connect($group, $server, $server->config(reconnect: true));
+            $peer->socket->close();
+            $channel = $group->spawn($client->channel(...));
+            delay(ms(10));
+
+            $peer = $server->accept();
+            $peer->handshake();
+            $peer->openChannel();
+
+            Assert::same($channel->await()->id, 1);
+            closeClient($group, $client, $peer);
         });
     }
 

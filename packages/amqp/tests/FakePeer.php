@@ -8,6 +8,7 @@ use Testo\Assert;
 use Thesis\Amqp\Internal\ContentHeader;
 use Thesis\Amqp\Internal\Frames;
 use Thesis\Amqp\Internal\Protocol\BasicProperties;
+use Thesis\Amqp\Internal\Protocol\BasicPublish;
 use Thesis\Amqp\Internal\Protocol\ChannelOpen;
 use Thesis\Amqp\Internal\Protocol\ChannelOpenOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionClose;
@@ -187,6 +188,43 @@ final readonly class FakePeer
         $buffer = new Buffer();
         Frames::method($buffer, $channel, $method);
         Frames::content($buffer, $channel, $properties ?? new BasicProperties(), $body, 4096);
+        $this->socket->write($buffer->drain());
+    }
+
+    /**
+     * A method with content whose body frames are $pieces, each followed by a heartbeat. The header announces
+     * $bodySize, the length of the pieces if null: a test may announce more than it sends.
+     *
+     * @param int<0, 65535> $channel
+     * @param list<string> $pieces
+     * @param ?non-negative-int $bodySize
+     */
+    public function sendInPieces(int $channel, Method $method, array $pieces, ?int $bodySize = null): void
+    {
+        $buffer = new Buffer();
+        Frames::method($buffer, $channel, $method);
+        $buffer->writeUint8(Frames::HEADER)->writeUint16($channel);
+        $mark = $buffer->reserve(4);
+        $buffer
+            ->writeUint16(BasicPublish::CLASS_ID)
+            ->writeUint16(0)
+            ->writeUint64($bodySize ?? \strlen(implode('', $pieces)))
+        ;
+        new BasicProperties()->encode($buffer);
+        $buffer->patchUint32($mark, $buffer->sizeSince($mark) - 4);
+        $buffer->writeUint8(Frames::END);
+
+        foreach ($pieces as $piece) {
+            $buffer
+                ->writeUint8(Frames::BODY)
+                ->writeUint16($channel)
+                ->writeUint32(\strlen($piece))
+                ->write($piece)
+                ->writeUint8(Frames::END)
+            ;
+            Frames::heartbeat($buffer);
+        }
+
         $this->socket->write($buffer->drain());
     }
 

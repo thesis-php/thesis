@@ -24,6 +24,8 @@ use Thesis\Amqp\Internal\Protocol\ChannelCloseOk;
 use Thesis\Amqp\Internal\Protocol\ConfirmSelect;
 use Thesis\Amqp\Internal\Protocol\ConfirmSelectOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionBlocked;
+use Thesis\Amqp\Internal\Protocol\ConnectionClose;
+use Thesis\Amqp\Internal\Protocol\ConnectionCloseOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionUnblocked;
 use Thesis\Amqp\Internal\Protocol\QueueDeclare;
 use Thesis\Amqp\Internal\Protocol\QueueDeclareOk;
@@ -342,6 +344,90 @@ final class ChannelTest
             $peer->send(0, new ConnectionUnblocked());
             $publish->await();
             $peer->expect(BasicPublish::class);
+        });
+    }
+
+    public function aPublishWaitingForTheMutexThrowsWhenTheChannelCloses(): void
+    {
+        self::withConfirms(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            // Larger than the socket buffers: the first publish holds the mutex while its write waits.
+            $first = $group->spawn(static fn() => failure(static fn() => $channel->publish(
+                new Message(str_repeat('x', 16_777_216)),
+            )));
+            delay(ms(10));
+            $second = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('second'))));
+            delay(ms(10));
+
+            $peer->send($id, new ChannelClose(ReplyCode::NotFound->value, 'NOT_FOUND', 60, 40));
+            $peer->expect(BasicPublish::class);
+            $peer->expectMessage();
+            $peer->expect(ChannelCloseOk::class);
+
+            foreach ([$first, $second] as $publish) {
+                $failure = $publish->await();
+                Assert::instanceOf($failure, ChannelClosed::class);
+                Assert::same($failure->replyCode, ReplyCode::NotFound);
+            }
+        });
+    }
+
+    public function aPublishWaitingWhileBlockedThrowsWhenTheChannelCloses(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $peer->send(0, new ConnectionBlocked('low on memory'));
+            delay(ms(10));
+            $publish = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('a'))));
+            delay(ms(10));
+
+            $peer->send($id, new ChannelClose(ReplyCode::NotFound->value, 'NOT_FOUND', 60, 40));
+            $peer->expect(ChannelCloseOk::class);
+            $peer->send(0, new ConnectionUnblocked());
+
+            Assert::instanceOf($publish->await(), ChannelClosed::class);
+        });
+    }
+
+    public function aPublishWaitingWhileBlockedThrowsWhenTheConnectionCloses(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer) {
+            $peer->send(0, new ConnectionBlocked('low on memory'));
+            delay(ms(10));
+            $publish = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('a'))));
+            delay(ms(10));
+
+            $peer->send(0, new ConnectionClose(ReplyCode::ConnectionForced->value, 'CONNECTION_FORCED', 0, 0));
+            $peer->expect(ConnectionCloseOk::class);
+
+            Assert::instanceOf($publish->await(), ConnectionClosed::class);
+        });
+    }
+
+    public function reusesTheIdOfAClosedChannel(): void
+    {
+        $server = FakeServer::listen();
+
+        group(static function (Group $group) use ($server) {
+            $peer = $group->spawn(static function () use ($server) {
+                $peer = $server->accept();
+                $peer->handshake(channelMax: 1);
+
+                return $peer;
+            });
+            $client = new Client($server->config());
+            $client->run($group);
+            $peer = $peer->await();
+            [$channel] = openChannel($group, $client, $peer);
+
+            $group->spawn(static function () use ($peer) {
+                $peer->expect(ChannelClose::class);
+                $peer->send(1, new ChannelCloseOk());
+            });
+            $channel->close();
+
+            [$channel, $id] = openChannel($group, $client, $peer);
+            Assert::same($id, 1);
+            Assert::same($channel->id, 1);
+            $peer->socket->close();
         });
     }
 

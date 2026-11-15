@@ -44,6 +44,22 @@ function openChannel(Group $group, Client $client, FakePeer $peer): array
 }
 
 /**
+ * What $fn throws, for a task whose failure the test awaits: a task that throws fails its group.
+ *
+ * @param callable(): mixed $fn
+ */
+function failure(callable $fn): ?\Throwable
+{
+    try {
+        $fn();
+    } catch (\Throwable $exception) {
+        return $exception;
+    }
+
+    return null;
+}
+
+/**
  * Closes $client gracefully, $peer agreeing.
  */
 function closeClient(Group $group, Client $client, FakePeer $peer): void
