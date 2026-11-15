@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Monorepo\Tests\GitHub;
 
 use Thesis\Monorepo\Internal\GitHub\Api;
+use Thesis\Monorepo\Internal\MonorepoException;
 
 final class FakeApi implements Api
 {
@@ -20,14 +21,20 @@ final class FakeApi implements Api
 
     /**
      * @param array<string, array<array-key, mixed>> $resources path => what GET returns, a missing path is 404
+     * @param array<string, string> $failing path => the message of the error that GET throws
      */
     public function __construct(
         private readonly array $resources = [],
+        private readonly array $failing = [],
     ) {}
 
     #[\Override]
     public function get(string $path): ?array
     {
+        if (isset($this->failing[$path])) {
+            throw new MonorepoException($this->failing[$path]);
+        }
+
         return $this->resources[$path] ?? null;
     }
 

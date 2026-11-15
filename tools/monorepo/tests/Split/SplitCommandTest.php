@@ -17,10 +17,12 @@ use Thesis\Monorepo\Tests\GitHub\FakeApi;
 final readonly class SplitCommandTest
 {
     /**
-     * The repositories of a and b are splits: they have a ruleset of the split.
+     * The repositories of a and b are splits: they exist under their names and have a ruleset of the split.
      */
     private const array SPLITS = [
+        'repos/thesis-php/a' => ['full_name' => 'thesis-php/a'],
         'repos/thesis-php/a/rulesets' => [['id' => 1, 'name' => 'read-only branches']],
+        'repos/thesis-php/b' => ['full_name' => 'thesis-php/b'],
         'repos/thesis-php/b/rulesets' => [['id' => 1, 'name' => 'read-only branches']],
     ];
 
@@ -93,7 +95,7 @@ final readonly class SplitCommandTest
     /**
      * An older package of the same name has no main, so the push would create it instead of failing.
      */
-    public static function skipsRepositoryThatIsNotSplitAndPushesTheOthers(): void
+    public static function skipsRepositoryWithoutRulesetsAndPushesTheOthers(): void
     {
         $repository = self::repository();
         $remotes = self::remotes('a', 'b');
@@ -105,17 +107,80 @@ final readonly class SplitCommandTest
             repository: $repository,
             ref: 'refs/heads/main',
             remote: 'file://' . $remotes->dir,
-            api: new FakeApi(['repos/thesis-php/a/rulesets' => self::SPLITS['repos/thesis-php/a/rulesets']]),
+            api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b/rulesets' => []]),
         );
 
         Assert::same($code, Command::FAILURE);
-        Assert::true(str_contains($output, 'thesis-php/b is not a split: it has no rulesets of the split'));
+        Assert::true(str_contains($output, 'b: thesis-php/b is not a split of packages/b'));
         Assert::true(str_contains($output, 'The push of b failed.'));
         Assert::same(
             actual: $remotes->head('a', 'refs/heads/main'),
             expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
         );
         Assert::same($remotes->head('b', 'refs/heads/main'), null);
+    }
+
+    /**
+     * GitHub redirects the old name of a renamed repository, the API and git push alike:
+     * the rulesets would be those of the other repository, and so would the push.
+     */
+    public static function skipsNameThatRedirectsToRenamedRepository(): void
+    {
+        $repository = self::repository();
+        $remotes = self::remotes('a', 'b');
+
+        [$code, $output] = self::run(
+            repository: $repository,
+            ref: 'refs/heads/main',
+            remote: 'file://' . $remotes->dir,
+            api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b' => ['full_name' => 'thesis-php/b-renamed']]),
+        );
+
+        Assert::same($code, Command::FAILURE);
+        Assert::true(str_contains($output, 'b: thesis-php/b is not a split of packages/b'));
+        Assert::same($remotes->head('b', 'refs/heads/main'), null);
+    }
+
+    public static function failsOnApiErrorAndPushesTheOthers(): void
+    {
+        $repository = self::repository();
+        $remotes = self::remotes('a', 'b');
+
+        [$code, $output] = self::run(
+            repository: $repository,
+            ref: 'refs/heads/main',
+            remote: 'file://' . $remotes->dir,
+            api: new FakeApi(self::SPLITS, failing: ['repos/thesis-php/b/rulesets' => 'GitHub is down.']),
+        );
+
+        Assert::same($code, Command::FAILURE);
+        Assert::true(str_contains($output, 'b: GitHub is down.'));
+        Assert::same(
+            actual: $remotes->head('a', 'refs/heads/main'),
+            expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
+        );
+        Assert::same($remotes->head('b', 'refs/heads/main'), null);
+    }
+
+    public static function skipsRepositoryThatIsNotSplitForTag(): void
+    {
+        $repository = self::repository();
+        $remotes = self::remotes('a', 'b');
+        $repository->git->run(['tag', 'v2.1.0']);
+
+        [$code] = self::run(
+            repository: $repository,
+            ref: 'refs/tags/v2.1.0',
+            remote: 'file://' . $remotes->dir,
+            api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b/rulesets' => []]),
+        );
+
+        Assert::same($code, Command::FAILURE);
+        Assert::same(
+            actual: $remotes->head('a', 'refs/tags/v2.1.0'),
+            expected: Split::of($repository->git, 'refs/tags/v2.1.0')->commits['a'] ?? '',
+        );
+        Assert::same($remotes->head('b', 'refs/tags/v2.1.0'), null);
     }
 
     public static function failsWithoutApiWhenPushing(): void

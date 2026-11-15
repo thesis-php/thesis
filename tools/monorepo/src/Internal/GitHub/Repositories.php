@@ -55,10 +55,15 @@ final class Repositories
     /**
      * Whether thesis-php/<dir> is a split, so the split may push to it. An older package of the same name has
      * no rulesets of the split, and a push of a branch it lacks (main) would create it instead of failing.
+     * A name that redirects to a renamed repository is not a split either: the API would return the rulesets
+     * of that repository, and git would push there too.
      */
     public static function isSplit(Api $api, string $dir): bool
     {
-        return self::hasSplitRulesets(self::rulesetIds($api, self::ORGANIZATION . '/' . $dir));
+        $repository = self::ORGANIZATION . '/' . $dir;
+
+        return self::isNamed($api->get('repos/' . $repository), $repository)
+            && self::hasSplitRulesets(self::rulesetIds($api, $repository));
     }
 
     private function __construct(
@@ -74,11 +79,9 @@ final class Repositories
 
         // GitHub redirects the old name of a renamed repository to it: the name is free,
         // and taking it ends the redirect.
-        $fullName = $actual['full_name'] ?? null;
-
-        if (\is_string($fullName) && strcasecmp($fullName, $repository) !== 0) {
+        if ($actual !== null && !self::isNamed($actual, $repository)) {
+            $created .= ', the redirect to ' . self::fullName($actual) . ' is gone';
             $actual = null;
-            $created .= ', the redirect to ' . $fullName . ' is gone';
         }
 
         $rulesets = $actual === null ? [] : self::rulesetIds($this->api, $repository);
@@ -183,6 +186,25 @@ final class Repositories
         }
 
         return $ids;
+    }
+
+    /**
+     * @param ?array<array-key, mixed> $repository what GET repos/<name> returns
+     * @param non-empty-string $name
+     */
+    private static function isNamed(?array $repository, string $name): bool
+    {
+        return $repository !== null && strcasecmp(self::fullName($repository), $name) === 0;
+    }
+
+    /**
+     * @param array<array-key, mixed> $repository what GET repos/<name> returns
+     */
+    private static function fullName(array $repository): string
+    {
+        $fullName = $repository['full_name'] ?? '';
+
+        return \is_string($fullName) ? $fullName : '';
     }
 
     /**

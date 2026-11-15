@@ -12,6 +12,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Thesis\Monorepo\Internal\Git\Git;
 use Thesis\Monorepo\Internal\GitHub\Api;
 use Thesis\Monorepo\Internal\GitHub\Repositories;
+use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Split\Remote;
 use Thesis\Monorepo\Internal\Split\Split;
@@ -81,10 +82,11 @@ final readonly class SplitCommand
 
             if (!$isSplit) {
                 $io->writeln(\sprintf(
-                    '%s: %s/%s is not a split: it has no rulesets of the split, run make github first.',
+                    '%1$s: %2$s/%1$s is not a split of %3$s/%1$s: it is missing, has no rulesets of the split'
+                        . ' or redirects to a renamed repository. Nothing is pushed there.',
                     $package,
                     Repositories::ORGANIZATION,
-                    $package,
+                    Monorepo::PACKAGES_DIR,
                 ));
                 $failed[] = $package;
 
