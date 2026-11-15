@@ -23,6 +23,11 @@ final readonly class Manifest
      * @param list<non-empty-string> $devFiles autoload-dev files, relative to the package
      * @param array<non-empty-string, non-empty-string> $suggest
      * @param array<non-empty-string, non-empty-string> $conflict
+     * @param list<non-empty-string> $optional packages and extensions of requireDev that src/ uses only when
+     *     they are installed, behind a check: composer-dependency-analyser allows them in src/.
+     *     Tell the users about them in $suggest
+     * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan is not here:
+     *     its errors are ignored in the code, by a phpstan-ignore comment with an identifier and a reason
      */
     public function __construct(
         public string $description,
@@ -34,5 +39,7 @@ final readonly class Manifest
         public array $devFiles = [],
         public array $suggest = [],
         public array $conflict = [],
+        public array $optional = [],
+        public array $skip = [],
     ) {}
 }

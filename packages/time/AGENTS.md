@@ -21,7 +21,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the same `TypeError` or `Error` that PHP 8.6 wraps as the previous exception.
 - The messages of the polyfill name `Time\Duration` literally, not with `__METHOD__` or `self::class`:
   `DurationFuzzTest` loads a renamed copy, and the messages must still match.
-- `Time\TimeException` is not final, as in PHP 8.6: `tools/php-cs-fixer.php` excludes the file from `final_class`.
+- `Time\TimeException` is not final, as in PHP 8.6: the manifest excludes the file from PHP CS Fixer (`final_class`).
 - Every duration fits in int nanoseconds (the range ends at 9_223_372_035.999999999 s, below `PHP_INT_MAX`):
   `toNs()` is exact, and the functions compute in nanoseconds. Integer conversions round exactly with
   `Internal\divide()`, never through a float.

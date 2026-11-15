@@ -45,6 +45,9 @@ description and dependencies. Generated from the manifests and `monorepo.php` by
 - `skills.json` (`sources`),
 - `testo.php`: one suite per package and per `tools/<name>/tests`, named after the directory.
   A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
+- `tools/manifests.php`: what the configs of fixer, rector and dependency-analyser take from the manifests.
+  An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in `tools/*.php`.
+  PHPStan errors are ignored in the code instead, by `@phpstan-ignore identifier (reason)`,
 - the package catalog below.
 
 ## Dependencies

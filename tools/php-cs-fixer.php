@@ -11,14 +11,16 @@ use Thesis\PhpCsFixer\StaticCallChainFixer;
 require_once __DIR__ . '/php-cs-fixer/src/StaticCallChainFixer.php';
 
 $root = dirname(__DIR__);
+/** @var array{optional: array<string, list<string>>, fixer: list<string>, rector: array<string, list<string>>} */
+$manifests = require __DIR__ . '/manifests.php';
+$skipped = array_map(static fn(string $path) => $root . '/' . $path, $manifests['fixer']);
 
 return new Config()
     ->setFinder(
         Finder
             ::create()
             ->in([$root . '/tools', $root . '/packages'])
-            // final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.
-            ->notPath('time/polyfill/TimeException.php')
+            ->filter(static fn(SplFileInfo $file) => !in_array($file->getPathname(), $skipped, true))
             ->append([
                 $root . '/bin/monorepo',
                 $root . '/monorepo.php',

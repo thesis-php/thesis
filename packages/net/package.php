@@ -27,4 +27,5 @@ return new Manifest(
         'ext-intl' => 'To resolve internationalized host names (Пример.test)',
         'ext-sockets' => 'To report why a connection failed (refused, unreachable) instead of a generic message',
     ],
+    optional: ['ext-intl', 'ext-sockets'],
 );

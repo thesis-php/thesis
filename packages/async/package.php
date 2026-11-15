@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Thesis\Monorepo\Manifest;
+use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
@@ -27,5 +29,15 @@ return new Manifest(
     ],
     conflict: [
         'amphp/amp' => '<3',
+    ],
+    // The amphp bridge: amphp/amp comes with the amphp library it is used with,
+    // and its classes are loaded only when ampCancellable() is called.
+    optional: ['amphp/amp'],
+    skip: [
+        new RectorSkip(
+            rule: ClassPropertyAssignToConstructorPromotionRector::class,
+            paths: ['src/LocalSemaphore.php'],
+            reason: 'The property is non-negative-int, the parameter is positive-int: promotion would lose the property\'s type.',
+        ),
     ],
 );

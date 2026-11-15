@@ -3,10 +3,15 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
-use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\Php80\Rector\Class_\StringableForToStringRector;
 
 $root = dirname(__DIR__);
+/** @var array{optional: array<string, list<string>>, fixer: list<string>, rector: array<string, list<string>>} */
+$manifests = require __DIR__ . '/manifests.php';
+$skipped = array_map(
+    static fn(array $paths) => array_map(static fn(string $path) => $root . '/' . $path, $paths),
+    $manifests['rector'],
+);
 
 return RectorConfig
     ::configure()
@@ -21,9 +26,6 @@ return RectorConfig
     ->withPhpSets()
     ->withSkip([
         StringableForToStringRector::class,
-        // The property is non-negative-int, the parameter is positive-int: promotion would lose the property's type.
-        ClassPropertyAssignToConstructorPromotionRector::class => [
-            $root . '/packages/async/src/LocalSemaphore.php',
-        ],
+        ...$skipped,
     ])
 ;
