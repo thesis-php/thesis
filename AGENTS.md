@@ -141,6 +141,11 @@ the whole monorepo is for the final check.
   for checking or normalizing on write. A method is for an operation with a meaning of its own
   (`advance($duration)`), for writing that waits (it may suspend the fiber) or returns something,
   and where an interface requires it.
+- A copy with some properties changed is `clone($object, ['name' => $value])`, not `clone` and assignments,
+  not a constructor call that repeats every property, not a `withX()` method. A `readonly` property is implicitly
+  `protected(set)`, so for `clone()` from outside the class declare it `public public(set)`: it stays readonly
+  (written once per object), only the copy may be made anywhere (`Thesis\Amqp\Message`).
+  The array costs an allocation: a hot path keeps `clone` and assignments if a benchmark says so (`Buffer::slice()`).
 - Every top-level symbol (class, interface, trait, enum, function, constant) in `src/` is marked either `@api`
   or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
   (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.

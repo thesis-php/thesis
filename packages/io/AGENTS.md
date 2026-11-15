@@ -12,6 +12,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `Buffer` is the hot path of every binary protocol: a change to it is justified by a benchmark, not by taste.
   Its micro-optimizations (properties with defaults instead of `readonly`, bounds checks folded into the byte fetch,
   `chr()` instead of `pack()` for 1-2 bytes, `clone` in `slice()`) are measured: keep them and their comments.
+  `slice()` is `clone $this` and assignments, not `clone($this, [...])`: the array of `clone()` makes it 33-43% slower.
 - Every read is O(1): the cursor advances, consumed bytes are discarded only in `fill()`.
 - A failed read throws `UnexpectedEof` and leaves the cursor where it was.
 - Range checks of written values are `assert()` only, never a runtime `if`: they cost nothing in production.
