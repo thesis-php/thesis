@@ -69,36 +69,36 @@ final class Buffer implements \Countable
     // ---------------------------------------------------------------- read
 
     /**
-     * Reads exactly $n bytes, an empty string for 0.
+     * Reads exactly $length bytes, an empty string for 0.
      *
-     * @param non-negative-int $n
-     * @return ($n is positive-int ? non-empty-string : string)
+     * @param non-negative-int $length
+     * @return ($length is positive-int ? non-empty-string : string)
      * @throws UnexpectedEof
      */
-    public function read(int $n): string
+    public function read(int $length): string
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < $n) {
-            throw $this->eof($n);
+        if (\strlen($this->bytes) - $offset < $length) {
+            throw $this->eof($length);
         }
 
-        $this->offset = $o + $n;
+        $this->offset = $offset + $length;
 
-        return substr($this->bytes, $o, $n);
+        return substr($this->bytes, $offset, $length);
     }
 
     /**
-     * @param non-negative-int $n
+     * @param non-negative-int $length
      * @throws UnexpectedEof
      */
-    public function skip(int $n): void
+    public function skip(int $length): void
     {
-        if (\strlen($this->bytes) - $this->offset < $n) {
-            throw $this->eof($n);
+        if (\strlen($this->bytes) - $this->offset < $length) {
+            throw $this->eof($length);
         }
 
-        $this->offset += $n;
+        $this->offset += $length;
     }
 
     /**
@@ -114,41 +114,41 @@ final class Buffer implements \Countable
     }
 
     /**
-     * Returns $n bytes after skipping $skip bytes without advancing the cursor.
+     * Returns $length bytes starting $offset bytes after the cursor, without advancing it.
      *
-     * @param non-negative-int $n
-     * @param non-negative-int $skip
+     * @param non-negative-int $length
+     * @param non-negative-int $offset
      * @throws UnexpectedEof
      */
-    public function peek(int $n, int $skip = 0): string
+    public function peek(int $length, int $offset = 0): string
     {
-        if (\strlen($this->bytes) - $this->offset < $skip + $n) {
-            throw $this->eof($skip + $n);
+        if (\strlen($this->bytes) - $this->offset < $offset + $length) {
+            throw $this->eof($offset + $length);
         }
 
-        return substr($this->bytes, $this->offset + $skip, $n);
+        return substr($this->bytes, $this->offset + $offset, $length);
     }
 
     /**
-     * Reads $n bytes into a new buffer of the same byte order,
+     * Reads $length bytes into a new buffer of the same byte order,
      * e.g. to decode a length-delimited nested message in isolation.
      *
-     * @param non-negative-int $n
+     * @param non-negative-int $length
      * @throws UnexpectedEof
      */
-    public function slice(int $n): self
+    public function slice(int $length): self
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < $n) {
-            throw $this->eof($n);
+        if (\strlen($this->bytes) - $offset < $length) {
+            throw $this->eof($length);
         }
 
         // clone skips the constructor
         $slice = clone $this;
-        $slice->bytes = substr($this->bytes, $o, $n);
+        $slice->bytes = substr($this->bytes, $offset, $length);
         $slice->offset = 0;
-        $this->offset = $o + $n;
+        $this->offset = $offset + $length;
 
         return $slice;
     }
@@ -178,12 +178,12 @@ final class Buffer implements \Countable
      */
     public function readInt8(): int
     {
-        $o = $this->offset;
-        $b = \ord(($this->bytes[$o] ?? throw $this->eof(1))[0]);
-        $this->offset = $o + 1;
+        $offset = $this->offset;
+        $byte = \ord(($this->bytes[$offset] ?? throw $this->eof(1))[0]);
+        $this->offset = $offset + 1;
 
         // sign extension: 0x80..0xFF become -128..-1, faster than a comparison
-        return ($b ^ 0x80) - 0x80;
+        return ($byte ^ 0x80) - 0x80;
     }
 
     /**
@@ -192,11 +192,11 @@ final class Buffer implements \Countable
      */
     public function readUint8(): int
     {
-        $o = $this->offset;
-        $b = \ord(($this->bytes[$o] ?? throw $this->eof(1))[0]);
-        $this->offset = $o + 1;
+        $offset = $this->offset;
+        $byte = \ord(($this->bytes[$offset] ?? throw $this->eof(1))[0]);
+        $this->offset = $offset + 1;
 
-        return $b;
+        return $byte;
     }
 
     /**
@@ -204,15 +204,15 @@ final class Buffer implements \Countable
      */
     public function readInt16(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
         // the bounds check is folded into the fetch of the last byte
-        $b = \ord(($this->bytes[$o + 1] ?? throw $this->eof(2))[0]);
-        $this->offset = $o + 2;
+        $byte = \ord(($this->bytes[$offset + 1] ?? throw $this->eof(2))[0]);
+        $this->offset = $offset + 2;
 
         // sign extension, as in readInt8()
         return (($this->big
-            ? \ord($this->bytes[$o]) << 8 | $b
-            : $b << 8 | \ord($this->bytes[$o])) ^ 0x8000) - 0x8000;
+            ? \ord($this->bytes[$offset]) << 8 | $byte
+            : $byte << 8 | \ord($this->bytes[$offset])) ^ 0x8000) - 0x8000;
     }
 
     /**
@@ -221,14 +221,14 @@ final class Buffer implements \Countable
      */
     public function readUint16(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
         // the bounds check is folded into the fetch of the last byte
-        $b = \ord(($this->bytes[$o + 1] ?? throw $this->eof(2))[0]);
-        $this->offset = $o + 2;
+        $byte = \ord(($this->bytes[$offset + 1] ?? throw $this->eof(2))[0]);
+        $this->offset = $offset + 2;
 
         return $this->big
-            ? \ord($this->bytes[$o]) << 8 | $b
-            : $b << 8 | \ord($this->bytes[$o]);
+            ? \ord($this->bytes[$offset]) << 8 | $byte
+            : $byte << 8 | \ord($this->bytes[$offset]);
     }
 
     /**
@@ -236,19 +236,19 @@ final class Buffer implements \Countable
      */
     public function readInt32(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 4) {
+        if (\strlen($this->bytes) - $offset < 4) {
             throw $this->eof(4);
         }
 
-        $this->offset = $o + 4;
+        $this->offset = $offset + 4;
 
-        /** @var array{1: non-negative-int} $v */
-        $v = unpack($this->u32, $this->bytes, $o);
+        /** @var array{1: non-negative-int} $value */
+        $value = unpack($this->u32, $this->bytes, $offset);
 
         // sign extension, as in readInt8()
-        return ($v[1] ^ 0x80_00_00_00) - 0x80_00_00_00;
+        return ($value[1] ^ 0x80_00_00_00) - 0x80_00_00_00;
     }
 
     /**
@@ -257,18 +257,18 @@ final class Buffer implements \Countable
      */
     public function readUint32(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 4) {
+        if (\strlen($this->bytes) - $offset < 4) {
             throw $this->eof(4);
         }
 
-        $this->offset = $o + 4;
+        $this->offset = $offset + 4;
 
-        /** @var array{1: int<0, 4294967295>} $v */
-        $v = unpack($this->u32, $this->bytes, $o);
+        /** @var array{1: int<0, 4294967295>} $value */
+        $value = unpack($this->u32, $this->bytes, $offset);
 
-        return $v[1];
+        return $value[1];
     }
 
     /**
@@ -276,17 +276,17 @@ final class Buffer implements \Countable
      */
     public function readInt64(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 8) {
+        if (\strlen($this->bytes) - $offset < 8) {
             throw $this->eof(8);
         }
 
-        $this->offset = $o + 8;
-        /** @var array{1: int} $v */
-        $v = unpack($this->u64, $this->bytes, $o);
+        $this->offset = $offset + 8;
+        /** @var array{1: int} $value */
+        $value = unpack($this->u64, $this->bytes, $offset);
 
-        return $v[1];
+        return $value[1];
     }
 
     /**
@@ -296,22 +296,22 @@ final class Buffer implements \Countable
      */
     public function readUint64(): int
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 8) {
+        if (\strlen($this->bytes) - $offset < 8) {
             throw $this->eof(8);
         }
 
-        /** @var array{1: int} $v */
-        $v = unpack($this->u64, $this->bytes, $o);
+        /** @var array{1: int} $value */
+        $value = unpack($this->u64, $this->bytes, $offset);
 
-        if ($v[1] < 0) {
+        if ($value[1] < 0) {
             throw new \OverflowException('Uint64 value exceeds PHP_INT_MAX.');
         }
 
-        $this->offset = $o + 8;
+        $this->offset = $offset + 8;
 
-        return $v[1];
+        return $value[1];
     }
 
     /**
@@ -319,18 +319,18 @@ final class Buffer implements \Countable
      */
     public function readFloat(): float
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 4) {
+        if (\strlen($this->bytes) - $offset < 4) {
             throw $this->eof(4);
         }
 
-        $this->offset = $o + 4;
+        $this->offset = $offset + 4;
 
-        /** @var array{1: float} $v */
-        $v = unpack($this->f32, $this->bytes, $o);
+        /** @var array{1: float} $value */
+        $value = unpack($this->f32, $this->bytes, $offset);
 
-        return $v[1];
+        return $value[1];
     }
 
     /**
@@ -338,18 +338,18 @@ final class Buffer implements \Countable
      */
     public function readDouble(): float
     {
-        $o = $this->offset;
+        $offset = $this->offset;
 
-        if (\strlen($this->bytes) - $o < 8) {
+        if (\strlen($this->bytes) - $offset < 8) {
             throw $this->eof(8);
         }
 
-        $this->offset = $o + 8;
+        $this->offset = $offset + 8;
 
-        /** @var array{1: float} $v */
-        $v = unpack($this->f64, $this->bytes, $o);
+        /** @var array{1: float} $value */
+        $value = unpack($this->f64, $this->bytes, $offset);
 
-        return $v[1];
+        return $value[1];
     }
 
     /**
@@ -361,31 +361,31 @@ final class Buffer implements \Countable
      */
     public function readUvarint(): int
     {
-        $o = $this->offset;
-        $b = \ord(($this->bytes[$o] ?? throw new UnexpectedEof('Unexpected end of varint.'))[0]);
+        $offset = $this->offset;
+        $byte = \ord(($this->bytes[$offset] ?? throw new UnexpectedEof('Unexpected end of varint.'))[0]);
 
         // a single byte is the most common case for tags and lengths
-        if ($b < 0x80) {
-            $this->offset = $o + 1;
+        if ($byte < 0x80) {
+            $this->offset = $offset + 1;
 
-            return $b;
+            return $byte;
         }
 
-        $v = $b & 0x7F;
+        $value = $byte & 0x7F;
 
         for ($shift = 7; $shift < 64; $shift += 7) {
-            $b = \ord(($this->bytes[++$o] ?? throw new UnexpectedEof('Unexpected end of varint.'))[0]);
-            $v |= ($b & 0x7F) << $shift;
+            $byte = \ord(($this->bytes[++$offset] ?? throw new UnexpectedEof('Unexpected end of varint.'))[0]);
+            $value |= ($byte & 0x7F) << $shift;
 
-            if ($b < 0x80) {
+            if ($byte < 0x80) {
                 // the 10th byte may only hold bit 63
-                if ($shift === 63 && $b > 1) {
+                if ($shift === 63 && $byte > 1) {
                     break;
                 }
 
-                $this->offset = $o + 1;
+                $this->offset = $offset + 1;
 
-                return $v;
+                return $value;
             }
         }
 
@@ -400,10 +400,10 @@ final class Buffer implements \Countable
      */
     public function readVarint(): int
     {
-        $u = $this->readUvarint();
+        $unsigned = $this->readUvarint();
 
         // 0, 1, 2, 3, ... decode to 0, -1, 1, -2, ...: branchless, faster than a comparison
-        return ($u >> 1 & PHP_INT_MAX) ^ -($u & 1);
+        return ($unsigned >> 1 & PHP_INT_MAX) ^ -($unsigned & 1);
     }
 
     // --------------------------------------------------------------- write
@@ -415,107 +415,110 @@ final class Buffer implements \Countable
         return $this;
     }
 
-    public function writeInt8(int $v): self
+    public function writeInt8(int $value): self
     {
-        \assert($v >= -0x80 && $v <= 0x7F, \sprintf('Expected an int8 value, got %d.', $v));
-        $this->bytes .= \chr($v & 0xFF);
+        \assert($value >= -0x80 && $value <= 0x7F, \sprintf('Expected an int8 value, got %d.', $value));
+        $this->bytes .= \chr($value & 0xFF);
 
         return $this;
     }
 
-    public function writeUint8(int $v): self
+    public function writeUint8(int $value): self
     {
-        \assert($v >= 0 && $v <= 0xFF, \sprintf('Expected a uint8 value, got %d.', $v));
-        $this->bytes .= \chr($v);
+        \assert($value >= 0 && $value <= 0xFF, \sprintf('Expected a uint8 value, got %d.', $value));
+        $this->bytes .= \chr($value);
 
         return $this;
     }
 
-    public function writeInt16(int $v): self
+    public function writeInt16(int $value): self
     {
-        \assert($v >= -0x8000 && $v <= 0x7FFF, \sprintf('Expected an int16 value, got %d.', $v));
+        \assert($value >= -0x8000 && $value <= 0x7FFF, \sprintf('Expected an int16 value, got %d.', $value));
         // chr() is faster than pack() for 2 bytes
         $this->bytes .= $this->big
-            ? \chr($v >> 8 & 0xFF) . \chr($v & 0xFF)
-            : \chr($v & 0xFF) . \chr($v >> 8 & 0xFF);
+            ? \chr($value >> 8 & 0xFF) . \chr($value & 0xFF)
+            : \chr($value & 0xFF) . \chr($value >> 8 & 0xFF);
 
         return $this;
     }
 
-    public function writeUint16(int $v): self
+    public function writeUint16(int $value): self
     {
-        \assert($v >= 0 && $v <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $v));
+        \assert($value >= 0 && $value <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $value));
         // chr() is faster than pack() for 2 bytes
         $this->bytes .= $this->big
-            ? \chr($v >> 8 & 0xFF) . \chr($v & 0xFF)
-            : \chr($v & 0xFF) . \chr($v >> 8 & 0xFF);
+            ? \chr($value >> 8 & 0xFF) . \chr($value & 0xFF)
+            : \chr($value & 0xFF) . \chr($value >> 8 & 0xFF);
 
         return $this;
     }
 
-    public function writeInt32(int $v): self
+    public function writeInt32(int $value): self
     {
-        \assert($v >= -0x80_00_00_00 && $v <= 0x7F_FF_FF_FF, \sprintf('Expected an int32 value, got %d.', $v));
+        \assert(
+            assertion: $value >= -0x80_00_00_00 && $value <= 0x7F_FF_FF_FF,
+            description: \sprintf('Expected an int32 value, got %d.', $value),
+        );
         // pack() truncates negatives to two's complement
-        $this->bytes .= pack($this->u32, $v);
+        $this->bytes .= pack($this->u32, $value);
 
         return $this;
     }
 
-    public function writeUint32(int $v): self
+    public function writeUint32(int $value): self
     {
-        \assert($v >= 0 && $v <= 0xFF_FF_FF_FF, \sprintf('Expected a uint32 value, got %d.', $v));
-        $this->bytes .= pack($this->u32, $v);
+        \assert($value >= 0 && $value <= 0xFF_FF_FF_FF, \sprintf('Expected a uint32 value, got %d.', $value));
+        $this->bytes .= pack($this->u32, $value);
 
         return $this;
     }
 
-    public function writeInt64(int $v): self
+    public function writeInt64(int $value): self
     {
-        $this->bytes .= pack($this->u64, $v);
+        $this->bytes .= pack($this->u64, $value);
 
         return $this;
     }
 
     /**
-     * @param non-negative-int $v
+     * @param non-negative-int $value
      */
-    public function writeUint64(int $v): self
+    public function writeUint64(int $value): self
     {
-        $this->bytes .= pack($this->u64, $v);
+        $this->bytes .= pack($this->u64, $value);
 
         return $this;
     }
 
-    public function writeFloat(float $v): self
+    public function writeFloat(float $value): self
     {
-        $this->bytes .= pack($this->f32, $v);
+        $this->bytes .= pack($this->f32, $value);
 
         return $this;
     }
 
-    public function writeDouble(float $v): self
+    public function writeDouble(float $value): self
     {
-        $this->bytes .= pack($this->f64, $v);
+        $this->bytes .= pack($this->f64, $value);
 
         return $this;
     }
 
     /**
-     * Writes an unsigned LEB128 varint. A negative $v is written as its 64-bit two's complement pattern (10 bytes),
+     * Writes an unsigned LEB128 varint. A negative $value is written as its 64-bit two's complement pattern (10 bytes),
      * which is how protobuf encodes negative int32/int64.
      */
-    public function writeUvarint(int $v): self
+    public function writeUvarint(int $value): self
     {
-        if ($v >= 0) {
-            if ($v < 0x80) {
-                $this->bytes .= \chr($v);
+        if ($value >= 0) {
+            if ($value < 0x80) {
+                $this->bytes .= \chr($value);
 
                 return $this;
             }
 
-            if ($v < 0x4000) {
-                $this->bytes .= \chr($v & 0x7F | 0x80) . \chr($v >> 7);
+            if ($value < 0x4000) {
+                $this->bytes .= \chr($value & 0x7F | 0x80) . \chr($value >> 7);
 
                 return $this;
             }
@@ -524,12 +527,12 @@ final class Buffer implements \Countable
         $bytes = '';
 
         do {
-            $bytes .= \chr($v & 0x7F | 0x80);
+            $bytes .= \chr($value & 0x7F | 0x80);
             // logical shift right: clear the sign bits spread by the arithmetic shift
-            $v = $v >> 7 & 0x01_FF_FF_FF_FF_FF_FF_FF;
-        } while ($v >= 0x80);
+            $value = $value >> 7 & 0x01_FF_FF_FF_FF_FF_FF_FF;
+        } while ($value >= 0x80);
 
-        $this->bytes .= $bytes . \chr($v);
+        $this->bytes .= $bytes . \chr($value);
 
         return $this;
     }
@@ -537,16 +540,16 @@ final class Buffer implements \Countable
     /**
      * Writes a zigzag-encoded signed varint (protobuf sint32/sint64, Kafka varint/varlong).
      */
-    public function writeVarint(int $v): self
+    public function writeVarint(int $value): self
     {
         // 0, -1, 1, -2, ... encode to 0, 1, 2, 3, ...: branchless, as in readVarint()
-        return $this->writeUvarint($v << 1 ^ $v >> 63);
+        return $this->writeUvarint($value << 1 ^ $value >> 63);
     }
 
     // ------------------------------------------------------ reserve/patch
 
     /**
-     * Appends $n zero bytes and returns a mark pointing at them, to be patched later,
+     * Appends $length zero bytes and returns a mark pointing at them, to be patched later,
      * e.g. with a length that is unknown until the payload is written.
      *
      *     $mark = $buffer->reserve(4);
@@ -555,13 +558,13 @@ final class Buffer implements \Countable
      *
      * Marks are invalidated by {@see fill()}, {@see flush()} and {@see drain()}.
      *
-     * @param non-negative-int $n
+     * @param non-negative-int $length
      * @return non-negative-int
      */
-    public function reserve(int $n): int
+    public function reserve(int $length): int
     {
         $mark = \strlen($this->bytes);
-        $this->bytes .= str_repeat("\0", $n);
+        $this->bytes .= str_repeat("\0", $length);
 
         return $mark;
     }
@@ -583,60 +586,60 @@ final class Buffer implements \Countable
     /**
      * @param non-negative-int $mark
      */
-    public function patchUint8(int $mark, int $v): void
+    public function patchUint8(int $mark, int $value): void
     {
-        \assert($v >= 0 && $v <= 0xFF, \sprintf('Expected a uint8 value, got %d.', $v));
+        \assert($value >= 0 && $value <= 0xFF, \sprintf('Expected a uint8 value, got %d.', $value));
         \assert($mark + 1 <= \strlen($this->bytes), 'Invalid mark.');
-        $this->bytes[$mark] = \chr($v);
+        $this->bytes[$mark] = \chr($value);
     }
 
     /**
      * @param non-negative-int $mark
      */
-    public function patchUint16(int $mark, int $v): void
+    public function patchUint16(int $mark, int $value): void
     {
-        \assert($v >= 0 && $v <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $v));
+        \assert($value >= 0 && $value <= 0xFFFF, \sprintf('Expected a uint16 value, got %d.', $value));
         \assert($mark + 2 <= \strlen($this->bytes), 'Invalid mark.');
 
         if ($this->big) {
-            $this->bytes[$mark] = \chr($v >> 8 & 0xFF);
-            $this->bytes[$mark + 1] = \chr($v & 0xFF);
+            $this->bytes[$mark] = \chr($value >> 8 & 0xFF);
+            $this->bytes[$mark + 1] = \chr($value & 0xFF);
         } else {
-            $this->bytes[$mark] = \chr($v & 0xFF);
-            $this->bytes[$mark + 1] = \chr($v >> 8 & 0xFF);
+            $this->bytes[$mark] = \chr($value & 0xFF);
+            $this->bytes[$mark + 1] = \chr($value >> 8 & 0xFF);
         }
     }
 
     /**
      * @param non-negative-int $mark
      */
-    public function patchUint32(int $mark, int $v): void
+    public function patchUint32(int $mark, int $value): void
     {
-        \assert($v >= 0 && $v <= 0xFF_FF_FF_FF, \sprintf('Expected a uint32 value, got %d.', $v));
+        \assert($value >= 0 && $value <= 0xFF_FF_FF_FF, \sprintf('Expected a uint32 value, got %d.', $value));
         \assert($mark + 4 <= \strlen($this->bytes), 'Invalid mark.');
 
         // string offset assignment overwrites in place (no copy while the string is not shared)
         if ($this->big) {
-            $this->bytes[$mark] = \chr($v >> 24 & 0xFF);
-            $this->bytes[$mark + 1] = \chr($v >> 16 & 0xFF);
-            $this->bytes[$mark + 2] = \chr($v >> 8 & 0xFF);
-            $this->bytes[$mark + 3] = \chr($v & 0xFF);
+            $this->bytes[$mark] = \chr($value >> 24 & 0xFF);
+            $this->bytes[$mark + 1] = \chr($value >> 16 & 0xFF);
+            $this->bytes[$mark + 2] = \chr($value >> 8 & 0xFF);
+            $this->bytes[$mark + 3] = \chr($value & 0xFF);
         } else {
-            $this->bytes[$mark] = \chr($v & 0xFF);
-            $this->bytes[$mark + 1] = \chr($v >> 8 & 0xFF);
-            $this->bytes[$mark + 2] = \chr($v >> 16 & 0xFF);
-            $this->bytes[$mark + 3] = \chr($v >> 24 & 0xFF);
+            $this->bytes[$mark] = \chr($value & 0xFF);
+            $this->bytes[$mark + 1] = \chr($value >> 8 & 0xFF);
+            $this->bytes[$mark + 2] = \chr($value >> 16 & 0xFF);
+            $this->bytes[$mark + 3] = \chr($value >> 24 & 0xFF);
         }
     }
 
     /**
      * @param non-negative-int $mark
-     * @param non-negative-int $v
+     * @param non-negative-int $value
      */
-    public function patchUint64(int $mark, int $v): void
+    public function patchUint64(int $mark, int $value): void
     {
         \assert($mark + 8 <= \strlen($this->bytes), 'Invalid mark.');
-        $bytes = pack($this->u64, $v);
+        $bytes = pack($this->u64, $value);
 
         for ($i = 0; $i < 8; ++$i) {
             $this->bytes[$mark + $i] = $bytes[$i];
@@ -646,15 +649,15 @@ final class Buffer implements \Countable
     // ---------------------------------------------------------------- I/O
 
     /**
-     * Reads from $reader until at least $n unread bytes are buffered. If a read throws, the bytes read
+     * Reads from $reader until at least $length unread bytes are buffered. If a read throws, the bytes read
      * before stay buffered: nothing is lost, as a read that throws has taken nothing.
      *
      * @throws UnexpectedEof
      * @throws IoException of the reader: {@see ReadFailed}, a closed stream
      */
-    public function fill(Reader $reader, int $n): void
+    public function fill(Reader $reader, int $length): void
     {
-        $missing = $n - \strlen($this->bytes) + $this->offset;
+        $missing = $length - \strlen($this->bytes) + $this->offset;
 
         if ($missing <= 0) {
             return;
@@ -742,13 +745,13 @@ final class Buffer implements \Countable
     // ------------------------------------------------------------ private
 
     /**
-     * @param non-negative-int $n
+     * @param non-negative-int $length
      */
-    private function eof(int $n): UnexpectedEof
+    private function eof(int $length): UnexpectedEof
     {
         return new UnexpectedEof(\sprintf(
             'Expected %d bytes, but only %d available.',
-            $n,
+            $length,
             \strlen($this->bytes) - $this->offset,
         ));
     }

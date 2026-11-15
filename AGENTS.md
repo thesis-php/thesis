@@ -178,6 +178,14 @@ the whole monorepo is for the final check.
   Rejected: listing every file in the manifest (each new file rebuilds the autoloader), runtime `glob()`
   (a cost for every user, magic by file name), static methods instead of functions (a worse API).
 
+### Naming
+
+- No one-letter names except a loop index (`$i`) and the operands of a comparator (`$a`, `$b`):
+  `$n`, `$o`, `$v` make the reader look up what they hold.
+- Where the PHP standard library has a name for the same thing, take it: a number of bytes is `$length`
+  (`substr()`, `fread()`), a position is `$offset`, the data is `$bytes`. In a write loop the bytes one call
+  has written are `$sent`, all written so far `$written`.
+
 ### Tests
 
 - No traits for test helpers: plain functions (in `tests/autoload.files.php`) or a base class.

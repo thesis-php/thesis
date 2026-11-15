@@ -140,9 +140,9 @@ final class SharedStream implements Reader, Writer, Closer
         try {
             $length = \strlen($bytes);
 
-            for ($written = 0; $written < $length; $written += $n) {
+            for ($written = 0; $written < $length; $written += $sent) {
                 $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
-                $n = 0;
+                $sent = 0;
 
                 if (!self::ready($stream, write: true)) {
                     if (!$this->watcher->writable()) {
@@ -153,9 +153,9 @@ final class SharedStream implements Reader, Writer, Closer
                 }
 
                 error_clear_last();
-                $n = @fwrite($stream, substr($bytes, $written, self::PIPE_BUF));
+                $sent = @fwrite($stream, substr($bytes, $written, self::PIPE_BUF));
 
-                if ($n === false) {
+                if ($sent === false) {
                     throw new WriteFailed(lastError('Failed to write to the stream.'));
                 }
             }

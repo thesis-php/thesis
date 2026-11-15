@@ -150,7 +150,7 @@ final class BufferFuzzTest
     private static function randomOperation(Randomizer $random, array $marks): array
     {
         $int = self::int($random);
-        $n = $random->getInt(0, 12);
+        $length = $random->getInt(0, 12);
         $max = $random->getInt(1, 80);
         $delimiter = self::DELIMITERS[$random->getInt(0, \count(self::DELIMITERS) - 1)];
         $bytes = self::bytes($random, min: 0, max: 20);
@@ -191,10 +191,10 @@ final class BufferFuzzTest
 
         /** @var array<string, \Closure(Buffer|ReferenceBuffer, Reader, Writer): mixed> $ops */
         $ops = [
-            'read' => static fn(Buffer|ReferenceBuffer $x) => $x->read($n),
-            'skip' => static fn(Buffer|ReferenceBuffer $x) => $x->skip($n),
-            'peek' => static fn(Buffer|ReferenceBuffer $x) => $x->peek($n, $max % 5),
-            'slice' => static fn(Buffer|ReferenceBuffer $x) => $x->slice($n),
+            'read' => static fn(Buffer|ReferenceBuffer $x) => $x->read($length),
+            'skip' => static fn(Buffer|ReferenceBuffer $x) => $x->skip($length),
+            'peek' => static fn(Buffer|ReferenceBuffer $x) => $x->peek($length, $max % 5),
+            'slice' => static fn(Buffer|ReferenceBuffer $x) => $x->slice($length),
             'readUntil' => static fn(Buffer|ReferenceBuffer $x): ?string => $x->readUntil($delimiter),
             'readInt8' => static fn(Buffer|ReferenceBuffer $x) => $x->readInt8(),
             'readUint8' => static fn(Buffer|ReferenceBuffer $x) => $x->readUint8(),
@@ -221,9 +221,9 @@ final class BufferFuzzTest
             'writeDouble' => static fn(Buffer|ReferenceBuffer $x) => $x->writeDouble($float),
             'writeUvarint' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUvarint($int),
             'writeVarint' => static fn(Buffer|ReferenceBuffer $x) => $x->writeVarint($int),
-            'reserve' => static fn(Buffer|ReferenceBuffer $x) => $x->reserve($n % 10),
+            'reserve' => static fn(Buffer|ReferenceBuffer $x) => $x->reserve($length % 10),
             'drain' => static fn(Buffer|ReferenceBuffer $x) => $x->drain(),
-            'fill' => static fn(Buffer|ReferenceBuffer $x, Reader $r) => $x->fill($r, $n * 7),
+            'fill' => static fn(Buffer|ReferenceBuffer $x, Reader $r) => $x->fill($r, $length * 7),
             'fillUntil' => static fn(Buffer|ReferenceBuffer $x, Reader $r) => $x->fillUntil($r, $delimiter, $max),
             'flush' => static fn(Buffer|ReferenceBuffer $x, Reader $r, Writer $w) => $x->flush($w),
         ];

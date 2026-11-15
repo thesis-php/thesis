@@ -207,14 +207,14 @@ final class Stream implements Reader, Writer, Closer
                 while ($written < $length) {
                     $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
                     error_clear_last();
-                    $n = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
+                    $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
 
-                    if ($n === false) {
+                    if ($sent === false) {
                         throw new WriteFailed(lastError('Failed to write to the stream.'));
                     }
 
-                    if ($n > 0) {
-                        $written += $n;
+                    if ($sent > 0) {
+                        $written += $sent;
                     } elseif (!$this->watcher->writable()) {
                         throw new StreamClosed('The stream was closed while writing.');
                     }

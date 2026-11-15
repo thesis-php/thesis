@@ -310,16 +310,16 @@ final class Socket implements Reader, Writer, Closer
                     $stream = $this->stream ?? throw new SocketClosed('The socket was closed while writing.');
                     error_clear_last();
                     // After a write that sent nothing, the same bytes are passed again: TLS requires it.
-                    $n = @fwrite($stream, $written === 0 ? $bytes : substr($bytes, $written, self::WRITE_CHUNK));
+                    $sent = @fwrite($stream, $written === 0 ? $bytes : substr($bytes, $written, self::WRITE_CHUNK));
 
                     // OpenSSL reports a broken pipe as 0 bytes written with a warning: waiting for writability
                     // would spin.
-                    if ($n === false || ($n === 0 && error_get_last() !== null)) {
+                    if ($sent === false || ($sent === 0 && error_get_last() !== null)) {
                         throw new WriteFailed(lastError('Failed to write to the socket.'));
                     }
 
-                    if ($n > 0) {
-                        $written += $n;
+                    if ($sent > 0) {
+                        $written += $sent;
                     } elseif (!$this->watcher->writable()) {
                         throw new SocketClosed('The socket was closed while writing.');
                     }

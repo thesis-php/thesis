@@ -28,14 +28,14 @@ final class ReferenceBuffer
         return \strlen($this->bytes);
     }
 
-    public function read(int $n): string
+    public function read(int $length): string
     {
-        return $this->take($n);
+        return $this->take($length);
     }
 
-    public function skip(int $n): void
+    public function skip(int $length): void
     {
-        $this->take($n);
+        $this->take($length);
     }
 
     public function drain(): string
@@ -43,16 +43,16 @@ final class ReferenceBuffer
         return $this->take(\strlen($this->bytes));
     }
 
-    public function peek(int $n, int $skip = 0): string
+    public function peek(int $length, int $offset = 0): string
     {
-        $this->need($skip + $n);
+        $this->need($offset + $length);
 
-        return substr($this->bytes, $skip, $n);
+        return substr($this->bytes, $offset, $length);
     }
 
-    public function slice(int $n): self
+    public function slice(int $length): self
     {
-        return new self($this->order, $this->take($n), $this->chunkSize);
+        return new self($this->order, $this->take($length), $this->chunkSize);
     }
 
     public function readUntil(string $delimiter): ?string
@@ -248,10 +248,10 @@ final class ReferenceBuffer
         return $this->writeUvarint($v >= 0 ? $v << 1 : (~$v << 1) | 1);
     }
 
-    public function reserve(int $n): int
+    public function reserve(int $length): int
     {
         $mark = $this->consumed + \strlen($this->bytes);
-        $this->bytes .= str_repeat("\0", $n);
+        $this->bytes .= str_repeat("\0", $length);
 
         return $mark;
     }
@@ -282,13 +282,13 @@ final class ReferenceBuffer
     }
 
     /**
-     * @param positive-int $n
+     * @param positive-int $length
      */
-    public function fill(Reader $reader, int $n): void
+    public function fill(Reader $reader, int $length): void
     {
-        while (\strlen($this->bytes) < $n) {
+        while (\strlen($this->bytes) < $length) {
             /** @var positive-int $max */
-            $max = max($n - \strlen($this->bytes), $this->chunkSize);
+            $max = max($length - \strlen($this->bytes), $this->chunkSize);
             $this->bytes .= $reader->read($max);
         }
     }
@@ -331,19 +331,19 @@ final class ReferenceBuffer
         }
     }
 
-    private function need(int $n): void
+    private function need(int $length): void
     {
-        if (\strlen($this->bytes) < $n) {
-            throw new UnexpectedEof(\sprintf('Expected %d bytes, but only %d available.', $n, \strlen($this->bytes)));
+        if (\strlen($this->bytes) < $length) {
+            throw new UnexpectedEof(\sprintf('Expected %d bytes, but only %d available.', $length, \strlen($this->bytes)));
         }
     }
 
-    private function take(int $n): string
+    private function take(int $length): string
     {
-        $this->need($n);
-        $bytes = substr($this->bytes, 0, $n);
-        $this->bytes = substr($this->bytes, $n);
-        $this->consumed += $n;
+        $this->need($length);
+        $bytes = substr($this->bytes, 0, $length);
+        $this->bytes = substr($this->bytes, $length);
+        $this->consumed += $length;
 
         return $bytes;
     }
