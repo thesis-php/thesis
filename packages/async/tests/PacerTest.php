@@ -10,6 +10,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class PacerTest
@@ -52,7 +53,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
 
-        delay(0);
+        delay(sec(0));
 
         Assert::false(self::yields(static function () use ($pacer) {
             $pacer->pace();
@@ -90,7 +91,7 @@ final class PacerTest
         $operations = 0;
 
         $exception = thrown(static function () use ($pacer, &$operations) {
-            timeout(1, static function () use ($pacer, &$operations) {
+            timeout(sec(1), static function () use ($pacer, &$operations) {
                 untilCancelled();
 
                 while ($operations < 1000) {
@@ -110,7 +111,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
 
-        delay(0);
+        delay(sec(0));
 
         assertNoCallbacksLeft();
     }

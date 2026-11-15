@@ -24,7 +24,12 @@ use Thesis\Async\Cancelled;
 final class Scope
 {
     /**
-     * The clock of {@see now()} while `Thesis\Async\VirtualTime\run()` runs, bound by it.
+     * The longest `Time\Duration` in nanoseconds: a little less than PHP_INT_MAX, the saturated deadline.
+     */
+    private const int LONGEST_DURATION = 9_223_372_035_999_999_999;
+
+    /**
+     * The clock of {@see self::now()} while `Thesis\Async\VirtualTime\run()` runs, bound by it.
      * Here, not found through the event loop driver, which may be decorated;
      * and here, not on {@see VirtualClock}, so that the class is loaded only if `run()` is used.
      */
@@ -58,20 +63,20 @@ final class Scope
     private array $children = [];
 
     /**
-     * The nearest deadline of this scope and its visible ancestors, as {@see now()}; INF if there is none.
+     * The nearest deadline of this scope and its visible ancestors, as {@see self::now()}; null if there is none.
      * Like the cancelled flag, it is resolved on creation, so {@see remaining()} reads one field.
      */
-    private readonly float $deadline;
+    private readonly ?int $deadline;
 
     /**
-     * @param ?float $timeout a deadline of this scope in seconds from now; an earlier one of the parent wins
+     * @param ?int $timeout a deadline of this scope in nanoseconds from now; an earlier one of the parent wins
      */
     public function __construct(
         private readonly ?self $parent = null,
         private readonly bool $shield = false,
-        ?float $timeout = null,
+        ?int $timeout = null,
     ) {
-        $deadline = $timeout === null ? INF : self::now() + $timeout;
+        $deadline = $timeout === null ? null : self::after($timeout);
 
         if ($parent !== null) {
             $parent->children[spl_object_id($this)] = $this;
@@ -81,7 +86,9 @@ final class Scope
             if (!$shield) {
                 // The parent's subtree has been notified before this scope existed.
                 $this->cancelled = $parent->cancelled;
-                $deadline = min($deadline, $parent->deadline);
+                $deadline = $deadline === null || $parent->deadline === null
+                    ? $deadline ?? $parent->deadline
+                    : min($deadline, $parent->deadline);
             }
         }
 
@@ -130,16 +137,19 @@ final class Scope
     }
 
     /**
-     * Seconds left until the nearest deadline of this scope or a visible ancestor, null if there is none.
+     * Nanoseconds left until the nearest deadline of this scope or a visible ancestor, null if there is none.
      * Zero once the deadline has passed, even if its timer has not fired yet.
+     *
+     * @return ?non-negative-int
      */
-    public function remaining(): ?float
+    public function remaining(): ?int
     {
-        if ($this->deadline === INF) {
+        if ($this->deadline === null) {
             return null;
         }
 
-        return max(0.0, $this->deadline - self::now());
+        // A saturated deadline is further than the longest Duration while the clock is below 0.86 s.
+        return min(max(0, $this->deadline - self::now()), self::LONGEST_DURATION);
     }
 
     /**
@@ -278,13 +288,24 @@ final class Scope
     }
 
     /**
-     * Monotonic, in seconds: the clock Revolt's timers run on. The only clock of the library: `Thesis\Async\now()` too.
-     * Within `Thesis\Async\VirtualTime\run()`, {@see $virtualClock} instead. Not on the hot path of a wait:
-     * only a deadline, {@see remaining()} and the rate limiters read the clock.
+     * Monotonic, in nanoseconds: the clock Revolt's timers run on. The only clock of the library:
+     * `Thesis\Async\Instant` too. Within `Thesis\Async\VirtualTime\run()`, {@see $virtualClock} instead.
+     * Not on the hot path of a wait: only a deadline, {@see remaining()} and the rate limiters read the clock.
      */
-    public static function now(): float
+    public static function now(): int
     {
-        return self::$virtualClock?->now() ?? hrtime(true) / 1e9;
+        // @phpstan-ignore return.type (hrtime() returns a float only on 32-bit PHP, which no package supports)
+        return self::$virtualClock->now ?? hrtime(true);
+    }
+
+    /**
+     * {@see now()} plus $nanoseconds, saturated: a deadline centuries away must not overflow into a float.
+     */
+    public static function after(int $nanoseconds): int
+    {
+        $now = self::now();
+
+        return $nanoseconds > PHP_INT_MAX - $now ? PHP_INT_MAX : $now + $nanoseconds;
     }
 
     private function notify(): void

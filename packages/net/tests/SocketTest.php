@@ -15,6 +15,7 @@ use Thesis\Io\WriteFailed;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\ms;
 
 #[Test]
 final class SocketTest
@@ -32,7 +33,7 @@ final class SocketTest
     {
         [$client, $server] = tcpPair();
         $client->write(str_repeat('x', 100_000));
-        delay(0.01);
+        delay(ms(10));
 
         Assert::true(\strlen($server->read(65_536)) > 8192);
     }
@@ -108,7 +109,7 @@ final class SocketTest
         // linger 0: close() sends RST instead of FIN
         socket_set_option($socket, SOL_SOCKET, SO_LINGER, ['l_onoff' => 1, 'l_linger' => 0]);
         socket_close($socket);
-        delay(0.01);
+        delay(ms(10));
         Expect::exception(ReadFailed::class)->withMessage('The connection is broken: reset by the peer or timed out.');
 
         $accepted->read(100);
@@ -133,7 +134,7 @@ final class SocketTest
 
         group(static function (Group $group) use ($left) {
             $group->spawn(static fn() => $left->read(1));
-            delay(0.01);
+            delay(ms(10));
             $left->close();
         });
         unset($right);
@@ -146,7 +147,7 @@ final class SocketTest
 
         group(static function (Group $group) use ($left) {
             $group->daemon(static fn() => $left->read(1));
-            delay(0.01);
+            delay(ms(10));
             $left->read(1);
         });
         unset($right);
@@ -156,7 +157,7 @@ final class SocketTest
     {
         [$left, $right] = socketPair();
 
-        $cancelled = timeoutOr(0.01, static fn() => $right->read(1), default: 'cancelled');
+        $cancelled = timeoutOr(ms(10), static fn() => $right->read(1), default: 'cancelled');
         $left->write('x');
 
         Assert::same($cancelled, 'cancelled');
@@ -167,7 +168,7 @@ final class SocketTest
     {
         [$left, $right] = socketPair();
 
-        timeoutOr(0.01, static fn() => $left->write(str_repeat('x', 10_000_000)));
+        timeoutOr(ms(10), static fn() => $left->write(str_repeat('x', 10_000_000)));
 
         Assert::true($left->isClosed);
         Assert::false($right->isClosed);
@@ -179,10 +180,10 @@ final class SocketTest
 
         group(static function (Group $group) use ($left, $right) {
             $group->spawn(static fn() => $left->write(str_repeat('a', 10_000_000)));
-            delay(0.01);
+            delay(ms(10));
 
             // waits for the write above
-            timeoutOr(0.01, static fn() => $left->write('b'));
+            timeoutOr(ms(10), static fn() => $left->write('b'));
 
             Assert::false($left->isClosed);
             readExactly($right, 10_000_000);

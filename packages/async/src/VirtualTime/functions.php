@@ -8,14 +8,15 @@ use Revolt\EventLoop;
 use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\VirtualClock;
 use Thesis\Async\Internal\VirtualTimeDriver;
+use Time\Duration;
+use function Thesis\Time\toNs;
 
 /**
  * Runs $fn on a virtual clock and on a fresh Revolt driver whose timers follow it. The clock starts at the current
- * `Thesis\Async\now()` rounded up to a whole second, so a time captured before `run()` stays valid in it,
- * and durations of whole seconds are exact.
- * The clock jumps to the next timer whenever nothing can run: `delay(3600)` is over at once, timers fire exactly
+ * `Thesis\Async\Instant::now()` rounded up to a whole second, so a time captured before `run()` stays valid in it.
+ * The clock jumps to the next timer whenever nothing can run: `delay(hours(1))` is over at once, timers fire exactly
  * in the order of their deadlines, and a deadlock fails at once instead of hanging. CPU work takes no time:
- * see {@see advance()}. `Thesis\Async\now()` and deadlines follow the clock, whatever the driver
+ * see {@see advance()}. `Thesis\Async\Instant::now()` and deadlines follow the clock, whatever the driver
  * is decorated with meanwhile.
  *
  * Streams and signals stay real: they are left to $driver, by default the one `EventLoop\DriverFactory` creates
@@ -74,9 +75,9 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     $previousDriver = EventLoop::getDriver();
     $stop($previousDriver);
     $previousClock = Scope::$virtualClock;
-    // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Whole seconds, so that
-    // whole-second durations on it are exact, and rounded up, so that the clock does not go back.
-    $clock = new VirtualClock(ceil(Scope::now()));
+    // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Rounded up, so that
+    // the clock does not go back, to a whole second, so that the times of a dump read well.
+    $clock = new VirtualClock(intdiv(Scope::now() + 999_999_999, 1_000_000_000) * 1_000_000_000);
     EventLoop::setDriver(new VirtualTimeDriver($clock, $driver));
     Scope::$virtualClock = $clock;
 
@@ -96,17 +97,17 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
 
 /**
  * Moves the clock of the current {@see run()} forward without yielding to the event loop, as CPU work
- * that takes $seconds would: a deadline passes, but its timer fires only at the next suspension.
+ * that takes $duration would: a deadline passes, but its timer fires only at the next suspension.
  *
  * @api
- * @throws \ValueError if $seconds is negative (the clock is monotonic) or NAN
+ * @throws \ValueError if $duration is negative: the clock is monotonic
  * @throws \LogicException outside of {@see run()}
  */
-function advance(float $seconds): void
+function advance(Duration $duration): void
 {
     if (Scope::$virtualClock === null) {
         throw new \LogicException('There is no virtual clock to advance outside of VirtualTime\run().');
     }
 
-    Scope::$virtualClock->advance($seconds);
+    Scope::$virtualClock->advance(toNs($duration));
 }

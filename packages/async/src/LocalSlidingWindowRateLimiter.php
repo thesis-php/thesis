@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Thesis\Async\Internal\Scope;
+use Time\Duration;
+use function Thesis\Time\format;
+use function Thesis\Time\isPositive;
+use function Thesis\Time\ns;
+use function Thesis\Time\toNs;
+
 /**
- * In-process {@see RateLimiter} with a sliding window: at most $limit calls start within any $window seconds,
+ * In-process {@see RateLimiter} with a sliding window: at most $limit calls start within any $window,
  * like .NET `SlidingWindowRateLimiter` with its `PermitLimit` and `Window`.
  * For a server that enforces exactly that, where a {@see LocalTokenBucketRateLimiter} would have to be set to half the
  * rate: a token bucket bounds the average, a window bounds every interval.
  *
  * It keeps the start times of the last $limit calls; a call waits until the oldest of them leaves the window.
  * So after a pause $limit calls start at once, and the next ones follow the pattern of the first window.
- * Memory is one float per call of the limit.
+ * Memory is one int per call of the limit.
  *
  * Fair and cancellable in the same way as {@see LocalTokenBucketRateLimiter}: callers queue on a {@see LocalMutex},
  * only the first in the queue sleeps, and a caller cancelled while queued or sleeping counts no call.
@@ -25,7 +32,7 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
     private readonly LocalMutex $mutex;
 
     /**
-     * @var array<non-negative-int, float> start times of the last calls, a ring; a slot is missing until its first call
+     * @var array<non-negative-int, int> start times of the last calls, a ring; a slot is missing until its first call
      */
     private array $starts = [];
 
@@ -35,21 +42,27 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
     private int $oldest = 0;
 
     /**
+     * @var int the window in nanoseconds
+     */
+    private readonly int $window;
+
+    /**
      * @param positive-int $limit how many calls may start within the window
-     * @param float $window the length of the window in seconds, > 0
+     * @param Duration $window the length of the window, positive
      * @throws \ValueError if $window is not positive
      */
     public function __construct(
         private readonly int $limit,
-        private readonly float $window,
+        Duration $window,
     ) {
-        if (!($window > 0)) {
+        if (!isPositive($window)) {
             throw new \ValueError(\sprintf(
                 'LocalSlidingWindowRateLimiter needs a positive window, got %s.',
-                is_nan($window) ? 'NAN' : $window,
+                format($window),
             ));
         }
 
+        $this->window = toNs($window);
         $this->mutex = new LocalMutex();
     }
 
@@ -58,16 +71,18 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         $lock = $this->mutex->acquire();
 
         try {
-            $leavesAt = ($this->starts[$this->oldest] ?? -INF) + $this->window;
-            $wait = $leavesAt - now();
+            $oldestStart = $this->starts[$this->oldest] ?? null;
+            $leavesAt = $oldestStart === null ? PHP_INT_MIN : $oldestStart + $this->window;
+            $wait = $leavesAt - Scope::now();
 
-            // Sleeps once and does not compare the clock again: a wake-up a hair early, as float rounding may cause,
-            // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
+            // Sleeps once and does not compare the clock again: Revolt's timers are float seconds, and a wake-up
+            // a hair early would loop on a delay too small to move the clock. A cancelled delay() throws before
+            // the call is counted.
             if ($wait > 0) {
-                delay($wait);
+                delay(ns($wait));
             }
 
-            $this->starts[$this->oldest] = max($leavesAt, now());
+            $this->starts[$this->oldest] = max($leavesAt, Scope::now());
             $this->oldest = ($this->oldest + 1) % $this->limit;
         } finally {
             $lock->release();

@@ -12,6 +12,7 @@ use Thesis\Async\Group;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\ms;
 
 #[Test]
 final class ServerTest
@@ -31,7 +32,7 @@ final class ServerTest
 
         $accepted = group(static function (Group $group) use ($server) {
             $accepted = $group->spawn($server->accept(...));
-            delay(0.01);
+            delay(ms(10));
             $server->close();
 
             return $accepted->await();
@@ -46,7 +47,7 @@ final class ServerTest
     {
         $server = listen('127.0.0.1', 0);
 
-        Assert::same(timeoutOr(0.01, $server->accept(...), default: 'cancelled'), 'cancelled');
+        Assert::same(timeoutOr(ms(10), $server->accept(...), default: 'cancelled'), 'cancelled');
         $server->close();
     }
 

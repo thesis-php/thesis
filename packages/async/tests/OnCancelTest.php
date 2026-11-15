@@ -9,6 +9,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class OnCancelTest
@@ -18,7 +19,7 @@ final class OnCancelTest
         $calls = 0;
 
         $exception = thrown(static function () use (&$calls) {
-            timeout(1, static function () use (&$calls) {
+            timeout(sec(1), static function () use (&$calls) {
                 onCancel(static function () use (&$calls) {
                     ++$calls;
                 });
@@ -43,7 +44,7 @@ final class OnCancelTest
         group(static function (Group $group) use (&$log) {
             $group->spawn(static function () use (&$log) {
                 thrown(static function () use (&$log) {
-                    timeout(1, static function () use (&$log) {
+                    timeout(sec(1), static function () use (&$log) {
                         onCancel(static function () use (&$log) {
                             $log[] = 'called';
                         });
@@ -66,7 +67,7 @@ final class OnCancelTest
 
         $value->with('bound', static function () use ($value, &$observed) {
             thrown(static function () use ($value, &$observed) {
-                timeout(1, static function () use ($value, &$observed) {
+                timeout(sec(1), static function () use ($value, &$observed) {
                     onCancel(static function () use ($value, &$observed) {
                         $observed = [isCancelled(), $value->get(), remaining()];
                     });
@@ -92,7 +93,7 @@ final class OnCancelTest
                 never();
             });
 
-            delay(1);
+            delay(sec(1));
             $handle->cancel();
         });
         checkpoint();
@@ -105,10 +106,10 @@ final class OnCancelTest
         $calls = 0;
 
         thrown(static function () use (&$calls) {
-            timeout(1, static function () use (&$calls) {
+            timeout(sec(1), static function () use (&$calls) {
                 group(static function (Group $group) use (&$calls) {
                     $group->spawn(static function () use (&$calls) {
-                        timeout(10, static function () use (&$calls) {
+                        timeout(sec(10), static function () use (&$calls) {
                             onCancel(static function () use (&$calls) {
                                 ++$calls;
                             });
@@ -129,7 +130,7 @@ final class OnCancelTest
         $calls = 0;
 
         thrown(static function () use (&$calls) {
-            timeout(5, static function () use (&$calls) {
+            timeout(sec(5), static function () use (&$calls) {
                 group(static function (Group $group) use (&$calls) {
                     $handle = $group->spawn(static function () use (&$calls) {
                         onCancel(static function () use (&$calls) {
@@ -139,11 +140,11 @@ final class OnCancelTest
                         try {
                             never();
                         } finally {
-                            shield(static fn() => delay(10));
+                            shield(static fn() => delay(sec(10)));
                         }
                     });
 
-                    delay(1);
+                    delay(sec(1));
                     $handle->cancel();
                     $handle->cancel();
                     never();
@@ -168,7 +169,7 @@ final class OnCancelTest
                 never();
             });
 
-            delay(1);
+            delay(sec(1));
             $handle->cancel();
             $observed = $called;
         });
@@ -181,7 +182,7 @@ final class OnCancelTest
         $called = false;
 
         thrown(static function () use (&$called) {
-            timeout(1, static function () use (&$called) {
+            timeout(sec(1), static function () use (&$called) {
                 $unsubscribe = onCancel(static function () use (&$called) {
                     $called = true;
                 });
@@ -211,7 +212,7 @@ final class OnCancelTest
                 never();
             });
 
-            delay(1);
+            delay(sec(1));
             $handle->cancel();
             /** @var \Closure(): void $unsubscribe */
             $unsubscribe();
@@ -227,7 +228,7 @@ final class OnCancelTest
         $observed = [];
 
         thrown(static function () use (&$observed) {
-            timeout(1, static function () use (&$observed) {
+            timeout(sec(1), static function () use (&$observed) {
                 try {
                     never();
                 } finally {
@@ -248,7 +249,7 @@ final class OnCancelTest
         $called = false;
 
         thrown(static function () use (&$called) {
-            timeout(1, static function () use (&$called) {
+            timeout(sec(1), static function () use (&$called) {
                 try {
                     never();
                 } finally {
@@ -268,13 +269,13 @@ final class OnCancelTest
     {
         $called = false;
 
-        timeout(1, static function () use (&$called) {
+        timeout(sec(1), static function () use (&$called) {
             shield(static function () use (&$called) {
                 onCancel(static function () use (&$called) {
                     $called = true;
                 });
 
-                delay(5);
+                delay(sec(5));
             });
         });
         checkpoint();
@@ -296,7 +297,7 @@ final class OnCancelTest
             }
         };
 
-        thrown(static fn() => timeout(1, static function () use ($recorder) {
+        thrown(static fn() => timeout(sec(1), static function () use ($recorder) {
             onCancel($recorder);
 
             never();
@@ -333,7 +334,7 @@ final class OnCancelTest
         };
         $reference = \WeakReference::create($callback);
 
-        timeout(1000, static function () use ($callback) {
+        timeout(sec(1000), static function () use ($callback) {
             onCancel($callback);
         });
         unset($callback);

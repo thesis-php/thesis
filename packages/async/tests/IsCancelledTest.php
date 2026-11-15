@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class IsCancelledTest
@@ -15,7 +16,7 @@ final class IsCancelledTest
     public function isFalseInHealthyScope(): void
     {
         Assert::false(isCancelled());
-        Assert::false(timeout(1000, isCancelled(...)));
+        Assert::false(timeout(sec(1000), isCancelled(...)));
     }
 
     public function isTrueInCancelledScope(): void
@@ -23,7 +24,7 @@ final class IsCancelledTest
         $observed = [];
 
         thrown(static function () use (&$observed) {
-            timeout(1, static function () use (&$observed) {
+            timeout(sec(1), static function () use (&$observed) {
                 $observed[] = isCancelled();
 
                 try {
@@ -42,11 +43,11 @@ final class IsCancelledTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(1, static function () use (&$observed) {
+            timeout(sec(1), static function () use (&$observed) {
                 try {
                     never();
                 } finally {
-                    $observed = timeout(1000, isCancelled(...));
+                    $observed = timeout(sec(1000), isCancelled(...));
                 }
             });
         });
@@ -67,7 +68,7 @@ final class IsCancelledTest
                 }
             });
 
-            delay(1);
+            delay(sec(1));
             $handle->cancel();
         });
 
@@ -79,7 +80,7 @@ final class IsCancelledTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(1, static function () use (&$observed) {
+            timeout(sec(1), static function () use (&$observed) {
                 try {
                     never();
                 } finally {

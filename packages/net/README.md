@@ -21,8 +21,9 @@ With ext-sockets, a failed connection says why (refused, unreachable).
 use Thesis\Io\Buffer;
 use function Thesis\Async\timeout;
 use function Thesis\Net\connect;
+use function Thesis\Time\sec;
 
-$socket = timeout(5, static fn() => connect('rabbitmq', 5672));
+$socket = timeout(sec(5), static fn() => connect('rabbitmq', 5672));
 
 $out = new Buffer();
 $out->write("AMQP\x00\x00\x09\x01")->flush($socket);
@@ -109,6 +110,7 @@ use Thesis\Net\Socket;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Net\listen;
+use function Thesis\Time\sec;
 
 $server = listen('0.0.0.0', 8443);
 $tls = new ServerTls(
@@ -121,7 +123,7 @@ try {
         while (null !== $socket = $server->accept()) {
             $group->spawn(static function () use ($socket, $tls) {
                 try {
-                    timeout(10, static fn() => $socket->enableTls($tls));
+                    timeout(sec(10), static fn() => $socket->enableTls($tls));
                     handle($socket); // catches its own errors: a failure would fail the whole group
                 } finally {
                     $socket->close();

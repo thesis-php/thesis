@@ -11,6 +11,7 @@ use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class AllSettledAndSomeTest
@@ -22,12 +23,12 @@ final class AllSettledAndSomeTest
 
         [$results, $errors] = allSettled([
             'slow' => static function () {
-                delay(3);
+                delay(sec(3));
 
                 return 1;
             },
             'late failure' => static function () use ($second) {
-                delay(2);
+                delay(sec(2));
 
                 throw $second;
             },
@@ -57,7 +58,7 @@ final class AllSettledAndSomeTest
                 throw new \RuntimeException('failed');
             },
             static function () use (&$events) {
-                delay(2);
+                delay(sec(2));
                 $events[] = 'other finished';
             },
         ]);
@@ -91,14 +92,14 @@ final class AllSettledAndSomeTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => allSettled([never(...)]));
+        timeout(sec(1), static fn() => allSettled([never(...)]));
     }
 
     public function allSettledThrowsCancelledEvenIfTaskTurnsItIntoFailure(): void
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => allSettled([
+        timeout(sec(1), static fn() => allSettled([
             static function () {
                 try {
                     never();
@@ -112,8 +113,8 @@ final class AllSettledAndSomeTest
     public function allSettledWithTimeoutPerTaskKeepsWhatIsReady(): void
     {
         [$results, $errors] = allSettled([
-            'fast' => static fn() => timeout(50, static fn() => 'fast'),
-            'slow' => static fn() => timeout(1, never(...)),
+            'fast' => static fn() => timeout(sec(50), static fn() => 'fast'),
+            'slow' => static fn() => timeout(sec(1), never(...)),
         ]);
 
         Assert::same($results, ['fast' => 'fast']);
@@ -125,17 +126,17 @@ final class AllSettledAndSomeTest
     {
         $results = some(2, [
             'slow' => static function () {
-                delay(20);
+                delay(sec(20));
 
                 return 'slow';
             },
             'medium' => static function () {
-                delay(3);
+                delay(sec(3));
 
                 return 'medium';
             },
             'fast' => static function () {
-                delay(1);
+                delay(sec(1));
 
                 return 'fast';
             },
@@ -148,7 +149,7 @@ final class AllSettledAndSomeTest
     {
         $results = some(2, [
             'a' => static function () {
-                delay(2);
+                delay(sec(2));
 
                 return 'a';
             },
@@ -164,7 +165,7 @@ final class AllSettledAndSomeTest
 
         some(1, [
             static function () {
-                delay(1);
+                delay(sec(1));
 
                 return 'winner';
             },
@@ -172,7 +173,7 @@ final class AllSettledAndSomeTest
                 try {
                     never();
                 } finally {
-                    shield(static fn() => delay(3));
+                    shield(static fn() => delay(sec(3)));
                     $loserCleanedUp = true;
                 }
             },
@@ -201,12 +202,12 @@ final class AllSettledAndSomeTest
         $results = some(2, [
             'down' => static fn() => throw new \RuntimeException('down'),
             'a' => static function () {
-                delay(1);
+                delay(sec(1));
 
                 return 'a';
             },
             'b' => static function () {
-                delay(2);
+                delay(sec(2));
 
                 return 'b';
             },
@@ -219,7 +220,7 @@ final class AllSettledAndSomeTest
     {
         $results = some(1, [
             static function () {
-                delay(1);
+                delay(sec(1));
 
                 return 'winner';
             },
@@ -242,12 +243,12 @@ final class AllSettledAndSomeTest
         $exception = thrown(static function () use (&$returned) {
             some(2, [
                 static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('a');
                 },
                 static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('b');
                 },
@@ -279,7 +280,7 @@ final class AllSettledAndSomeTest
                 return 'too late';
             },
             'winner' => static function () {
-                delay(1);
+                delay(sec(1));
 
                 return 'winner';
             },
@@ -298,12 +299,12 @@ final class AllSettledAndSomeTest
         $elapsed = elapsed(static function () use ($first, $second, &$exception) {
             $exception = thrown(static fn() => some(2, [
                 static function () use ($first) {
-                    delay(1);
+                    delay(sec(1));
 
                     throw $first;
                 },
                 static function () use ($second) {
-                    delay(2);
+                    delay(sec(2));
 
                     throw $second;
                 },
@@ -323,7 +324,7 @@ final class AllSettledAndSomeTest
 
         $exception = thrown(static fn() => some(2, [
             static function () use ($first) {
-                delay(1);
+                delay(sec(1));
 
                 throw $first;
             },
@@ -344,7 +345,7 @@ final class AllSettledAndSomeTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => some(1, [never(...), never(...)]));
+        timeout(sec(1), static fn() => some(1, [never(...), never(...)]));
     }
 
     public function someOfMoreThanThereAreIsRejected(): void

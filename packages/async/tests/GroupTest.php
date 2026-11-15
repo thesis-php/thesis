@@ -15,6 +15,7 @@ use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class GroupTest
@@ -31,7 +32,7 @@ final class GroupTest
         group(static function (Group $group) use (&$finished) {
             foreach ([3, 1, 2] as $seconds) {
                 $group->spawn(static function () use ($seconds, &$finished) {
-                    delay($seconds);
+                    delay(sec($seconds));
                     $finished[] = $seconds;
                 });
             }
@@ -46,7 +47,7 @@ final class GroupTest
         $elapsed = elapsed(static function () {
             group(static function (Group $group) {
                 for ($i = 0; $i < 10; ++$i) {
-                    $group->spawn(static fn() => delay(20));
+                    $group->spawn(static fn() => delay(sec(20)));
                 }
             });
         });
@@ -61,7 +62,7 @@ final class GroupTest
         $exception = thrown(static function () use (&$events) {
             group(static function (Group $group) use (&$events) {
                 $group->spawn(static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('task failed');
                 });
@@ -73,7 +74,7 @@ final class GroupTest
 
                         throw $cancelled;
                     } finally {
-                        shield(static fn() => delay(5));
+                        shield(static fn() => delay(sec(5)));
                         $events[] = 'sibling cleaned up';
                     }
                 });
@@ -99,7 +100,7 @@ final class GroupTest
 
         group(static function (Group $group) {
             $group->spawn(static function () {
-                delay(1);
+                delay(sec(1));
 
                 throw new \RuntimeException('first');
             });
@@ -128,7 +129,7 @@ final class GroupTest
                         throw $cancelled;
                     }
                 });
-                delay(1);
+                delay(sec(1));
 
                 throw new \LogicException('body failed');
             });
@@ -150,7 +151,7 @@ final class GroupTest
                     throw new \RuntimeException('task failed on cancellation');
                 }
             });
-            delay(1);
+            delay(sec(1));
 
             throw new \LogicException('body failed');
         });
@@ -170,10 +171,10 @@ final class GroupTest
                     throw $cancelled;
                 }
             });
-            delay(1);
+            delay(sec(1));
 
             $group->cancelTasks();
-            delay(1);
+            delay(sec(1));
 
             return 'body result';
         });
@@ -191,7 +192,7 @@ final class GroupTest
             $handle = $group->spawn(static function () use (&$started) {
                 $started = true;
             });
-            delay(0); // the task would have started here
+            delay(sec(0)); // the task would have started here
 
             Assert::true($handle->isDone);
             $awaited = thrown(static fn() => $handle->await());
@@ -208,7 +209,7 @@ final class GroupTest
     {
         $result = group(static function (Group $group) {
             $handle = $group->spawn(never(...));
-            delay(1);
+            delay(sec(1));
             $handle->cancel();
 
             return 'ok';
@@ -236,9 +237,9 @@ final class GroupTest
 
         group(static function (Group $group) use (&$finished) {
             $group->spawn(static function () use ($group, &$finished) {
-                delay(1);
+                delay(sec(1));
                 $group->spawn(static function () use (&$finished) {
-                    delay(1);
+                    delay(sec(1));
                     $finished = true;
                 });
             });
@@ -275,7 +276,7 @@ final class GroupTest
         group(static function (Group $group) use (&$events) {
             $group->daemon(static function () use (&$events) {
                 try {
-                    delay(50);
+                    delay(sec(50));
                     $events[] = 'daemon finished by itself';
                 } catch (Cancelled $cancelled) {
                     $events[] = 'daemon cancelled';
@@ -284,7 +285,7 @@ final class GroupTest
                 }
             });
             $group->spawn(static function () use (&$events) {
-                delay(5);
+                delay(sec(5));
                 $events[] = 'task done';
             });
             $events[] = 'body done';
@@ -301,14 +302,14 @@ final class GroupTest
             $group->spawn(static function () use ($group, &$events) {
                 $group->daemon(static function () use (&$events) {
                     try {
-                        delay(50);
+                        delay(sec(50));
                     } catch (Cancelled $cancelled) {
                         $events[] = 'daemon cancelled';
 
                         throw $cancelled;
                     }
                 });
-                delay(1);
+                delay(sec(1));
             });
         });
 
@@ -321,7 +322,7 @@ final class GroupTest
 
         group(static function (Group $group) {
             $group->daemon(static function () {
-                delay(1);
+                delay(sec(1));
 
                 throw new \RuntimeException('heartbeat failed');
             });
@@ -344,9 +345,9 @@ final class GroupTest
                     throw $cancelled;
                 }
             });
-            delay(1);
+            delay(sec(1));
             $group->cancelTasks();
-            delay(1);
+            delay(sec(1));
             $events[] = 'body done';
         });
 
@@ -356,7 +357,7 @@ final class GroupTest
     public function outerCancellationOfUnawaitedTaskIsNotSwallowed(): void
     {
         $exception = thrown(static function () {
-            timeout(1, static fn() => group(static function (Group $group) {
+            timeout(sec(1), static fn() => group(static function (Group $group) {
                 $group->spawn(never(...));
 
                 return 'pretends to be done';
@@ -368,7 +369,7 @@ final class GroupTest
 
     public function outerCancellationOfDaemonOnlyDoesNotDiscardResult(): void
     {
-        $result = timeout(1, static fn() => group(static function (Group $group) {
+        $result = timeout(sec(1), static fn() => group(static function (Group $group) {
             $group->daemon(never(...));
 
             untilCancelled();
@@ -383,7 +384,7 @@ final class GroupTest
     {
         Expect::exception(\RuntimeException::class)->withMessage('connection reset');
 
-        timeout(1, static function () {
+        timeout(sec(1), static function () {
             group(static function (Group $group) {
                 $group->spawn(static function () {
                     try {
@@ -401,10 +402,10 @@ final class GroupTest
         $taskFinished = false;
 
         $exception = thrown(static function () use (&$taskFinished) {
-            timeout(1, static function () use (&$taskFinished) {
+            timeout(sec(1), static function () use (&$taskFinished) {
                 group(static function (Group $group) use (&$taskFinished) {
                     $group->spawn(static function () use (&$taskFinished) {
-                        shield(static fn() => delay(5));
+                        shield(static fn() => delay(sec(5)));
                         $taskFinished = true;
                     });
 
@@ -421,7 +422,7 @@ final class GroupTest
     {
         Expect::exception(\RuntimeException::class)->withMessage('connection reset');
 
-        timeout(1, static function () {
+        timeout(sec(1), static function () {
             group(static function (Group $group) {
                 $group->spawn(static function () {
                     try {
@@ -442,14 +443,14 @@ final class GroupTest
         $first = null;
 
         $exception = thrown(static function () use (&$first) {
-            timeout(1, static function () use (&$first) {
+            timeout(sec(1), static function () use (&$first) {
                 group(static function (Group $group) use (&$first) {
                     // spawned first, but cut short last: it unwinds after a cleanup
                     $group->spawn(static function () {
                         try {
                             never();
                         } finally {
-                            shield(static fn() => delay(1));
+                            shield(static fn() => delay(sec(1)));
                         }
                     });
                     $group->spawn(static function () use (&$first) {
@@ -475,11 +476,11 @@ final class GroupTest
         $elapsed = elapsed(static function () {
             group(static function (Group $group) {
                 $first = $group->spawn(static function () {
-                    delay(1); // meanwhile the second task enters its own scope
+                    delay(sec(1)); // meanwhile the second task enters its own scope
                     never(); // still waits in the first task's scope
                 });
-                $group->spawn(static fn() => delay(1));
-                delay(5);
+                $group->spawn(static fn() => delay(sec(1)));
+                delay(sec(5));
 
                 $first->cancel();
             });
@@ -493,10 +494,10 @@ final class GroupTest
         $elapsed = elapsed(static function () {
             group(static function (Group $group) {
                 $handle = $group->spawn(static function () {
-                    timeout(1000, static fn() => null);
+                    timeout(sec(1000), static fn() => null);
                     never(); // still waits in the task's scope
                 });
-                delay(1);
+                delay(sec(1));
 
                 $handle->cancel();
             });
@@ -507,7 +508,7 @@ final class GroupTest
 
     public function cancelledRethrownOutsideItsScopeFailsGroup(): void
     {
-        $foreign = thrown(static fn() => timeout(1, never(...)))->getPrevious();
+        $foreign = thrown(static fn() => timeout(sec(1), never(...)))->getPrevious();
         Assert::instanceOf($foreign, Cancelled::class);
 
         $exception = thrown(static function () use ($foreign) {
@@ -528,7 +529,7 @@ final class GroupTest
 
     public function cancelledRethrownOutsideItsScopeFromBodyFailsGroup(): void
     {
-        $foreign = thrown(static fn() => timeout(1, never(...)))->getPrevious();
+        $foreign = thrown(static fn() => timeout(sec(1), never(...)))->getPrevious();
         Assert::instanceOf($foreign, Cancelled::class);
         $events = [];
 
@@ -543,7 +544,7 @@ final class GroupTest
                         throw $cancelled;
                     }
                 });
-                delay(1);
+                delay(sec(1));
 
                 throw $foreign;
             });
@@ -572,7 +573,7 @@ final class GroupTest
 
                         throw $cancelled;
                     } finally {
-                        shield(static fn() => delay(1));
+                        shield(static fn() => delay(sec(1)));
                         $events[] = 'task cleaned up';
                     }
                 });
@@ -604,11 +605,11 @@ final class GroupTest
                         EventLoop::defer(static function () {
                             throw new \RuntimeException('foreign');
                         });
-                        shield(static fn() => delay(1));
+                        shield(static fn() => delay(sec(1)));
                         $events[] = 'task cleaned up';
                     }
                 });
-                delay(0);
+                delay(sec(0));
 
                 throw new \LogicException('body failed');
             });
@@ -670,14 +671,14 @@ final class GroupTest
 
         // let the orphaned task finish
         $never->complete();
-        delay(0);
+        delay(sec(0));
         assertNoCallbacksLeft();
     }
 
     public function worksInsideFiber(): void
     {
         $nested = static function (Group $inner) {
-            $inner->spawn(static fn() => delay(1));
+            $inner->spawn(static fn() => delay(sec(1)));
 
             return 'nested';
         };
@@ -701,17 +702,17 @@ final class GroupTest
 
         group(static function (Group $group) use ($onlyChild) {
             $body = Scope::current();
-            timeout(1000, static fn() => null);
-            thrown(static fn() => timeout(1, never(...)));
+            timeout(sec(1000), static fn() => null);
+            thrown(static fn() => timeout(sec(1), never(...)));
             shield(static fn() => null);
             $group->spawn(static fn() => null);
             $group->spawn(never(...))->cancel();
             $group->daemon(static fn() => null);
             $group->spawn(static function () {
-                timeout(1000, static fn() => delay(1));
-                shield(static fn() => delay(1));
+                timeout(sec(1000), static fn() => delay(sec(1)));
+                shield(static fn() => delay(sec(1)));
             })->await();
-            delay(1);
+            delay(sec(1));
 
             $tasksScope = $onlyChild($body);
             $daemonsScope = $onlyChild($tasksScope);
@@ -742,7 +743,7 @@ final class GroupTest
                 $group->daemon(static function () use (&$references, $parent) {
                     $references['daemons'] = \WeakReference::create($parent());
                 });
-                delay(1);
+                delay(sec(1));
             });
         } finally {
             if ($gc) {

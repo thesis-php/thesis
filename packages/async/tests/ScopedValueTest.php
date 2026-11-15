@@ -7,6 +7,7 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Test;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ScopedValueTest
@@ -151,7 +152,7 @@ final class ScopedValueTest
 
         $observed = $value->with('request', static fn() => group(static function (Group $group) use ($value) {
             $handle = $group->spawn(static function () use ($value): ?string {
-                delay(1);
+                delay(sec(1));
 
                 return $value->get();
             });
@@ -202,17 +203,17 @@ final class ScopedValueTest
             $first = $group->spawn(static fn(): ?string => $value->with(
                 value: 'first',
                 fn: static function () use ($value): ?string {
-                    delay(2);
+                    delay(sec(2));
 
                     return $value->get();
                 },
             ));
             $second = $group->spawn(static function () use ($value): ?string {
-                delay(1);
+                delay(sec(1));
 
                 return $value->get();
             });
-            delay(1);
+            delay(sec(1));
             $inBody = $value->get();
 
             return [$first->await(), $second->await(), $inBody, $value->get()];
@@ -240,7 +241,7 @@ final class ScopedValueTest
         /** @var ScopedValue<?string> */
         $value = new ScopedValue();
 
-        $observed = $value->with('bound', static fn() => timeout(1000, static fn() => shield($value->get(...))));
+        $observed = $value->with('bound', static fn() => timeout(sec(1000), static fn() => shield($value->get(...))));
 
         Assert::same($observed, 'bound');
     }

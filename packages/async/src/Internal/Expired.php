@@ -7,6 +7,8 @@ namespace Thesis\Async\Internal;
 use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
 use Thesis\Async\TimedOut;
+use Time\Duration;
+use function Thesis\Time\toNs;
 
 /**
  * Runs a body under a deadline of its own and reports the expiry of exactly that deadline:
@@ -27,20 +29,16 @@ final readonly class Expired
      * @template T
      * @param callable(): T $body
      * @return T|self self only if the deadline cut $body short and the parent is not cancelled
-     * @throws \ValueError if $seconds is NAN
      */
-    public static function run(float $seconds, callable $body): mixed
+    public static function run(Duration $duration, callable $body): mixed
     {
-        if (is_nan($seconds)) {
-            throw new \ValueError('A deadline needs a number of seconds, got NAN.');
-        }
-
+        $timeout = toNs($duration);
         $parent = Scope::current();
-        $scope = new Scope($parent, timeout: $seconds);
+        $scope = new Scope($parent, timeout: $timeout);
         $timer = null;
 
-        if ($seconds > 0) {
-            $timer = EventLoop::delay($seconds, static function () use ($scope) {
+        if ($timeout > 0) {
+            $timer = EventLoop::delay($timeout / 1e9, static function () use ($scope) {
                 $scope->cancel();
             });
         } else {

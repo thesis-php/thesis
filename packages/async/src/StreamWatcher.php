@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Revolt\EventLoop;
+use Time\Duration;
+use function Thesis\Time\toSecFloat;
 
 /**
  * The waits on one stream, owned by whoever owns the stream, so that closing it can end them.
@@ -67,16 +69,11 @@ final class StreamWatcher
      *
      * @return bool true once the time has passed, false if {@see close()} has ended the wait or was called before
      * @throws Cancelled
-     * @throws \ValueError if $seconds is NAN
      */
-    public function delay(float $seconds): bool
+    public function delay(Duration $duration): bool
     {
-        if (is_nan($seconds)) {
-            throw new \ValueError('StreamWatcher::delay() needs a number of seconds, got NAN.');
-        }
-
         // Revolt rejects a negative delay.
-        $seconds = max(0.0, $seconds);
+        $seconds = max(0.0, toSecFloat($duration));
 
         return $this->wait(static fn(\Closure $callback) => EventLoop::delay($seconds, $callback));
     }

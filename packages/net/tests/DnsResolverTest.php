@@ -10,6 +10,8 @@ use Testo\Test;
 use Thesis\Async\Group;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class DnsResolverTest
@@ -108,7 +110,7 @@ final class DnsResolverTest
             $working = FakeDns::start($group, ['db.test' => self::a('10.0.0.1')]);
             $resolver = new DnsResolver(
                 nameservers: [$failing->address, $silent->address, $working->address],
-                timeout: 0.05,
+                timeout: ms(50),
             );
 
             return $resolver->resolve('db.test');
@@ -147,7 +149,7 @@ final class DnsResolverTest
             $resolver->resolve('db.test');
             $resolver->resolve('db.test');
             Assert::same(\count($dns->queries), 2);
-            delay(1.01);
+            delay(ms(1010));
             $resolver->resolve('db.test');
 
             return \count($dns->queries);
@@ -219,7 +221,7 @@ final class DnsResolverTest
                 nameservers: [$dns->address],
                 hosts: $hosts,
                 search: $search,
-                timeout: 1,
+                timeout: sec(1),
                 attempts: 1,
             );
 

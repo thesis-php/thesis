@@ -11,6 +11,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class DeferredTest
@@ -68,7 +69,7 @@ final class DeferredTest
                 $group->spawn(static fn() => thrown($deferred->await(...))),
                 $group->spawn(static fn() => thrown($deferred->await(...))),
             ];
-            delay(1);
+            delay(sec(1));
 
             $deferred->fail($failure);
 
@@ -91,7 +92,7 @@ final class DeferredTest
                 $awaiters[] = $group->spawn($deferred->await(...));
             }
 
-            delay(1);
+            delay(sec(1));
             $deferred->complete('value');
 
             return array_map(static fn(Task $awaiter) => $awaiter->await(), $awaiters);
@@ -135,7 +136,7 @@ final class DeferredTest
     {
         /** @var Deferred<string> */
         $deferred = new Deferred();
-        $cancelled = thrown(static fn() => timeout(1, never(...)))->getPrevious();
+        $cancelled = thrown(static fn() => timeout(sec(1), never(...)))->getPrevious();
         Assert::instanceOf($cancelled, Cancelled::class);
 
         $exception = thrown(static fn() => $deferred->fail($cancelled));
@@ -153,7 +154,7 @@ final class DeferredTest
         /** @var Deferred<string> */
         $deferred = new Deferred();
 
-        $exception = thrown(static fn() => timeout(1, $deferred->await(...)));
+        $exception = thrown(static fn() => timeout(sec(1), $deferred->await(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
         Assert::false($deferred->isDone);
@@ -167,9 +168,9 @@ final class DeferredTest
         $result = group(static function (Group $group) use ($deferred) {
             $cancelled = $group->spawn($deferred->await(...));
             $other = $group->spawn($deferred->await(...));
-            delay(1);
+            delay(sec(1));
             $cancelled->cancel();
-            delay(1);
+            delay(sec(1));
 
             $deferred->complete('value');
 
@@ -186,7 +187,7 @@ final class DeferredTest
 
         $result = group(static function (Group $group) use ($deferred) {
             $awaiter = $group->spawn($deferred->await(...));
-            delay(1);
+            delay(sec(1));
 
             $deferred->complete('value');
             $awaiter->cancel();
@@ -203,7 +204,7 @@ final class DeferredTest
         $deferred = new Deferred();
 
         for ($i = 0; $i < 3; ++$i) {
-            thrown(static fn() => timeout(1, $deferred->await(...)));
+            thrown(static fn() => timeout(sec(1), $deferred->await(...)));
         }
 
         Assert::same((fn(): array => $this->waiters)->call($deferred), []);
@@ -215,7 +216,7 @@ final class DeferredTest
         $deferred = new Deferred();
         $deferred->complete('value');
 
-        $result = timeout(1, static function () use ($deferred) {
+        $result = timeout(sec(1), static function () use ($deferred) {
             untilCancelled();
 
             return $deferred->await();
@@ -231,7 +232,7 @@ final class DeferredTest
         /** @var Deferred<string> */
         $deferred = new Deferred();
 
-        timeout(1, static function () use ($deferred) {
+        timeout(sec(1), static function () use ($deferred) {
             untilCancelled();
 
             $deferred->await();

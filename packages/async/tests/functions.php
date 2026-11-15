@@ -13,8 +13,9 @@ use Revolt\EventLoop;
 use Testo\Assert;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
-use function Thesis\Async\now;
+use Thesis\Async\Instant;
 use function Thesis\Async\suspend;
+use function Thesis\Time\toSecFloat;
 
 /**
  * A wait that only a cancellation ends. It registers nothing, so it does not keep the loop alive:
@@ -81,18 +82,22 @@ function withoutWarnings(callable $fn): mixed
 }
 
 /**
- * Runs $fn and measures how long it took on the clock of deadlines. What $fn throws goes through:
+ * Instant::elapsed() in float seconds, so that a test asserts it with Assert::same(). What $fn throws goes through:
  * a test that expects an exception catches it inside $fn with thrown() and checks it.
  *
  * @param callable(): mixed $fn
- * @return float seconds
  */
 function elapsed(callable $fn): float
 {
-    $start = now();
-    $fn();
+    return toSecFloat(Instant::elapsed($fn));
+}
 
-    return now() - $start;
+/**
+ * The time elapsed since $start in float seconds, so that a test asserts it with Assert::same().
+ */
+function secondsSince(Instant $start): float
+{
+    return toSecFloat(Instant::now()->since($start));
 }
 
 /**

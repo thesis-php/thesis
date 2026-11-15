@@ -13,6 +13,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class SuspendTest
@@ -169,7 +170,7 @@ final class SuspendTest
         $calls = 0;
 
         thrown(static function () use (&$calls) {
-            timeout(1, static function () use (&$calls) {
+            timeout(sec(1), static function () use (&$calls) {
                 suspend(static function (Continuation $continuation) use (&$calls) {
                     return static function () use (&$calls) {
                         ++$calls;
@@ -208,7 +209,7 @@ final class SuspendTest
         $continuation = null;
 
         $exception = thrown(static function () use (&$continuation) {
-            timeout(1, static function () use (&$continuation) {
+            timeout(sec(1), static function () use (&$continuation) {
                 suspend(static function (Continuation $c) use (&$continuation) {
                     $continuation = $c;
                 });
@@ -226,7 +227,7 @@ final class SuspendTest
         $registered = false;
 
         $exception = thrown(static function () use (&$registered) {
-            timeout(1, static function () use (&$registered) {
+            timeout(sec(1), static function () use (&$registered) {
                 untilCancelled();
 
                 suspend(static function (Continuation $continuation) use (&$registered) {
@@ -252,7 +253,7 @@ final class SuspendTest
                 $received[] = 'returned';
                 suspend(static function (Continuation $continuation) {});
             });
-            delay(1);
+            delay(sec(1));
 
             /** @var Continuation<mixed> $continuation */
             $continuation->resume('message');
@@ -265,7 +266,7 @@ final class SuspendTest
     public function cancelledTracePointsAtInterruptedWait(): void
     {
         $exception = thrown(static function () {
-            timeout(1, static function () {
+            timeout(sec(1), static function () {
                 suspend(static function (Continuation $continuation) {});
             });
         });
@@ -280,7 +281,7 @@ final class SuspendTest
     public function leavesNoCallbacks(): void
     {
         thrown(static function () {
-            timeout(1, static function () {
+            timeout(sec(1), static function () {
                 suspend(static function (Continuation $continuation) {
                     $timer = EventLoop::delay(10_000, static function () use ($continuation) {
                         $continuation->resume();
@@ -298,7 +299,7 @@ final class SuspendTest
 
     public function throwOfCancelledIsRejected(): void
     {
-        $cancelled = thrown(static fn() => timeout(1, never(...)))->getPrevious();
+        $cancelled = thrown(static fn() => timeout(sec(1), never(...)))->getPrevious();
         Assert::instanceOf($cancelled, Cancelled::class);
         $rejection = null;
 

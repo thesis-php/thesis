@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class EachAndMapTest
@@ -19,7 +20,7 @@ final class EachAndMapTest
         $calls = [];
 
         each(['a' => 1, 'b' => 2, 'c' => 3], 2, static function () use (&$calls) {
-            delay(1);
+            delay(sec(1));
             $calls[] = \func_get_args();
         });
 
@@ -48,7 +49,7 @@ final class EachAndMapTest
 
         each(range(1, 10), $concurrency, static function () use (&$running, &$peak) {
             $peak = max($peak, ++$running);
-            delay(1);
+            delay(sec(1));
             --$running;
         });
 
@@ -59,14 +60,14 @@ final class EachAndMapTest
     {
         $pages = (static function () {
             foreach ([1, 2, 3] as $page) {
-                delay(1); // fetch the next page
+                delay(sec(1)); // fetch the next page
                 yield $page;
             }
         })();
         $processed = [];
 
         each($pages, 2, static function (int $page) use (&$processed) {
-            delay(2);
+            delay(sec(2));
             $processed[] = $page;
         });
 
@@ -142,8 +143,8 @@ final class EachAndMapTest
         // Both workers are busy until item 1 is done, so item 3 waits for that.
         each($items, 2, static function (int $item) use (&$events) {
             match ($item) {
-                1 => delay(1),
-                2 => delay(2),
+                1 => delay(sec(1)),
+                2 => delay(sec(2)),
                 default => null,
             };
 
@@ -173,7 +174,7 @@ final class EachAndMapTest
 
         each(range(1, 10), 3, static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
-            delay(1);
+            delay(sec(1));
         });
 
         Assert::same($fibers->count(), 3);
@@ -185,7 +186,7 @@ final class EachAndMapTest
 
         each([1, 2], 100, static function () use ($fibers) {
             $fibers->offsetSet(\Fiber::getCurrent());
-            delay(1);
+            delay(sec(1));
         });
 
         Assert::same($fibers->count(), 2);
@@ -206,7 +207,7 @@ final class EachAndMapTest
     {
         $pages = (static function () {
             foreach (range(1, 6) as $page) {
-                delay(1);
+                delay(sec(1));
 
                 yield $page;
             }
@@ -238,7 +239,7 @@ final class EachAndMapTest
         $exception = thrown(static function () use (&$pulled) {
             each(self::recordPulls(range(1, 5), $pulled), 3, static function (int $item) {
                 match ($item) {
-                    1 => delay(1),
+                    1 => delay(sec(1)),
                     default => throw new \RuntimeException("item {$item} failed"),
                 };
             });
@@ -304,7 +305,7 @@ final class EachAndMapTest
             $peak = max($peak, ++$running);
 
             if ($item > 0) {
-                delay(1);
+                delay(sec(1));
             }
 
             --$running;
@@ -317,13 +318,13 @@ final class EachAndMapTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => each([1, 2], 2, never(...)));
+        timeout(sec(1), static fn() => each([1, 2], 2, never(...)));
     }
 
     public function mapReturnsResultsWithKeysInInputOrder(): void
     {
         $results = map(['x' => 3, 'y' => 1, 'z' => 2], 3, static function (int $seconds) {
-            delay($seconds);
+            delay(sec($seconds));
 
             return $seconds * 10;
         });
@@ -334,7 +335,7 @@ final class EachAndMapTest
     public function mapKeepsInputOrderWhenWorkersTakeItemsOutOfOrder(): void
     {
         $results = map(['a' => 4, 'b' => 1, 'c' => 1, 'd' => 2, 'e' => 1], 2, static function (int $seconds) {
-            delay($seconds);
+            delay(sec($seconds));
 
             return $seconds;
         });
@@ -380,6 +381,6 @@ final class EachAndMapTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => map([1, 2], 2, never(...)));
+        timeout(sec(1), static fn() => map([1, 2], 2, never(...)));
     }
 }

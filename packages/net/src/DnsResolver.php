@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
+use Thesis\Async\Instant;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
@@ -12,11 +13,12 @@ use Thesis\Net\Internal\Dns\Cached;
 use Thesis\Net\Internal\Dns\Message;
 use Thesis\Net\Internal\Dns\Response;
 use Thesis\Net\Internal\Dns\SystemConfig;
+use Time\Duration;
 use function Thesis\Async\allSettled;
-use function Thesis\Async\now;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Net\Internal\asciiHost;
 use function Thesis\Net\Internal\lastError;
+use function Thesis\Time\sec;
 
 /**
  * A stub resolver, like the one of glibc, that never blocks the event loop: /etc/hosts first, then A and AAAA queries
@@ -58,7 +60,7 @@ final class DnsResolver implements Resolver
             hosts: $config->hosts,
             search: $config->search,
             ndots: $config->ndots,
-            timeout: $config->timeout,
+            timeout: sec($config->timeout),
             attempts: $config->attempts,
         );
     }
@@ -68,13 +70,15 @@ final class DnsResolver implements Resolver
      */
     private array $cache = [];
 
+    private readonly Duration $timeout;
+
     /**
      * @param non-empty-list<InetAddress> $nameservers asked in this order, the next one if a server fails or is silent
      * @param array<non-empty-string, non-empty-list<non-empty-string>> $hosts lower-case host name => its addresses,
      *     as in /etc/hosts
      * @param list<non-empty-string> $search domains appended to a name with fewer than $ndots dots
      * @param non-negative-int $ndots
-     * @param float $timeout seconds to wait for one server to answer
+     * @param ?Duration $timeout how long to wait for one server to answer, 5 seconds if null
      * @param positive-int $attempts rounds over the servers
      */
     public function __construct(
@@ -82,9 +86,12 @@ final class DnsResolver implements Resolver
         private readonly array $hosts = [],
         private readonly array $search = [],
         private readonly int $ndots = 1,
-        private readonly float $timeout = 5,
+        ?Duration $timeout = null,
         private readonly int $attempts = 2,
-    ) {}
+    ) {
+        // A default value cannot call a function or a static method.
+        $this->timeout = $timeout ?? sec(5);
+    }
 
     /**
      * IPv6 addresses come first: {@see connect()} alternates the families anyway, starting with the first one.
@@ -115,7 +122,7 @@ final class DnsResolver implements Resolver
 
         $cached = $this->cache[$name] ?? null;
 
-        if ($cached !== null && $cached->expiresAt > now()) {
+        if ($cached !== null && $cached->expiresAt > Instant::now()) {
             return $cached->addresses;
         }
 
@@ -323,6 +330,6 @@ final class DnsResolver implements Resolver
             unset($this->cache[array_key_first($this->cache)]);
         }
 
-        $this->cache[$name] = new Cached(addresses: $addresses, expiresAt: now() + min($ttl, self::MAX_TTL));
+        $this->cache[$name] = new Cached(addresses: $addresses, expiresAt: Instant::now()->add(sec(min($ttl, self::MAX_TTL))));
     }
 }

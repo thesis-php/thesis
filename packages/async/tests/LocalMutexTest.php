@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use function Thesis\Time\sec;
 
 #[Test]
 final class LocalMutexTest
@@ -20,7 +21,7 @@ final class LocalMutexTest
                 $group->spawn(static function () use ($mutex, $name, &$log) {
                     synchronized($mutex, static function () use ($name, &$log) {
                         $log[] = $name . ' in';
-                        delay(1);
+                        delay(sec(1));
                         $log[] = $name . ' out';
                     });
                 });
@@ -38,7 +39,7 @@ final class LocalMutexTest
             $log = [];
             $lock = $mutex->acquire();
             $group->spawn(static function () use ($lock, &$log) {
-                delay(1);
+                delay(sec(1));
                 $log[] = 'released';
                 $lock->release();
             });

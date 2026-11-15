@@ -14,6 +14,8 @@ use function Thesis\Async\all;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class TlsTest
@@ -59,13 +61,13 @@ final class TlsTest
     {
         [$client, $server] = self::handshake(self::server('server.test'), self::trusting('server.test'));
         $server->close();
-        delay(0.01);
+        delay(ms(10));
         Expect::exception(WriteFailed::class)->withMessageContaining('Broken pipe');
 
         // OpenSSL reports a broken pipe as a write of 0 bytes with a warning, not as false
-        timeout(1, static function () use ($client) {
+        timeout(sec(1), static function () use ($client) {
             $client->write('x');
-            delay(0.01);
+            delay(ms(10));
             $client->write('x');
         });
     }
@@ -160,7 +162,7 @@ final class TlsTest
         $tls = new ClientTls(peerName: 'server.test');
 
         try {
-            timeout(0.05, static fn() => $client->enableTls($tls));
+            timeout(ms(50), static fn() => $client->enableTls($tls));
             Assert::fail('Expected TimedOut.');
         } catch (TimedOut) {
         }
@@ -176,7 +178,7 @@ final class TlsTest
 
         group(static function (Group $group) use ($client, $server) {
             $group->spawn(static function () use ($server) {
-                delay(0.01);
+                delay(ms(10));
                 $server->close();
             });
             $client->enableTls(new ClientTls(peerName: 'server.test'));

@@ -12,13 +12,14 @@ use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\VirtualTime\advance;
+use function Thesis\Time\sec;
 
 #[Test]
 final class DelayAndCheckpointTest
 {
     public function delayWaitsGivenTime(): void
     {
-        Assert::same(elapsed(static fn() => delay(20)), 20.0);
+        Assert::same(elapsed(static fn() => delay(sec(20))), 20.0);
         assertNoCallbacksLeft();
     }
 
@@ -27,7 +28,7 @@ final class DelayAndCheckpointTest
         $exception = null;
 
         $elapsed = elapsed(static function () use (&$exception) {
-            $exception = thrown(static fn() => timeout(1, static fn() => delay(10_000)));
+            $exception = thrown(static fn() => timeout(sec(1), static fn() => delay(sec(10_000))));
         });
 
         Assert::instanceOf($exception, TimedOut::class);
@@ -37,7 +38,7 @@ final class DelayAndCheckpointTest
 
     public function delayOfZeroOrLessWaitsAsZero(): void
     {
-        foreach ([0.0, -1.0, -INF] as $seconds) {
+        foreach ([0, -1] as $seconds) {
             $order = [];
 
             group(static function (Group $group) use ($seconds, &$order) {
@@ -46,7 +47,7 @@ final class DelayAndCheckpointTest
                 });
 
                 $order[] = 'before';
-                Assert::same(elapsed(static fn() => delay($seconds)), 0.0);
+                Assert::same(elapsed(static fn() => delay(sec($seconds))), 0.0);
                 $order[] = 'after';
             });
 
@@ -57,20 +58,13 @@ final class DelayAndCheckpointTest
 
     public function delayOfZeroOrLessIsCancellationPoint(): void
     {
-        $exception = thrown(static fn() => timeout(1, static function () {
+        $exception = thrown(static fn() => timeout(sec(1), static function () {
             untilCancelled();
 
-            delay(-1);
+            delay(sec(-1));
         }));
 
         Assert::instanceOf($exception, TimedOut::class);
-    }
-
-    public function delayRejectsNan(): void
-    {
-        Expect::exception(\ValueError::class);
-
-        delay(NAN);
     }
 
     public function delayLetsOtherTasksRun(): void
@@ -79,11 +73,11 @@ final class DelayAndCheckpointTest
 
         group(static function (Group $group) use (&$events) {
             $group->spawn(static function () use (&$events) {
-                delay(20);
+                delay(sec(20));
                 $events[] = 'slow';
             });
             $group->spawn(static function () use (&$events) {
-                delay(1);
+                delay(sec(1));
                 $events[] = 'fast';
             });
         });
@@ -102,7 +96,7 @@ final class DelayAndCheckpointTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static function () {
+        timeout(sec(1), static function () {
             untilCancelled();
 
             checkpoint();
@@ -130,10 +124,10 @@ final class DelayAndCheckpointTest
         $iterations = 0;
 
         $exception = thrown(static function () use (&$iterations) {
-            timeout(5, static function () use (&$iterations) {
+            timeout(sec(5), static function () use (&$iterations) {
                 while ($iterations < 1000) {
                     ++$iterations;
-                    advance(1);
+                    advance(sec(1));
                     checkpoint();
                 }
             });

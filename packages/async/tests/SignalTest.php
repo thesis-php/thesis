@@ -11,6 +11,7 @@ use Thesis\Async\Internal\SignalTrapImpl;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class SignalTest
@@ -56,7 +57,7 @@ final class SignalTest
         Expect::exception(TimedOut::class);
 
         try {
-            timeout(1, static fn() => awaitSignal(SIGUSR1));
+            timeout(sec(1), static fn() => awaitSignal(SIGUSR1));
         } finally {
             assertNoCallbacksLeft();
         }
@@ -122,9 +123,9 @@ final class SignalTest
         $received = trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
             self::kill(SIGUSR1); // nobody receives yet: pending
             self::kill(SIGUSR1); // merged with the pending one, and the process survives
-            delay(1); // the handler runs at the next tick
+            delay(sec(1)); // the handler runs at the next tick
             $received = $trap->receive();
-            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
+            $nothingMore = thrown(static fn() => timeout(sec(5), $trap->receive(...)));
 
             return $received;
         });
@@ -156,7 +157,7 @@ final class SignalTest
             $group->daemon(static function () use (&$reloads) {
                 trapSignals([SIGUSR1], static function (SignalTrap $trap) use (&$reloads) {
                     foreach ($trap as $_) {
-                        delay(5); // the next signal comes during this reload
+                        delay(sec(5)); // the next signal comes during this reload
                         ++$reloads;
                     }
                 });
@@ -164,7 +165,7 @@ final class SignalTest
 
             self::kill(SIGUSR1);
             self::kill(SIGUSR1);
-            delay(20);
+            delay(sec(20));
         });
 
         Assert::same($reloads, 2);
@@ -179,7 +180,7 @@ final class SignalTest
             $cancelled = $group->spawn(static fn() => $trap->receive());
             $other = $group->spawn(static fn() => $trap->receive());
             $group->spawn(static function () use ($cancelled) {
-                delay(1);
+                delay(sec(1));
                 $cancelled->cancel();
                 posix_kill(posix_getpid(), SIGUSR1);
             });
@@ -198,7 +199,7 @@ final class SignalTest
         $received = trapSignals([SIGUSR1, SIGUSR1], static function (SignalTrap $trap) use (&$nothingMore) {
             self::kill(SIGUSR1);
             $received = $trap->receive();
-            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
+            $nothingMore = thrown(static fn() => timeout(sec(5), $trap->receive(...)));
 
             return $received;
         });
@@ -215,7 +216,7 @@ final class SignalTest
         ) use ($trap) {
             $cancelled = $group->spawn(static fn() => $trap->receive());
             $other = $group->spawn(static fn() => $trap->receive());
-            delay(1);
+            delay(sec(1));
 
             // The loop runs the cancelled fiber, which leaves the queue, before the next signal callback:
             // only a signal caught right after the cancellation, in the same tick, meets a receiver that refuses it.
@@ -225,7 +226,7 @@ final class SignalTest
 
             Assert::instanceOf(thrown($cancelled->await(...)), TaskCancelled::class);
 
-            return timeout(1, $other->await(...));
+            return timeout(sec(1), $other->await(...));
         }));
 
         Assert::same($received, SIGUSR1);
@@ -254,7 +255,7 @@ final class SignalTest
 
                     $events[] = 'trap released';
                 });
-                delay(1); // the receiver waits
+                delay(sec(1)); // the receiver waits
             });
         });
 
@@ -272,7 +273,7 @@ final class SignalTest
                 $trap->receive();
             });
 
-            $nothingMore = thrown(static fn() => timeout(5, $trap->receive(...)));
+            $nothingMore = thrown(static fn() => timeout(sec(5), $trap->receive(...)));
         });
 
         Assert::instanceOf($nothingMore, TimedOut::class);
@@ -282,7 +283,7 @@ final class SignalTest
     {
         trapSignals([SIGUSR1], static function (SignalTrap $trap) {
             try {
-                timeout(1, $trap->receive(...));
+                timeout(sec(1), $trap->receive(...));
             } catch (TimedOut) {
             }
 
@@ -312,7 +313,7 @@ final class SignalTest
      */
     private static function kill(int $signal): void
     {
-        delay(1);
+        delay(sec(1));
         posix_kill(posix_getpid(), $signal);
     }
 }

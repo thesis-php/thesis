@@ -11,6 +11,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class StreamWatcherTest
@@ -22,7 +23,7 @@ final class StreamWatcherTest
 
         $elapsed = group(static function (Group $group) use ($watcher, $writer) {
             $group->spawn(static function () use ($writer) {
-                delay(10);
+                delay(sec(10));
                 fwrite($writer, 'ping');
             });
 
@@ -49,7 +50,7 @@ final class StreamWatcherTest
         $exception = null;
 
         $elapsed = elapsed(static function () use ($watcher, &$exception) {
-            $exception = thrown(static fn() => timeout(1, $watcher->readable(...)));
+            $exception = thrown(static fn() => timeout(sec(1), $watcher->readable(...)));
         });
 
         Assert::instanceOf($exception, TimedOut::class);
@@ -66,10 +67,10 @@ final class StreamWatcherTest
             $handles = [
                 $group->spawn($watcher->readable(...)),
                 $group->spawn($watcher->writable(...)),
-                $group->spawn(static fn() => $watcher->delay(100)),
+                $group->spawn(static fn() => $watcher->delay(sec(100))),
             ];
 
-            delay(1);
+            delay(sec(1));
             $watcher->close();
             fclose($pair[0]);
 
@@ -88,7 +89,7 @@ final class StreamWatcherTest
 
         $elapsed = group(static function (Group $group) use ($watcher) {
             $group->spawn(static function () use ($watcher) {
-                delay(3);
+                delay(sec(3));
                 $watcher->close();
             });
 
@@ -109,7 +110,7 @@ final class StreamWatcherTest
         $elapsed = elapsed(static function () use ($watcher) {
             Assert::false($watcher->readable());
             Assert::false($watcher->writable());
-            Assert::false($watcher->delay(10));
+            Assert::false($watcher->delay(sec(10)));
         });
 
         Assert::same($elapsed, 0.0);
@@ -122,7 +123,7 @@ final class StreamWatcherTest
         $watcher = new StreamWatcher($reader);
         $watcher->close();
 
-        $readable = timeoutOr(1, static function () use ($watcher) {
+        $readable = timeoutOr(sec(1), static function () use ($watcher) {
             untilCancelled();
 
             return $watcher->readable();
@@ -156,7 +157,7 @@ final class StreamWatcherTest
         $delayed = null;
 
         $elapsed = elapsed(static function () use ($watcher, &$delayed) {
-            $delayed = $watcher->delay(20);
+            $delayed = $watcher->delay(sec(20));
         });
 
         Assert::true($delayed);
@@ -169,16 +170,7 @@ final class StreamWatcherTest
         [$reader] = self::pair();
         $watcher = new StreamWatcher($reader);
 
-        Assert::same(elapsed(static fn() => Assert::true($watcher->delay(-1))), 0.0);
-    }
-
-    public function delayRejectsNan(): void
-    {
-        [$reader] = self::pair();
-
-        Expect::exception(\ValueError::class);
-
-        new StreamWatcher($reader)->delay(NAN);
+        Assert::same(elapsed(static fn() => Assert::true($watcher->delay(sec(-1)))), 0.0);
     }
 
     public function delayIsCancelledByTaskTree(): void
@@ -188,7 +180,7 @@ final class StreamWatcherTest
 
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => $watcher->delay(100));
+        timeout(sec(1), static fn() => $watcher->delay(sec(100)));
     }
 
     public function readableReturnsForStreamWithBytes(): void
@@ -206,7 +198,7 @@ final class StreamWatcherTest
         fwrite($writer, 'ping');
         $watcher = new StreamWatcher($reader);
 
-        $exception = thrown(static fn() => timeout(1, static function () use ($watcher) {
+        $exception = thrown(static fn() => timeout(sec(1), static function () use ($watcher) {
             untilCancelled();
 
             $watcher->readable();

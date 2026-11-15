@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Thesis\Async\Internal\Scope;
+use function Thesis\Time\ns;
+
 /**
  * In-process {@see RateLimiter}: a token bucket. It holds up to $burst tokens and gains $perSecond of them a second;
  * a call takes one. After a pause, $burst calls start at once, then one every 1 / $perSecond seconds.
@@ -11,7 +14,7 @@ namespace Thesis\Async;
  * For a server that rejects more than N calls in any T seconds, use {@see LocalSlidingWindowRateLimiter}.
  *
  * There is no timer that refills the bucket and no clock read until the first call: the limiter keeps the absolute
- * time at which the bucket would be full again, and a call compares it with the clock ({@see now()}).
+ * time at which the bucket would be full again, and a call compares it with the clock ({@see Instant::now()}).
  * Callers queue on a {@see LocalMutex}, so it is fair in the same way: tokens go in the order of arrival,
  * and only the first in the queue sleeps until the next token. A caller cancelled while queued or sleeping
  * takes no token, and the next one gets it on time.
@@ -26,12 +29,12 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
     private readonly LocalMutex $mutex;
 
     /**
-     * @var float the time the counting started at: when the bucket was last full
+     * @var int the time the counting started at, in nanoseconds of the clock: when the bucket was last full
      */
-    private float $fullAt = -INF;
+    private int $fullAt = PHP_INT_MIN;
 
     /**
-     * @var non-negative-int tokens taken since then; the bucket is full again at fullAt + taken / perSecond
+     * @var non-negative-int tokens taken since then; the bucket is full again at {@see tokenAt()} of them
      */
     private int $taken = 0;
 
@@ -59,25 +62,34 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
         $lock = $this->mutex->acquire();
 
         try {
-            $now = now();
+            $now = Scope::now();
 
-            if ($this->fullAt + $this->taken / $this->perSecond <= $now) {
+            if ($this->tokenAt($this->taken) <= $now) {
                 $this->fullAt = $now;
                 $this->taken = 0;
             }
 
-            // Each token has an absolute time computed afresh, so float errors do not add up. The caller sleeps once
-            // and does not compare the clock again: a wake-up a hair early, as float rounding may cause, would loop
-            // on a delay too small to move the clock. A cancelled delay() throws before the token is taken.
-            $wait = $this->fullAt + ($this->taken - $this->burst + 1) / $this->perSecond - $now;
+            // The caller sleeps once and does not compare the clock again: Revolt's timers are float seconds,
+            // and a wake-up a hair early would loop on a delay too small to move the clock.
+            // A cancelled delay() throws before the token is taken.
+            $wait = $this->tokenAt($this->taken - $this->burst + 1) - $now;
 
             if ($wait > 0) {
-                delay($wait);
+                delay(ns($wait));
             }
 
             ++$this->taken;
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * When the $tokens-th token after {@see $fullAt} comes. Computed afresh from $fullAt, so the rounding of a token
+     * interval that is not a whole number of nanoseconds does not add up.
+     */
+    private function tokenAt(int $tokens): int
+    {
+        return $this->fullAt + (int) round($tokens * 1e9 / $this->perSecond);
     }
 }

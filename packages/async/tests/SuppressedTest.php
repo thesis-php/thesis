@@ -9,6 +9,7 @@ use Testo\Test;
 use Thesis\Async\Internal\Suppressed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class SuppressedTest
@@ -50,7 +51,7 @@ final class SuppressedTest
         $exception = thrown(static function () use ($first, &$rollback) {
             group(static function (Group $group) use ($first, &$rollback) {
                 $group->spawn(static function () use ($first) {
-                    delay(1);
+                    delay(sec(1));
 
                     throw $first;
                 });
@@ -58,7 +59,7 @@ final class SuppressedTest
                     try {
                         never();
                     } catch (\Throwable $exception) {
-                        shield(static fn() => delay(1));
+                        shield(static fn() => delay(sec(1)));
 
                         throw $rollback = new \LogicException('rollback failed', previous: $exception);
                     }
@@ -124,7 +125,7 @@ final class SuppressedTest
                 });
                 $group->spawn(static fn() => $failing->await()); // rethrows $second
 
-                delay(1);
+                delay(sec(1));
                 $go->complete(null);
             });
         });
@@ -147,7 +148,7 @@ final class SuppressedTest
                 $group->spawn(static function () use ($shared, &$b) {
                     group(static function (Group $inner) use ($shared, &$b) {
                         $inner->spawn(static function () use (&$b) {
-                            delay(1);
+                            delay(sec(1));
 
                             throw $b = new \RuntimeException('b');
                         });
@@ -161,7 +162,7 @@ final class SuppressedTest
                     });
                 });
 
-                delay(2);
+                delay(sec(2));
                 $shared->fail($a);
             });
         });
@@ -195,7 +196,7 @@ final class SuppressedTest
         $exception = thrown(static function () use (&$innerSecond) {
             group(static function (Group $group) use (&$innerSecond) {
                 $group->spawn(static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('outer first');
                 });
@@ -239,7 +240,7 @@ final class SuppressedTest
             group(static function (Group $group) use ($never, $failure) {
                 $group->spawn(static fn() => shield($never->await(...)));
                 $group->spawn(static function () use ($failure) {
-                    delay(1);
+                    delay(sec(1));
 
                     throw $failure;
                 });
@@ -254,7 +255,7 @@ final class SuppressedTest
 
         // let the orphaned task finish
         $never->complete();
-        delay(0);
+        delay(sec(0));
     }
 
     public function deadlockIsNotSuppressedBySameDeadlock(): void
@@ -275,7 +276,7 @@ final class SuppressedTest
         Assert::same(suppressed($exception), []);
 
         $never->complete();
-        delay(0);
+        delay(sec(0));
     }
 
     public function entryGoesAwayWithError(): void
@@ -311,7 +312,7 @@ final class SuppressedTest
                 });
             }
 
-            delay(1);
+            delay(sec(1));
             $go->complete(null);
         });
     }

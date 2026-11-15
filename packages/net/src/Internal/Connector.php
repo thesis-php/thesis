@@ -11,6 +11,7 @@ use Thesis\Net\ConnectFailed;
 use Thesis\Net\Socket;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\sec;
 
 /**
  * @internal
@@ -87,7 +88,7 @@ final readonly class Connector
                     while ($running > 0) {
                         $outcome = $i === $last
                             ? $outcomes->receive()
-                            : timeoutOr(self::ATTEMPT_DELAY, $outcomes->receive(...));
+                            : timeoutOr(sec(self::ATTEMPT_DELAY), $outcomes->receive(...));
 
                         if ($outcome === null) {
                             break;

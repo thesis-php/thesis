@@ -16,9 +16,9 @@ final class VirtualTimer
     public bool $referenced = true;
 
     /**
-     * when it is due, while it waits in the driver's queue.
+     * when it is due, in nanoseconds of the clock, while it waits in the driver's queue.
      */
-    public float $expiration = 0.0;
+    public int $expiration = 0;
 
     /**
      * outdates the entries of the driver's queue that do not match.
@@ -31,11 +31,12 @@ final class VirtualTimer
     public ?string $firingCallbackId = null;
 
     /**
+     * @param int $interval in nanoseconds
      * @param \Closure(string): mixed $callback
      */
     public function __construct(
         public readonly string $callbackId,
-        public readonly float $interval,
+        public readonly int $interval,
         public readonly \Closure $callback,
         public readonly bool $repeat,
     ) {}

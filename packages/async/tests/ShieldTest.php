@@ -9,6 +9,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ShieldTest
@@ -23,12 +24,12 @@ final class ShieldTest
         $cleanedUp = false;
 
         $exception = thrown(static function () use (&$cleanedUp) {
-            timeout(1, static function () use (&$cleanedUp) {
+            timeout(sec(1), static function () use (&$cleanedUp) {
                 try {
                     never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
-                        delay(5);
+                        delay(sec(5));
                         $cleanedUp = true;
                     });
                 }
@@ -44,14 +45,14 @@ final class ShieldTest
         $cleanedUp = false;
 
         thrown(static function () use (&$cleanedUp) {
-            timeout(1, static function () use (&$cleanedUp) {
+            timeout(sec(1), static function () use (&$cleanedUp) {
                 try {
                     never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
                         group(static function (Group $group) use (&$cleanedUp) {
                             $group->spawn(static function () use (&$cleanedUp) {
-                                delay(5);
+                                delay(sec(5));
                                 $cleanedUp = true;
                             });
                         });
@@ -70,7 +71,7 @@ final class ShieldTest
         $exception = thrown(static function () use (&$cleanedUp) {
             group(static function (Group $group) use (&$cleanedUp) {
                 $group->spawn(static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('task failed');
                 });
@@ -79,7 +80,7 @@ final class ShieldTest
                     never();
                 } finally {
                     shield(static function () use (&$cleanedUp) {
-                        delay(5);
+                        delay(sec(5));
                         $cleanedUp = true;
                     });
                 }
@@ -93,10 +94,10 @@ final class ShieldTest
     public function outerCancellationIsVisibleAgainAfterShield(): void
     {
         $exception = thrown(static function () {
-            timeout(1, static function () {
+            timeout(sec(1), static function () {
                 untilCancelled();
 
-                shield(static fn() => delay(1));
+                shield(static fn() => delay(sec(1)));
                 never();
             });
         });
@@ -107,7 +108,7 @@ final class ShieldTest
     public function deadlineInsideShieldStillWorks(): void
     {
         $exception = thrown(static function () {
-            shield(static fn() => timeout(1, never(...)));
+            shield(static fn() => timeout(sec(1), never(...)));
         });
 
         Assert::instanceOf($exception, TimedOut::class);
@@ -118,11 +119,11 @@ final class ShieldTest
         $inner = null;
 
         thrown(static function () use (&$inner) {
-            timeout(1, static function () use (&$inner) {
+            timeout(sec(1), static function () use (&$inner) {
                 try {
                     never();
                 } finally {
-                    $inner = thrown(static fn() => shield(static fn() => timeout(1, never(...))));
+                    $inner = thrown(static fn() => shield(static fn() => timeout(sec(1), never(...))));
                 }
             });
         });

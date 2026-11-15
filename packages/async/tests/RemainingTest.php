@@ -9,6 +9,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\VirtualTime\advance;
+use function Thesis\Time\sec;
 
 #[Test]
 final class RemainingTest
@@ -21,65 +22,65 @@ final class RemainingTest
 
     public function isTimeLeftUnderTimeout(): void
     {
-        $remaining = timeout(1000, static function () {
-            delay(10);
+        $remaining = timeout(sec(1000), static function () {
+            delay(sec(10));
 
             return remaining();
         });
 
-        Assert::same($remaining, 990.0);
+        Assert::equals($remaining, sec(990));
     }
 
     public function decreasesWhileTimeGoesBy(): void
     {
-        [$before, $after] = timeout(1000, static function () {
+        [$before, $after] = timeout(sec(1000), static function () {
             $before = remaining();
-            advance(2);
+            advance(sec(2));
 
             return [$before, remaining()];
         });
 
-        Assert::same([$before, $after], [1000.0, 998.0]);
+        Assert::equals([$before, $after], [sec(1000), sec(998)]);
     }
 
     public function nestedTimeoutWithLaterDeadlineShowsParentOne(): void
     {
-        $remaining = timeout(500, static fn() => timeout(10_000, remaining(...)));
+        $remaining = timeout(sec(500), static fn() => timeout(sec(10_000), remaining(...)));
 
-        Assert::same($remaining, 500.0);
+        Assert::equals($remaining, sec(500));
     }
 
     public function nestedTimeoutWithEarlierDeadlineShowsItsOwn(): void
     {
-        [$inner, $outer] = timeout(10_000, static fn() => [timeout(500, remaining(...)), remaining()]);
+        [$inner, $outer] = timeout(sec(10_000), static fn() => [timeout(sec(500), remaining(...)), remaining()]);
 
-        Assert::same([$inner, $outer], [500.0, 10_000.0]);
+        Assert::equals([$inner, $outer], [sec(500), sec(10_000)]);
     }
 
     public function isNullInsideShield(): void
     {
-        $remaining = timeout(1000, static fn() => shield(remaining(...)));
+        $remaining = timeout(sec(1000), static fn() => shield(remaining(...)));
 
         Assert::null($remaining);
     }
 
     public function timeoutInsideShieldShowsOnlyItsOwn(): void
     {
-        $remaining = timeout(500, static fn() => shield(static fn() => timeout(10_000, remaining(...))));
+        $remaining = timeout(sec(500), static fn() => shield(static fn() => timeout(sec(10_000), remaining(...))));
 
-        Assert::same($remaining, 10_000.0);
+        Assert::equals($remaining, sec(10_000));
     }
 
     public function taskSeesDeadlineOfItsGroup(): void
     {
-        $remaining = timeout(500, static fn() => group(static function (Group $group) {
+        $remaining = timeout(sec(500), static fn() => group(static function (Group $group) {
             $daemon = $group->daemon(remaining(...));
             $handle = $group->spawn(remaining(...));
 
             return [$handle->await(), $daemon->await()];
         }));
 
-        Assert::same($remaining, [500.0, 500.0]);
+        Assert::equals($remaining, [sec(500), sec(500)]);
     }
 
     public function isZeroOnceDeadlinePassedBeforeTimerFired(): void
@@ -87,19 +88,19 @@ final class RemainingTest
         $observed = null;
 
         thrown(static function () use (&$observed) {
-            timeout(1, static function () use (&$observed) {
-                advance(2);
+            timeout(sec(1), static function () use (&$observed) {
+                advance(sec(2));
                 $observed = [remaining(), isCancelled()];
                 never();
             });
         });
 
-        Assert::same($observed, [0.0, false]);
+        Assert::equals($observed, [sec(0), false]);
     }
 
     public function isGoneAfterTimeoutReturns(): void
     {
-        timeout(1000, static fn() => null);
+        timeout(sec(1000), static fn() => null);
 
         Assert::null(remaining());
     }

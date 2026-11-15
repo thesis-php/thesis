@@ -11,6 +11,7 @@ return new Manifest(
     licenseSince: 2026,
     require: [
         'revolt/event-loop' => '^1.0.9',
+        'thesis/time' => '*',
     ],
     requireDev: [
         'ext-pcntl' => '*',

@@ -20,7 +20,8 @@
     "require": {
         "php": "^8.5",
         "php-64bit": "*",
-        "revolt/event-loop": "^1.0.9"
+        "revolt/event-loop": "^1.0.9",
+        "thesis/time": "^2.0"
     },
     "require-dev": {
         "ext-pcntl": "*",

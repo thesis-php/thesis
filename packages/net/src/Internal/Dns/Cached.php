@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Net\Internal\Dns;
 
+use Thesis\Async\Instant;
+
 /**
  * @internal
  */
@@ -14,6 +16,6 @@ final readonly class Cached
      */
     public function __construct(
         public array $addresses,
-        public float $expiresAt,
+        public Instant $expiresAt,
     ) {}
 }

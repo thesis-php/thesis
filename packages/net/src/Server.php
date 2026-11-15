@@ -8,6 +8,7 @@ use Thesis\Async\Cancelled;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
+use function Thesis\Time\sec;
 
 /**
  * A listening socket, created by {@see listen()} or {@see listenUnix()}.
@@ -101,7 +102,7 @@ final class Server
                 $woken = false;
                 $backoff = min(self::MIN_BACKOFF * 2 ** $failures++, self::MAX_BACKOFF);
 
-                if (!$this->watcher->delay($backoff)) {
+                if (!$this->watcher->delay(sec($backoff))) {
                     return null;
                 }
             } elseif ($this->watcher->readable()) {

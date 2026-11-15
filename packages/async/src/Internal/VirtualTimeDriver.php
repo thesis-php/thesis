@@ -38,7 +38,7 @@ final class VirtualTimeDriver implements Driver
     private array $timers = [];
 
     /**
-     * @var \SplMinHeap<array{float, int, string}> [expiration, order, callback id]; an entry is valid while its order
+     * @var \SplMinHeap<array{int, int, string}> [expiration, order, callback id]; an entry is valid while its order
      * is the timer's: {@see enqueue()} gives a new one, {@see disable()} outdates it. The callback id, not the timer:
      * an outdated entry stays until it reaches the top or {@see compact()} drops it, and must not keep the closure
      * of a cancelled timer.
@@ -185,7 +185,7 @@ final class VirtualTimeDriver implements Driver
 
         if (!$timer->enabled) {
             $timer->enabled = true;
-            $this->enqueue($timer, $this->clock->now() + $timer->interval);
+            $this->enqueue($timer);
         }
 
         return $callbackId;
@@ -345,7 +345,7 @@ final class VirtualTimeDriver implements Driver
     public function __debugInfo(): array
     {
         return [
-            'now' => $this->clock->now(),
+            'now' => $this->clock->now / 1e9,
             'timers' => \count($this->timers),
             'inner' => $this->inner->__debugInfo(),
         ];
@@ -360,20 +360,26 @@ final class VirtualTimeDriver implements Driver
             throw new \Error(\sprintf('%s must be greater than or equal to zero', $repeat ? 'Interval' : 'Delay'));
         }
 
+        // Rounded, not truncated: a delay of whole nanoseconds that Revolt passes as float seconds comes back exact.
+        // Saturated: a delay of centuries does not fit in int nanoseconds.
+        $nanoseconds = round($seconds * 1e9);
+        $interval = $nanoseconds >= PHP_INT_MAX ? PHP_INT_MAX : (int) $nanoseconds;
         // Not like the inner ids, which are letters.
         $callbackId = 'virtual-' . $this->nextId++;
-        $timer = new VirtualTimer(callbackId: $callbackId, interval: $seconds, callback: $callback, repeat: $repeat);
+        $timer = new VirtualTimer(callbackId: $callbackId, interval: $interval, callback: $callback, repeat: $repeat);
         $this->timers[$callbackId] = $timer;
-        $this->enqueue($timer, $this->clock->now() + $seconds);
+        $this->enqueue($timer);
 
         return $callbackId;
     }
 
     /**
-     * Makes the timer pending.
+     * Makes the timer pending, due an interval from now; saturated, as a deadline of {@see Scope::after()}.
      */
-    private function enqueue(VirtualTimer $timer, float $expiration): void
+    private function enqueue(VirtualTimer $timer): void
     {
+        $now = $this->clock->now;
+        $expiration = $timer->interval > PHP_INT_MAX - $now ? PHP_INT_MAX : $now + $timer->interval;
         $timer->expiration = $expiration;
         $timer->order = ++$this->order;
         $this->queue->insert([$expiration, $timer->order, $timer->callbackId]);
@@ -408,7 +414,7 @@ final class VirtualTimeDriver implements Driver
             return;
         }
 
-        /** @var \SplMinHeap<array{float, int, string}> $queue */
+        /** @var \SplMinHeap<array{int, int, string}> $queue */
         $queue = new \SplMinHeap();
 
         foreach ($this->queue as $entry) {
@@ -466,7 +472,7 @@ final class VirtualTimeDriver implements Driver
             $this->clock->jump($timer->expiration);
         }
 
-        while (($timer = $this->next()) !== null && $timer->expiration <= $this->clock->now()) {
+        while (($timer = $this->next()) !== null && $timer->expiration <= $this->clock->now) {
             $this->queue->extract();
             $this->fire($timer);
         }
@@ -505,7 +511,7 @@ final class VirtualTimeDriver implements Driver
             ++$this->activity;
 
             if ($timer->repeat) {
-                $this->enqueue($timer, $this->clock->now() + $timer->interval);
+                $this->enqueue($timer);
             } else {
                 unset($this->timers[$timer->callbackId]);
                 $this->updatePump();

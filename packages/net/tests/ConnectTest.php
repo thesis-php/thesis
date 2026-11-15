@@ -8,10 +8,12 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Group;
+use Thesis\Async\Instant;
 use Thesis\Async\TimedOut;
 use function Thesis\Async\group;
-use function Thesis\Async\now;
 use function Thesis\Async\timeout;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ConnectTest
@@ -86,17 +88,18 @@ final class ConnectTest
         }
 
         $server = listen('::1', $port);
-        $start = now();
+        $start = Instant::now();
 
-        $socket = timeout(2, static fn() => connect(
+        $socket = timeout(sec(2), static fn() => connect(
             host: 'dual.test',
             port: $port,
             resolver: new StaticResolver(['127.0.0.1', '::1']),
         ));
 
         Assert::same((string) $socket->remoteAddress, "[::1]:{$port}");
-        Assert::true(now() - $start >= 0.25);
-        Assert::true(now() - $start < 1);
+        $elapsed = Instant::now()->since($start);
+        Assert::true($elapsed >= ms(250));
+        Assert::true($elapsed < sec(1));
         $full->close();
         $server->close();
         unset($fillers);
@@ -133,7 +136,7 @@ final class ConnectTest
         Expect::exception(TimedOut::class);
 
         try {
-            timeout(0.05, static fn() => connect('127.0.0.1', $port));
+            timeout(ms(50), static fn() => connect('127.0.0.1', $port));
         } finally {
             $full->close();
             unset($fillers);

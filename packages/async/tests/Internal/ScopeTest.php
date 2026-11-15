@@ -13,6 +13,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ScopeTest
@@ -21,7 +22,7 @@ final class ScopeTest
     {
         $root = Scope::current();
 
-        timeout(1000, static fn() => delay(1));
+        timeout(sec(1000), static fn() => delay(sec(1)));
         group(static fn() => null);
 
         Assert::same(Scope::current(), $root);
@@ -46,7 +47,7 @@ final class ScopeTest
         $inFiber = null;
 
         $fiber = new \Fiber(static function () use (&$inFiber) {
-            timeout(1000, static fn() => null);
+            timeout(sec(1000), static fn() => null);
             $inFiber = Scope::current();
         });
         $fiber->start();
@@ -269,5 +270,22 @@ final class ScopeTest
         checkpoint();
 
         Assert::same((fn(): array => $this->callbacks)->call($scope), []);
+    }
+
+    public function remainingFitsDurationWhenClockIsNearOrigin(): void
+    {
+        // A deadline saturated at PHP_INT_MAX is further than the longest Duration while the clock is below 0.86 s.
+        $clock = Scope::$virtualClock;
+        Scope::$virtualClock = new VirtualClock(0);
+
+        try {
+            $scope = new Scope(timeout: PHP_INT_MAX);
+            $remaining = $scope->remaining();
+            $scope->close();
+        } finally {
+            Scope::$virtualClock = $clock;
+        }
+
+        Assert::same($remaining, 9_223_372_035_999_999_999);
     }
 }

@@ -8,19 +8,22 @@ use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Time\Duration;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
+use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\VirtualTime\advance;
+use function Thesis\Time\sec;
 
 #[Test]
 final class TimeoutTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeout(1000, static function () {
-            delay(1);
+        $result = timeout(sec(1000), static function () {
+            delay(sec(1));
 
             return 'result';
         });
@@ -31,11 +34,11 @@ final class TimeoutTest
 
     public function throwsTimedOutWhenDeadlineExpires(): void
     {
-        $exception = thrown(static fn() => timeout(1, never(...)));
+        $exception = thrown(static fn() => timeout(sec(1), never(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same($exception->seconds, 1.0);
-        Assert::same($exception->getMessage(), 'Timed out after 1 seconds.');
+        Assert::equals($exception->timeout, sec(1));
+        Assert::same($exception->getMessage(), 'Timed out after 1s.');
         Assert::instanceOf($exception->getPrevious(), Cancelled::class);
         assertNoCallbacksLeft();
     }
@@ -46,7 +49,7 @@ final class TimeoutTest
             $callbacks = null;
 
             $exception = thrown(static function () use ($seconds, &$callbacks) {
-                timeout($seconds, static function () use (&$callbacks) {
+                timeout(sec($seconds), static function () use (&$callbacks) {
                     // Inside the body, not after it: a timer cancelled in finally would pass the check after.
                     $callbacks = EventLoop::getIdentifiers();
                     never();
@@ -55,29 +58,14 @@ final class TimeoutTest
 
             Assert::same($callbacks, []);
             Assert::instanceOf($exception, TimedOut::class);
-            Assert::same($exception->seconds, $seconds);
+            Assert::equals($exception->timeout, sec($seconds));
             assertNoCallbacksLeft();
         }
     }
 
-    public function rejectsNan(): void
-    {
-        $ran = false;
-
-        $exception = thrown(static function () use (&$ran) {
-            timeout(NAN, static function () use (&$ran) {
-                $ran = true;
-            });
-        });
-
-        Assert::instanceOf($exception, \ValueError::class);
-        Assert::false($ran);
-        assertNoCallbacksLeft();
-    }
-
     public function expiredDeadlineReturnsResultOfBodyThatDoesNotWait(): void
     {
-        Assert::same(timeout(-1, static fn() => remaining()), 0.0);
+        Assert::equals(timeout(sec(-1), static fn() => remaining()), sec(0));
         assertNoCallbacksLeft();
     }
 
@@ -85,11 +73,11 @@ final class TimeoutTest
     {
         $inner = null;
         $outer = thrown(static function () use (&$inner) {
-            timeout(1, static function () use (&$inner) {
+            timeout(sec(1), static function () use (&$inner) {
                 try {
                     never();
                 } finally {
-                    $inner = thrown(static fn() => timeout(-1, never(...)));
+                    $inner = thrown(static fn() => timeout(sec(-1), never(...)));
                 }
             });
         });
@@ -103,7 +91,7 @@ final class TimeoutTest
     {
         Expect::exception(TimedOut::class);
 
-        timeout(1, static function () {
+        timeout(sec(1), static function () {
             group(static function (Group $group) {
                 $group->spawn(never(...));
             });
@@ -115,8 +103,8 @@ final class TimeoutTest
         $inner = null;
 
         $outer = thrown(static function () use (&$inner) {
-            timeout(1, static function () use (&$inner) {
-                $inner = thrown(static fn() => timeout(10, never(...)));
+            timeout(sec(1), static function () use (&$inner) {
+                $inner = thrown(static fn() => timeout(sec(10), never(...)));
 
                 throw $inner;
             });
@@ -124,7 +112,7 @@ final class TimeoutTest
 
         Assert::instanceOf($inner, Cancelled::class);
         Assert::instanceOf($outer, TimedOut::class);
-        Assert::same($outer->seconds, 1.0);
+        Assert::equals($outer->timeout, sec(1));
     }
 
     public function outerCancellationOutranksExpiredInnerDeadline(): void
@@ -132,10 +120,10 @@ final class TimeoutTest
         $inner = null;
 
         $outer = thrown(static function () use (&$inner) {
-            timeout(1, static function () use (&$inner) {
+            timeout(sec(1), static function () use (&$inner) {
                 $inner = thrown(static function () {
-                    timeout(2, static function () {
-                        advance(5); // both deadlines expire before anyone looks
+                    timeout(sec(2), static function () {
+                        advance(sec(5)); // both deadlines expire before anyone looks
                         never();
                     });
                 });
@@ -146,7 +134,7 @@ final class TimeoutTest
 
         Assert::instanceOf($inner, Cancelled::class);
         Assert::instanceOf($outer, TimedOut::class);
-        Assert::same($outer->seconds, 1.0);
+        Assert::equals($outer->timeout, sec(1));
     }
 
     public function passesForeignCancellationThrough(): void
@@ -156,12 +144,12 @@ final class TimeoutTest
         $exception = thrown(static function () use (&$seen) {
             group(static function (Group $group) use (&$seen) {
                 $group->spawn(static function () {
-                    delay(1);
+                    delay(sec(1));
 
                     throw new \RuntimeException('task failed');
                 });
 
-                $seen = thrown(static fn() => timeout(10, never(...)));
+                $seen = thrown(static fn() => timeout(sec(10), never(...)));
             });
         });
 
@@ -173,7 +161,7 @@ final class TimeoutTest
     {
         Expect::exception(\LogicException::class)->withMessage('failure');
 
-        timeout(1000, static function () {
+        timeout(sec(1000), static function () {
             throw new \LogicException('failure');
         });
     }
@@ -182,7 +170,7 @@ final class TimeoutTest
     {
         Expect::exception(\RuntimeException::class)->withMessage('connection reset');
 
-        timeout(1, static function () {
+        timeout(sec(1), static function () {
             try {
                 never();
             } catch (Cancelled) {
@@ -193,7 +181,7 @@ final class TimeoutTest
 
     public function valueReturnedAfterDeadlineWins(): void
     {
-        $result = timeout(1, static function () {
+        $result = timeout(sec(1), static function () {
             untilCancelled();
 
             return 'value';
@@ -204,31 +192,41 @@ final class TimeoutTest
 
     public function restoresCurrentScope(): void
     {
-        thrown(static fn() => timeout(1, never(...)));
+        thrown(static fn() => timeout(sec(1), never(...)));
 
-        delay(1); // would throw if the expired scope stayed current
+        delay(sec(1)); // would throw if the expired scope stayed current
 
         group(static function (Group $group) {
             $group->spawn(static function () {
-                thrown(static fn() => timeout(1, never(...)));
+                thrown(static fn() => timeout(sec(1), never(...)));
 
-                delay(1);
+                delay(sec(1));
             });
         });
 
         assertNoCallbacksLeft();
     }
 
-    public function nowIsTheClockOfDeadlines(): void
+    public function instantIsTheClockOfDeadlines(): void
     {
-        $at = now() + 1;
+        $at = Instant::now()->add(sec(1));
 
-        $remaining = timeout($at - now(), remaining(...));
+        $remaining = timeout($at->since(Instant::now()), remaining(...));
 
-        Assert::same($remaining, 1.0);
+        Assert::equals($remaining, sec(1));
 
-        $start = now();
-        delay(10);
-        Assert::same(now() - $start, 10.0);
+        $start = Instant::now();
+        delay(sec(10));
+        Assert::same(secondsSince($start), 10.0);
+    }
+
+    public function longestTimeoutDoesNotOverflowClock(): void
+    {
+        $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
+
+        $remaining = timeout($longest, static fn() => remaining());
+
+        Assert::notNull($remaining);
+        Assert::true($remaining > sec(9_000_000_000));
     }
 }

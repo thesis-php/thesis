@@ -9,14 +9,15 @@ use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
+use function Thesis\Time\sec;
 
 #[Test]
 final class TimeoutOrTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeoutOr(seconds: 1000, body: static function () {
-            delay(1);
+        $result = timeoutOr(duration: sec(1000), body: static function () {
+            delay(sec(1));
 
             return 'result';
         }, default: 'default');
@@ -27,8 +28,8 @@ final class TimeoutOrTest
 
     public function returnsDefaultWhenDeadlineExpires(): void
     {
-        Assert::same(timeoutOr(1, never(...), default: 'default'), 'default');
-        Assert::null(timeoutOr(1, never(...)));
+        Assert::same(timeoutOr(sec(1), never(...), default: 'default'), 'default');
+        Assert::null(timeoutOr(sec(1), never(...)));
         assertNoCallbacksLeft();
     }
 
@@ -36,28 +37,13 @@ final class TimeoutOrTest
     {
         $expired = new \stdClass();
 
-        Assert::null(timeoutOr(1, static fn() => null, default: $expired));
-        Assert::same(timeoutOr(1, never(...), default: $expired), $expired);
+        Assert::null(timeoutOr(sec(1), static fn() => null, default: $expired));
+        Assert::same(timeoutOr(sec(1), never(...), default: $expired), $expired);
     }
 
     public function returnsDefaultForExpiredDeadline(): void
     {
-        Assert::same(timeoutOr(-1, never(...), default: 'default'), 'default');
-        assertNoCallbacksLeft();
-    }
-
-    public function rejectsNan(): void
-    {
-        $ran = false;
-
-        $exception = thrown(static function () use (&$ran) {
-            timeoutOr(NAN, static function () use (&$ran) {
-                $ran = true;
-            });
-        });
-
-        Assert::instanceOf($exception, \ValueError::class);
-        Assert::false($ran);
+        Assert::same(timeoutOr(sec(-1), never(...), default: 'default'), 'default');
         assertNoCallbacksLeft();
     }
 
@@ -65,9 +51,9 @@ final class TimeoutOrTest
     {
         $done = [];
 
-        timeoutOr(1, static function () use (&$done) {
+        timeoutOr(sec(1), static function () use (&$done) {
             $done[] = 1;
-            delay(2);
+            delay(sec(2));
             $done[] = 2;
         });
 
@@ -76,7 +62,7 @@ final class TimeoutOrTest
 
     public function doesNotSwallowTimedOutOfNestedTimeout(): void
     {
-        $exception = thrown(static fn() => timeoutOr(10, static fn() => timeout(1, never(...))));
+        $exception = thrown(static fn() => timeoutOr(sec(10), static fn() => timeout(sec(1), never(...))));
 
         Assert::instanceOf($exception, TimedOut::class);
         assertNoCallbacksLeft();
@@ -86,8 +72,8 @@ final class TimeoutOrTest
     {
         $inner = 'not reached';
 
-        $outer = timeoutOr(seconds: 1, body: static function () use (&$inner) {
-            $inner = timeoutOr(10, never(...), default: 'inner');
+        $outer = timeoutOr(duration: sec(1), body: static function () use (&$inner) {
+            $inner = timeoutOr(sec(10), never(...), default: 'inner');
         }, default: 'outer');
 
         Assert::same($outer, 'outer');
@@ -99,11 +85,11 @@ final class TimeoutOrTest
         $inner = null;
 
         $outer = thrown(static function () use (&$inner) {
-            timeout(1, static function () use (&$inner) {
+            timeout(sec(1), static function () use (&$inner) {
                 try {
                     never();
                 } finally {
-                    $inner = thrown(static fn() => timeoutOr(-1, never(...)));
+                    $inner = thrown(static fn() => timeoutOr(sec(-1), never(...)));
                 }
             });
         });
@@ -115,7 +101,7 @@ final class TimeoutOrTest
 
     public function passesFailureThrough(): void
     {
-        $exception = thrown(static fn() => timeoutOr(1000, static fn() => throw new \LogicException('failure')));
+        $exception = thrown(static fn() => timeoutOr(sec(1000), static fn() => throw new \LogicException('failure')));
 
         Assert::instanceOf($exception, \LogicException::class);
         assertNoCallbacksLeft();

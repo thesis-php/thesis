@@ -18,9 +18,12 @@ use Thesis\Async\Internal\VirtualTimeDriver;
 use Thesis\Async\Testo\VirtualTime;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
+use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Async\VirtualTime\run;
+use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 /**
  * Every test already runs on virtual time: the ones of run() itself nest a run() in it.
@@ -30,40 +33,40 @@ final class VirtualTimeTest
 {
     public function clockStartsAtCurrentTimeRoundedUpToWholeSecond(): void
     {
-        advance(0.25);
-        $outer = now();
+        advance(ms(250));
+        $outer = Instant::now();
 
-        Assert::same(run(static fn() => now() - $outer), 0.75);
+        Assert::same(run(static fn() => secondsSince($outer)), 0.75);
     }
 
     public function timeCapturedBeforeRunStaysValidInIt(): void
     {
-        $deadline = now() + 5;
+        $deadline = Instant::now()->add(sec(5));
 
-        Assert::same(run(static fn() => $deadline - now()), 5.0);
+        Assert::equals(run(static fn() => $deadline->since(Instant::now())), sec(5));
     }
 
     public function longDelayIsOverAtOnce(): void
     {
-        $start = now();
+        $start = Instant::now();
         $realStart = hrtime(true);
 
-        delay(3600);
+        delay(sec(3600));
 
-        Assert::same(now() - $start, 3600.0);
+        Assert::same(secondsSince($start), 3600.0);
         Assert::int(hrtime(true) - $realStart)->lessThan(1_000_000_000);
     }
 
     public function timersFireInOrderOfDeadlines(): void
     {
-        $start = now();
+        $start = Instant::now();
         $log = [];
 
         group(static function (Group $group) use ($start, &$log) {
             foreach ([3, 1, 2] as $seconds) {
                 $group->spawn(static function () use ($start, $seconds, &$log) {
-                    delay($seconds);
-                    $log[] = [$seconds, now() - $start];
+                    delay(sec($seconds));
+                    $log[] = [$seconds, secondsSince($start)];
                 });
             }
         });
@@ -73,24 +76,24 @@ final class VirtualTimeTest
 
     public function codeTakesNoTime(): void
     {
-        $start = now();
+        $start = Instant::now();
 
         for ($i = 0, $sum = 0; $i < 100_000; ++$i) {
             $sum += $i;
         }
 
-        Assert::same(now() - $start, 0.0);
+        Assert::same(secondsSince($start), 0.0);
     }
 
     public function repeatedTimerFiresEveryInterval(): void
     {
-        $start = now();
+        $start = Instant::now();
         $fired = [];
         $timer = EventLoop::repeat(2, static function () use ($start, &$fired) {
-            $fired[] = now() - $start;
+            $fired[] = secondsSince($start);
         });
 
-        delay(7);
+        delay(sec(7));
         EventLoop::cancel($timer);
 
         Assert::same($fired, [2.0, 4.0, 6.0]);
@@ -98,51 +101,51 @@ final class VirtualTimeTest
 
     public function advanceMovesClockButTimerFiresAtNextSuspension(): void
     {
-        $start = now();
+        $start = Instant::now();
         $fired = null;
         EventLoop::delay(1, static function () use ($start, &$fired) {
-            $fired = now() - $start;
+            $fired = secondsSince($start);
         });
 
-        advance(2);
+        advance(sec(2));
 
-        Assert::same([now() - $start, $fired], [2.0, null]);
+        Assert::same([secondsSince($start), $fired], [2.0, null]);
 
-        delay(0);
+        delay(sec(0));
 
         Assert::same($fired, 2.0);
     }
 
     public function advanceExpiresDeadline(): void
     {
-        $start = now();
-        $exception = thrown(static fn() => timeout(1, static function () {
-            advance(1);
-            delay(0);
+        $start = Instant::now();
+        $exception = thrown(static fn() => timeout(sec(1), static function () {
+            advance(sec(1));
+            delay(sec(0));
         }));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same(now() - $start, 1.0);
+        Assert::same(secondsSince($start), 1.0);
     }
 
     public function advanceRejectsNegativeSeconds(): void
     {
         Expect::exception(\ValueError::class);
 
-        advance(-1);
+        advance(sec(-1));
     }
 
     public function advanceMovesClockOfInnermostRun(): void
     {
-        $start = now();
+        $start = Instant::now();
         $inner = run(static function () {
-            $start = now();
-            advance(3);
+            $start = Instant::now();
+            advance(sec(3));
 
-            return now() - $start;
+            return secondsSince($start);
         });
 
-        Assert::same([$inner, now() - $start], [3.0, 0.0]);
+        Assert::same([$inner, secondsSince($start)], [3.0, 0.0]);
     }
 
     public function advanceThrowsOutsideRun(): void
@@ -152,7 +155,7 @@ final class VirtualTimeTest
         $classLoader = new \ReflectionClass(ClassLoader::class)->getFileName();
         \assert(\is_string($classLoader));
         $code = \sprintf(
-            'require %s; try { Thesis\Async\VirtualTime\advance(1); } catch (LogicException $e) { echo $e::class; }',
+            'require %s; try { Thesis\Async\VirtualTime\advance(Thesis\Time\sec(1)); } catch (LogicException $e) { echo $e::class; }',
             var_export(\dirname($classLoader, 2) . '/autoload.php', true),
         );
         $process = proc_open(command: [PHP_BINARY, '-r', $code], descriptor_spec: [1 => ['pipe', 'w']], pipes: $pipes);
@@ -165,32 +168,32 @@ final class VirtualTimeTest
 
     public function clockIsClockOfLibrary(): void
     {
-        $start = now();
-        delay(5);
+        $start = Instant::now();
+        delay(sec(5));
 
-        Assert::same([now() - $start, timeout(10, remaining(...))], [5.0, 10.0]);
+        Assert::equals([secondsSince($start), timeout(sec(10), remaining(...))], [5.0, sec(10)]);
     }
 
     public function clockIsFollowedThroughDecoratedDriver(): void
     {
-        $start = now();
+        $start = Instant::now();
         EventLoop::setDriver(new TracingDriver(EventLoop::getDriver()));
 
-        $exception = thrown(static fn() => timeout(5, never(...)));
+        $exception = thrown(static fn() => timeout(sec(5), never(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same(now() - $start, 5.0);
+        Assert::same(secondsSince($start), 5.0);
     }
 
     public function deadlockFailsAtOnce(): void
     {
-        $start = now();
+        $start = Instant::now();
         $exception = thrown(static fn() => group(static function (Group $group) {
             $group->spawn(never(...));
         }));
 
         Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');
-        Assert::same(now() - $start, 0.0);
+        Assert::same(secondsSince($start), 0.0);
     }
 
     public function streamsAreReal(): void
@@ -198,11 +201,11 @@ final class VirtualTimeTest
         /** @var array{resource, resource} $pair */
         $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
         [$reader, $writer] = $pair;
-        $start = now();
+        $start = Instant::now();
 
         $read = group(static function (Group $group) use ($reader, $writer, $start) {
             $group->spawn(static function () use ($writer) {
-                delay(10);
+                delay(sec(10));
                 fwrite($writer, 'ping');
             });
 
@@ -216,7 +219,7 @@ final class VirtualTimeTest
                 };
             });
 
-            return [fread($reader, 4), now() - $start];
+            return [fread($reader, 4), secondsSince($start)];
         });
 
         Assert::same($read, ['ping', 10.0]);
@@ -225,14 +228,14 @@ final class VirtualTimeTest
 
     public function signalsAreReal(): void
     {
-        $start = now();
+        $start = Instant::now();
         $received = group(static function (Group $group) use ($start) {
             $group->spawn(static function () {
-                delay(5);
+                delay(sec(5));
                 posix_kill(posix_getpid(), SIGUSR1);
             });
 
-            return [awaitSignal(SIGUSR1), now() - $start];
+            return [awaitSignal(SIGUSR1), secondsSince($start)];
         });
 
         Assert::same($received, [SIGUSR1, 5.0]);
@@ -244,7 +247,7 @@ final class VirtualTimeTest
         $driver = EventLoop::getDriver();
 
         $virtual = run(static function () {
-            delay(1);
+            delay(sec(1));
 
             return EventLoop::getDriver();
         });
@@ -286,23 +289,23 @@ final class VirtualTimeTest
 
     public function nestedRunRestoresOuterClock(): void
     {
-        $start = now();
-        delay(10);
+        $start = Instant::now();
+        delay(sec(10));
         $inner = run(static function () {
-            $start = now();
-            delay(1);
+            $start = Instant::now();
+            delay(sec(1));
 
-            return now() - $start;
+            return secondsSince($start);
         });
 
-        Assert::same([$inner, now() - $start], [1.0, 10.0]);
+        Assert::same([$inner, secondsSince($start)], [1.0, 10.0]);
     }
 
     public function runRestoresDriverAndClockEvenIfStoppingLoopThrows(): void
     {
         $driver = EventLoop::getDriver();
-        $start = now();
-        delay(5);
+        $start = Instant::now();
+        delay(sec(5));
         $returned = false;
 
         $exception = thrown(static function () use (&$returned) {
@@ -323,11 +326,11 @@ final class VirtualTimeTest
         Assert::true($returned);
         Assert::instanceOf($exception, UncaughtThrowable::class);
         Assert::instanceOf($exception->getPrevious(), \RuntimeException::class);
-        Assert::same([EventLoop::getDriver(), now() - $start], [$driver, 5.0]);
+        Assert::same([EventLoop::getDriver(), secondsSince($start)], [$driver, 5.0]);
 
-        delay(1);
+        delay(sec(1));
 
-        Assert::same(now() - $start, 6.0);
+        Assert::same(secondsSince($start), 6.0);
     }
 
     public function runDropsWhatIsLeftInLoop(): void
@@ -339,20 +342,10 @@ final class VirtualTimeTest
                 $fired = true;
             });
         });
-        delay(1);
+        delay(sec(1));
 
         Assert::false($fired);
         assertNoCallbacksLeft();
-    }
-
-    public function advanceRejectsNan(): void
-    {
-        $start = now();
-
-        $exception = thrown(static fn() => advance(NAN));
-
-        Assert::instanceOf($exception, \ValueError::class);
-        Assert::same(now() - $start, 0.0);
     }
 
     public function runThrowsInFiber(): void
@@ -382,16 +375,16 @@ final class VirtualTimeTest
 
     public function enablingCallbackIsActivity(): void
     {
-        $start = now();
+        $start = Instant::now();
         $ran = null;
         $callbackId = EventLoop::defer(static function () use ($start, &$ran) {
-            $ran = now() - $start;
+            $ran = secondsSince($start);
         });
         EventLoop::disable($callbackId);
         EventLoop::delay(5, static function () {});
 
         EventLoop::enable($callbackId);
-        delay(10);
+        delay(sec(10));
 
         Assert::same($ran, 0.0);
     }
@@ -401,8 +394,8 @@ final class VirtualTimeTest
         $seen = null;
 
         $inner = run(static function () use (&$seen) {
-            $start = now();
-            advance(100);
+            $start = Instant::now();
+            advance(sec(100));
 
             // Both in one tick: the first resumes {main}, the second is left to the tick that run() finishes.
             suspend(static function (Continuation $continuation) use ($start, &$seen) {
@@ -410,11 +403,11 @@ final class VirtualTimeTest
                     $continuation->resume();
                 });
                 EventLoop::defer(static function () use ($start, &$seen) {
-                    $seen = now() - $start;
+                    $seen = secondsSince($start);
                 });
             });
 
-            return now() - $start;
+            return secondsSince($start);
         });
 
         Assert::same([$inner, $seen], [100.0, 100.0]);
@@ -426,7 +419,7 @@ final class VirtualTimeTest
             $timer = EventLoop::unreference(EventLoop::delay(1, static function () use ($continuation) {
                 $continuation->resume(true);
             }));
-            advance(1);
+            advance(sec(1));
             // Runs in the tick in which the due timer is handed to its firing defer, after it is.
             EventLoop::defer(static function () use ($timer) {
                 EventLoop::reference($timer);
@@ -446,7 +439,7 @@ final class VirtualTimeTest
             $timer = EventLoop::delay(1, static function () use ($continuation) {
                 $continuation->resume();
             });
-            advance(1);
+            advance(sec(1));
             EventLoop::defer(static function () use ($timer) {
                 EventLoop::unreference($timer);
             });
@@ -461,20 +454,20 @@ final class VirtualTimeTest
 
     public function disabledTimerDoesNotFireUntilEnabledAgain(): void
     {
-        $start = now();
+        $start = Instant::now();
         $fired = [];
         $timer = EventLoop::delay(2, static function () use ($start, &$fired) {
-            $fired[] = now() - $start;
+            $fired[] = secondsSince($start);
         });
 
         Assert::same(EventLoop::disable($timer), $timer);
         EventLoop::disable($timer);
         Assert::false(EventLoop::isEnabled($timer));
-        delay(3);
+        delay(sec(3));
         Assert::same(EventLoop::enable($timer), $timer);
         EventLoop::enable($timer);
         Assert::true(EventLoop::isEnabled($timer));
-        delay(3);
+        delay(sec(3));
 
         Assert::same($fired, [5.0]);
     }
@@ -485,12 +478,12 @@ final class VirtualTimeTest
         $timer = EventLoop::delay(1, static function () use (&$fired) {
             $fired = true;
         });
-        advance(1);
+        advance(sec(1));
         EventLoop::defer(static function () use ($timer) {
             EventLoop::disable($timer);
         });
 
-        delay(2);
+        delay(sec(2));
 
         Assert::false($fired);
         EventLoop::cancel($timer);
@@ -512,7 +505,7 @@ final class VirtualTimeTest
 
         Assert::same(EventLoop::reference($timer), $timer);
         Assert::true(EventLoop::isReferenced($timer));
-        delay(1);
+        delay(sec(1));
 
         Assert::same($fired, 1);
     }
@@ -594,10 +587,10 @@ final class VirtualTimeTest
 
     public function cancelledTimersDoNotPileUpInQueue(): void
     {
-        $start = now();
+        $start = Instant::now();
         $fired = [];
         EventLoop::delay(3600, static function () use ($start, &$fired) {
-            $fired[] = now() - $start;
+            $fired[] = secondsSince($start);
         });
         $timers = [];
 
@@ -615,7 +608,7 @@ final class VirtualTimeTest
 
         Assert::int($queue->count())->lessThan(100);
 
-        delay(3600);
+        delay(sec(3600));
 
         Assert::same($fired, [3600.0]);
     }

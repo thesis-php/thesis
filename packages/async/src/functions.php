@@ -15,7 +15,10 @@ use Thesis\Async\Internal\ScopeCancellation;
 use Thesis\Async\Internal\SignalTrapImpl;
 use Thesis\Async\Internal\Suppressed;
 use Thesis\Async\Internal\Workers;
+use Time\Duration;
 use function Thesis\Async\Internal\fiberKey;
+use function Thesis\Time\ns;
+use function Thesis\Time\toNs;
 
 /**
  * THE suspension point: every wait in the library goes through it, so cancellation is implemented once.
@@ -123,18 +126,7 @@ function onCancel(callable $callback): \Closure
 }
 
 /**
- * Monotonic time in seconds, on the clock of deadlines and Revolt's timers: for measuring and for deadlines
- * computed ahead, `timeout($at - now(), ...)`. Not wall-clock time: only differences make sense.
- *
- * @api
- */
-function now(): float
-{
-    return Scope::now();
-}
-
-/**
- * Seconds left until the deadline of the current scope, null if there is none: the nearest of the enclosing
+ * Time left until the deadline of the current scope, null if there is none: the nearest of the enclosing
  * {@see timeout()} calls, tasks included, since a task inherits the deadline under which its group runs.
  * Inside {@see shield()} outer deadlines are not visible, as outer cancellation is not.
  *
@@ -144,9 +136,11 @@ function now(): float
  *
  * @api
  */
-function remaining(): ?float
+function remaining(): ?Duration
 {
-    return Scope::current()->remaining();
+    $remaining = Scope::current()->remaining();
+
+    return $remaining === null ? null : ns($remaining);
 }
 
 /**
@@ -155,16 +149,11 @@ function remaining(): ?float
  *
  * @api
  * @throws Cancelled
- * @throws \ValueError if $seconds is NAN
  */
-function delay(float $seconds): void
+function delay(Duration $duration): void
 {
-    if (is_nan($seconds)) {
-        throw new \ValueError('delay() needs a number of seconds, got NAN.');
-    }
-
     // Revolt rejects a negative delay.
-    $seconds = max(0.0, $seconds);
+    $seconds = max(0, toNs($duration)) / 1e9;
 
     suspend(static function (Continuation $continuation) use ($seconds) {
         $timer = EventLoop::delay($seconds, static function () use ($continuation) {
@@ -189,14 +178,13 @@ function delay(float $seconds): void
  * @param callable(): T $body
  * @return T
  * @throws TimedOut
- * @throws \ValueError if $seconds is NAN, before $body runs
  */
-function timeout(float $seconds, callable $body): mixed
+function timeout(Duration $duration, callable $body): mixed
 {
-    $result = Expired::run($seconds, $body);
+    $result = Expired::run($duration, $body);
 
     if ($result instanceof Expired) {
-        throw new TimedOut($seconds, $result->cancelled);
+        throw new TimedOut($duration, $result->cancelled);
     }
 
     return $result;
@@ -211,7 +199,7 @@ function timeout(float $seconds, callable $body): mixed
  * Whatever $body has done before the deadline stays done: collect partial results by reference.
  *
  * If $body may return $default itself (null, for example), pass a $default it never returns to tell the expiry apart:
- * `$result = timeoutOr(1, $body, default: $expired = new \stdClass())`, then compare with `=== $expired`.
+ * `$result = timeoutOr(sec(1), $body, default: $expired = new \stdClass())`, then compare with `=== $expired`.
  *
  * @api
  * @template T
@@ -219,11 +207,10 @@ function timeout(float $seconds, callable $body): mixed
  * @param callable(): T $body
  * @param D $default returned if the deadline cuts $body short
  * @return T|D
- * @throws \ValueError if $seconds is NAN, before $body runs
  */
-function timeoutOr(float $seconds, callable $body, mixed $default = null): mixed
+function timeoutOr(Duration $duration, callable $body, mixed $default = null): mixed
 {
-    $result = Expired::run($seconds, $body);
+    $result = Expired::run($duration, $body);
 
     return $result instanceof Expired ? $default : $result;
 }

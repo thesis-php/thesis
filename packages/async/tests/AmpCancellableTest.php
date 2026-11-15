@@ -15,6 +15,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
+use function Thesis\Time\sec;
 
 #[Test]
 final class AmpCancellableTest
@@ -36,7 +37,7 @@ final class AmpCancellableTest
         $exception = null;
 
         $elapsed = elapsed(static function () use (&$exception) {
-            $exception = thrown(static fn() => timeout(10, static fn() => ampCancellable(
+            $exception = thrown(static fn() => timeout(sec(10), static fn() => ampCancellable(
                 static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
             )));
         });
@@ -53,14 +54,14 @@ final class AmpCancellableTest
 
         Expect::exception(TimedOut::class);
 
-        timeout(1, static fn() => ampCancellable(
+        timeout(sec(1), static fn() => ampCancellable(
             static fn($cancellation) => $deferred->getFuture()->await($cancellation),
         ));
     }
 
     public function ownCancellationOfOperationIsRethrownAsIs(): void
     {
-        $exception = thrown(static fn() => timeout(1000, static fn() => ampCancellable(
+        $exception = thrown(static fn() => timeout(sec(1000), static fn() => ampCancellable(
             static fn() => ampDelay(10_000, cancellation: new TimeoutCancellation(1)),
         )));
 
@@ -70,7 +71,7 @@ final class AmpCancellableTest
 
     public function throwsCancelledWithoutCallingFnInCancelledScope(): void
     {
-        $exception = thrown(static fn() => timeout(1, static function () {
+        $exception = thrown(static fn() => timeout(sec(1), static function () {
             untilCancelled();
 
             ampCancellable(static function () {
@@ -86,7 +87,7 @@ final class AmpCancellableTest
         $events = [];
 
         $exception = thrown(static function () use (&$events) {
-            timeout(1, static function () use (&$events) {
+            timeout(sec(1), static function () use (&$events) {
                 try {
                     ampCancellable(static fn($cancellation) => ampDelay(1000, cancellation: $cancellation));
                 } finally {
@@ -147,7 +148,7 @@ final class AmpCancellableTest
         // The amphp timer and the deadline fire in the same tick: the cancellation callback is queued for
         // a suspension that has already been resumed by the timer. It must not reach the next wait (the join).
         // On virtual time they always do, so one round is enough.
-        $exception = thrown(static fn() => timeout(2, static fn() => group(static function (Group $group) {
+        $exception = thrown(static fn() => timeout(sec(2), static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => ampCancellable(
                 static fn($cancellation) => ampDelay(2, cancellation: $cancellation),
             ));

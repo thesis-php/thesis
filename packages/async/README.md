@@ -139,11 +139,12 @@ A background task that lives exactly as long as the work it accompanies:
 
 ```php
 use function Thesis\Async\delay;
+use function Thesis\Time\sec;
 
 group(static function (Group $group) use ($message) {
     $group->daemon(static function () use ($message) {
         while (true) {
-            delay(10);
+            delay(sec(10));
             $message->touch(); // heartbeat
         }
     });
@@ -203,17 +204,21 @@ A deadline covers everything inside the closure, including nested groups.
 ```php
 use Thesis\Async\TimedOut;
 use function Thesis\Async\timeout;
+use function Thesis\Time\ms;
 
 try {
-    $recommendations = timeout(0.3, static fn() => fetchRecommendations($userId));
+    $recommendations = timeout(ms(300), static fn() => fetchRecommendations($userId));
 } catch (TimedOut) {
     $recommendations = [];
 }
 ```
 
+Durations are `Time\Duration` of PHP 8.6 (a polyfill on 8.5), created with the functions of
+[`thesis/time`](../time/README.md): `ms(300)`, `sec(5)`, `minutes(1.5)`. The unit is in the code, not in a convention.
+
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,
 and an outer cancellation always outranks a deadline. A deadline that is zero or negative has already passed:
-the closure runs, but its first wait throws. A `NAN` deadline is a bug and throws `\ValueError` before the closure runs.
+the closure runs, but its first wait throws.
 `delay()` of zero or less waits as `delay(0)`, as in Go and Python: until the next tick, a cancellation point all the same.
 
 When running out of time is an expected outcome, `timeoutOr()` returns a default instead of throwing,
@@ -222,7 +227,7 @@ When running out of time is an expected outcome, `timeoutOr()` returns a default
 ```php
 use function Thesis\Async\timeoutOr;
 
-$recommendations = timeoutOr(0.3, static fn() => fetchRecommendations($userId), default: []);
+$recommendations = timeoutOr(ms(300), static fn() => fetchRecommendations($userId), default: []);
 ```
 
 It is not `try { timeout() } catch (TimedOut)`: that would also swallow a `TimedOut` of a nested `timeout()`
@@ -232,27 +237,51 @@ If the closure may return the default itself (`null`, for example), pass a defau
 as with [`Channel::tryReceive()`](#producers-and-consumers-channel):
 
 ```php
-$user = timeoutOr(0.3, static fn() => findUser($userId), default: $expired = new \stdClass()); // ?User
+$user = timeoutOr(ms(300), static fn() => findUser($userId), default: $expired = new \stdClass()); // ?User
 
 if ($user === $expired) {
     // the deadline, not a missing user
 }
 ```
 
-`now()` is the monotonic clock of deadlines, for one computed ahead: `$at = now() + 5`, later `timeout($at - now(), ...)`.
+`Instant` is a point on the monotonic clock of deadlines, the one `VirtualTime\run()` replaces. Code that keeps times
+(a cache entry that expires, a breaker that reopens) takes them from it, not from `hrtime()`, so that virtual time moves them.
+The difference of two instants is a `Duration`, and instants compare with the operators:
 
-`remaining()` tells how many seconds are left until the nearest deadline, or `null` if there is none,
+```php
+use Thesis\Async\Instant;
+use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
+
+$elapsed = Instant::elapsed(static fn() => $client->ping()); // Duration
+
+$start = Instant::now();
+// ...
+$elapsed = Instant::now()->since($start);
+
+$expiresAt = Instant::now()->add($ttl);
+// later
+if ($expiresAt <= Instant::now()) {
+    // expired
+}
+
+$deadline = Instant::now()->add(sec(5)); // computed ahead
+timeout($deadline->since(Instant::now()), $body);
+```
+
+`remaining()` tells how much time is left until the nearest deadline, or `null` if there is none,
 so the deadline can be passed on to where a scope cannot reach: a database, a remote call.
 A task sees the deadline under which its group runs; inside `shield()` outer deadlines are not visible,
 since nothing would enforce them there.
 
 ```php
 use function Thesis\Async\remaining;
+use function Thesis\Time\toMs;
 
-$seconds = remaining();
+$remaining = remaining();
 
-if ($seconds !== null) {
-    $connection->execute(sprintf('SET statement_timeout = %d', (int) ceil($seconds * 1000)));
+if ($remaining !== null) {
+    $connection->execute(sprintf('SET statement_timeout = %d', toMs($remaining, \RoundingMode::PositiveInfinity)));
 }
 ```
 
@@ -266,12 +295,13 @@ if every contender fails, the first failure is rethrown.
 ```php
 use function Thesis\Async\delay;
 use function Thesis\Async\race;
+use function Thesis\Time\ms;
 
 // Hedged request: ask the replica only if the primary is slow.
 $value = race([
     static fn() => read('primary', $key),
     static function () use ($key) {
-        delay(0.05);
+        delay(ms(50));
 
         return read('replica', $key);
     },
@@ -308,9 +338,10 @@ each with the keys of the tasks and in their order:
 ```php
 use function Thesis\Async\allSettled;
 use function Thesis\Async\timeout;
+use function Thesis\Time\ms;
 
 [$pages, $errors] = allSettled(array_map(
-    static fn(string $url) => static fn() => timeout(0.1, static fn() => fetch($url)),
+    static fn(string $url) => static fn() => timeout(ms(100), static fn() => fetch($url)),
     $urls,
 ));
 ```
@@ -355,7 +386,7 @@ try {
     $connection->execute('UPDATE accounts ...');
     $connection->execute('COMMIT');
 } catch (\Throwable $exception) {
-    shield(static fn() => timeout(1, static fn() => $connection->execute('ROLLBACK')));
+    shield(static fn() => timeout(sec(1), static fn() => $connection->execute('ROLLBACK')));
 
     throw $exception;
 }
@@ -474,7 +505,7 @@ $pending[$requestId] = $response; // the connection's reader calls $response->co
 
 $connection->send($request);
 
-return timeout(5, $response->await(...));
+return timeout(sec(5), $response->await(...));
 ```
 
 `complete()` and `fail()` return `false` if the deferred is already done. A deferred cannot fail with `Cancelled`:
@@ -586,7 +617,7 @@ each($repositories, 5, static function (Repository $repository) use ($github) { 
 ```
 
 After a pause, `$burst` calls start at once, then one every `1 / $perSecond` seconds. No timer refills the bucket:
-it keeps the time at which it would be full again, and a call compares it with `now()`. It is fair like the mutex it queues on: tokens go in the order
+it keeps the time at which it would be full again, and a call compares it with the clock. It is fair like the mutex it queues on: tokens go in the order
 callers came, and only the first one sleeps. A caller cancelled while waiting takes no token, so the next one gets it on time;
 `timeout()` around `wait()` bounds how long a call may wait for its turn.
 
@@ -596,8 +627,9 @@ in any `T` seconds, use a sliding window instead, which bounds every interval at
 
 ```php
 use Thesis\Async\LocalSlidingWindowRateLimiter;
+use function Thesis\Time\sec;
 
-$api = new LocalSlidingWindowRateLimiter(limit: 10, window: 1); // never 11 starts within one second
+$api = new LocalSlidingWindowRateLimiter(limit: 10, window: sec(1)); // never 11 starts within one second
 ```
 
 It keeps the start times of the last `$limit` calls, and a call waits until the oldest of them leaves the window.
@@ -616,6 +648,7 @@ messages delivered to a subscription, stages of a pipeline. `send()` waits while
 use Thesis\Async\Channel;
 use Thesis\Async\ChannelClosed;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\sec;
 
 /** @var Channel<Event> */
 $events = new Channel(1000);
@@ -628,7 +661,7 @@ group(static function (Group $group) use ($events, $server) {
 
             try {
                 // Up to 100 events or 1 second. A value that arrives together with the deadline is not lost.
-                timeoutOr(1, static function () use ($events, &$batch) {
+                timeoutOr(sec(1), static function () use ($events, &$batch) {
                     while (\count($batch) < 100) {
                         $batch[] = $events->receive();
                     }
@@ -784,8 +817,9 @@ It needs `amphp/amp` v3 (any amphp library brings it); the rest of the package d
 use Amp\Cancellation;
 use function Thesis\Async\ampCancellable;
 use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
 
-$response = timeout(5, static fn() => ampCancellable(
+$response = timeout(sec(5), static fn() => ampCancellable(
     static fn(Cancellation $cancellation) => $httpClient->request($request, $cancellation),
 ));
 ```
@@ -801,17 +835,18 @@ even if the cancellation has already happened, so it cannot wake a fiber that ha
 ### Tests on virtual time: `VirtualTime\run()`
 
 Code with long deadlines is hard to test on real time: a heartbeat every 30 seconds, a backoff up to a minute.
-`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `now()`
+`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `Instant::now()`
 rounded up to a whole second, so a time captured before `run()` (a deadline, a rate limiter) stays valid in it, and stands still
 while code runs; when nothing can run, it jumps to the nearest timer. So an hour of waiting is over at once,
 timers fire exactly in the order of their deadlines, and durations can be asserted exactly:
 
 ```php
+use Thesis\Async\Instant;
 use Thesis\Async\VirtualTime;
-use function Thesis\Async\now;
+use function Thesis\Time\sec;
 
 VirtualTime\run(static function () {
-    $start = now();
+    $start = Instant::now();
     $client = new Client(new AlwaysFailingSocket());
 
     try {
@@ -819,12 +854,12 @@ VirtualTime\run(static function () {
     } catch (ConnectionFailed) {
     }
 
-    assert(now() - $start === 31.0);
+    assert(Instant::now()->since($start) == sec(31));
 });
 ```
 
-CPU work takes no time on this clock: `VirtualTime\advance($seconds)` moves it forward without yielding,
-as busy code would (a negative or `NAN` `$seconds` throws `\ValueError`).
+CPU work takes no time on this clock: `VirtualTime\advance($duration)` moves it forward without yielding,
+as busy code would (a negative `$duration` throws `\ValueError`).
 A deadline passes then, but its timer fires only at the next suspension, as after a loop that blocked the event loop.
 A deadlock fails at once instead of hanging: there is no timer to jump to, and Revolt ends the loop.
 `run()` swaps the driver of the event loop, so it must be called in `{main}`: in a fiber it throws `LogicException`.
@@ -835,7 +870,7 @@ or on one passed as `run($fn, $driver)`. It must be fresh: not the current drive
 so nothing from outside runs on virtual time, and it is dropped with whatever `$fn` leaves in it. They are polled on every tick, and only timers are waited for virtually,
 so a stream that becomes ready from outside the process may be jumped past.
 While `run()` runs, its clock is the clock of the library, bound by `run()` itself rather than found through the driver:
-`now()`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
+`Instant`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
 Each `run()` has a clock of its own, so an object that keeps times must not outlive the `run()` it was used in:
 a rate limiter shared by two `run()`s one after another, or used again outside, may see a time from the future of its clock.
 
@@ -1013,26 +1048,26 @@ all([user, orders])              orders fails after 50 ms
 | `some(int $count, array<K, callable(): T>): non-empty-array<K, T>` | first `$count` successes win, the rest are cancelled and joined |
 | `each(iterable<T>, int $concurrency, callable(T))` | bounded concurrency |
 | `map(iterable<K, T>, int $concurrency, callable(T): R): array<K, R>` | bounded concurrency with results |
-| `timeout(float $seconds, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
-| `timeoutOr(float $seconds, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
-| `remaining(): ?float` | seconds left until the nearest deadline, `null` if there is none |
-| `now(): float` | monotonic seconds, the clock of deadlines |
+| `timeout(Duration, callable(): T): T` | deadline for a subtree, throws `TimedOut` |
+| `timeoutOr(Duration, callable(): T, D $default = null): T\|D` | deadline for a subtree, `$default` once it expires |
+| `remaining(): ?Duration` | time left until the nearest deadline, `null` if there is none |
+| `Instant`: `now()`, `elapsed(callable): Duration`, `add(Duration)`, `since(Instant): Duration`, `<`, `==` | a point on the monotonic clock of deadlines |
 | `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |
 | `KeyedMutex extends KeyedSemaphore`: `acquire(int\|string $key): Lock`; `LocalKeyedMutex`, `LocalKeyedSemaphore(int $permits)` | a mutex or a semaphore per key |
 | `synchronizedKey(KeyedSemaphore, int\|string $key, callable(): T): T` | run holding a permit of a key, reentrant within a fiber per key |
-| `RateLimiter`: `wait(): void`; `LocalTokenBucketRateLimiter(float $perSecond, int $burst)`, `LocalSlidingWindowRateLimiter(int $limit, float $window)` | how often calls start: a token bucket or a sliding window, fair |
+| `RateLimiter`: `wait(): void`; `LocalTokenBucketRateLimiter(float $perSecond, int $burst)`, `LocalSlidingWindowRateLimiter(int $limit, Duration $window)` | how often calls start: a token bucket or a sliding window, fair |
 | `Channel<T>(int $capacity)`: `send(T)`, `trySend(T): SendResult`, `receive(): T`, `tryReceive(D $default = null): T\|D`, `close(?\Throwable $reason = null)`, `$isClosed`, `count()`, `$capacity`, `foreach` | bounded FIFO queue between fibers, fair |
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
-| `delay(float $seconds)` | cancellable sleep; zero or less waits as zero |
+| `delay(Duration)` | cancellable sleep; zero or less waits as zero |
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `Pacer(int $perTick)`: `pace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
-| `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(float $seconds): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
+| `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(Duration): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |
@@ -1040,7 +1075,7 @@ all([user, orders])              orders fails after 50 ms
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
-| `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(float $seconds)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
+| `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(Duration)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
 
 ## Limitations
 
@@ -1059,10 +1094,6 @@ all([user, orders])              orders fails after 50 ms
 Ideas that are not implemented yet.
 
 - **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
-- **`Time\Duration` of PHP 8.6.** To think over: accept `float|Duration` where a duration is passed in (`delay()`, `timeout()`,
-  `timeoutOr()`, the rate limiters), so that a value from the Polling API needs no conversion, while `delay(1)` stays short;
-  keep `float` where time comes out (`now()`, `remaining()`), since deadlines are computed with it.
-  Then also decide whether to require PHP 8.6 or support 8.5 with a stub for static analysis.
 - **A package for `VirtualTimePlugin` and `#[VirtualTime]`**: the Testo plugin lives in `tests/Testo` for now.
 
 ## Prior art

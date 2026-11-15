@@ -19,7 +19,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   where it is caught: `timeout()` throws `TimedOut` only if its scope is cancelled and its parent is not.
   `timeoutOr()` decides the same way, in the shared `Internal\Expired::run()`, never by catching `TimedOut`:
   that would swallow a `TimedOut` of a nested `timeout()`. A deadline `<= 0` cancels the scope at once, without a timer.
-  A `NAN` deadline or delay throws `\ValueError`; `delay(<= 0)` is `delay(0)`.
+  `delay(<= 0)` is `delay(0)`.
 - `Cancelled` is thrown only where the current scope is cancelled. Awaiting a cancelled task from a healthy scope
   throws `TaskCancelled` (a regular exception). `Deferred::fail()`, `Channel::close()` and `Continuation::throw()` reject `Cancelled`
   with `\ValueError`; a wait is cancelled only through `ContinuationImpl::interrupt()`. A `Cancelled` that escapes a task
@@ -78,7 +78,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   able to end every wait before `fclose()` (a Revolt watcher of a closed stream is an error, the fiber would never wake up).
   `close()` resumes the waits with `false` and cancels their watchers; a wait after `close()` returns `false` without
   suspending or a cancellation check, like `receive()` of a closed channel. Its `delay()` is there for the owner's backoff
-  (an accept loop), which a closed stream must end too; it follows `delay()`: `NAN` throws, `<= 0` is zero.
+  (an accept loop), which a closed stream must end too; it follows `delay()`: `<= 0` is zero.
 - `Pacer` is separate from `StreamWatcher`: fairness of a fast path has nothing to do with streams
   (a hot channel needs it too). It counts calls per tick and is reset by an `EventLoop::defer()` registered
   by the first call of the tick; past the limit it calls `checkpoint()` *before* the operation,
@@ -95,20 +95,38 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the tree.
   One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
   A wait subscribes its `ContinuationImpl` itself (`Scope::subscribe()`/`unsubscribe()`), without allocating closures.
-- The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`hrtime`, `INF` if none),
+- The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`Scope::now()`, null if none),
   the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the clock;
   `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
-- `Internal\Scope::now()` is the only clock of the library (`now()`, deadlines, the rate limiters): never call `hrtime()`
+- `Internal\Scope::now()` is the only clock of the library (`Instant`, deadlines, the rate limiters): never call `hrtime()`
   or `microtime()` elsewhere. Within `VirtualTime\run()`, it reads `Internal\Scope::$virtualClock`, bound by `run()`:
   never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on `Scope`, not on
   `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The clock is not read in `suspend()`.
-  The virtual clock starts at `ceil(now())`, not at zero: a time captured before `run()` stays in the past, and whole seconds stay exact.
+  The virtual clock starts at `Scope::now()` rounded up to a whole second, not at zero: a time captured before `run()`
+  stays in the past.
 - `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run since the previous pump.
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
   `VirtualTime\run()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is finished.
 - A rate limiter keeps absolute times and sleeps once per call, without comparing the clock again after the wake-up:
-  a wake-up a hair early (float rounding) must not loop on a delay too small to move the virtual clock.
+  a wake-up a hair early (Revolt's timers are float seconds) must not loop on a delay too small to move the clock.
+- A duration passed in is `Time\Duration` only (`delay()`, `timeout()`, `timeoutOr()`, `StreamWatcher::delay()`,
+  the window of the rate limiter, `VirtualTime\advance()`), and `remaining()` returns one. A point in time is `Instant`, not a
+  `Duration` (as `thesis/time` decided) and not a float: the difference of two is a `Duration`.
+  Its shape follows the `Instant` sketched in the future scope of the Duration RFC: `add(Duration)`, the difference
+  is a signed `Duration`, no adding of two instants. A native one would not follow `VirtualTime\run()`, so ours stays
+  even then; it may wrap the native one. A rate (`$perSecond`) is not a duration and stays a float.
+- Inside, time is `int` nanoseconds: `Internal\Scope::now()` is `hrtime(true)` or the virtual clock, and so are
+  the deadlines, `Instant`, the rate limiters and the virtual timers. Exact like `Duration` (the same representation,
+  `ns()`/`toNs()` convert without a loss) and as cheap as a float. Revolt is the only float boundary: `$ns / 1e9`
+  into `EventLoop::delay()`, rounded back in `VirtualTimeDriver`. An int overflow turns into a float and a
+  `TypeError`, so every sum with a `Duration` from outside is guarded. A deadline and a virtual timer saturate at
+  `PHP_INT_MAX` (`Scope::after()`, `VirtualTimeDriver::enqueue()`): a timeout of centuries is still a deadline,
+  only one that never comes. `Scope::remaining()` is capped at the longest `Duration`, a little below `PHP_INT_MAX`,
+  so `ns()` of it never throws. `Instant` is a value, so it does not saturate: `add()` and `since()` throw
+  `Time\TimeException` beyond int, as `Duration` does beyond its range.
+  Rejected: float seconds (they lose nanoseconds after about 100 days of uptime and do not convert to `Duration`
+  exactly), `Duration` objects (about 500 ns an operation on the polyfill against 40, and an allocation each).
 - `ScopedValue`s live outside the scope tree, in `Internal\Context`: an immutable array per fiber, copied by `with()`.
   A task's scope is a child of the group, not of the spawn site, so `GroupImpl::start()` captures the values
   in the spawning fiber and the task runs with them. A shield does not hide values. A task that inherits nothing
@@ -120,8 +138,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 ## Conventions
 
 - Every test runs on virtual time (`VirtualTimePlugin` in `testo.plugins.php`, from `tests/Testo`; no attribute is needed): delays are whole seconds
-  (`delay(1)`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted exactly
-  (`Assert::same(now() - $start, 20.0)`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
+  (`delay(sec(1))`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted
+  exactly (`Assert::same(secondsSince($start), 20.0)`, `Assert::equals(remaining(), sec(990))`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
   Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
   Real time is only for what virtual time cannot model.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.

@@ -23,7 +23,8 @@
         "ext-filter": "*",
         "ext-openssl": "*",
         "thesis/async": "^2.0",
-        "thesis/io": "^2.0"
+        "thesis/io": "^2.0",
+        "thesis/time": "^2.0"
     },
     "require-dev": {
         "ext-intl": "*",

@@ -12,6 +12,7 @@ return new Manifest(
         'ext-openssl' => '*',
         'thesis/async' => '*',
         'thesis/io' => '*',
+        'thesis/time' => '*',
     ],
     requireDev: [
         'ext-intl' => '*',

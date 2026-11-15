@@ -8,9 +8,11 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\Tests\withoutWarnings;
+use function Thesis\Time\sec;
 
 #[Test]
 final class LocalTokenBucketRateLimiterTest
@@ -18,16 +20,16 @@ final class LocalTokenBucketRateLimiterTest
     public function burstStartsAtOnceThenOneEveryInterval(): void
     {
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 3);
-        $start = now();
+        $start = Instant::now();
 
         $limiter->wait();
         $limiter->wait();
         $limiter->wait();
-        $burst = now() - $start;
+        $burst = secondsSince($start);
         $limiter->wait();
-        $fourth = now() - $start;
+        $fourth = secondsSince($start);
         $limiter->wait();
-        $fifth = now() - $start;
+        $fifth = secondsSince($start);
 
         Assert::same([$burst, $fourth, $fifth], [0.0, 1.0, 2.0]);
         assertNoCallbacksLeft();
@@ -48,15 +50,15 @@ final class LocalTokenBucketRateLimiterTest
     public function callsStartOnScheduleAtAnyRate(float $perSecond, int $burst): void
     {
         $limiter = new LocalTokenBucketRateLimiter($perSecond, $burst);
-        $start = now();
+        $start = Instant::now();
 
         for ($call = 0; $call < $burst + 30; ++$call) {
             $limiter->wait();
             $expected = max(0, $call - $burst + 1) / $perSecond;
 
             Assert::true(
-                actual: abs(now() - $start - $expected) < 1e-9,
-                message: \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected),
+                actual: abs(secondsSince($start) - $expected) < 1e-9,
+                message: \sprintf('Call %d started at %s instead of %s.', $call, secondsSince($start), $expected),
             );
         }
 
@@ -65,15 +67,15 @@ final class LocalTokenBucketRateLimiterTest
 
     public function limiterCreatedOutsideRunWorksInside(): void
     {
-        delay(100); // the clock of the inner run() must not start behind the time the limiter has seen
+        delay(sec(100)); // the clock of the inner run() must not start behind the time the limiter has seen
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
         $limiter->wait();
 
         $elapsed = VirtualTime\run(static function () use ($limiter) {
-            $start = now();
+            $start = Instant::now();
             $limiter->wait();
 
-            return now() - $start;
+            return secondsSince($start);
         });
 
         Assert::same($elapsed, 1.0);
@@ -101,7 +103,7 @@ final class LocalTokenBucketRateLimiterTest
     {
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
 
-        $thrown = timeout(1, static function () use ($limiter) {
+        $thrown = timeout(sec(1), static function () use ($limiter) {
             untilCancelled();
 
             try {
@@ -120,13 +122,13 @@ final class LocalTokenBucketRateLimiterTest
     {
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
-        $start = now();
+        $start = Instant::now();
 
-        $result = timeoutOr(1, $limiter->wait(...), default: 'timed out');
+        $result = timeoutOr(sec(1), $limiter->wait(...), default: 'timed out');
         $limiter->wait();
 
         Assert::same($result, 'timed out');
-        Assert::same(now() - $start, 2.0); // 4.0 if the cancelled wait counted
+        Assert::same(secondsSince($start), 2.0); // 4.0 if the cancelled wait counted
         assertNoCallbacksLeft();
     }
 
@@ -134,21 +136,21 @@ final class LocalTokenBucketRateLimiterTest
     {
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 1);
         $limiter->wait();
-        $start = now();
+        $start = Instant::now();
 
         $at = group(static function (Group $group) use ($limiter, $start) {
             $sleeper = $group->spawn(static function () use ($limiter, $start) {
                 $limiter->wait();
 
-                return now() - $start;
+                return secondsSince($start);
             });
             $queued = $group->spawn($limiter->wait(...));
             $last = $group->spawn(static function () use ($limiter, $start) {
                 $limiter->wait();
 
-                return now() - $start;
+                return secondsSince($start);
             });
-            delay(1);
+            delay(sec(1));
 
             $queued->cancel();
 
@@ -163,14 +165,14 @@ final class LocalTokenBucketRateLimiterTest
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 2);
         $limiter->wait();
         $limiter->wait();
-        delay(10);
-        $start = now();
+        delay(sec(10));
+        $start = Instant::now();
 
         $limiter->wait();
         $limiter->wait();
-        $afterBurst = now() - $start;
+        $afterBurst = secondsSince($start);
         $limiter->wait();
-        $third = now() - $start;
+        $third = secondsSince($start);
 
         Assert::same([$afterBurst, $third], [0.0, 2.0]);
     }
