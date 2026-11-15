@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Rector\CodeQuality\Rector\Attribute\SortAttributeNamedArgsRector;
+use Rector\CodeQuality\Rector\FuncCall\SortCallLikeNamedArgsRector;
 use Rector\Config\RectorConfig;
 use Rector\Php80\Rector\Class_\StringableForToStringRector;
 
@@ -24,8 +26,14 @@ return RectorConfig
     ->withParallel()
     ->withCache($root . '/var/rector')
     ->withPhpSets()
+    ->withRules([
+        SortCallLikeNamedArgsRector::class,
+        SortAttributeNamedArgsRector::class,
+    ])
     ->withSkip([
         StringableForToStringRector::class,
+        // The fixtures call functions with named arguments out of order on purpose.
+        SortCallLikeNamedArgsRector::class => [$root . '/packages/phpstan-extension/types'],
         // Generated, see php-cs-fixer.php.
         __DIR__ . '/manifests.php',
         ...$skipped,

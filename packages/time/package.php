@@ -20,11 +20,11 @@ return new Manifest(
     ],
     files: ['src/autoload.files.php'],
     devFiles: ['tests/autoload.files.php'],
-    dist: ['polyfill'],
     skip: [
         new FixerSkip(
             paths: ['polyfill/TimeException.php'],
             reason: 'final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.',
         ),
     ],
+    dist: ['polyfill'],
 );
