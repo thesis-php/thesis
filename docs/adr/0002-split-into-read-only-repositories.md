@@ -1,6 +1,6 @@
 # 2. Packages are split into read-only repositories
 
-Status: accepted, the tool of the split (1) superseded by 0003
+Status: accepted, the split by splitsh (1) superseded by 0003, the refs of the split (1) and the versions (5–7) by 0004
 
 ## Context
 
