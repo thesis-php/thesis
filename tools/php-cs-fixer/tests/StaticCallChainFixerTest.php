@@ -78,6 +78,9 @@ final readonly class StaticCallChainFixerTest
                     '--config=' . \dirname(__DIR__, 2) . '/php-cs-fixer.php',
                     '--path-mode=override',
                     '--using-cache=no',
+                    // The tests run on every PHP version of CI, the fixer refuses the ones it does not support yet.
+                    // The fixtures have no syntax of those versions, and the code style is checked on a supported one.
+                    '--allow-unsupported-php-version=yes',
                     '--sequential',
                     '--quiet',
                     $dir,

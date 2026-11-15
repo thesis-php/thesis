@@ -18,4 +18,18 @@ jobs:
       # Generated files and the lock are checked by regenerating them: sync is the only source of truth.
       - run: make sync
       - run: git diff --exit-code
-      - run: make check
+      # The checks of `make check` except the tests: they run in the test job, on every PHP version.
+      - run: make fixer-check rector-check phpstan deps-analyze
+
+  # Time\Duration is a polyfill on PHP 8.5 and native on PHP 8.6: the code runs against both.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.5', '8.6']
+    env:
+      PHP_VERSION: ${{ matrix.php }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make test

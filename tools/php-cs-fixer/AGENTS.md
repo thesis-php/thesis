@@ -10,6 +10,8 @@ Custom rules of PHP CS Fixer for `tools/php-cs-fixer.php`.
   It also runs the expected output, which must not change: `make fixer-check` right after `make fixer` must pass.
   A rule is correct only together with the rules around it, so a fixture is the whole file, not one token.
   `.php.inc` keeps the fixtures away from PHP CS Fixer, Rector and PHPStan.
+- The tests run on every PHP version of CI, PHP CS Fixer refuses a version newer than it supports:
+  the test passes `--allow-unsupported-php-version=yes`, and the fixtures keep to the syntax of the oldest version.
 
 ## Thesis/static_call_chain
 
