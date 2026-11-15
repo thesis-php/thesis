@@ -108,6 +108,9 @@ of its package, and a step that is done is deleted from here.
 2. Postgres: pure PHP on the wire protocol rather than ext-pgsql or pecl-pq?
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
-5. Windows: supported or not? It decides `windows-registry` for DNS and the Windows branch of `process`.
+5. Windows: supported or not, and to what extent? Think it through before `process`: it decides `windows-registry`
+   for DNS and the Windows branch of `process`. Already affected: `stdio()` of `io` throws there (a pipe can be
+   neither selected nor watched), Unix sockets of `net`, `trapSignals()` of `async`. Supporting it means a Windows
+   job in CI, and nothing tests it now.
 6. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
 7. The cache: a package of its own or a part of `async`?
