@@ -92,6 +92,11 @@ of its package, and a step that is done is deleted from here.
 3. Failing tests first, integration tests against the service in compose.
 4. A package that takes an older name gets its old tags by hand (ADR 0002, 7).
 
+## Tooling
+
+- Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
+  or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
+
 ## Open questions
 
 1. Protobuf: wait for grpc, or rewrite it earlier as a standalone serializer?
