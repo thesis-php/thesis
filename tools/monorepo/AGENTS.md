@@ -25,7 +25,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
   locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`.
 - `github` throws on an existing repository without our rulesets: older packages of the organization share names
-  with new ones. Taking one over is done by hand, by adding the rulesets.
+  with new ones. Taking one over is done by hand, by adding the rulesets. A name that GitHub redirects to a renamed
+  repository (`full_name` differs) is free: the repository is created, which ends the redirect.
 - The organization, the default branch and the id of the app are constants of `Repositories`, not of `Config`:
   they describe the infrastructure, not the packages, and nobody writes them by hand.
 - HTTP goes through `file_get_contents()` with a stream context behind the `Api` interface: a few JSON requests

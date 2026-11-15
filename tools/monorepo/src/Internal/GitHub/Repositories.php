@@ -54,6 +54,17 @@ final class Repositories
     {
         $repository = self::ORGANIZATION . '/' . $package->dir;
         $actual = $this->api->get('repos/' . $repository);
+        $created = 'created';
+
+        // GitHub redirects the old name of a renamed repository to it: the name is free,
+        // and taking it ends the redirect.
+        $fullName = $actual['full_name'] ?? null;
+
+        if (\is_string($fullName) && strcasecmp($fullName, $repository) !== 0) {
+            $actual = null;
+            $created .= ', the redirect to ' . $fullName . ' is gone';
+        }
+
         $rulesets = $actual === null ? [] : $this->rulesetIds($repository);
 
         // A repository of the same name may be an older package that is not a split: it must not be taken over.
@@ -69,7 +80,7 @@ final class Repositories
         if ($actual === null) {
             $this->change(
                 repository: $repository,
-                what: 'created',
+                what: $created,
                 apply: fn() => $this->api->send('POST', 'orgs/' . self::ORGANIZATION . '/repos', [
                     'name' => $package->dir,
                     'visibility' => 'public',

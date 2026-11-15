@@ -26,14 +26,22 @@ for a new package. The organization is on the free plan of GitHub.
    the description, the homepage (`packages/<name>` in the monorepo), the disabled features and the rulesets,
    and registers the package on Packagist. GitHub itself is the state, the command is idempotent and deletes nothing.
    It refuses a repository that exists without the rulesets of the split: the organization holds older packages
-   under the same names (`thesis-php/time`), and taking one over is a decision, not a side effect of a push.
+   under the same names, and taking one over is a decision, not a side effect of a push. The old name
+   of a renamed repository is free: it only redirects.
 5. **One version, tags only where something changed.** All packages share the version series of `Config::$version`.
-   A tag `vX.Y.Z` of the monorepo goes to a package only if `packages/<name>` changed since the previous tag
-   of the same series. The first tag of a series (`v0.2.0`) goes to every package, so that `^0.2` resolves for all.
+   A stable tag `vX.Y.Z` of the monorepo goes to a package only if `packages/<name>` changed since the previous
+   tag of the same series and that tag was stable. Every other tag goes to every package: the first tag of a series
+   (`v2.1.0`), so that `^2.1` resolves for all, and a pre-release or the first stable tag after one, so that
+   no package is left less stable than the others.
 6. **Explicit lower bounds.** A dependency on a monorepo package is `'*'` by default, which the generator writes
-   as `Config::$version`. A manifest may give a narrower constraint (`'thesis/io' => '^0.1.3'`) when it starts
+   as `Config::$version`. A manifest may give a narrower constraint (`'thesis/io' => '^2.0.3'`) when it starts
    using an API that appeared later in the series. `sync` fails when such a constraint is outside
    `Config::$version`, the release fails when no existing or new tag of the dependency satisfies it.
+7. **Versions start at 2.0**, with pre-releases (`v2.0.0-alpha1`). The older packages of the organization
+   reach 1.0.2 (`thesis/amqp`), so no new version repeats an old one under a reused name. A new package that takes
+   the name of an older one gets its tags once, by hand: they are pushed from the old repository into the new one,
+   so Packagist keeps the old versions and the locks that point to their commits keep working. The rulesets protect
+   those tags, and the split never touches them.
 
 ## Consequences
 
@@ -43,6 +51,10 @@ for a new package. The organization is on the free plan of GitHub.
 - The root lock tests one combination of dependencies. Installing every package alone with the lowest
   and the highest allowed versions is a separate job, worth it once there are tags to resolve.
 - A forgotten lower bound breaks only the users who keep an older dependency. That job catches it.
+- Until 2.0.0 a user needs `minimum-stability: alpha` (or `beta`, `RC`) with `prefer-stable: true`: a stability flag
+  like `@alpha` works only in the root package, not for the dependencies between our packages.
+- A reused name loses the redirect of a renamed repository (`thesis-php/time` to `thesis-php/time-span`)
+  and changes the repository behind the Packagist package of that name. Its abandoned flag is removed by hand.
 
 ## Rejected
 
@@ -56,5 +68,7 @@ for a new package. The organization is on the free plan of GitHub.
   a configuration file in each repository and weak support of rulesets.
 - **A tag in every package on every release** (strict lockstep): empty releases of unchanged packages.
   **Independent versions per package**: a changelog and constraints of each package kept by hand.
+- **Starting at 0.1 or 1.0**: the versions would repeat the old ones under reused names (`thesis/time` has 0.2.3),
+  and their tags could not live in the same repository.
 - **Lower bounds rewritten by the release** to the latest tags of the dependencies: a release would change
   the generated `composer.json` and would cascade a tag to every dependent package.

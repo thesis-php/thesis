@@ -104,7 +104,7 @@ final readonly class RepositoriesTest
     public static function refusesRepositoryThatIsNotSplit(): void
     {
         $api = new FakeApi([
-            'repos/thesis-php/io' => ['default_branch' => '0.2.x'],
+            'repos/thesis-php/io' => ['full_name' => 'thesis-php/io', 'default_branch' => '0.2.x'],
             'repos/thesis-php/io/rulesets' => [],
         ]);
 
@@ -113,6 +113,18 @@ final readonly class RepositoriesTest
         );
 
         Repositories::sync(self::monorepo(), $api, dryRun: true);
+    }
+
+    public static function createsRepositoryWhoseNameRedirectsToRenamedOne(): void
+    {
+        $api = new FakeApi([
+            'repos/thesis-php/io' => ['full_name' => 'thesis-php/io-legacy', 'default_branch' => '0.2.x'],
+        ]);
+
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+
+        Assert::same($api->writes[0] ?? null, 'POST orgs/thesis-php/repos');
+        Assert::same($changes[0] ?? null, 'thesis-php/io: created, the redirect to thesis-php/io-legacy is gone');
     }
 
     public static function writesNothingInDryRun(): void
@@ -151,7 +163,7 @@ final readonly class RepositoriesTest
      */
     private static function repository(): array
     {
-        return ['id' => 42, 'default_branch' => 'main', ...self::settings()];
+        return ['id' => 42, 'full_name' => 'thesis-php/io', 'default_branch' => 'main', ...self::settings()];
     }
 
     /**

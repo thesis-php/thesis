@@ -11,14 +11,24 @@ git rev-parse --verify --quiet "$ref^{commit}" > /dev/null || {
     exit 1
 }
 
-# A tag goes only to the packages that changed since the previous tag of the same minor series: the first tag
-# of a series (v0.2.0) goes to all of them, so that ^0.2 resolves for every package.
+# A stable tag goes only to the packages that changed since the previous stable tag of the same minor series.
+# Every other tag goes to all packages: the first tag of a series (v2.1.0), so that ^2.1 resolves for each of them,
+# and a pre-release or the first stable tag after one (v2.0.0-beta1, v2.0.0), so that no package is left
+# with a less stable version than the others.
 previous=
 case $ref in
     refs/heads/*) ;;
     refs/tags/v*)
         tag=${ref#refs/tags/}
-        previous=$(git -c versionsort.suffix=- tag --list 'v*' --merged "$ref" --sort=-v:refname | grep -vxF "$tag" | head -n 1 || true)
+        previous=$(
+            git -c versionsort.suffix=- tag --list 'v*' --merged "$ref" --sort=-v:refname \
+                | grep -vxF "$tag" \
+                | head -n 1 \
+                || true
+        )
+        case "$tag $previous" in
+            *-*) previous= ;;
+        esac
         if [ "${previous%.*}" != "${tag%.*}" ]; then
             previous=
         fi
@@ -32,7 +42,8 @@ esac
 for prefix in $(git ls-tree -d --name-only "$ref" packages/); do
     name=${prefix#packages/}
 
-    if [ -n "$previous" ] && [ "$(git rev-parse --verify --quiet "$previous:$prefix" || true)" = "$(git rev-parse "$ref:$prefix")" ]; then
+    if [ -n "$previous" ] \
+        && [ "$(git rev-parse --verify --quiet "$previous:$prefix" || true)" = "$(git rev-parse "$ref:$prefix")" ]; then
         echo "$name: unchanged since $previous, skipped"
         continue
     fi

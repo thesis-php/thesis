@@ -10,8 +10,10 @@ Why it works this way is in `docs/adr/0002-split-into-read-only-repositories.md`
 - A split is deterministic: the same commit of the monorepo gives the same commit of a package. The pushes are
   never forced, so a split that cannot fast-forward fails instead of rewriting a published history.
 - Only what is committed at the ref is split (`git ls-tree`), never the working tree.
-- A tag goes to a package only if `packages/<name>` changed since the previous tag of the same minor series
-  (the tree hashes differ). The first tag of a series goes to every package.
+- A stable tag goes to a package only if `packages/<name>` changed since the previous tag of the same minor series
+  (the tree hashes differ) and that tag is stable too. The first tag of a series, a pre-release and the first
+  stable tag after a pre-release go to every package: otherwise a package would keep only an alpha
+  while the others are stable, and `minimum-stability: stable` could not install it.
 
 ## Decisions
 
