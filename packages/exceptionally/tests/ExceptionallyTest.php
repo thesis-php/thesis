@@ -145,6 +145,33 @@ final class ExceptionallyTest
         Assert::same(get_error_handler(), $this->previous);
     }
 
+    public function passesOnPastTheHandlersOfOtherCalls(): void
+    {
+        $depths = [];
+        set_error_handler(static function () use (&$depths) {
+            $depths[] = \count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS));
+
+            return true;
+        });
+        $suspended = [];
+
+        for ($calls = 1; $calls <= 3; ++$calls) {
+            $fiber = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+            $fiber->start();
+            $suspended[] = $fiber;
+            trigger_error('main', E_USER_WARNING);
+        }
+
+        foreach ($suspended as $fiber) {
+            $fiber->resume();
+        }
+
+        restore_error_handler();
+
+        Assert::same(\count($depths), 3);
+        Assert::same(\count(array_unique($depths)), 1);
+    }
+
     public function throwsWhileAnotherFiberIsSuspendedInSuppression(): void
     {
         $fiber = new \Fiber(static fn() => @\Fiber::suspend());
@@ -174,12 +201,12 @@ final class ExceptionallyTest
     }
 
     /**
-     * @param callable(): mixed $function
+     * @param callable(): mixed $fn
      */
-    private static function errorOf(callable $function): \ErrorException
+    private static function errorOf(callable $fn): \ErrorException
     {
         try {
-            $function();
+            $fn();
         } catch (\ErrorException $error) {
             return $error;
         }

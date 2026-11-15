@@ -10,8 +10,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - The handler stack of PHP is global, a call of `exceptionally()` belongs to one fiber. So the levels live
   per fiber (`$levelsOfFibers`, keyed by `\Fiber::getCurrent() ?? $main`), and every handler that `exceptionally()`
   sets reads the levels of the fiber the error comes from. Fibers suspended inside `exceptionally()` finish in any order
-  and `restore_error_handler()` removes the handler of another call: harmless, since all of them behave the same.
+  and `restore_error_handler()` removes the handler of another call: harmless while only our handlers are above
+  the one it set, since all of them behave the same. A handler set by other code while a call is suspended
+  is removed in its place and ours stays: the stack is global, no design avoids it, the README warns about it.
   The number of `set_error_handler()` and `restore_error_handler()` calls must stay equal, `finally` keeps it.
+- The previous handler of ours is never ours: if a handler of another call is below, its previous one is taken
+  (`$previousOfHandlers`). It would decide the same and pass the error on, and without the skip an error passed on
+  with N calls suspended goes through N closures (1 ms at 1000, `passesOnPastTheHandlersOfOtherCalls`).
 - An error that is not thrown (another fiber, another level, suppressed) goes to the previous handler,
   not `return false`: `false` goes straight to the standard handler of PHP and skips the one of the application.
 - Suppression is `error_reporting() & $level`. `error_reporting()` is saved per fiber by PHP (`@` in a suspended
@@ -31,6 +36,12 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   it lies for functions that return `false` without an error (`strpos()`, `array_search()`).
   Rejected: `exceptional()`, a wrapper that makes a callable exceptional: `static fn() => exceptionally(...)` is
   as short, and the old one was broken.
+- One handler per call, even if ours is on top. Rejected: a global counter of calls that sets the handler at 0→1
+  and restores it at 1→0, or skipping the set when ours is on top: a handler that the function sets and keeps
+  (a framework for the time of its `run()`) would then be above ours for nested calls and could swallow their errors.
+  A call costs one closure and one `set_error_handler()`, passing on costs one hop (see the invariants).
+- The parameter is `$fn`, as the root rule of naming callables says, not `$function` of 0.3: the release
+  breaks the API anyway.
 - Rejected: setting one handler once and never restoring it: code that sets a handler for a while and restores it
   (a test framework per test) would remove ours and leave its own forever.
 - Rejected: `@` with `error_get_last()`: the last error is global, after a suspension it may be of another fiber,

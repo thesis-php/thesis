@@ -11,11 +11,11 @@ namespace Thesis;
  *
  * @api
  * @template T
- * @param callable(): T $function
+ * @param callable(): T $fn
  * @return T
  * @throws \ErrorException
  */
-function exceptionally(callable $function, int $levels = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED): mixed
+function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED): mixed
 {
     // The handler stack is global, while a call of exceptionally() belongs to one fiber: while it is suspended,
     // other fibers run under its handler and may restore it out of order. So every handler reads the levels
@@ -25,35 +25,44 @@ function exceptionally(callable $function, int $levels = E_ALL & ~E_DEPRECATED &
     // {main} has no \Fiber, so it gets a key of its own
     /** @var \stdClass */
     static $main = new \stdClass();
+    /** @var \WeakMap<\Closure, ?callable> $previousOfHandlers */
+    static $previousOfHandlers = new \WeakMap();
 
-    // NEVER keep the key in a variable: kept while the fiber is suspended in $function(), it is a reference
+    // NEVER keep the key in a variable: kept while the fiber is suspended in $fn(), it is a reference
     // from the stack of the fiber to the fiber itself, a cycle that outlives the last reference to the fiber
-    $stack = $levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? [];
-    $stack[] = $levels;
-    $levelsOfFibers[\Fiber::getCurrent() ?? $main] = $stack;
+    $levelsOfFibers[\Fiber::getCurrent() ?? $main] = [
+        ...($levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? []),
+        $levels,
+    ];
 
-    $previous = null;
-    $previous = set_error_handler(
-        static function (int $level, string $message, string $file, int $line) use (
-            &$previous,
-            $levelsOfFibers,
-            $main,
-        ) {
-            $stack = $levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? [];
-            $levels = array_last($stack) ?? 0;
-            // error_reporting() is a part of the fiber state: @ in another fiber does not change it here
-            $reported = (error_reporting() & $level) !== 0;
+    // A handler of another call below would decide the same and pass the error on, so it is skipped:
+    // with N calls suspended, an error passed on would go through N handlers otherwise
+    $below = get_error_handler();
+    $previous = $below instanceof \Closure && $previousOfHandlers->offsetExists($below)
+        ? $previousOfHandlers[$below]
+        : $below;
 
-            if ($reported && ($levels & $level) !== 0) {
-                throw new \ErrorException($message, severity: $level, filename: $file, line: $line);
-            }
+    $handler = static function (int $level, string $message, string $file, int $line) use (
+        $previous,
+        $levelsOfFibers,
+        $main,
+    ) {
+        $stack = $levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? [];
+        $levels = array_last($stack) ?? 0;
+        // error_reporting() is a part of the fiber state: @ in another fiber does not change it here
+        $reported = (error_reporting() & $level) !== 0;
 
-            return $previous !== null && $previous($level, $message, $file, $line) !== false;
-        },
-    );
+        if ($reported && ($levels & $level) !== 0) {
+            throw new \ErrorException($message, severity: $level, filename: $file, line: $line);
+        }
+
+        return $previous !== null && $previous($level, $message, $file, $line) !== false;
+    };
+    $previousOfHandlers[$handler] = $previous;
+    set_error_handler($handler);
 
     try {
-        return $function();
+        return $fn();
     } finally {
         restore_error_handler();
 
