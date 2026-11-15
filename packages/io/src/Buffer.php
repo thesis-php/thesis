@@ -187,7 +187,7 @@ final class Buffer implements \Countable
     }
 
     /**
-     * @return non-negative-int
+     * @return int<0, 255>
      * @throws UnexpectedEof
      */
     public function readUint8(): int
@@ -216,7 +216,7 @@ final class Buffer implements \Countable
     }
 
     /**
-     * @return non-negative-int
+     * @return int<0, 65535>
      * @throws UnexpectedEof
      */
     public function readUint16(): int
@@ -252,7 +252,7 @@ final class Buffer implements \Countable
     }
 
     /**
-     * @return non-negative-int
+     * @return int<0, 4294967295>
      * @throws UnexpectedEof
      */
     public function readUint32(): int
@@ -265,7 +265,7 @@ final class Buffer implements \Countable
 
         $this->offset = $o + 4;
 
-        /** @var array{1: non-negative-int} $v */
+        /** @var array{1: int<0, 4294967295>} $v */
         $v = unpack($this->u32, $this->bytes, $o);
 
         return $v[1];

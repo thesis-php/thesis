@@ -1,0 +1,53 @@
+{
+    "name": "thesis/amqp",
+    "description": "AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "ext-filter": "*",
+        "ext-uri": "*",
+        "thesis/async": "^2.0",
+        "thesis/io": "^2.0",
+        "thesis/net": "^2.0",
+        "thesis/time": "^2.0"
+    },
+    "require-dev": {
+        "ext-simplexml": "*",
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29",
+        "thesis/testo": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Amqp\\": "src/"
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Amqp\\": "tests/"
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
+    }
+}

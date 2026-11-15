@@ -1,0 +1,148 @@
+# Thesis AMQP
+
+An AMQP 0.9.1 client for RabbitMQ on [thesis/async](../async/README.md): publisher confirms that block
+until the broker has the message, consumers as iterators, reconnects with a backoff.
+
+> **Experimental.** The API is unstable.
+
+## Installation
+
+```shell
+composer require thesis/amqp
+```
+
+## Usage
+
+### Connecting
+
+`Client` is passive until `run()`, as every long-lived client of thesis: `run()` connects and performs the handshake
+in the calling fiber, then the reader, the heartbeats and the reconnects run as daemons of the group.
+
+```php
+use Thesis\Amqp\Client;
+use Thesis\Amqp\Config;
+use Thesis\Async\Group;
+use function Thesis\Async\group;
+use function Thesis\Async\shield;
+use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
+
+$client = new Client(Config::fromUri('amqp://guest:guest@localhost:5672/'));
+
+group(static function (Group $group) use ($client) {
+    $client->run($group);
+
+    try {
+        $channel = $client->channel();
+        // ...
+    } finally {
+        shield(static fn() => timeout(sec(5), $client->close(...)));
+    }
+});
+```
+
+`Config::fromUri()` takes the [URI of RabbitMQ](https://www.rabbitmq.com/docs/uri-spec) with its
+[query parameters](https://www.rabbitmq.com/docs/uri-query-parameters) (`heartbeat`, `connection_timeout`,
+`auth_mechanism`, the TLS files), and several hosts separated by commas: they are tried in order.
+`new Config(...)` takes the same with durations of thesis/time: `heartbeat: sec(30)`, `connectTimeout: sec(5)`.
+
+`close()` ends the consumers, waits for the confirms that are due and closes the connection. Nothing in the API
+has a timeout parameter: bound any call with `timeout()`, and a cancelled group stops the client.
+
+### Publishing
+
+```php
+use Thesis\Amqp\DeliveryMode;
+use Thesis\Amqp\Message;
+
+$channel->confirmSelect();
+$channel->publish(
+    message: new Message(body: '{"id": 1}', contentType: 'application/json', deliveryMode: DeliveryMode::Persistent),
+    exchange: 'events',
+    routingKey: 'user.created',
+);
+```
+
+With confirms on, `publish()` returns once the broker has the message and throws `PublishNacked` if it refused it.
+Concurrent publishes of one channel are confirmed together, so fibers that publish at once do not wait for each other.
+Without confirms, `publish()` returns once the message is written.
+
+`mandatory: true` asks the broker to return a message that no queue takes: `publish()` throws `MessageReturned`
+with the message then. It needs confirms, otherwise a return could not be told apart from a success.
+
+`Message` is immutable, a modified copy is made with `clone`:
+`clone($message, ['headers' => [...$message->headers, 'attempt' => 2]])`.
+A property that is null is not sent. `expiration` is a `Duration`.
+
+`publishBatch()` publishes many messages with a few writes and, with confirms, waits for all of them:
+
+```php
+use Thesis\Amqp\Publish;
+use Thesis\Amqp\PublishBatchFailed;
+
+try {
+    $channel->publishBatch(array_map(
+        static fn(string $body) => new Publish(new Message($body), routingKey: 'tasks'),
+        $bodies,
+    ));
+} catch (PublishBatchFailed $failed) {
+    // $failed->nacked are the Publish refused, $failed->returned the MessageReturned; the others are confirmed.
+}
+```
+
+### Consuming
+
+```php
+$channel->qos(prefetchCount: 100);
+
+foreach ($channel->consume('tasks') as $delivery) {
+    try {
+        handle($delivery->message);
+        $delivery->ack();
+    } catch (\Throwable $exception) {
+        $delivery->nack(requeue: false);
+    }
+}
+```
+
+A consumer is an iterator of `Delivery`. It ends after `$consumer->cancel()`, `$channel->close()` or `$client->close()`,
+and throws if the channel or the connection is lost, or `ConsumerCancelled` if the broker cancels it
+(the queue is deleted). Deliveries are buffered without a bound: the prefetch of `qos()` limits what the broker sends.
+
+A delivery is settled once: the first of `ack()`, `nack()` and `reject()` counts, so `nack()` on a failure
+and `ack()` in `finally` is safe. `ack(multiple: true)` settles the earlier deliveries of the channel too.
+
+`batches()` takes up to `$count` deliveries, waiting at most `$timeout` for a batch to fill:
+
+```php
+use function Thesis\Time\ms;
+
+foreach ($channel->consume('events')->batches(count: 500, timeout: ms(100)) as $batch) {
+    insertAll($batch);
+    $batch->ack(); // one basic.ack with multiple
+}
+```
+
+`$channel->get('queue')` takes one message, null if the queue is empty.
+`$delivery->reply($message)` answers an RPC request: it publishes to its `replyTo` with its `correlationId`.
+
+### Topology and transactions
+
+`exchangeDeclare()`, `queueDeclare()` (it returns a `Queue` with the name and the counts), the bindings, `queuePurge()`
+and `queueDelete()` map to the methods of AMQP. `transactional($fn)` commits if `$fn` returns and rolls back
+if it throws.
+
+### Errors and reconnects
+
+Every error of the broker or of the connection is an `AmqpException`. `ChannelClosed` and `ConnectionClosed`
+carry the `ReplyCode` of the broker: a failed method (a missing queue, a wrong argument) closes its channel,
+open a new one.
+
+A lost connection takes its channels with it: they throw `ConnectionClosed`, and so do their consumers
+and the publishes waiting for a confirm. The client connects again in the background with a backoff
+from 100 ms to 30 s, `channel()` waits for the connection, and the application opens its channels and consumers anew.
+Nothing is recovered behind its back: declarations and consumers would be repeated in an order it does not control.
+`reconnect: false` turns reconnects off.
+
+The client advertises the capabilities of RabbitMQ: publisher confirms, `basic.nack`, consumer cancel notifications,
+`connection.blocked` (publishes wait while the broker blocks them), exchange-to-exchange bindings, per-consumer QoS.

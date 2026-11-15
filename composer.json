@@ -22,6 +22,7 @@
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
+        "ext-uri": "*",
         "internal/container": "^1.1",
         "psr/clock": "^1.0",
         "revolt/event-loop": "^1.0.9",
@@ -31,6 +32,7 @@
         "ext-intl": "*",
         "ext-pcntl": "*",
         "ext-posix": "*",
+        "ext-simplexml": "*",
         "ext-sockets": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
@@ -44,6 +46,7 @@
         "testo/test": "^0.1.8"
     },
     "replace": {
+        "thesis/amqp": "self.version",
         "thesis/async": "self.version",
         "thesis/io": "self.version",
         "thesis/net": "self.version",
@@ -52,6 +55,7 @@
     },
     "autoload": {
         "psr-4": {
+            "Thesis\\Amqp\\": "packages/amqp/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
@@ -59,6 +63,7 @@
             "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
+            "packages/amqp/src/autoload.files.php",
             "packages/async/src/autoload.files.php",
             "packages/net/src/autoload.files.php",
             "packages/time/src/autoload.files.php"
@@ -66,6 +71,7 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "Thesis\\Amqp\\": "packages/amqp/tests/",
             "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
@@ -76,6 +82,7 @@
             "Thesis\\Time\\": "packages/time/tests/"
         },
         "files": [
+            "packages/amqp/tests/autoload.files.php",
             "packages/async/tests/autoload.files.php",
             "packages/net/tests/autoload.files.php",
             "packages/time/tests/autoload.files.php"

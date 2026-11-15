@@ -9,6 +9,7 @@ use Testo\Application\Config\SuiteConfig;
 
 return new ApplicationConfig(
     src: [
+        __DIR__ . '/packages/amqp/src',
         __DIR__ . '/packages/async/src',
         __DIR__ . '/packages/io/src',
         __DIR__ . '/packages/net/src',
@@ -18,6 +19,7 @@ return new ApplicationConfig(
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
         new SuiteConfig(name: 'php-cs-fixer', location: [__DIR__ . '/tools/php-cs-fixer/tests']),
+        new SuiteConfig(name: 'amqp', location: [__DIR__ . '/packages/amqp/tests']),
         new SuiteConfig(
             name: 'async',
             location: [__DIR__ . '/packages/async/tests'],
