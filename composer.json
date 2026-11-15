@@ -12,11 +12,15 @@
     "require": {
         "php": "^8.5",
         "php-64bit": "*",
+        "ext-filter": "*",
+        "ext-openssl": "*",
         "revolt/event-loop": "^1.0.9"
     },
     "require-dev": {
+        "ext-intl": "*",
         "ext-pcntl": "*",
         "ext-posix": "*",
+        "ext-sockets": "*",
         "ext-tokenizer": "*",
         "amphp/amp": "^3",
         "internal/container": "^1.1",
@@ -32,15 +36,18 @@
     },
     "replace": {
         "thesis/async": "self.version",
-        "thesis/io": "self.version"
+        "thesis/io": "self.version",
+        "thesis/net": "self.version"
     },
     "autoload": {
         "psr-4": {
             "Thesis\\Async\\": "packages/async/src/",
-            "Thesis\\Io\\": "packages/io/src/"
+            "Thesis\\Io\\": "packages/io/src/",
+            "Thesis\\Net\\": "packages/net/src/"
         },
         "files": [
-            "packages/async/src/autoload.files.php"
+            "packages/async/src/autoload.files.php",
+            "packages/net/src/autoload.files.php"
         ]
     },
     "autoload-dev": {
@@ -48,10 +55,12 @@
             "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
-            "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/"
+            "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
+            "Thesis\\Net\\": "packages/net/tests/"
         },
         "files": [
-            "packages/async/tests/autoload.files.php"
+            "packages/async/tests/autoload.files.php",
+            "packages/net/tests/autoload.files.php"
         ]
     },
     "config": {

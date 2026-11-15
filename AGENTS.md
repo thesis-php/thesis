@@ -161,6 +161,7 @@ Structured concurrency on top of revolt/event-loop.
 Streams, sockets, files, processes.
 
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
+- `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Uses: async, io.
 
 ### protocol
 

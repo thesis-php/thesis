@@ -1,0 +1,50 @@
+{
+    "name": "thesis/net",
+    "description": "Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "ext-filter": "*",
+        "ext-openssl": "*",
+        "revolt/event-loop": "^1.0.9",
+        "thesis/async": "^0.1",
+        "thesis/io": "^0.1"
+    },
+    "require-dev": {
+        "ext-intl": "*",
+        "ext-sockets": "*",
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "suggest": {
+        "ext-intl": "To resolve internationalized host names (Пример.test)",
+        "ext-sockets": "To report why a connection failed (refused, unreachable) instead of a generic message"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Net\\": "src/"
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Net\\": "tests/"
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

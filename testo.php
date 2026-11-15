@@ -11,6 +11,7 @@ return new ApplicationConfig(
     src: [
         __DIR__ . '/packages/async/src',
         __DIR__ . '/packages/io/src',
+        __DIR__ . '/packages/net/src',
     ],
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
@@ -20,5 +21,6 @@ return new ApplicationConfig(
             plugins: require __DIR__ . '/packages/async/testo.plugins.php',
         ),
         new SuiteConfig(name: 'io', location: [__DIR__ . '/packages/io/tests']),
+        new SuiteConfig(name: 'net', location: [__DIR__ . '/packages/net/tests']),
     ],
 );

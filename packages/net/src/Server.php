@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Thesis\Net;
+
+use Thesis\Async\Cancelled;
+use Thesis\Net\Internal\Readiness;
+use function Thesis\Net\Internal\address;
+
+/**
+ * A listening socket, created by {@see listen()} or {@see listenUnix()}.
+ *
+ * @api
+ */
+final class Server
+{
+    /**
+     * Pause after an accept that fails although a connection is pending: the process may be out of file descriptors,
+     * and retrying at once would spin. Doubles up to {@see MAX_BACKOFF}.
+     */
+    private const float MIN_BACKOFF = 0.005;
+    private const float MAX_BACKOFF = 1.0;
+
+    /**
+     * @internal
+     * @param resource $stream a listening socket, owned from now on
+     * @param ?non-empty-string $unixPath the path of a Unix socket, removed by {@see close()}
+     */
+    public static function create(mixed $stream, ?string $unixPath = null): self
+    {
+        stream_set_blocking($stream, false);
+
+        return new self(
+            stream: $stream,
+            address: $unixPath === null
+                ? address(stream_socket_get_name($stream, false), unix: false)
+                : new UnixAddress(path: $unixPath),
+            unixPath: $unixPath,
+        );
+    }
+
+    public bool $isClosed {
+        get => $this->stream === null;
+    }
+
+    private readonly Readiness $readiness;
+
+    /**
+     * @param ?resource $stream
+     * @param ?non-empty-string $unixPath
+     */
+    private function __construct(
+        private mixed $stream,
+        /**
+         * Where the server listens, with the port the OS has chosen if it was 0.
+         */
+        public readonly Address $address,
+        private readonly ?string $unixPath,
+    ) {
+        $this->readiness = new Readiness();
+    }
+
+    /**
+     * Waits for the next connection. Returns null once the server is closed, a wait in progress included,
+     * so that an accept loop ends by itself:
+     *
+     *     while (null !== $socket = $server->accept()) {
+     *         $group->spawn(static fn() => handle($socket));
+     *     }
+     *
+     * No TLS handshake happens here, so that a slow client does not hold up the others:
+     * call {@see Socket::enableTls()} in the task of the connection.
+     *
+     * @throws Cancelled
+     */
+    public function accept(): ?Socket
+    {
+        $this->readiness->pace();
+        $failures = 0;
+        $woken = false;
+
+        while ($this->stream !== null) {
+            $client = @stream_socket_accept($this->stream, 0);
+
+            if ($client !== false) {
+                return Socket::create($client, unix: $this->unixPath !== null);
+            }
+
+            if ($woken) {
+                // Readable, but nothing to accept: another fiber has taken it, or accept() itself fails.
+                $woken = false;
+                $backoff = min(self::MIN_BACKOFF * 2 ** $failures++, self::MAX_BACKOFF);
+
+                if (!$this->readiness->sleep($backoff)) {
+                    return null;
+                }
+            } elseif ($this->readiness->readable($this->stream)) {
+                $woken = true;
+            } else {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Stops listening: waiting {@see accept()} calls return null, accepted sockets stay open.
+     * The file of a Unix socket is removed. Idempotent.
+     */
+    public function close(): void
+    {
+        $stream = $this->stream;
+
+        if ($stream === null) {
+            return;
+        }
+
+        $this->stream = null;
+        $this->readiness->close();
+        @fclose($stream);
+
+        if ($this->unixPath !== null) {
+            @unlink($this->unixPath);
+        }
+    }
+}
