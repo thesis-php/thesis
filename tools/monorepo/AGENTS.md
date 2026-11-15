@@ -42,7 +42,11 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   the settings that differ, creates or replaces the two rulesets. It compares only the keys it sends
   (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
   locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`.
-- `github` throws on an existing repository without our rulesets: older packages of the organization share names
+- A failure of one package does not block the others, the job still fails: `github` collects an error
+  per repository and goes on, CI runs `split` after a failed `github`, and `split` pushes in parallel
+  and reports every failed push at the end. A push to a repository that `github` refused fails by itself:
+  it is never forced, and a repository without the split history cannot fast-forward.
+- `github` refuses an existing repository without our rulesets: older packages of the organization share names
   with new ones. Taking one over is done by hand, by adding the rulesets. A name that GitHub redirects to a renamed
   repository (`full_name` differs) is free: the repository is created, which ends the redirect.
 - The organization, the default branch and the id of the app are constants of `Repositories`, not of `Config`:

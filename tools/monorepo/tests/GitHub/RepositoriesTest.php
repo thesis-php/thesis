@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Thesis\Monorepo\Tests\GitHub;
 
 use Testo\Assert;
-use Testo\Expect;
 use Testo\Test;
 use Thesis\Monorepo\Internal\GitHub\Repositories;
 use Thesis\Monorepo\Internal\Monorepo;
-use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Tests\Fixture;
 
 #[Test]
@@ -19,7 +17,7 @@ final readonly class RepositoriesTest
     {
         $api = new FakeApi();
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
 
         Assert::same($api->writes, [
             'POST orgs/thesis-php/repos',
@@ -42,7 +40,7 @@ final readonly class RepositoriesTest
     {
         $api = new FakeApi(self::inSync());
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
 
         Assert::same($api->writes, []);
         Assert::same($changes, []);
@@ -54,7 +52,7 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io'] = [...self::repository(), 'description' => 'Old.', 'has_issues' => true];
         $api = new FakeApi($resources);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
 
         Assert::same($api->writes, ['PATCH repos/thesis-php/io']);
         Assert::same($api->bodies['PATCH repos/thesis-php/io'] ?? null, [
@@ -95,24 +93,30 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io/rulesets/2'] = [...$ruleset, 'bypass_actors' => []];
         $api = new FakeApi($resources);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
 
         Assert::same($api->writes, ['PUT repos/thesis-php/io/rulesets/2']);
         Assert::same($changes, ['thesis-php/io: ruleset "read-only tags" updated']);
     }
 
-    public static function refusesRepositoryThatIsNotSplit(): void
+    public static function refusesRepositoryThatIsNotSplitAndSyncsTheOthers(): void
     {
         $api = new FakeApi([
             'repos/thesis-php/io' => ['full_name' => 'thesis-php/io', 'default_branch' => '0.2.x'],
             'repos/thesis-php/io/rulesets' => [],
         ]);
 
-        Expect::exception(MonorepoException::class)->withMessage(
-            'thesis-php/io exists, but is not a split of packages/io: it has no rulesets of the split. Rename or delete it, or add the rulesets by hand to take it over.',
-        );
+        $synced = Repositories::sync(new Fixture()->package('io')->package('net')->load(), $api, dryRun: false);
 
-        Repositories::sync(self::monorepo(), $api, dryRun: true);
+        Assert::same($synced->errors, [
+            'thesis-php/io exists, but is not a split of packages/io: it has no rulesets of the split. Rename or delete it, or add the rulesets by hand to take it over.',
+        ]);
+        Assert::same($api->writes, [
+            'POST orgs/thesis-php/repos',
+            'PATCH repos/thesis-php/net',
+            'POST repos/thesis-php/net/rulesets',
+            'POST repos/thesis-php/net/rulesets',
+        ]);
     }
 
     public static function createsRepositoryWhoseNameRedirectsToRenamedOne(): void
@@ -121,7 +125,7 @@ final readonly class RepositoriesTest
             'repos/thesis-php/io' => ['full_name' => 'thesis-php/io-legacy', 'default_branch' => '0.2.x'],
         ]);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
 
         Assert::same($api->writes[0] ?? null, 'POST orgs/thesis-php/repos');
         Assert::same($changes[0] ?? null, 'thesis-php/io: created, the redirect to thesis-php/io-legacy is gone');
@@ -131,7 +135,7 @@ final readonly class RepositoriesTest
     {
         $api = new FakeApi();
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: true);
+        $changes = Repositories::sync(self::monorepo(), $api, dryRun: true)->changes;
 
         Assert::same($api->writes, []);
         Assert::same(\count($changes), 4);

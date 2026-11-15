@@ -11,7 +11,8 @@ use Thesis\Monorepo\Internal\Package;
 
 /**
  * Brings thesis-php/<dir> of every package to the state derived from its manifest: a public read-only copy
- * of packages/<dir> that only the app of the split may push to. Deletes nothing.
+ * of packages/<dir> that only the app of the split may push to. Deletes nothing. A repository that fails
+ * does not stop the others: the split still pushes every package whose repository is fine.
  *
  * @internal
  */
@@ -27,22 +28,28 @@ final class Repositories
     public const int BOT_APP_ID = 5766114;
 
     /**
-     * @var list<non-empty-string>
+     * @var list<non-empty-string> what was changed, or would be with
      */
-    private array $changes = [];
+    public private(set) array $changes = [];
 
     /**
-     * @return list<non-empty-string> what was changed, or would be with $dryRun
+     * @var list<string> one per repository that could not be synced
      */
-    public static function sync(Monorepo $monorepo, Api $api, bool $dryRun): array
+    public private(set) array $errors = [];
+
+    public static function sync(Monorepo $monorepo, Api $api, bool $dryRun): self
     {
         $repositories = new self($api, $dryRun);
 
         foreach ($monorepo->packages as $package) {
-            $repositories->repository($package);
+            try {
+                $repositories->repository($package);
+            } catch (MonorepoException $exception) {
+                $repositories->errors[] = $exception->getMessage();
+            }
         }
 
-        return $repositories->changes;
+        return $repositories;
     }
 
     private function __construct(

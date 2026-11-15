@@ -38,17 +38,23 @@ final readonly class GitHubCommand
 
         try {
             $monorepo = Monorepo::load($this->root);
-            $changes = Repositories::sync($monorepo, new HttpApi($token), $dryRun);
+            $synced = Repositories::sync($monorepo, new HttpApi($token), $dryRun);
         } catch (MonorepoException $exception) {
             $io->error($exception->getMessage());
 
             return Command::FAILURE;
         }
 
-        $io->listing($changes);
+        $io->listing($synced->changes);
 
-        if ($dryRun && $changes !== []) {
-            $io->warning(\sprintf('Dry run: %d change(s) not made.', \count($changes)));
+        if ($synced->errors !== []) {
+            $io->error($synced->errors);
+
+            return Command::FAILURE;
+        }
+
+        if ($dryRun && $synced->changes !== []) {
+            $io->warning(\sprintf('Dry run: %d change(s) not made.', \count($synced->changes)));
         } else {
             $io->success(\sprintf('%d repositories are in sync.', \count($monorepo->packages)));
         }

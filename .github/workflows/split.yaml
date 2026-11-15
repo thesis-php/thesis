@@ -30,11 +30,15 @@ jobs:
           permission-administration: write
           permission-contents: write
       # Before the split: a package needs its repository before the first push.
-      - run: make github
+      - id: github
+        run: make github
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+      # Even when github failed for some repositories: the others get their splits, the job fails anyway.
+      # A push to a repository that is not a split fails by itself, it is never forced.
       # The ref goes through the environment, not into the script: a tag name may hold ; $ ` and quotes.
-      - run: make split
+      - if: ${{ !cancelled() && steps.token.outcome == 'success' }}
+        run: make split
         env:
           REF: ${{ github.ref }}
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php
