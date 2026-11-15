@@ -11,6 +11,10 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
 - `monorepo.php` is the root config: PHP constraint, authors, tools and composer plugins of the root.
+- `docs/adr/NNNN-<slug>.md` holds decisions that span packages (Context, Decision, Consequences, Rejected).
+  A decision of one package goes to the "Decisions" section of its `AGENTS.md` instead. An ADR is not rewritten
+  when the decision changes: a new one replaces it, and the old one gets `Status: superseded by NNNN`.
+  Read the accepted ADRs before designing a package they concern.
 
 ## Instructions are layered
 
