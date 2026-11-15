@@ -67,18 +67,23 @@ final readonly class Fixture
 
     public function __destruct()
     {
-        if (!is_dir($this->root)) {
+        self::remove($this->root);
+    }
+
+    public static function remove(string $dir): void
+    {
+        if (!is_dir($dir)) {
             return;
         }
 
         /** @var \SplFileInfo $file */
         foreach (new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS),
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST,
         ) as $file) {
             $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
         }
 
-        rmdir($this->root);
+        rmdir($dir);
     }
 }

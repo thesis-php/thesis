@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use Symfony\Component\Console\Application;
 use Thesis\Monorepo\Internal\Command\GitHubCommand;
+use Thesis\Monorepo\Internal\Command\SplitCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
 
 $root = dirname(__DIR__);
@@ -14,5 +15,8 @@ require $root . '/vendor/autoload.php';
 $application = new Application('monorepo');
 $application->addCommand(new SyncCommand($root));
 $application->addCommand(new GitHubCommand($root));
+// https://x-access-token:<token>@github.com/thesis-php in CI, unset to only print the splits.
+$remote = getenv('SPLIT_REMOTE');
+$application->addCommand(new SplitCommand($root, $remote === false || $remote === '' ? null : $remote));
 
 exit($application->run());

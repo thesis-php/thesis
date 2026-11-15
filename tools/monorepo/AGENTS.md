@@ -1,6 +1,6 @@
 # tools/monorepo
 
-The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync` and `github`.
+The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync`, `github` and `split`.
 Rejected: a scaffolding command, a new package is copied by hand after an existing one.
 
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
@@ -8,8 +8,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 - `.gitattributes` of a package is an allowlist (`/* export-ignore`, then `-export-ignore` for what is kept):
   the split repository stays an exact copy of the package (ADR 0002), only the archive is trimmed, and a new file
   of the monorepo stays out of it without anyone remembering to exclude it. `sync` throws on a `dist` path that
-  does not exist. Rejected: excluding files from the split itself (splitsh-lite splits only a prefix, rewriting
-  every commit is slow and nobody gains from it: users install the archive); a list of excluded files
+  does not exist. Rejected: excluding files from the split itself (every split commit would differ from its directory
+  and nobody gains from it: users install the archive); a list of excluded files
   (a forgotten one leaks into every install).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
   a property does not exist, so nothing is read back from the current file. `type` (default `library`)
@@ -49,3 +49,62 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   they describe the infrastructure, not the packages, and nobody writes them by hand.
 - HTTP goes through `file_get_contents()` with a stream context behind the `Api` interface: a few JSON requests
   do not need a client library. Tests use `FakeApi`.
+
+## split
+
+`make split [REF=refs/heads/main]` (`Internal\Split`) splits every `packages/<name>` of a branch or a `v*` tag
+and pushes each split to the same ref of `thesis-php/<name>`, all pushes in parallel. Without `SPLIT_REMOTE`
+(`https://x-access-token:<token>@github.com/thesis-php`) it only prints the commits: that is how to try it locally.
+CI (`.github/workflows/split.yaml`) runs it after `github` on every push of a branch or a tag.
+
+Invariants:
+
+- A split is deterministic: the same commit of the monorepo gives the same commit of a package on any machine,
+  and the pushes are never forced. How a commit is written (the headers copied, the parents kept, their order)
+  is part of the ids of every published history: a change to it rewrites all split repositories, and since
+  every `*.*.x` branch and tag runs the splitter of its own checkout, it has to reach the maintained branches too.
+  `givesTheSameIdsForEveryKindOfCommit` pins the ids, checked once against a model built with `git commit-tree`,
+  and `givesTheSameIdsForLinearHistory` a history that splitsh-lite gave the same ids for: the switch from it
+  needed no force push.
+- Only the commit the ref points to is split, resolved once (`show-ref --verify`, then `rev-parse`), never
+  the working tree and never a revision like `main~1`, which would push another commit under the name of the ref.
+- Nothing outside the objects decides a split: git runs without the caller's `GIT_*` variables, without replace
+  refs and grafts (`Git::ENV`), and versions are compared in PHP (`Version`), not by `git tag --sort`,
+  whose order depends on the user's config.
+- A failure is an exception before any push, never an `assert`: with assertions off an empty commit id would make
+  the refspec `:<ref>`, which deletes the branch of the split repository, and the app bypasses the rulesets.
+- A tag is `vX.Y.Z` or `vX.Y.Z-alphaN`, `-betaN`, `-RCN`, anything else under `v*` fails. A stable tag goes to
+  a package only if `packages/<name>` changed (the tree ids differ, a package added counts) since the highest lower
+  version among the tags merged into it, and only if that one is stable and of the same minor series.
+  The first tag of a series, a pre-release and the first stable tag after a pre-release go to every package:
+  otherwise a package would keep only an alpha while the others are stable.
+
+Decisions:
+
+- Our own split instead of splitsh-lite (ADR 0003): splitsh needs libgit2 1.5 exactly, so CI built it in a Docker
+  image on every run. Ours is one `git rev-list --topo-order` and one `git cat-file --batch` for all packages
+  at once, ids are `sha1()` in PHP and the commits are written as loose objects directly. No cache: the cache
+  of splitsh was keyed by the name of the ref, so a ref moved back got its old split.
+- Only the frontier of the walk is in memory: the heads of a commit are dropped after its last child,
+  and `SplitCommit` names its parents by id. Heads per package and commit exhausted the memory of a long history,
+  and objects holding their parents crashed PHP when it freed a chain of about 60 000 of them.
+  `keepsMemoryOfHeadsFlatAsHistoryGrows` guards the first, the id-typed parents the second: a test of 60 000
+  commits would take half a minute of `fast-import`.
+- A commit without the package passes the split heads of its parents to its children: a package removed and added
+  again continues its history (splitsh started a new root, which could not be pushed without a force).
+  A commit where `packages` is a file or a link has no packages, it does not break the splits after it.
+- A parent that is an ancestor of another parent is dropped and a repeated one is kept once, so a merge
+  is kept only where both sides changed the package. A commit is reused when its only parent has the same tree.
+- Author, committer, encoding and message are copied byte for byte, every other header is dropped: a signature
+  (`gpgsig`, `mergetag`) signs the commit of the monorepo, not the split.
+- A loose object left by an earlier run is kept only if it inflates to this very object: a run killed while
+  writing leaves a broken one.
+- The credentials of `SPLIT_REMOTE` go to the environment of `git push` as `url.<with>.insteadOf <without>`
+  (`Remote`): the arguments of a process are visible to everyone in `ps`. The ref reaches `make split`
+  through the environment, quoted: a tag name may hold `;`, `$`, backquotes and quotes.
+- The check that every parent is split before its children is unreachable while `--topo-order` holds,
+  no test can trigger it: it turns a broken order into an error instead of a split with a new root.
+- Rejected: `git subtree split` (a process per commit, slow as the history grows); a fork of splitsh with
+  a prebuilt image (still cgo pinned to libgit2 1.5, plus an image and a registry to maintain); a tool in Go
+  (a toolchain to distribute for what is git plumbing); an action that copies files into a new commit
+  (no history, no deterministic commits); filtering files out of the split (see `.gitattributes` above).

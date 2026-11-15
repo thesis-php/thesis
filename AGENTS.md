@@ -11,9 +11,9 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
   A package that continues an older repository of the same name keeps its `CHANGELOG.md` there (`exceptionally`).
   A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
-- `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
+- `tools/monorepo/` is the monorepo tooling (`bin/monorepo`): generated files, the repositories of the packages
+  and their split in CI, see its `AGENTS.md`.
 - `tools/php-cs-fixer/` holds our custom PHP CS Fixer rules, see its `AGENTS.md`.
-- `tools/split/` splits `packages/<name>` into the read-only `thesis-php/<name>` in CI, see its `AGENTS.md`.
 - `monorepo.php` is the root config: PHP constraint, authors, tools and composer plugins of the root.
   `platform` there is required by every package: all of them are 64-bit only (`php-64bit`), so code may rely
   on 64-bit int (nanoseconds, `pack('J')`) without checking `PHP_INT_SIZE`. A manifest does not repeat it.

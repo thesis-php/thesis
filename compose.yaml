@@ -14,15 +14,6 @@ services:
       - ~/.composer/cache:/composer/cache
     tty: true
     init: true
-  split:
-    build: tools/split
-    profiles: [tools]
-    user: ${DOCKER_USER:-}
-    working_dir: /workspace
-    environment:
-      SPLIT_REMOTE: ${SPLIT_REMOTE:-}
-    volumes:
-      - .:/workspace
 
   rabbitmq:
     image: rabbitmq:4.1-alpine

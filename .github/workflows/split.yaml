@@ -33,6 +33,8 @@ jobs:
       - run: make github
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
-      - run: make split REF=${{ github.ref }}
+      # The ref goes through the environment, not into the script: a tag name may hold ; $ ` and quotes.
+      - run: make split
         env:
+          REF: ${{ github.ref }}
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php

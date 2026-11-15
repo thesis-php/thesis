@@ -1,0 +1,280 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Thesis\Monorepo\Internal\Split;
+
+use Thesis\Monorepo\Internal\Git\CatFile;
+use Thesis\Monorepo\Internal\Git\Git;
+use Thesis\Monorepo\Internal\Monorepo;
+use Thesis\Monorepo\Internal\MonorepoException;
+
+/**
+ * Splits the history of every packages/<name> of a commit in one pass: each commit of the monorepo that changes
+ * a package becomes a commit of its split with the same author, committer and message.
+ *
+ * @internal
+ */
+final class Splitter
+{
+    /**
+     * @var array<non-empty-string, SplitCommit> id => commit of any package
+     */
+    private array $commits = [];
+
+    /**
+     * What a commit of the monorepo leaves to its children for each package: its split if it has the package,
+     * otherwise the heads of its parents, so the history goes on across a removal of the package.
+     * Dropped once its last child is split: only the frontier of the walk is kept in memory.
+     *
+     * @var array<string, array<string, list<SplitCommit>>> monorepo commit => package => split heads
+     */
+    private array $heads = [];
+
+    /**
+     * @var array<string, positive-int> monorepo commit => its children not split yet
+     */
+    private array $children = [];
+
+    /**
+     * @var array<string, true> monorepo commits split so far
+     */
+    private array $split = [];
+
+    /**
+     * @param non-empty-string $commit the id of a commit, resolved once by the caller: a ref may move meanwhile
+     * @return array<string, non-empty-string> package => its split commit, for every package of the commit
+     */
+    public static function split(Git $git, string $commit): array
+    {
+        if (trim($git->run(['rev-parse', '--is-shallow-repository'])) === 'true') {
+            throw new MonorepoException('The history is shallow: fetch it whole (fetch-depth: 0 in CI).');
+        }
+
+        if (trim($git->run(['rev-parse', '--show-object-format'])) !== 'sha1') {
+            throw new MonorepoException('Only a repository of SHA-1 objects can be split.');
+        }
+
+        $splitter = new self(
+            catFile: $git->catFile(),
+            objects: trim($git->run(['rev-parse', '--path-format=absolute', '--git-path', 'objects'])),
+        );
+        $packages = array_keys($splitter->catFile->subtrees($commit . ':' . Monorepo::PACKAGES_DIR));
+
+        if ($packages === []) {
+            return [];
+        }
+
+        // --topo-order lists every parent before its children, whatever the dates say.
+        $history = explode("\n", trim($git->run(['rev-list', '--reverse', '--topo-order', '--parents', $commit])));
+
+        foreach ($history as $line) {
+            foreach (\array_slice(explode(' ', $line), 1) as $parent) {
+                $splitter->children[$parent] = ($splitter->children[$parent] ?? 0) + 1;
+            }
+        }
+
+        foreach ($history as $line) {
+            $parents = explode(' ', $line);
+            $child = array_shift($parents);
+
+            if ($child === '') {
+                throw new MonorepoException(\sprintf('git rev-list: no commit in the line "%s".', $line));
+            }
+
+            $splitter->splitCommit($child, $parents, $packages);
+        }
+
+        $commits = [];
+
+        foreach ($packages as $package) {
+            $heads = $splitter->heads[$commit][$package] ?? [];
+
+            if (\count($heads) !== 1) {
+                throw new MonorepoException(\sprintf('%s of %s has no single split commit.', $package, $commit));
+            }
+
+            $commits[$package] = $heads[0]->id;
+        }
+
+        return $commits;
+    }
+
+    private function __construct(
+        private readonly CatFile $catFile,
+        private readonly string $objects,
+    ) {}
+
+    /**
+     * @param non-empty-string $commit
+     * @param list<string> $parents
+     * @param list<string> $packages
+     */
+    private function splitCommit(string $commit, array $parents, array $packages): void
+    {
+        foreach ($parents as $parent) {
+            if (!isset($this->split[$parent])) {
+                throw new MonorepoException(\sprintf('The parent %s of %s is not split yet.', $parent, $commit));
+            }
+        }
+
+        $trees = $this->catFile->subtrees($commit . ':' . Monorepo::PACKAGES_DIR);
+        $raw = null;
+
+        foreach ($packages as $package) {
+            $heads = $this->parentHeads($package, $parents);
+            $tree = $trees[$package] ?? null;
+            $unchanged = \count($heads) === 1 && $heads[0]->tree === $tree;
+
+            if ($tree !== null && !$unchanged) {
+                $raw ??= $this->catFile->read($commit, type: 'commit')
+                    ?? throw new MonorepoException(\sprintf('No commit %s.', $commit));
+                $heads = [$this->write($tree, $heads, $raw)];
+            }
+
+            $this->heads[$commit][$package] = $heads;
+        }
+
+        $this->split[$commit] = true;
+
+        foreach ($parents as $parent) {
+            $left = ($this->children[$parent] ?? 1) - 1;
+
+            if ($left > 0) {
+                $this->children[$parent] = $left;
+            } else {
+                unset($this->heads[$parent], $this->children[$parent]);
+            }
+        }
+    }
+
+    /**
+     * The heads of the parents without repeats and without the ones that are ancestors of another:
+     * such a parent adds nothing to a merge, so the history of a package stays linear where only
+     * another directory had a branch.
+     *
+     * @param list<string> $parents
+     * @return list<SplitCommit>
+     */
+    private function parentHeads(string $package, array $parents): array
+    {
+        if (\count($parents) === 1) {
+            return $this->heads[$parents[0]][$package] ?? [];
+        }
+
+        $heads = [];
+
+        foreach ($parents as $parent) {
+            foreach ($this->heads[$parent][$package] ?? [] as $head) {
+                $heads[$head->id] ??= $head;
+            }
+        }
+
+        $heads = array_values($heads);
+
+        return array_values(array_filter(
+            $heads,
+            fn(SplitCommit $head) => array_all(
+                $heads,
+                fn(SplitCommit $other) => $other === $head || !$this->isAncestor($head, $other),
+            ),
+        ));
+    }
+
+    private function isAncestor(SplitCommit $ancestor, SplitCommit $commit): bool
+    {
+        $queue = [$commit];
+        $seen = [];
+
+        while (($next = array_pop($queue)) !== null) {
+            foreach ($next->parents as $id) {
+                if ($id === $ancestor->id) {
+                    return true;
+                }
+
+                $parent = $this->commits[$id] ?? throw new MonorepoException(\sprintf('No split commit %s.', $id));
+
+                // An ancestor has a lower generation than any of its descendants: none of this lower is one.
+                if ($parent->generation > $ancestor->generation && !isset($seen[$id])) {
+                    $seen[$id] = true;
+                    $queue[] = $parent;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Copies the author, the committer, the encoding and the message of the commit. Every other header
+     * is dropped: a signature (gpgsig, mergetag) signs the commit of the monorepo, not this one.
+     *
+     * @param non-empty-string $tree
+     * @param list<SplitCommit> $parents
+     */
+    private function write(string $tree, array $parents, string $raw): SplitCommit
+    {
+        $end = strpos($raw, "\n\n");
+        $headers = $end === false ? $raw : substr($raw, 0, $end);
+        $message = $end === false ? '' : substr($raw, $end + 2);
+        $body = 'tree ' . $tree . "\n";
+
+        foreach ($parents as $parent) {
+            $body .= 'parent ' . $parent->id . "\n";
+        }
+
+        foreach (explode("\n", $headers) as $header) {
+            if (preg_match('/^(author|committer|encoding) /', $header) === 1) {
+                $body .= $header . "\n";
+            }
+        }
+
+        $body .= "\n" . $message;
+        $object = 'commit ' . \strlen($body) . "\0" . $body;
+        $id = sha1($object);
+
+        if (!isset($this->commits[$id])) {
+            $this->store($id, $object);
+            $this->commits[$id] = new SplitCommit(
+                id: $id,
+                tree: $tree,
+                parents: array_map(static fn(SplitCommit $parent) => $parent->id, $parents),
+                generation: 1 + max([0, ...array_map(static fn(SplitCommit $parent) => $parent->generation, $parents)]),
+            );
+        }
+
+        return $this->commits[$id];
+    }
+
+    /**
+     * Writes a loose object the way git does, without a process per commit. A file left by an earlier run
+     * is kept only if it holds this very object: a broken one would be pushed as it is.
+     */
+    private function store(string $id, string $object): void
+    {
+        $dir = $this->objects . '/' . substr($id, 0, 2);
+        $path = $dir . '/' . substr($id, 2);
+        $existing = is_file($path) ? @file_get_contents($path) : false;
+
+        if ($existing !== false && @gzuncompress($existing) === $object) {
+            return;
+        }
+
+        if (!is_dir($dir) && !mkdir($dir) && !is_dir($dir)) {
+            throw new MonorepoException(\sprintf('Cannot create %s.', $dir));
+        }
+
+        $temporary = $dir . '/tmp_obj_' . bin2hex(random_bytes(8));
+        $compressed = gzcompress($object);
+
+        if ($compressed === false
+            || file_put_contents($temporary, $compressed) === false
+            || !chmod($temporary, 0o444)
+            || !rename($temporary, $path)
+        ) {
+            @unlink($temporary);
+
+            throw new MonorepoException(\sprintf('Cannot write the object %s.', $id));
+        }
+    }
+}
