@@ -10,6 +10,7 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
   A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
+- `tools/php-cs-fixer/` holds our custom PHP CS Fixer rules, see its `AGENTS.md`.
 - `monorepo.php` is the root config: PHP constraint, authors, tools and composer plugins of the root.
 - `docs/adr/NNNN-<slug>.md` holds decisions that span packages (Context, Decision, Consequences, Rejected).
   A decision of one package goes to the "Decisions" section of its `AGENTS.md` instead. An ADR is not rewritten
@@ -27,6 +28,8 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 - An important finding (an invariant, a decision, a trap, a rejected approach) goes into the right `AGENTS.md`
   in the same change, without being asked. When we rethink something, rewrite the existing text instead of
   appending a correction: the file describes how things are now, not how we got here.
+- What a tool enforces (`make fixer`, `make rector`) is not described here: the tool fixes the code anyway.
+  Why a custom rule is the way it is goes to the `AGENTS.md` next to the rule.
 - Keeping `AGENTS.md` files in shape is critical: they are the only memory that survives between sessions.
   Every rule is short, current and in the section it belongs to. Delete what became obsolete, merge duplicates.
 
@@ -39,8 +42,8 @@ description and dependencies. Generated from the manifests and `monorepo.php` by
 - the root `composer.json`,
 - `LICENSE` of the root and of every package, from the year in the manifest,
 - `skills.json` (`sources`),
-- `testo.php`: one suite per package, named after its directory. A package that needs Testo plugins
-  returns a list of them from `packages/<name>/testo.plugins.php`,
+- `testo.php`: one suite per package and per `tools/<name>/tests`, named after the directory.
+  A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
 - the package catalog below.
 
 ## Dependencies
@@ -96,8 +99,6 @@ the whole monorepo is for the final check.
   (`proc_open()`, `stream_socket_pair()`). Where the call already reads well, skip them:
   `substr($bytes, $offset, $length)`. Rejected: a mechanical rule like "name every argument of a call with more
   than two", it is noise around the standard library.
-- A multiline chain of method calls ends with `;` on its own line, so a call is added or removed without touching
-  the previous line. `make fixer` enforces it.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
@@ -121,9 +122,6 @@ the whole monorepo is for the final check.
   Tests are not marked: they are not part of the API.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
-- A PHPDoc of a declaration (class, method, function, property, constant, enum case) is multi-line,
-  even with one tag. An inline annotation in code is one line: `/** @var list<int> $ids */`.
-  PHP CS Fixer enforces both (`phpdoc_line_span`).
 - A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
   rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
   they stay.

@@ -202,7 +202,8 @@ final class TlsTest
     public function needsAPeerNameWithoutAHost(): void
     {
         [$left] = socketPair();
-        Expect::exception(\LogicException::class)
+        Expect
+            ::exception(\LogicException::class)
             ->withMessage('The socket was not connected to a host name: pass ClientTls::$peerName.')
         ;
 

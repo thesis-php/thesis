@@ -83,7 +83,7 @@ infect: var vendor ## Run mutation testing [P=]
 
 # CI
 
-fix: fixer rector ## Fix code style and apply Rector rules [P=]
+fix: rector fixer ## Apply Rector rules, then fix code style: Rector prints chains in its own way [P=]
 .PHONY: fix
 
 check: fixer-check rector-check phpstan deps-analyze test ## Run all checks

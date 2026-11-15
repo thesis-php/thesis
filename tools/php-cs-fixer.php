@@ -5,12 +5,17 @@ declare(strict_types=1);
 use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
+use Thesis\PhpCsFixer\StaticCallChainFixer;
+
+// PHP CS Fixer is installed globally in the image and does not load the autoloader of the monorepo.
+require_once __DIR__ . '/php-cs-fixer/src/StaticCallChainFixer.php';
 
 $root = dirname(__DIR__);
 
 return new Config()
     ->setFinder(
-        Finder::create()
+        Finder
+            ::create()
             ->in([$root . '/tools', $root . '/packages'])
             ->append([
                 $root . '/bin/monorepo',
@@ -20,6 +25,7 @@ return new Config()
     ->setParallelConfig(ParallelConfigFactory::detect())
     ->setCacheFile($root . '/var/php-cs-fixer.cache')
     ->setRiskyAllowed(true)
+    ->registerCustomFixers([new StaticCallChainFixer()])
     ->setRules([
         '@PHP8x4Migration' => true,
         '@PHP8x2Migration:risky' => true,
@@ -27,6 +33,7 @@ return new Config()
         '@PhpCsFixer:risky' => true,
         '@PER-CS2x0' => true,
         '@PER-CS2x0:risky' => true,
+        'Thesis/static_call_chain' => true,
         'attribute_empty_parentheses' => true,
         'blank_line_before_statement' => ['statements' => [
             'continue',
@@ -57,7 +64,6 @@ return new Config()
             'import_functions' => false,
             'import_classes' => false,
         ],
-        'method_chaining_indentation' => false,
         'modernize_strpos' => true,
         'multiline_promoted_properties' => true,
         'multiline_whitespace_before_semicolons' => ['strategy' => 'new_line_for_chained_calls'],

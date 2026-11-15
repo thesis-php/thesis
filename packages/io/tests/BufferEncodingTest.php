@@ -283,7 +283,8 @@ final class BufferEncodingTest
     public function throwsOnTruncatedReadWithoutConsuming(\Closure $read, int $available): void
     {
         $buffer = new Buffer(bytes: str_repeat("\x01", $available));
-        Expect::exception(UnexpectedEof::class)
+        Expect
+            ::exception(UnexpectedEof::class)
             ->withMessage(\sprintf('Expected %d bytes, but only %d available.', $available + 1, $available))
         ;
 

@@ -61,7 +61,8 @@ final readonly class GeneratorTest
 
         $files = Generator::generate($fixture->load());
 
-        Assert::string($files['AGENTS.md'] ?? '')
+        Assert
+            ::string($files['AGENTS.md'] ?? '')
             ->contains("- `bytes`: Package bytes.\n")
             ->contains("- `async`: Package async. Requires: bytes.\n")
         ;
@@ -73,7 +74,8 @@ final readonly class GeneratorTest
 
         $files = Generator::generate($fixture->load());
 
-        Assert::string($files['packages/bytes/LICENSE'] ?? '')
+        Assert
+            ::string($files['packages/bytes/LICENSE'] ?? '')
             ->startsWith("MIT License\n\nCopyright (c) 2024-present Fixture\n")
         ;
     }
@@ -84,7 +86,8 @@ final readonly class GeneratorTest
 
         $files = Generator::generate($fixture->load());
 
-        Assert::string($files['testo.php'] ?? '')
+        Assert
+            ::string($files['testo.php'] ?? '')
             ->contains(<<<'PHP'
                         new SuiteConfig(
                             name: 'async',
@@ -94,6 +97,29 @@ final readonly class GeneratorTest
                         new SuiteConfig(name: 'bytes', location: [__DIR__ . '/packages/bytes/tests']),
 
                 PHP)
+        ;
+    }
+
+    public static function writesTestoSuiteOfEveryToolWithTests(): void
+    {
+        $fixture = self
+            ::fixture()
+            ->file('tools/lint/tests/LintTest.php', "<?php\n")
+            ->file('tools/build/tests/BuildTest.php', "<?php\n")
+            ->file('tools/docs/src/Docs.php', "<?php\n")
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        Assert
+            ::string($files['testo.php'] ?? '')
+            ->contains(<<<'PHP'
+                    suites: [
+                        new SuiteConfig(name: 'build', location: [__DIR__ . '/tools/build/tests']),
+                        new SuiteConfig(name: 'lint', location: [__DIR__ . '/tools/lint/tests']),
+                        new SuiteConfig(name: 'async', location: [__DIR__ . '/packages/async/tests']),
+                PHP)
+            ->notContains('docs')
         ;
     }
 

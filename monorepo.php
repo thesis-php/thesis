@@ -28,6 +28,7 @@ return new Config(
     autoloadDev: [
         'Thesis\Monorepo\\' => 'tools/monorepo/src/',
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',
+        'Thesis\PhpCsFixer\Tests\\' => 'tools/php-cs-fixer/tests/',
     ],
     allowPlugins: [
         'llm/skills' => true,

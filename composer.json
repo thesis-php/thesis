@@ -64,7 +64,8 @@
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
-            "Thesis\\Net\\": "packages/net/tests/"
+            "Thesis\\Net\\": "packages/net/tests/",
+            "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/"
         },
         "files": [
             "packages/async/tests/autoload.files.php",

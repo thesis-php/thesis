@@ -8,7 +8,8 @@ use Rector\Php80\Rector\Class_\StringableForToStringRector;
 
 $root = dirname(__DIR__);
 
-return RectorConfig::configure()
+return RectorConfig
+    ::configure()
     ->withPaths([
         $root . '/bin/monorepo',
         $root . '/monorepo.php',

@@ -251,7 +251,8 @@ final class GroupTest
     {
         $escaped = group(static fn(Group $group) => $group);
 
-        Expect::exception(\LogicException::class)
+        Expect
+            ::exception(\LogicException::class)
             ->withMessage('The group is closed: a task can only be started until group() returns.')
         ;
 
@@ -637,7 +638,8 @@ final class GroupTest
         });
 
         Assert::instanceOf($exception, \Error::class);
-        Assert::string($exception->getMessage())
+        Assert
+            ::string($exception->getMessage())
             ->startsWith('Event loop terminated without resuming the current suspension')
         ;
         Assert::same($events, ['task cancelled']);
@@ -658,7 +660,8 @@ final class GroupTest
         });
 
         Assert::instanceOf($exception, \Error::class);
-        Assert::string($exception->getMessage())
+        Assert
+            ::string($exception->getMessage())
             ->startsWith('Event loop terminated without resuming the current suspension')
         ;
         Assert::same(self::children($root), []);

@@ -246,7 +246,8 @@ final class SuppressedTest
             });
         });
 
-        Assert::string($exception->getMessage())
+        Assert
+            ::string($exception->getMessage())
             ->startsWith('Event loop terminated without resuming the current suspension')
         ;
         Assert::same(suppressed($exception), [$failure]);
@@ -267,7 +268,8 @@ final class SuppressedTest
             });
         });
 
-        Assert::string($exception->getMessage())
+        Assert
+            ::string($exception->getMessage())
             ->startsWith('Event loop terminated without resuming the current suspension')
         ;
         Assert::same(suppressed($exception), []);

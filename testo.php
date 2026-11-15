@@ -15,6 +15,7 @@ return new ApplicationConfig(
     ],
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
+        new SuiteConfig(name: 'php-cs-fixer', location: [__DIR__ . '/tools/php-cs-fixer/tests']),
         new SuiteConfig(
             name: 'async',
             location: [__DIR__ . '/packages/async/tests'],

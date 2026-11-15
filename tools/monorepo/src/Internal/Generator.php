@@ -224,7 +224,14 @@ final readonly class Generator
     {
         $plugins = self::TESTO_PLUGINS;
         $src = '';
-        $suites = "        new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),\n";
+        $suites = '';
+        $tools = glob($this->monorepo->root . '/tools/*/tests', GLOB_ONLYDIR);
+        \assert($tools !== false);
+
+        foreach ($tools as $tests) {
+            $tool = basename(\dirname($tests));
+            $suites .= "        new SuiteConfig(name: '{$tool}', location: [__DIR__ . '/tools/{$tool}/tests']),\n";
+        }
 
         foreach ($this->monorepo->packages as $package) {
             $path = $package->path();

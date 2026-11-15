@@ -119,7 +119,8 @@ final class DnsResolverTest
 
     public function reportsWhatTheServersSaid(): void
     {
-        Expect::exception(DnsFailed::class)
+        Expect
+            ::exception(DnsFailed::class)
             ->withMessage('Failed to resolve "db.test": db.test: 127.0.0.1:%d: server failure')
         ;
 

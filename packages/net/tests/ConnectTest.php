@@ -37,7 +37,8 @@ final class ConnectTest
     public function failsIfRefused(): void
     {
         $port = self::freePort('127.0.0.1');
-        Expect::exception(ConnectFailed::class)
+        Expect
+            ::exception(ConnectFailed::class)
             ->withMessage("Failed to connect to 127.0.0.1:{$port}: 127.0.0.1:{$port}: Connection refused")
         ;
 
@@ -103,7 +104,8 @@ final class ConnectTest
 
     public function wrapsAResolverFailure(): void
     {
-        Expect::exception(ConnectFailed::class)
+        Expect
+            ::exception(ConnectFailed::class)
             ->withMessage('Failed to connect to missing.test:80: Host "missing.test" not found.')
             ->withPrevious(DnsFailed::class)
         ;
