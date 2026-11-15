@@ -38,11 +38,7 @@ final class ContinuationImpl implements Continuation
 
     public function resume(mixed $value = null): bool
     {
-        return $this->fire(
-            value: $value,
-            error: null,
-            interrupted: false,
-        );
+        return $this->fire(value: $value, error: null, interrupted: false);
     }
 
     public function throw(\Throwable $error): bool
@@ -54,11 +50,7 @@ final class ContinuationImpl implements Continuation
             );
         }
 
-        return $this->fire(
-            value: null,
-            error: $error,
-            interrupted: false,
-        );
+        return $this->fire(value: null, error: $error, interrupted: false);
     }
 
     /**
@@ -67,11 +59,7 @@ final class ContinuationImpl implements Continuation
      */
     public function interrupt(): bool
     {
-        return $this->fire(
-            value: null,
-            error: null,
-            interrupted: true,
-        );
+        return $this->fire(value: null, error: null, interrupted: true);
     }
 
     /**

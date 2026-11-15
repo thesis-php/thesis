@@ -668,8 +668,8 @@ final class Buffer implements \Countable
      *     $buffer->fillUntil($reader, "\r\n");
      *     $line = $buffer->readUntil("\r\n");
      *
-     * @param positive-int $maxLength max number of unread bytes to buffer while searching
      * @param non-empty-string $delimiter
+     * @param positive-int $maxLength max number of unread bytes to buffer while searching
      * @throws UnexpectedEof
      * @throws \OverflowException if the delimiter is not found within $maxLength bytes
      */
@@ -727,7 +727,11 @@ final class Buffer implements \Countable
      */
     private function eof(int $n): UnexpectedEof
     {
-        return new UnexpectedEof(\sprintf('Expected %d bytes, but only %d available.', $n, \strlen($this->bytes) - $this->offset));
+        return new UnexpectedEof(\sprintf(
+            'Expected %d bytes, but only %d available.',
+            $n,
+            \strlen($this->bytes) - $this->offset,
+        ));
     }
 
     private function compact(): void

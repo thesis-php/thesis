@@ -65,11 +65,11 @@ final class ScopeTest
         $scope->cancel();
 
         Assert::same(
-            array_map(
-                static fn(Scope $scope) => $scope->isCancelled(),
-                [$scope, $child, $grandchild, $shield, $shielded],
+            actual: array_map(
+                callback: static fn(Scope $scope) => $scope->isCancelled(),
+                array: [$scope, $child, $grandchild, $shield, $shielded],
             ),
-            [true, true, true, false, false],
+            expected: [true, true, true, false, false],
         );
     }
 
@@ -83,8 +83,11 @@ final class ScopeTest
         $shielded = new Scope($shield);
 
         Assert::same(
-            array_map(static fn(Scope $scope) => $scope->isCancelled(), [$child, $grandchild, $shield, $shielded]),
-            [true, true, false, false],
+            actual: array_map(
+                callback: static fn(Scope $scope) => $scope->isCancelled(),
+                array: [$child, $grandchild, $shield, $shielded],
+            ),
+            expected: [true, true, false, false],
         );
     }
 

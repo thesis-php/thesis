@@ -382,11 +382,7 @@ function allSettled(array $tasks): array
  */
 function some(int $count, array $tasks): array
 {
-    return Internal\some(
-        function: 'some',
-        count: $count,
-        tasks: $tasks,
-    );
+    return Internal\some(function: 'some', count: $count, tasks: $tasks);
 }
 
 /**
@@ -401,11 +397,7 @@ function some(int $count, array $tasks): array
  */
 function race(array $tasks): mixed
 {
-    return array_first(Internal\some(
-        function: 'race',
-        count: 1,
-        tasks: $tasks,
-    ));
+    return array_first(Internal\some(function: 'race', count: 1, tasks: $tasks));
 }
 
 /**
@@ -513,12 +505,7 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
         return $fn();
     }
 
-    return Internal\holding(
-        locks: $locks,
-        key: $semaphore,
-        lock: $semaphore->acquire(),
-        fn: $fn,
-    );
+    return Internal\holding(locks: $locks, key: $semaphore, lock: $semaphore->acquire(), fn: $fn);
 }
 
 /**
@@ -562,12 +549,7 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
         return $fn();
     }
 
-    return Internal\holding(
-        locks: $locks,
-        key: $key,
-        lock: $semaphore->acquire($key),
-        fn: $fn,
-    );
+    return Internal\holding(locks: $locks, key: $key, lock: $semaphore->acquire($key), fn: $fn);
 }
 
 /**
@@ -585,10 +567,7 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
  */
 function awaitSignal(int $signal, int ...$signals): int
 {
-    return trapSignals(
-        signals: [$signal, ...$signals],
-        fn: static fn(SignalTrap $trap) => $trap->receive(),
-    );
+    return trapSignals(signals: [$signal, ...$signals], fn: static fn(SignalTrap $trap) => $trap->receive());
 }
 
 /**

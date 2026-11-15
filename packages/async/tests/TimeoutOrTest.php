@@ -15,7 +15,7 @@ final class TimeoutOrTest
 {
     public function returnsResultWithinDeadline(): void
     {
-        $result = timeoutOr(1_000, static function () {
+        $result = timeoutOr(seconds: 1_000, body: static function () {
             delay(1);
 
             return 'result';
@@ -86,7 +86,7 @@ final class TimeoutOrTest
     {
         $inner = 'not reached';
 
-        $outer = timeoutOr(1, static function () use (&$inner) {
+        $outer = timeoutOr(seconds: 1, body: static function () use (&$inner) {
             $inner = timeoutOr(10, never(...), default: 'inner');
         }, default: 'outer');
 

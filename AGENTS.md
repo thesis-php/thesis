@@ -77,7 +77,10 @@ the whole monorepo is for the final check.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
-- A call with more than two arguments puts them one per line with a trailing comma.
+- A call stays on one line while it fits in 120 characters, named arguments or not:
+  `self::bytes($random, min: 0, max: 40)`. Otherwise its arguments go one per line with a trailing comma,
+  and every argument is named, so the names form a column. The exception is a call whose arguments go
+  to a variadic parameter (`\sprintf()`, `...$args`): PHP cannot name them.
 - Don't neglect named arguments where they help reading: a flag or a bare literal (`strict: true`, `limit: 3`),
   neighbours that are easy to swap (`actual:`/`expected:`), a call of our own code with many parameters,
   a data object built field by field (a DTO, a manifest), a rarely used function whose parameters nobody remembers

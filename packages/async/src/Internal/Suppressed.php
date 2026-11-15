@@ -29,11 +29,7 @@ final class Suppressed
         $errors = $suppressed[$first] ?? null;
         // $error may already hold $first: one failed Deferred awaited from an inner and an outer group
         // is recorded under the inner group's error, which then reaches the outer group after it.
-        self::detach(
-            suppressed: $suppressed,
-            root: $error,
-            error: $first,
-        );
+        self::detach(suppressed: $suppressed, root: $error, error: $first);
 
         if ($errors === null) {
             /** @var \SplObjectStorage<\Throwable, null> */

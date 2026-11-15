@@ -78,8 +78,8 @@ final class ScopeCancellationTest
         $cancellation = new ScopeCancellation(new Scope());
 
         Assert::notSame(
-            $cancellation->subscribe(static function () {}),
-            $cancellation->subscribe(static function () {}),
+            actual: $cancellation->subscribe(static function () {}),
+            expected: $cancellation->subscribe(static function () {}),
         );
     }
 

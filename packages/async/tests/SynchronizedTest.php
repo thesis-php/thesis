@@ -74,8 +74,8 @@ final class SynchronizedTest
         $semaphore = self::semaphore();
 
         $result = synchronized($semaphore, static fn() => synchronized(
-            $semaphore,
-            static fn() => [$semaphore->acquires, $semaphore->releases],
+            semaphore: $semaphore,
+            fn: static fn() => [$semaphore->acquires, $semaphore->releases],
         ));
 
         Assert::same($result, [1, 0]);

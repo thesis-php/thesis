@@ -70,7 +70,7 @@ final class StreamTest
 
     public function readsMoreThanDefaultSocketChunk(): void
     {
-        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
         \assert(\is_array($pair) && isset($pair[0], $pair[1]));
         [$left, $right] = $pair;
         $out = new Stream($left);

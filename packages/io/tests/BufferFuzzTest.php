@@ -47,9 +47,9 @@ final class BufferFuzzTest
     private function runSequence(Randomizer $random, string $context): void
     {
         $order = $random->getInt(0, 1) === 0 ? Order::Big : Order::Little;
-        $initial = self::bytes($random, 0, 40);
+        $initial = self::bytes($random, min: 0, max: 40);
         $chunkSize = $random->getInt(1, 64);
-        $source = self::bytes($random, 0, 600);
+        $source = self::bytes($random, min: 0, max: 600);
         $readerSeed = $random->getInt(0, PHP_INT_MAX);
 
         $buffer = new Buffer($order, $initial, $chunkSize);
@@ -70,23 +70,27 @@ final class BufferFuzzTest
 
             $result = null;
             $referenceResult = null;
-            $outcome = self::outcome(static function () use ($op, $buffer, $reader, $writer, &$result): mixed {
+            $outcome = self::outcome(operation: static function () use ($op, $buffer, $reader, $writer, &$result): mixed {
                 return $result = $op['run']($buffer, $reader, $writer);
-            }, $op['name'] === 'reserve');
-            $referenceOutcome = self::outcome(static function () use ($op, $reference, $referenceReader, $referenceWriter, &$referenceResult): mixed {
+            }, ignoreResult: $op['name'] === 'reserve');
+            $referenceOutcome = self::outcome(operation: static function () use ($op, $reference, $referenceReader, $referenceWriter, &$referenceResult): mixed {
                 return $referenceResult = $op['run']($reference, $referenceReader, $referenceWriter);
-            }, $op['name'] === 'reserve');
+            }, ignoreResult: $op['name'] === 'reserve');
 
             if ($outcome !== $referenceOutcome) {
-                Assert::same($outcome, $referenceOutcome, $where);
+                Assert::same(actual: $outcome, expected: $referenceOutcome, message: $where);
             }
 
             if ($buffer->count() !== $reference->count()) {
-                Assert::same($buffer->count(), $reference->count(), "{$where}: count");
+                Assert::same(actual: $buffer->count(), expected: $reference->count(), message: "{$where}: count");
             }
 
             if ($writer->writes !== $referenceWriter->writes) {
-                Assert::same($writer->writes, $referenceWriter->writes, "{$where}: written bytes");
+                Assert::same(
+                    actual: $writer->writes,
+                    expected: $referenceWriter->writes,
+                    message: "{$where}: written bytes",
+                );
             }
 
             if ($op['name'] === 'reserve' && \is_int($result) && \is_int($referenceResult)) {
@@ -97,7 +101,7 @@ final class BufferFuzzTest
                 $slices[] = [$result, $referenceResult];
             }
 
-            if (\in_array($op['name'], ['drain', 'fill', 'fillUntil', 'flush'], true)) {
+            if (\in_array($op['name'], ['drain', 'fill', 'fillUntil', 'flush'], strict: true)) {
                 // marks are invalidated by these operations
                 $marks = [];
             }
@@ -106,7 +110,11 @@ final class BufferFuzzTest
             $referenceUnread = $reference->peek($reference->count());
 
             if ($unread !== $referenceUnread) {
-                Assert::same(bin2hex($unread), bin2hex($referenceUnread), "{$where}: contents");
+                Assert::same(
+                    actual: bin2hex($unread),
+                    expected: bin2hex($referenceUnread),
+                    message: "{$where}: contents",
+                );
             }
         }
 
@@ -114,10 +122,18 @@ final class BufferFuzzTest
         foreach ($slices as [$slice, $referenceSlice]) {
             $slice->writeUint16(0x01_02)->writeUvarint(300);
             $referenceSlice->writeUint16(0x01_02)->writeUvarint(300);
-            Assert::same(bin2hex($slice->drain()), bin2hex($referenceSlice->drain()), "{$context}: slice");
+            Assert::same(
+                actual: bin2hex($slice->drain()),
+                expected: bin2hex($referenceSlice->drain()),
+                message: "{$context}: slice",
+            );
         }
 
-        Assert::same(bin2hex($buffer->drain()), bin2hex($reference->drain()), "{$context}: final contents");
+        Assert::same(
+            actual: bin2hex($buffer->drain()),
+            expected: bin2hex($reference->drain()),
+            message: "{$context}: final contents",
+        );
     }
 
     /**
@@ -130,7 +146,7 @@ final class BufferFuzzTest
         $n = $random->getInt(0, 12);
         $max = $random->getInt(1, 80);
         $delimiter = self::DELIMITERS[$random->getInt(0, \count(self::DELIMITERS) - 1)];
-        $bytes = self::bytes($random, 0, 20);
+        $bytes = self::bytes($random, min: 0, max: 20);
         $float = self::float($random);
 
         if ($marks !== [] && $random->getInt(0, 4) === 0) {

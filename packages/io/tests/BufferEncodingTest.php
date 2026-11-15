@@ -197,7 +197,8 @@ final class BufferEncodingTest
     {
         $buffer = new Buffer(bytes: str_repeat("\x01", $available));
         Expect::exception(UnexpectedEof::class)
-            ->withMessage(\sprintf('Expected %d bytes, but only %d available.', $available + 1, $available));
+            ->withMessage(\sprintf('Expected %d bytes, but only %d available.', $available + 1, $available))
+        ;
 
         try {
             $read($buffer);

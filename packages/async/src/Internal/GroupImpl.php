@@ -60,11 +60,7 @@ final class GroupImpl implements Group
         $bodyScope = new Scope(Scope::current());
         $tasksScope = new Scope($bodyScope);
         $daemonsScope = new Scope($tasksScope);
-        $group = new self(
-            bodyScope: $bodyScope,
-            tasksScope: $tasksScope,
-            daemonsScope: $daemonsScope,
-        );
+        $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
         $result = null;
 
         try {
@@ -78,7 +74,7 @@ final class GroupImpl implements Group
                 if ($error instanceof Cancelled) {
                     // Not this group's: rethrown as is, it would leave a healthy scope as a cancellation.
                     $error = new \LogicException(
-                        'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
+                        message: 'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
                         previous: $error,
                     );
                 }
@@ -238,7 +234,7 @@ final class GroupImpl implements Group
                 } else {
                     if ($error instanceof Cancelled) {
                         $error = new \LogicException(
-                            'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
+                            message: 'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
                             previous: $error,
                         );
                     }

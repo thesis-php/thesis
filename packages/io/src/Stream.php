@@ -22,7 +22,10 @@ final readonly class Stream implements Reader, Writer, Closer
         int $chunkSize = 65_536,
     ) {
         if (!\is_resource($stream) || get_resource_type($stream) !== 'stream') {
-            throw new \InvalidArgumentException(\sprintf('Expected a stream resource, got %s.', get_debug_type($stream)));
+            throw new \InvalidArgumentException(\sprintf(
+                'Expected a stream resource, got %s.',
+                get_debug_type($stream),
+            ));
         }
 
         stream_set_chunk_size($stream, $chunkSize);

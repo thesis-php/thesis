@@ -519,8 +519,8 @@ final class GroupTest
 
         Assert::instanceOf($exception, \LogicException::class);
         Assert::same(
-            $exception->getMessage(),
-            'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
+            actual: $exception->getMessage(),
+            expected: 'Cancelled escaped a task whose scope is not cancelled: it was caught elsewhere and rethrown.',
         );
         Assert::same($exception->getPrevious(), $foreign);
     }
@@ -550,8 +550,8 @@ final class GroupTest
 
         Assert::instanceOf($exception, \LogicException::class);
         Assert::same(
-            $exception->getMessage(),
-            'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
+            actual: $exception->getMessage(),
+            expected: 'Cancelled escaped a group body whose scope is not cancelled: it was caught elsewhere and rethrown.',
         );
         Assert::same($exception->getPrevious(), $foreign);
         Assert::same($events, ['task cancelled']);

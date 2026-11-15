@@ -64,13 +64,8 @@ final class LocalSlidingWindowRateLimiterTest
             $expected = intdiv($call, $limit) * $window;
 
             Assert::true(
-                abs(now() - $start - $expected) < 1e-9,
-                \sprintf(
-                    'Call %d started at %s instead of %s.',
-                    $call,
-                    now() - $start,
-                    $expected,
-                ),
+                actual: abs(now() - $start - $expected) < 1e-9,
+                message: \sprintf('Call %d started at %s instead of %s.', $call, now() - $start, $expected),
             );
         }
 
@@ -201,8 +196,8 @@ final class LocalSlidingWindowRateLimiterTest
 
         Assert::instanceOf($exception, \ValueError::class);
         Assert::same(
-            $exception->getMessage(),
-            \sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $shown),
+            actual: $exception->getMessage(),
+            expected: \sprintf('LocalSlidingWindowRateLimiter needs a positive window, got %s.', $shown),
         );
     }
 }

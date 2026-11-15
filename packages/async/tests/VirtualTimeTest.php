@@ -155,11 +155,7 @@ final class VirtualTimeTest
             'require %s; try { Thesis\Async\VirtualTime\advance(1); } catch (LogicException $e) { echo $e::class; }',
             var_export(\dirname($classLoader, 2) . '/autoload.php', true),
         );
-        $process = proc_open(
-            command: [PHP_BINARY, '-r', $code],
-            descriptor_spec: [1 => ['pipe', 'w']],
-            pipes: $pipes,
-        );
+        $process = proc_open(command: [PHP_BINARY, '-r', $code], descriptor_spec: [1 => ['pipe', 'w']], pipes: $pipes);
         \assert(\is_resource($process) && isset($pipes[1]));
         $output = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
@@ -200,11 +196,7 @@ final class VirtualTimeTest
     public function streamsAreReal(): void
     {
         /** @var array{resource, resource} $pair */
-        $pair = stream_socket_pair(
-            domain: STREAM_PF_UNIX,
-            type: STREAM_SOCK_STREAM,
-            protocol: STREAM_IPPROTO_IP,
-        );
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
         [$reader, $writer] = $pair;
         $start = now();
 
@@ -266,11 +258,11 @@ final class VirtualTimeTest
     {
         $driver = new StreamSelectDriver();
 
-        [$callbackId, $identifiers] = run(static function () use ($driver) {
+        [$callbackId, $identifiers] = run(fn: static function () use ($driver) {
             $callbackId = EventLoop::defer(static function () {});
 
             return [$callbackId, $driver->getIdentifiers()];
-        }, $driver);
+        }, driver: $driver);
 
         Assert::same($identifiers, [$callbackId]);
     }
@@ -532,12 +524,12 @@ final class VirtualTimeTest
         $defer = EventLoop::defer(static function () {});
 
         Assert::same(
-            [EventLoop::getType($delay), EventLoop::getType($repeat), EventLoop::getType($defer)],
-            [CallbackType::Delay, CallbackType::Repeat, CallbackType::Defer],
+            actual: [EventLoop::getType($delay), EventLoop::getType($repeat), EventLoop::getType($defer)],
+            expected: [CallbackType::Delay, CallbackType::Repeat, CallbackType::Defer],
         );
         Assert::same(
-            [EventLoop::isEnabled($defer), EventLoop::isReferenced(EventLoop::unreference($defer))],
-            [true, false],
+            actual: [EventLoop::isEnabled($defer), EventLoop::isReferenced(EventLoop::unreference($defer))],
+            expected: [true, false],
         );
         Assert::true(EventLoop::isReferenced(EventLoop::reference($defer)));
 
@@ -553,19 +545,15 @@ final class VirtualTimeTest
         $repeat = thrown(static fn() => EventLoop::repeat(-1, static function () {}));
 
         Assert::same(
-            [$delay->getMessage(), $repeat->getMessage()],
-            ['Delay must be greater than or equal to zero', 'Interval must be greater than or equal to zero'],
+            actual: [$delay->getMessage(), $repeat->getMessage()],
+            expected: ['Delay must be greater than or equal to zero', 'Interval must be greater than or equal to zero'],
         );
     }
 
     public function callbackReturningValueIsRejectedAsByRevolt(): void
     {
         /** @var array{resource, resource} $pair */
-        $pair = stream_socket_pair(
-            domain: STREAM_PF_UNIX,
-            type: STREAM_SOCK_STREAM,
-            protocol: STREAM_IPPROTO_IP,
-        );
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
         $register = [
             static fn(\Closure $callback) => EventLoop::delay(0, $callback),
             EventLoop::defer(...),
@@ -589,7 +577,7 @@ final class VirtualTimeTest
         $driver = new StreamSelectDriver();
         $handler = static function () {};
 
-        [$handle, $errorHandler, $debugInfo] = run(static function () use ($handler) {
+        [$handle, $errorHandler, $debugInfo] = run(fn: static function () use ($handler) {
             EventLoop::setErrorHandler($handler);
             EventLoop::delay(1, static function () {});
 
@@ -598,7 +586,7 @@ final class VirtualTimeTest
                 EventLoop::getErrorHandler(),
                 EventLoop::getDriver()->__debugInfo(),
             ];
-        }, $driver);
+        }, driver: $driver);
 
         Assert::same([$handle, $errorHandler], [$driver->getHandle(), $handler]);
         Assert::same([$debugInfo['timers'] ?? null, $debugInfo['inner'] ?? null], [1, $driver->__debugInfo()]);

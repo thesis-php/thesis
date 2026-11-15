@@ -70,12 +70,7 @@ function thrown(callable $fn): \Throwable
 function withoutWarnings(callable $fn): mixed
 {
     set_error_handler(static function (int $severity, string $message, string $file, int $line): never {
-        throw new \ErrorException(
-            message: $message,
-            severity: $severity,
-            filename: $file,
-            line: $line,
-        );
+        throw new \ErrorException(message: $message, severity: $severity, filename: $file, line: $line);
     });
 
     try {

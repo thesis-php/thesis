@@ -309,8 +309,8 @@ final class SuspendTest
 
         Assert::instanceOf($rejection, \ValueError::class);
         Assert::same(
-            $rejection->getMessage(),
-            'A continuation cannot be thrown Cancelled: the waiting scope is not cancelled. Throw a regular exception.',
+            actual: $rejection->getMessage(),
+            expected: 'A continuation cannot be thrown Cancelled: the waiting scope is not cancelled. Throw a regular exception.',
         );
         Assert::same($value, 'still pending');
     }

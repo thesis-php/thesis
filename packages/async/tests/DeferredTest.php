@@ -142,8 +142,8 @@ final class DeferredTest
 
         Assert::instanceOf($exception, \ValueError::class);
         Assert::same(
-            $exception->getMessage(),
-            'A deferred cannot fail with Cancelled: its awaiters are not cancelled. Fail it with a regular exception.',
+            actual: $exception->getMessage(),
+            expected: 'A deferred cannot fail with Cancelled: its awaiters are not cancelled. Fail it with a regular exception.',
         );
         Assert::false($deferred->isDone);
     }

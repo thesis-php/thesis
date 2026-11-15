@@ -37,11 +37,7 @@ final class Context
      */
     public static function run(array $values, callable $fn): mixed
     {
-        return self::bind(
-            values: $values,
-            previous: self::capture(),
-            fn: $fn,
-        );
+        return self::bind(values: $values, previous: self::capture(), fn: $fn);
     }
 
     /**
@@ -82,11 +78,7 @@ final class Context
         $values = $previous;
         $values[spl_object_id($key)] = [$key, $value];
 
-        return self::bind(
-            values: $values,
-            previous: $previous,
-            fn: $fn,
-        );
+        return self::bind(values: $values, previous: $previous, fn: $fn);
     }
 
     /**

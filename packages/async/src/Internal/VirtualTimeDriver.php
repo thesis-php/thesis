@@ -144,21 +144,13 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function delay(float $delay, \Closure $closure): string
     {
-        return $this->schedule(
-            seconds: $delay,
-            callback: $closure,
-            repeat: false,
-        );
+        return $this->schedule(seconds: $delay, callback: $closure, repeat: false);
     }
 
     #[\Override]
     public function repeat(float $interval, \Closure $closure): string
     {
-        return $this->schedule(
-            seconds: $interval,
-            callback: $closure,
-            repeat: true,
-        );
+        return $this->schedule(seconds: $interval, callback: $closure, repeat: true);
     }
 
     #[\Override]
@@ -311,8 +303,8 @@ final class VirtualTimeDriver implements Driver
     public function getIdentifiers(): array
     {
         $identifiers = array_values(array_filter(
-            $this->inner->getIdentifiers(),
-            fn(string $callbackId) => !isset($this->own[$callbackId]),
+            array: $this->inner->getIdentifiers(),
+            callback: fn(string $callbackId) => !isset($this->own[$callbackId]),
         ));
 
         return [...$identifiers, ...array_keys($this->timers)];
@@ -370,12 +362,7 @@ final class VirtualTimeDriver implements Driver
 
         // Not like the inner ids, which are letters.
         $callbackId = 'virtual-' . $this->nextId++;
-        $timer = new VirtualTimer(
-            callbackId: $callbackId,
-            interval: $seconds,
-            callback: $callback,
-            repeat: $repeat,
-        );
+        $timer = new VirtualTimer(callbackId: $callbackId, interval: $seconds, callback: $callback, repeat: $repeat);
         $this->timers[$callbackId] = $timer;
         $this->enqueue($timer, $this->clock->now() + $seconds);
 
