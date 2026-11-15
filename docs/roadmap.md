@@ -66,9 +66,10 @@ of its package, and a step that is done is deleted from here.
    (check what the old repository has; probably from scratch).
 4. **SQL.** `postgres` on the wire protocol (pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, `COPY`),
    designed with norm in mind. Then `pgmq`.
-5. **HTTP.** `http` (messages, headers from the old `thesis/headers`, bodies as `io\Reader`), `http-client`
-   (HTTP/1.1, keep-alive, the pool, CONNECT, cookies), `http-server` (graceful shutdown by `trapSignals()`,
-   router, form parser), HTTP/2 with HPACK (needed by grpc; ALPN is in `net`), then `websocket`.
+5. **HTTP.** Ideas for the messages: [http-ideas.md](http-ideas.md). `http` (messages, headers from the old
+   `thesis/headers`, bodies as `io\Reader`), `http-client` (HTTP/1.1, keep-alive, the pool, CONNECT, cookies),
+   `http-server` (graceful shutdown by `trapSignals()`, router, form parser), HTTP/2 with HPACK
+   (needed by grpc; ALPN is in `net`), then `websocket`.
    `Content-Encoding` needs zlib streams (decorators of `Reader`/`Writer`, in `io` or `http`). A first version
    found: `deflate_add()` ignores a flush with empty input, so a writer keeps the last bytes to flush them with;
    the output of one `inflate_add()` cannot be limited, so a reader feeds it 8 KiB at a time (deflate expands
