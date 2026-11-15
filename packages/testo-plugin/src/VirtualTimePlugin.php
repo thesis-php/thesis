@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Testo;
+namespace Thesis\TestoPlugin;
 
 use Internal\Container\Container;
 use Testo\Common\PluginConfigurator;
 use Testo\Pipeline\InterceptorCollector;
-use Thesis\Testo\Internal\VirtualTimeInterceptor;
+use Thesis\TestoPlugin\Internal\VirtualTimeInterceptor;
 
 /**
  * Runs every test of the suite as {@see VirtualTime} does. A test that has the attribute as well is not wrapped twice.

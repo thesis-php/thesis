@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Testo;
+namespace Thesis\TestoPlugin;
 
 use Testo\Assert;
 use Testo\Expect;

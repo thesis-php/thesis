@@ -31,7 +31,7 @@
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29",
-        "thesis/testo": "^2.0"
+        "thesis/testo-plugin": "^2.0"
     },
     "conflict": {
         "amphp/amp": "<3"

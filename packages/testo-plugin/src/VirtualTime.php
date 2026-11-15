@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Testo;
+namespace Thesis\TestoPlugin;
 
 use Testo\Pipeline\Attribute\FallbackInterceptor;
 use Testo\Pipeline\Attribute\Interceptable;
-use Thesis\Testo\Internal\VirtualTimeInterceptor;
+use Thesis\TestoPlugin\Internal\VirtualTimeInterceptor;
 
 /**
  * Runs the test, its hooks included, on a fresh virtual time: see `Thesis\Async\VirtualTime\run()`.

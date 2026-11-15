@@ -50,7 +50,7 @@
         "thesis/async": "self.version",
         "thesis/io": "self.version",
         "thesis/net": "self.version",
-        "thesis/testo": "self.version",
+        "thesis/testo-plugin": "self.version",
         "thesis/time": "self.version"
     },
     "autoload": {
@@ -59,7 +59,7 @@
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
-            "Thesis\\Testo\\": "packages/testo/src/",
+            "Thesis\\TestoPlugin\\": "packages/testo-plugin/src/",
             "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
@@ -78,7 +78,7 @@
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
-            "Thesis\\Testo\\": "packages/testo/tests/",
+            "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",
             "Thesis\\Time\\": "packages/time/tests/"
         },
         "files": [

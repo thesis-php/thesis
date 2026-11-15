@@ -874,9 +874,9 @@ While `run()` runs, its clock is the clock of the library, bound by `run()` itse
 Each `run()` has a clock of its own, so an object that keeps times must not outlive the `run()` it was used in:
 a rate limiter shared by two `run()`s one after another, or used again outside, may see a time from the future of its clock.
 
-For [Testo](https://github.com/php-testo/testo), [thesis/testo](https://github.com/thesis-php/testo) runs tests
-this way: its `VirtualTimePlugin` runs every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute
-does the same for a class or a test. The tests of this library run on it.
+For [Testo](https://github.com/php-testo/testo),
+[thesis/testo-plugin](https://github.com/thesis-php/testo-plugin) runs tests this way: its `VirtualTimePlugin` runs
+every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute does the same for a class or a test. The tests of this library run on it.
 
 ### Streams: `StreamWatcher`
 

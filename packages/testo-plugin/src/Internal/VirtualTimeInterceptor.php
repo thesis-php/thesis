@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Testo\Internal;
+namespace Thesis\TestoPlugin\Internal;
 
 use Testo\Core\Context\TestInfo;
 use Testo\Core\Context\TestResult;

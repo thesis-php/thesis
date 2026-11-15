@@ -1,14 +1,14 @@
-# Thesis Testo
+# Thesis Testo Plugin
 
-[![PHP Version Requirement](https://img.shields.io/packagist/dependency-v/thesis/testo/php)](https://packagist.org/packages/thesis/testo)
-[![GitHub Release](https://img.shields.io/github/v/release/thesis-php/testo)](https://github.com/thesis-php/testo/releases)
+[![PHP Version Requirement](https://img.shields.io/packagist/dependency-v/thesis/testo-plugin/php)](https://packagist.org/packages/thesis/testo-plugin)
+[![GitHub Release](https://img.shields.io/github/v/release/thesis-php/testo-plugin)](https://github.com/thesis-php/testo-plugin/releases)
 
 Plugins for [Testo](https://github.com/php-testo/testo) to test code built on thesis packages.
 
 ## Installation
 
 ```shell
-composer require --dev thesis/testo
+composer require --dev thesis/testo-plugin
 ```
 
 Requires 64-bit PHP 8.5+.
@@ -25,7 +25,7 @@ Every test of a suite, with the plugin in `testo.php`:
 ```php
 use Testo\Application\Config\ApplicationConfig;
 use Testo\Application\Config\SuiteConfig;
-use Thesis\Testo\VirtualTimePlugin;
+use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new ApplicationConfig(
     suites: [
@@ -40,7 +40,7 @@ Or only some, with the attribute on a test class or a test:
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Instant;
-use Thesis\Testo\VirtualTime;
+use Thesis\TestoPlugin\VirtualTime;
 use function Thesis\Async\delay;
 use function Thesis\Time\hours;
 

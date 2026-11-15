@@ -13,7 +13,7 @@ use Thesis\Amqp\Internal\Protocol\ConnectionCloseOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionStart;
 use Thesis\Async\Group;
 use Thesis\Io\IoException;
-use Thesis\Testo\VirtualTime;
+use Thesis\TestoPlugin\VirtualTime;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Time\ms;

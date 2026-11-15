@@ -20,7 +20,7 @@ return new Manifest(
         'testo/assert' => '^0.1.17',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
-        'thesis/testo' => '*',
+        'thesis/testo-plugin' => '*',
     ],
     files: ['src/autoload.files.php'],
     devFiles: ['tests/autoload.files.php'],

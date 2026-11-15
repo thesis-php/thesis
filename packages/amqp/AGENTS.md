@@ -59,6 +59,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `MethodTest` skips the lowercase files of `src/Internal/Protocol`: `class_exists('decodeMethod')` includes the file
   of functions a second time and redeclares them.
 - The fake broker of the tests (`FakeServer`, `FakePeer`) speaks the protocol over a real local TCP socket,
-  so `Client` is tested end to end. Heartbeat tests run on `#[VirtualTime]` of thesis/testo.
+  so `Client` is tested end to end. Heartbeat tests run on `#[VirtualTime]` of thesis/testo-plugin.
   `tests/Integration` checks against the RabbitMQ of `compose.yaml` what a fake cannot: the semantics of the broker.
 - Not done yet: an RPC helper with direct reply-to.

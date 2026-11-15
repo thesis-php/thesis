@@ -1,5 +1,5 @@
 {
-    "name": "thesis/testo",
+    "name": "thesis/testo-plugin",
     "description": "Testo plugins for thesis packages: tests on the virtual time of thesis/async.",
     "license": "MIT",
     "type": "library",
@@ -31,12 +31,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Thesis\\Testo\\": "src/"
+            "Thesis\\TestoPlugin\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Thesis\\Testo\\": "tests/"
+            "Thesis\\TestoPlugin\\": "tests/"
         }
     }
 }

@@ -21,7 +21,7 @@ return new Manifest(
         'testo/data' => '^0.1.10',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
-        'thesis/testo' => '*',
+        'thesis/testo-plugin' => '*',
     ],
     files: ['src/autoload.files.php'],
     devFiles: ['tests/autoload.files.php'],

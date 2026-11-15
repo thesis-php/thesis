@@ -187,7 +187,7 @@ in the same change. Atomic changes across packages are the reason this is a mono
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree. Requires: time.
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
-- `testo`: Testo plugins for thesis packages: tests on the virtual time of thesis/async. Requires: async.
+- `testo-plugin`: Testo plugins for thesis packages: tests on the virtual time of thesis/async. Requires: async.
 - `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.
 
 <!-- packages:end -->

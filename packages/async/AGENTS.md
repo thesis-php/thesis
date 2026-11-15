@@ -153,7 +153,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 
 ## Conventions
 
-- Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo in `testo.plugins.php`; no attribute is needed): delays are whole seconds
+- Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo-plugin in `testo.plugins.php`; no attribute is needed): delays are whole seconds
   (`delay(sec(1))`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted
   exactly (`Assert::same(secondsSince($start), 20.0)`, `Assert::equals(remaining(), sec(990))`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
   Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
