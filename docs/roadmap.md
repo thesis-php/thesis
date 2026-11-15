@@ -96,11 +96,11 @@ of its package, and a step that is done is deleted from here.
 
 - Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
   or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
-- Run the tests on several Revolt drivers in CI (`REVOLT_DRIVER`, passed through `compose.yaml`): the image has
-  ext-uv, so `DriverFactory` picks `UvDriver` and `StreamSelectDriver`, the default of most users, is never tested.
-  The drivers differ in signals (pcntl or native), closed or re-registered streams and the order of callbacks
-  in a tick; `VirtualTimeDriver` leaves streams and signals to the inner driver. First `StreamSelectDriver`
-  and `UvDriver`, then `EvDriver` (needs ext-ev in the image); `EventDriver` probably not.
+- Run the tests on `EvDriver` and `EventDriver` in CI (`driver` of the matrix) once the image has ext-ev and
+  ext-event. `EventDriver` is chosen last by `DriverFactory`, but users of Workerman or ReactPHP have ext-event,
+  and its signals move between event bases (`static $activeSignals`), which `VirtualTime\run()` nesting a driver hits.
+- Run the child of `StdioTest` on the driver of the tests instead of `StreamSelectDriver`: on `UvDriver`
+  it shows the `O_NONBLOCK` left on stdio (`packages/io/AGENTS.md`).
 - Links between packages in a README (`[thesis/async](../async/README.md)` in `amqp`, `async`, `io`, `net`)
   work only in the monorepo: the split repository and Packagist have no `../async`. Replace them all at once
   with links to the repositories of the packages (`https://github.com/thesis-php/async`), and make `bin/monorepo`

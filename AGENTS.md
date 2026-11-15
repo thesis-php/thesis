@@ -78,8 +78,8 @@ the whole monorepo is for the final check.
 - `make test` starts the services of `compose.yaml` (RabbitMQ) first (`make up`), `make down` stops them.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
-  so commit the generated files. CI runs the tests on PHP 8.5 and 8.6 (`PHP_VERSION=8.6 make test`), the other
-  checks on 8.5 only
+  so commit the generated files. CI runs the tests on PHP 8.5 and 8.6 (`PHP_VERSION=8.6 make test`)
+  and on the Revolt drivers `StreamSelect` and `Uv` (`DRIVER=StreamSelect make test`), the other checks on 8.5 only
 
 ## Git
 

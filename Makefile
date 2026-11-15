@@ -7,6 +7,11 @@ COMPOSER ?= $(RUN) composer
 
 # (P=<name> narrows the quality tools and the tests to packages/<name>)
 P ?=
+# (DRIVER=StreamSelect|Uv|Ev|Event runs the tests on that Revolt driver, by default DriverFactory chooses)
+DRIVER ?=
+ifneq ($(DRIVER),)
+export REVOLT_DRIVER := Revolt\EventLoop\Driver\$(DRIVER)Driver
+endif
 # (REF is the branch or the tag to split, passed through the environment: a ref name may hold ; $ ` and quotes)
 export REF ?= $(shell git symbolic-ref --quiet HEAD)
 PATHS = $(if $(P),packages/$(P),bin/monorepo monorepo.php tools packages)
@@ -83,7 +88,9 @@ deps-analyze: vendor ## Check for unused and shadow dependencies
 	$(RUN) composer-dependency-analyser --config=tools/composer-dependency-analyser.php $(ARGS)
 .PHONY: deps-analyze
 
-test: var vendor up ## Run tests [P=]
+# (Fails when REVOLT_DRIVER is lost on the way to the container: the tests would pass on another driver)
+test: var vendor up ## Run tests [P=] [DRIVER=]
+	$(RUN) php -r 'require "vendor/autoload.php"; $$driver = Revolt\EventLoop::getDriver()::class; echo "Revolt driver: $$driver\n"; exit(\in_array(getenv("REVOLT_DRIVER"), [false, "", $$driver], true) ? 0 : 1);'
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 

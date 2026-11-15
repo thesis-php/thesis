@@ -22,14 +22,17 @@ jobs:
       - run: make fixer-check rector-check phpstan deps-analyze
 
   # Time\Duration is a polyfill on PHP 8.5 and native on PHP 8.6: the code runs against both.
+  # The Revolt drivers differ in signals, closed streams and the order of callbacks: the code runs on each.
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         php: ['8.5', '8.6']
+        driver: [StreamSelect, Uv]
     env:
       PHP_VERSION: ${{ matrix.php }}
+      DRIVER: ${{ matrix.driver }}
     steps:
       - uses: actions/checkout@v6
       - run: make test
