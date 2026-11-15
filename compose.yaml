@@ -22,7 +22,8 @@ services:
       RABBITMQ_DEFAULT_USER: thesis
       RABBITMQ_DEFAULT_PASS: thesis
     healthcheck:
-      test: rabbitmq-diagnostics --quiet ping
+      # ping answers before the AMQP listener accepts connections, and the first tests would be refused.
+      test: rabbitmq-diagnostics --quiet check_port_connectivity
       interval: 2s
       timeout: 5s
       retries: 30
