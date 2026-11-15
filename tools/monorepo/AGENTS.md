@@ -97,6 +97,10 @@ Decisions:
 - A commit without the package passes the split heads of its parents to its children: a package removed and added
   again continues its history (splitsh started a new root, which could not be pushed without a force).
   A commit where `packages` is a file or a link has no packages, it does not break the splits after it.
+- A package is split by the name of its directory, renames are not followed: a renamed `packages/<name>` starts
+  a new root, which cannot fast-forward the history of the old name. So a package is renamed together with
+  a new repository: delete the old one (`github` creates it again), do not rename it on GitHub
+  (`testo` → `testo-plugin` was rejected by the next split).
 - A parent that is an ancestor of another parent is dropped and a repeated one is kept once, so a merge
   is kept only where both sides changed the package. A commit is reused when its only parent has the same tree.
 - Author, committer, encoding and message are copied byte for byte, every other header is dropped: a signature
