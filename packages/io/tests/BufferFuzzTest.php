@@ -69,13 +69,20 @@ final class BufferFuzzTest
             $where = "{$context}, step {$step}, {$op['name']}";
 
             $result = null;
-            $referenceResult = null;
-            $outcome = self::outcome(operation: static function () use ($op, $buffer, $reader, $writer, &$result): mixed {
-                return $result = $op['run']($buffer, $reader, $writer);
-            }, ignoreResult: $op['name'] === 'reserve');
-            $referenceOutcome = self::outcome(operation: static function () use ($op, $reference, $referenceReader, $referenceWriter, &$referenceResult): mixed {
-                return $referenceResult = $op['run']($reference, $referenceReader, $referenceWriter);
-            }, ignoreResult: $op['name'] === 'reserve');
+            $expected = null;
+            $run = $op['run'];
+            $outcome = self::outcome(
+                operation: static function () use ($run, $buffer, $reader, $writer, &$result) {
+                    return $result = $run($buffer, $reader, $writer);
+                },
+                ignoreResult: $op['name'] === 'reserve',
+            );
+            $referenceOutcome = self::outcome(
+                operation: static function () use ($run, $reference, $referenceReader, $referenceWriter, &$expected) {
+                    return $expected = $run($reference, $referenceReader, $referenceWriter);
+                },
+                ignoreResult: $op['name'] === 'reserve',
+            );
 
             if ($outcome !== $referenceOutcome) {
                 Assert::same(actual: $outcome, expected: $referenceOutcome, message: $where);
@@ -93,12 +100,12 @@ final class BufferFuzzTest
                 );
             }
 
-            if ($op['name'] === 'reserve' && \is_int($result) && \is_int($referenceResult)) {
-                $marks[] = [$result, $referenceResult];
+            if ($op['name'] === 'reserve' && \is_int($result) && \is_int($expected)) {
+                $marks[] = [$result, $expected];
             }
 
-            if ($result instanceof Buffer && $referenceResult instanceof ReferenceBuffer) {
-                $slices[] = [$result, $referenceResult];
+            if ($result instanceof Buffer && $expected instanceof ReferenceBuffer) {
+                $slices[] = [$result, $expected];
             }
 
             if (\in_array($op['name'], ['drain', 'fill', 'fillUntil', 'flush'], strict: true)) {
@@ -155,7 +162,7 @@ final class BufferFuzzTest
             if ($random->getInt(0, 2) === 0) {
                 return [
                     'name' => 'sizeSince',
-                    'run' => static fn(Buffer|ReferenceBuffer $x): int => $x->sizeSince($x instanceof Buffer ? $mark : $referenceMark),
+                    'run' => static fn(Buffer|ReferenceBuffer $x) => $x->sizeSince($x instanceof Buffer ? $mark : $referenceMark),
                 ];
             }
 
@@ -164,7 +171,7 @@ final class BufferFuzzTest
 
             return [
                 'name' => 'patchUint' . ($width * 8),
-                'run' => static function (Buffer|ReferenceBuffer $x) use ($mark, $referenceMark, $width, $value): mixed {
+                'run' => static function (Buffer|ReferenceBuffer $x) use ($mark, $referenceMark, $width, $value) {
                     $m = $x instanceof Buffer ? $mark : $referenceMark;
 
                     // patching beyond the written bytes is a contract violation checked by assert()
@@ -184,38 +191,38 @@ final class BufferFuzzTest
 
         /** @var array<string, \Closure(Buffer|ReferenceBuffer, Reader, Writer): mixed> $ops */
         $ops = [
-            'read' => static fn(Buffer|ReferenceBuffer $x): string => $x->read($n),
+            'read' => static fn(Buffer|ReferenceBuffer $x) => $x->read($n),
             'skip' => static fn(Buffer|ReferenceBuffer $x) => $x->skip($n),
-            'peek' => static fn(Buffer|ReferenceBuffer $x): string => $x->peek($n, $max % 5),
-            'slice' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->slice($n),
+            'peek' => static fn(Buffer|ReferenceBuffer $x) => $x->peek($n, $max % 5),
+            'slice' => static fn(Buffer|ReferenceBuffer $x) => $x->slice($n),
             'readUntil' => static fn(Buffer|ReferenceBuffer $x): ?string => $x->readUntil($delimiter),
-            'readInt8' => static fn(Buffer|ReferenceBuffer $x): int => $x->readInt8(),
-            'readUint8' => static fn(Buffer|ReferenceBuffer $x): int => $x->readUint8(),
-            'readInt16' => static fn(Buffer|ReferenceBuffer $x): int => $x->readInt16(),
-            'readUint16' => static fn(Buffer|ReferenceBuffer $x): int => $x->readUint16(),
-            'readInt32' => static fn(Buffer|ReferenceBuffer $x): int => $x->readInt32(),
-            'readUint32' => static fn(Buffer|ReferenceBuffer $x): int => $x->readUint32(),
-            'readInt64' => static fn(Buffer|ReferenceBuffer $x): int => $x->readInt64(),
-            'readUint64' => static fn(Buffer|ReferenceBuffer $x): int => $x->readUint64(),
-            'readFloat' => static fn(Buffer|ReferenceBuffer $x): float => $x->readFloat(),
-            'readDouble' => static fn(Buffer|ReferenceBuffer $x): float => $x->readDouble(),
-            'readUvarint' => static fn(Buffer|ReferenceBuffer $x): int => $x->readUvarint(),
-            'readVarint' => static fn(Buffer|ReferenceBuffer $x): int => $x->readVarint(),
-            'write' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->write($bytes),
-            'writeInt8' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt8(($int & 0xFF) - 0x80),
-            'writeUint8' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint8($int & 0xFF),
-            'writeInt16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt16(($int & 0xFFFF) - 0x8000),
-            'writeUint16' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint16($int & 0xFFFF),
-            'writeInt32' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt32(($int & 0xFF_FF_FF_FF) - 0x80_00_00_00),
-            'writeUint32' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint32($int & 0xFF_FF_FF_FF),
-            'writeInt64' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeInt64($int),
-            'writeUint64' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUint64($int & PHP_INT_MAX),
-            'writeFloat' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeFloat($float),
-            'writeDouble' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeDouble($float),
-            'writeUvarint' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeUvarint($int),
-            'writeVarint' => static fn(Buffer|ReferenceBuffer $x): Buffer|ReferenceBuffer => $x->writeVarint($int),
-            'reserve' => static fn(Buffer|ReferenceBuffer $x): int => $x->reserve($n % 10),
-            'drain' => static fn(Buffer|ReferenceBuffer $x): string => $x->drain(),
+            'readInt8' => static fn(Buffer|ReferenceBuffer $x) => $x->readInt8(),
+            'readUint8' => static fn(Buffer|ReferenceBuffer $x) => $x->readUint8(),
+            'readInt16' => static fn(Buffer|ReferenceBuffer $x) => $x->readInt16(),
+            'readUint16' => static fn(Buffer|ReferenceBuffer $x) => $x->readUint16(),
+            'readInt32' => static fn(Buffer|ReferenceBuffer $x) => $x->readInt32(),
+            'readUint32' => static fn(Buffer|ReferenceBuffer $x) => $x->readUint32(),
+            'readInt64' => static fn(Buffer|ReferenceBuffer $x) => $x->readInt64(),
+            'readUint64' => static fn(Buffer|ReferenceBuffer $x) => $x->readUint64(),
+            'readFloat' => static fn(Buffer|ReferenceBuffer $x) => $x->readFloat(),
+            'readDouble' => static fn(Buffer|ReferenceBuffer $x) => $x->readDouble(),
+            'readUvarint' => static fn(Buffer|ReferenceBuffer $x) => $x->readUvarint(),
+            'readVarint' => static fn(Buffer|ReferenceBuffer $x) => $x->readVarint(),
+            'write' => static fn(Buffer|ReferenceBuffer $x) => $x->write($bytes),
+            'writeInt8' => static fn(Buffer|ReferenceBuffer $x) => $x->writeInt8(($int & 0xFF) - 0x80),
+            'writeUint8' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUint8($int & 0xFF),
+            'writeInt16' => static fn(Buffer|ReferenceBuffer $x) => $x->writeInt16(($int & 0xFFFF) - 0x8000),
+            'writeUint16' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUint16($int & 0xFFFF),
+            'writeInt32' => static fn(Buffer|ReferenceBuffer $x) => $x->writeInt32(($int & 0xFF_FF_FF_FF) - 0x80_00_00_00),
+            'writeUint32' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUint32($int & 0xFF_FF_FF_FF),
+            'writeInt64' => static fn(Buffer|ReferenceBuffer $x) => $x->writeInt64($int),
+            'writeUint64' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUint64($int & PHP_INT_MAX),
+            'writeFloat' => static fn(Buffer|ReferenceBuffer $x) => $x->writeFloat($float),
+            'writeDouble' => static fn(Buffer|ReferenceBuffer $x) => $x->writeDouble($float),
+            'writeUvarint' => static fn(Buffer|ReferenceBuffer $x) => $x->writeUvarint($int),
+            'writeVarint' => static fn(Buffer|ReferenceBuffer $x) => $x->writeVarint($int),
+            'reserve' => static fn(Buffer|ReferenceBuffer $x) => $x->reserve($n % 10),
+            'drain' => static fn(Buffer|ReferenceBuffer $x) => $x->drain(),
             'fill' => static fn(Buffer|ReferenceBuffer $x, Reader $r) => $x->fill($r, $n * 7),
             'fillUntil' => static fn(Buffer|ReferenceBuffer $x, Reader $r) => $x->fillUntil($r, $delimiter, $max),
             'flush' => static fn(Buffer|ReferenceBuffer $x, Reader $r, Writer $w) => $x->flush($w),
@@ -263,8 +270,10 @@ final class BufferFuzzTest
                 3 => "\r",
                 4 => "\n",
                 5 => "\x00",
+                // an overlong varint: continuation bytes, then a terminator
                 6 => $random->getInt(0, 4) === 0
-                    ? str_repeat(\chr($random->getInt(0x80, 0xFF)), $random->getInt(7, 10)) . \chr($random->getInt(0, 3))
+                    ? str_repeat(\chr($random->getInt(0x80, 0xFF)), $random->getInt(7, 10))
+                        . \chr($random->getInt(0, 3))
                     : \chr($random->getInt(0, 0x7F)),
                 default => \chr($random->getInt(0, 0x7F)),
             };

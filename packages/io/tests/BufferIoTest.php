@@ -175,6 +175,23 @@ final class BufferIoTest
         Assert::count($buffer, 0);
     }
 
+    public function flushThatFailedKeepsTheBytesBeforeThoseWrittenMeanwhile(): void
+    {
+        $buffer = new Buffer(bytes: 'abc');
+        $buffer->read(1);
+        $writer = new FailingWriter(static function () use ($buffer) {
+            $buffer->write('d');
+        });
+
+        try {
+            $buffer->flush($writer);
+            Assert::fail('WriteFailed expected.');
+        } catch (WriteFailed) {
+        }
+
+        Assert::same($buffer->drain(), 'bcd');
+    }
+
     public function flushDoesNotWriteEmptyBuffer(): void
     {
         $writer = new RecordingWriter();

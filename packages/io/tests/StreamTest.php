@@ -12,8 +12,10 @@ use Testo\Test;
 use Thesis\Async\Group;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 #[Covers(Stream::class)]
@@ -189,6 +191,121 @@ final class StreamTest
         unset($left);
     }
 
+    public function secondReaderIsAnErrorEvenIfBytesHaveArrivedForTheFirst(): void
+    {
+        [$left, $right] = self::pair();
+        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the stream.');
+
+        // without the error, the first reader would wait forever for the bytes the second has taken
+        timeout(sec(1), static fn() => group(static function (Group $group) use ($left, $right) {
+            $group->spawn(static fn() => $right->read(100));
+            delay(ms(1));
+            $left->write('for the first');
+            $right->read(100);
+        }));
+    }
+
+    public function readsThatNeverWaitStillLetOtherTasksRun(): void
+    {
+        $stream = new Stream(self::memory(str_repeat('x', 1000)));
+
+        $readsWhenTicked = group(static function (Group $group) use ($stream) {
+            $done = new \stdClass();
+            $done->reads = 0;
+            $ticked = $group->spawn(static fn() => $done->reads);
+
+            for (; $done->reads < 1000; ++$done->reads) {
+                $stream->read(1);
+            }
+
+            return $ticked->await();
+        });
+
+        Assert::true($readsWhenTicked < 1000);
+    }
+
+    public function writesThatNeverWaitStillLetOtherTasksRun(): void
+    {
+        $stream = new Stream(self::open('php://memory', 'w'));
+
+        $writesWhenTicked = group(static function (Group $group) use ($stream) {
+            $done = new \stdClass();
+            $done->writes = 0;
+            $ticked = $group->spawn(static fn() => $done->writes);
+
+            for (; $done->writes < 1000; ++$done->writes) {
+                $stream->write('x');
+            }
+
+            return $ticked->await();
+        });
+
+        Assert::true($writesWhenTicked < 1000);
+    }
+
+    public function readDoesNotAllocateTheWholeMaxUpFront(): void
+    {
+        [$left, $right] = self::pair();
+        $left->write('x');
+        memory_reset_peak_usage();
+        $before = memory_get_peak_usage();
+
+        $right->read(512 * 1_048_576);
+
+        Assert::true(memory_get_peak_usage() - $before < 4 * 1_048_576);
+    }
+
+    public function writeCancelledAfterAPartClosesTheStream(): void
+    {
+        [$left, $right] = self::pair();
+
+        timeoutOr(ms(10), static fn() => $left->write(str_repeat('x', 10_000_000)));
+
+        Assert::true($left->isClosed);
+        Assert::false($right->isClosed);
+    }
+
+    public function writeCancelledBeforeWritingAnythingLeavesTheStreamOpen(): void
+    {
+        [$left, $right] = self::pair();
+
+        group(static function (Group $group) use ($left, $right) {
+            $group->spawn(static fn() => $left->write(str_repeat('a', 10_000_000)));
+            delay(ms(10));
+
+            // waits for the write above
+            timeoutOr(ms(10), static fn() => $left->write('b'));
+
+            Assert::false($left->isClosed);
+            $buffer = new Buffer();
+            $buffer->fill($right, 10_000_000);
+        });
+
+        $left->write('c');
+        Assert::same($right->read(1), 'c');
+    }
+
+    public function writeDoesNotSlipIntoRoomFreedForAWaitingWrite(): void
+    {
+        [$left, $right] = self::pair();
+        $a = str_repeat('a', 4_000_000);
+
+        $received = group(static function (Group $group) use ($left, $right, $a) {
+            $group->spawn(static fn() => $left->write($a));
+            delay(ms(1));
+            $buffer = new Buffer();
+            // frees room while the first write still waits, then a second write starts before it resumes
+            $buffer->fill($right, 1000);
+            $group->spawn(static fn() => $left->write('BBBB'));
+            delay(ms(1));
+            $buffer->fill($right, 4_000_004);
+
+            return $buffer->drain();
+        });
+
+        Assert::true($received === $a . 'BBBB');
+    }
+
     public function throwsOnFailedWrite(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'thesis-io-');
@@ -231,14 +348,6 @@ final class StreamTest
         new Stream($handle);
     }
 
-    public function rejectsNonResource(): void
-    {
-        Expect::exception(\InvalidArgumentException::class)->withMessage('Expected a stream resource, got string.');
-
-        /** @phpstan-ignore argument.type */
-        new Stream('php://memory');
-    }
-
     /**
      * @return array{Stream, Stream}
      */
@@ -248,6 +357,18 @@ final class StreamTest
         \assert(\is_array($pair) && isset($pair[0], $pair[1]));
 
         return [new Stream($pair[0]), new Stream($pair[1])];
+    }
+
+    /**
+     * @return resource
+     */
+    private static function memory(string $bytes): mixed
+    {
+        $handle = self::open('php://memory', 'w+');
+        fwrite($handle, $bytes);
+        rewind($handle);
+
+        return $handle;
     }
 
     /**

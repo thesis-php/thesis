@@ -11,6 +11,7 @@ return new Manifest(
         'thesis/async' => '*',
     ],
     requireDev: [
+        'revolt/event-loop' => '^1.0.9',
         'testo/assert' => '^0.1.17',
         'testo/codecov' => '^0.2.5',
         'testo/data' => '^0.1.10',

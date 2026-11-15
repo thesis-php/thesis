@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Io;
 
+use Revolt\EventLoop\Driver\StreamSelectDriver;
 use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
@@ -134,5 +135,112 @@ final class StdioTest
 
         proc_close($process);
         Assert::same($stderr, 'alive');
+    }
+
+    public function writeCancelledAfterAPartLeavesStdoutUsable(): void
+    {
+        $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
+        $code = <<<PHP
+            require '{$autoload}';
+            Thesis\\Async\\timeoutOr(
+                Thesis\\Time\\ms(100),
+                static fn() => Thesis\\Io\\stdout()->write(str_repeat('x', 10_000_000)),
+            );
+            fwrite(STDERR, "cancelled\\n");
+            Thesis\\Io\\stdout()->write('after');
+            PHP;
+        $process = proc_open(
+            command: [PHP_BINARY, '-r', $code],
+            descriptor_spec: [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            pipes: $pipes,
+        );
+        \assert(\is_resource($process) && isset($pipes[1], $pipes[2]));
+        $stderr = new Buffer();
+
+        // the pipe of stdout stays full until the write has been cancelled
+        $stderr->fillUntil(new Stream($pipes[2]), "\n");
+        $stdout = readAll(new Stream($pipes[1]));
+
+        Assert::same(proc_close($process), 0);
+        Assert::same($stderr->readUntil("\n"), 'cancelled');
+        Assert::true(str_ends_with($stdout, 'xafter'));
+    }
+
+    /**
+     * The uv driver makes a descriptor non-blocking for as long as it watches it: see AGENTS.md,
+     * these tests run on the stream_select() driver until stdio is tested on every driver.
+     */
+    public function stdinIsBlockingForOthersWhileAReadWaitsAndAfterItIsCancelled(): void
+    {
+        $code = <<<'PHP_WRAP'
+            $check = static function () {
+                $child = proc_open(
+                    [PHP_BINARY, '-r', 'fwrite(STDERR, stream_get_meta_data(STDIN)["blocked"] ? "blocking\n" : "non-blocking\n");'],
+                    [0 => STDIN],
+                    $pipes,
+                );
+                proc_close($child);
+            };
+            Thesis\Async\group(static function (Thesis\Async\Group $group) use ($check) {
+                $read = $group->spawn(static fn() => Thesis\Io\stdin()->read(10));
+                Thesis\Async\delay(Thesis\Time\ms(50));
+                $check();
+                $read->cancel();
+            });
+            $check();
+            PHP_WRAP;
+
+        $stderr = self::runOnSelectDriver($code, [0 => ['pipe', 'r'], 2 => ['pipe', 'w']], output: 2);
+
+        Assert::same($stderr, "blocking\nblocking\n");
+    }
+
+    public function stdoutIsBlockingForOthersWhileAWriteWaitsForRoom(): void
+    {
+        $code = <<<'PHP_WRAP'
+            Thesis\Async\group(static function (Thesis\Async\Group $group) {
+                $write = $group->spawn(static fn() => Thesis\Io\stdout()->write(str_repeat('x', 10_000_000)));
+                Thesis\Async\delay(Thesis\Time\ms(50));
+                $child = proc_open(
+                    [PHP_BINARY, '-r', 'fwrite(STDERR, stream_get_meta_data(STDOUT)["blocked"] ? "blocking" : "non-blocking");'],
+                    [1 => STDOUT, 2 => STDERR],
+                    $pipes,
+                );
+                proc_close($child);
+                $write->cancel();
+            });
+            PHP_WRAP;
+
+        $stderr = self::runOnSelectDriver($code, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], output: 2);
+
+        Assert::same($stderr, 'blocking');
+    }
+
+    /**
+     * Runs $code in a child on the stream_select() driver and returns what it writes to the pipe $output.
+     * The other pipes are neither written nor read, so a read of the child waits and a write fills its pipe.
+     *
+     * @param array<int, list<string>> $descriptors
+     */
+    private static function runOnSelectDriver(string $code, array $descriptors, int $output): string
+    {
+        $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
+        $process = proc_open(
+            command: [PHP_BINARY, '-r', "require '{$autoload}'; {$code}"],
+            descriptor_spec: $descriptors,
+            pipes: $pipes,
+            env_vars: [...getenv(), 'REVOLT_DRIVER' => StreamSelectDriver::class],
+        );
+        \assert(\is_resource($process) && isset($pipes[$output]));
+
+        $bytes = timeoutOr(sec(5), static fn() => readAll(new Stream($pipes[$output])), default: 'hung');
+
+        foreach ($pipes as $pipe) {
+            fclose($pipe);
+        }
+
+        proc_close($process);
+
+        return $bytes;
     }
 }

@@ -32,11 +32,14 @@ skills ship with the package and reach its users through llm/skills.
   OpenSSL requires it.
 - An `fwrite()` that returns 0 *with* an error has failed: OpenSSL reports a broken pipe this way, not as `false`,
   and waiting for writability then would spin forever.
-- `read()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch the stream:
-  it yields for a tick after 16 calls in one tick, so a peer that never pauses (or a flood of connections)
-  does not starve the event loop. It yields *before* the operation, so a cancelled read has taken nothing.
-  Writes are not paced: a writer waits whenever the peer reads slower.
-- A second concurrent reader is a `LogicException`, never a silent race.
+- `read()`, `write()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch
+  the stream: it yields for a tick after 16 calls in one tick, so a peer that never pauses, one that reads faster
+  than we write (another process on the same host), or a flood of connections does not starve the event loop.
+  It yields *before* the operation, so a cancelled read has taken nothing and a cancelled write has sent nothing.
+- A second concurrent reader is a `LogicException`, never a silent race: the `reading` flag is held for the whole
+  `read()`, so the second one fails even when bytes have arrived for the first, which would wait forever for them.
+- One `fread()` asks for at most 1 MiB (`MAX_READ`): PHP allocates the whole length before reading, so a length
+  from a header would cost its size in memory before a byte has arrived.
 - `Server::accept()` never spins: a failed accept after a readiness wake-up backs off (5 ms doubling to 1 s),
   in a wait that `close()` ends.
 - A host name never reaches `stream_socket_client()`/`stream_socket_server()`: PHP resolves it with a blocking

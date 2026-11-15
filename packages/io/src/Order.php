@@ -15,9 +15,6 @@ enum Order
 
     public static function native(): self
     {
-        /** @var ?self $order */
-        static $order;
-
-        return $order ??= pack('S', 1) === "\x01\x00" ? self::Little : self::Big;
+        return pack('S', 1) === "\x01\x00" ? self::Little : self::Big;
     }
 }

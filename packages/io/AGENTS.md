@@ -1,7 +1,7 @@
 # thesis/io
 
 Fast binary I/O: `Buffer` with typed big/little-endian encoding and varints, the `Reader`, `Writer`, `Closer`
-interfaces, and the streams: `Stream` over a non-blocking PHP resource with `stdin()`/`stdout()`/`stderr()`.
+interfaces, and the streams: `Stream` over a non-blocking PHP resource, and `stdin()`/`stdout()`/`stderr()`.
 Streams wait through thesis/async.
 The API and the design decisions are described in `README.md` — read it first.
 
@@ -20,26 +20,39 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - 64-bit PHP is required (`php-64bit`): `int` is int64. `readUint64()` throws `\OverflowException` above
   `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
 - Marks of `reserve()` are absolute positions, invalidated by `fill()`, `flush()` and `drain()`.
-- `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end and `ReadFailed` on any other failure
-  (a reset is not an end: a protocol may treat an EOF between messages as a clean close), `Writer::write()` writes all bytes,
+- `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
+  (a reset is not an end: a protocol may treat an EOF between messages as a clean close) and an `IoException`
+  of its own once this side has closed it (`StreamClosed`, `SocketClosed`). `Writer::write()` writes all bytes,
   `Closer::close()` is idempotent.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.
   A decorator keeps it too: it changes its state only after the inner read has returned.
   A write that throws after writing a part leaves its writer unusable (`Stream` closes itself):
-  a retry would duplicate bytes or leave a hole.
-- `Buffer`, `Order` and the interfaces do not use thesis/async: only streams that wait do.
+  a retry would duplicate bytes or leave a hole. Only stdio, which has no messages, goes on after the half.
+  `Buffer::flush()` puts the bytes back on a throw, before those written meanwhile: the drain comes first,
+  since bytes appended by another fiber during the write must not be written or lost.
+- `Buffer`, `Order` and the interfaces call nothing of thesis/async: only streams that wait do
+  (the interfaces name `Cancelled` in their PHPDoc only).
+- `Stream` and `SharedStream` hold the `reading` flag for the whole `read()`, `pace()` included: a second reader
+  is a `LogicException` even when bytes have arrived for the first, which would otherwise wait forever for them.
+- One `fread()` asks for at most 1 MiB (`MAX_READ`): PHP allocates the whole length before reading, so a length
+  from a header would cost its size in memory before a byte has arrived. `Socket` of thesis/net does the same.
+- Reads and writes that do not wait go through one `Pacer(16)` per stream: a file, /dev/null or a fast peer
+  never makes them wait, and they must not hold the event loop. The pacer yields before the operation,
+  so a cancelled one has done nothing.
 - `Stream` reads first and waits only on an empty read, never the other way round: a regular file or php://memory
   never has to wait, and the event loop cannot watch them at all (the uv driver rejects a file). Its PHP read buffer
   is off for the same reason. The rest of its discipline (the `StreamWatcher` closed before `fclose()`,
-  the write mutex taken only by writes that wait, a second reader is a `LogicException`, `Pacer(16)` on reads)
-  is that of `Socket` of thesis/net: a fix of one is checked against the other.
-- stdio streams are `Stream::shared()`: blocking between calls, non-blocking only inside `fread()`/`fwrite()`.
-  `O_NONBLOCK` belongs to the open file description, shared with the shell, the jobs of the same terminal,
-  the children that inherit it and the next commands of a pipeline: left on, it gives them `EAGAIN`,
-  and `echo` of our own process would drop output. Readiness is waited for in the blocking mode: the event loop
-  only polls. Only a fatal error or a kill inside one of those calls leaves the mode on (`StdioTest` checks
-  others while we run and the next process after `write()` and after `close()`).
+  the write mutex taken only by writes that wait) is that of `Socket` of thesis/net:
+  a fix of one is checked against the other.
+- stdio is `Internal\SharedStream`, which never touches the mode of the descriptor: `O_NONBLOCK` belongs
+  to the open file description, shared with the shell, the jobs of the same terminal, the children that inherit it
+  and the next commands of a pipeline, and they would get `EAGAIN` while it is on (or `echo` of our own process
+  would drop output). A call is made only once `stream_select()` with a zero timeout says it will not block,
+  a write passes at most `PIPE_BUF` (4096) bytes, and the waits go through a `StreamWatcher`.
+  Toggling the mode around each call was rejected: a neighbour blocked on the same full pipe wakes with us
+  and sees the flag (half of its writes failed in a measurement).
 - stdio streams are over duplicates (`php://stdout` dups the descriptor in the CLI), so `close()` leaves `STDOUT` open.
+  A write cancelled after a part leaves stdio open: closing would leave the process without its stdout for good.
 
 ## Decisions
 
@@ -52,13 +65,24 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   writes and the handler reads). Nobody else does: WebSocket permessage-deflate is raw deflate per message
   on `deflate_add()`, MongoDB compresses whole messages, protocol tests use `socketPair()` of thesis/net,
   values between fibers go through `Channel` of thesis/async. The roadmap keeps what a first version found.
-- stdio is functions with a `static` stream. Rejected: constants (`const STDOUT = new Stream(...)`):
+- stdio is functions with a `static` stream, typed `Reader&Closer` and `Writer&Closer`: its class is internal.
+  Rejected: constants (`const STDOUT = new Stream(...)`):
   a constant initializer cannot call `fopen()` for a duplicate, it runs when its file loads (for every process
   that loads it), and constants are not autoloaded.
 - Rejected for stdio: a descriptor non-blocking for the whole run, restored at shutdown (amphp, Node.js):
   others sharing it fail meanwhile. Reopening it for a description of our own (as libuv does for a terminal):
   `/proc/self/fd/N` reopens a pipe only on Linux, a file gets an offset of its own, a socket cannot be reopened.
-- Windows is not supported by stdio: PHP cannot make a pipe non-blocking there.
+- Windows is not supported by stdio: a pipe can be neither selected nor watched there, so `stdio()` throws
+  `LogicException` instead of blocking the event loop.
+- `Stream` has no chunk size: with the PHP read buffer off a read asks the descriptor for the length it is given.
+
+## Known issues
+
+- The uv driver makes a descriptor non-blocking: `uv_poll_init()` sets `O_NONBLOCK`, and Revolt creates
+  a poll handle per wait. So under uv a `SharedStream` that waits leaves stdio non-blocking for others during
+  the wait and after it (cancelled or not), until the process ends. Not fixed until stdio is tested on every driver:
+  the `StdioTest` checks of the mode run on the stream_select() driver. Candidates: a timer that polls with
+  `stream_select()` instead of a watcher, or one long-lived watcher per descriptor.
 
 ## Tests
 

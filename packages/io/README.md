@@ -125,13 +125,15 @@ if ($line === null) {
 
 ### Streams over resources and stdio
 
-`Stream` adapts a PHP stream resource (a pipe of `proc_open()`, a terminal, a file, a socket without TLS)
+`Stream` adapts a PHP stream resource that the process owns (a pipe of `proc_open()`, a file, a socket without TLS)
 to `Reader`, `Writer` and `Closer`. It makes the resource non-blocking: a read waits for bytes and a write
 for room in the pipe without blocking the event loop. As with sockets of thesis/net, one fiber reads at a time,
 writes of concurrent fibers never interleave, and a write that fails after a part of its bytes closes the stream.
-It raises the PHP stream chunk size to 64 KiB, so that a single read from a socket is not capped at 8 KiB.
+One read returns at most 1 MiB, whatever `$max` is: PHP allocates the whole length before reading.
+Reads and writes that never have to wait (a file, `/dev/null`, a fast peer) still yield to the event loop
+now and then, so a loop of them does not starve the other tasks.
 
-`stdin()`, `stdout()` and `stderr()` return such streams over the standard descriptors, the same object every time:
+`stdin()`, `stdout()` and `stderr()` are streams over the standard descriptors, the same object every time:
 
 ```php
 use function Thesis\Io\stdin;
@@ -142,11 +144,13 @@ $line->fillUntil(stdin(), "\n");
 stdout()->write(strtoupper($line->readUntil("\n")) . "\n");
 ```
 
-A descriptor shares its blocking mode with the shell, the other jobs of the terminal and the children
-that inherit it, so these streams leave it blocking and turn it non-blocking only for the time of each read
-and write. Nobody else ever sees a non-blocking descriptor, `echo` included: an `echo` while a write of
-`stdout()` waits for room blocks the process as usual and may land in the middle of that write.
-Not supported on Windows, where PHP cannot make a pipe non-blocking.
+A standard descriptor shares its blocking mode with the shell, the other jobs of the terminal and the children
+that inherit it, so these streams never change it: they read and write only once `stream_select()` says
+the call will not block, and wait through the event loop otherwise. `echo` and the processes that share
+the descriptor keep working: an `echo` while a write of `stdout()` waits for room blocks as usual and may land
+in the middle of that write. A write cancelled after a part leaves `stdout()` open, the next one goes on
+after the half: there are no messages to break. On the uv driver the descriptor is non-blocking while a read
+or a write waits, and stays so: a known issue. Not supported on Windows: the functions throw `LogicException`.
 
 ## Supported types
 

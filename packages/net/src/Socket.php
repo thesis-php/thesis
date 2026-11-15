@@ -33,10 +33,16 @@ final class Socket implements Reader, Writer, Closer
     private const int WRITE_CHUNK = 1_048_576;
 
     /**
-     * Reads that find bytes at once before one yields: enough to drain a burst without a wait for each,
-     * few enough that a peer sending without a pause cannot hold the event loop.
+     * fread() allocates its whole length up front, so one read is bounded whatever the caller asks for:
+     * a length from a header must not cost its size in memory before a byte has arrived.
      */
-    private const int READS_PER_TICK = 16;
+    private const int MAX_READ = 1_048_576;
+
+    /**
+     * Reads and writes that do not wait before one yields: enough to drain a burst without a wait for each,
+     * few enough that a peer sending without a pause, or reading faster than we write, cannot hold the event loop.
+     */
+    private const int OPS_PER_TICK = 16;
 
     /**
      * @internal
@@ -71,7 +77,7 @@ final class Socket implements Reader, Writer, Closer
     private readonly Pacer $pacer;
 
     /**
-     * Whether a read waits: a second reader is a bug, the two would take bytes from each other.
+     * Whether a read is in progress: a second reader is a bug, the two would take bytes from each other.
      */
     private bool $reading = false;
 
@@ -94,7 +100,7 @@ final class Socket implements Reader, Writer, Closer
         public readonly Address $remoteAddress,
         private readonly ?string $host,
     ) {
-        $this->pacer = new Pacer(self::READS_PER_TICK);
+        $this->pacer = new Pacer(self::OPS_PER_TICK);
     }
 
     /**
@@ -107,48 +113,46 @@ final class Socket implements Reader, Writer, Closer
      * @throws UnexpectedEof once the peer has closed its side and every byte has been read
      * @throws ReadFailed if the connection is broken (reset by the peer, a TLS error)
      * @throws SocketClosed if this side has closed the socket, during the wait too
-     * @throws \LogicException if another fiber is waiting in read()
+     * @throws \LogicException if another fiber is reading
      */
     public function read(int $max): string
     {
-        $this->pacer->pace();
+        if ($this->reading) {
+            throw new \LogicException('Another fiber is reading from the socket.');
+        }
 
-        while (true) {
-            $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
+        $this->reading = true;
 
-            // Read first, wait only if there is nothing:
-            // TLS keeps decrypted bytes where the event loop does not see them.
-            error_clear_last();
-            $bytes = @fread($stream, $max);
+        try {
+            $this->pacer->pace();
 
-            if ($bytes !== '' && $bytes !== false) {
-                return $bytes;
+            while (true) {
+                $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
+
+                // Read first, wait only if there is nothing:
+                // TLS keeps decrypted bytes where the event loop does not see them.
+                error_clear_last();
+                $bytes = @fread($stream, min($max, self::MAX_READ));
+
+                if ($bytes !== '' && $bytes !== false) {
+                    return $bytes;
+                }
+
+                if ($bytes === false) {
+                    // PHP raises no error for a reset of a plain socket, only TLS has its own messages.
+                    throw new ReadFailed(lastError('The connection is broken: reset by the peer or timed out.'));
+                }
+
+                if (feof($stream)) {
+                    throw new UnexpectedEof('The peer has closed the connection.');
+                }
+
+                if (!$this->watcher->readable()) {
+                    throw new SocketClosed('The socket was closed while reading.');
+                }
             }
-
-            if ($bytes === false) {
-                // PHP raises no error for a reset of a plain socket, only TLS has its own messages.
-                throw new ReadFailed(lastError('The connection is broken: reset by the peer or timed out.'));
-            }
-
-            if (feof($stream)) {
-                throw new UnexpectedEof('The peer has closed the connection.');
-            }
-
-            if ($this->reading) {
-                throw new \LogicException('Another fiber is reading from the socket.');
-            }
-
-            $this->reading = true;
-
-            try {
-                $readable = $this->watcher->readable();
-            } finally {
-                $this->reading = false;
-            }
-
-            if (!$readable) {
-                throw new SocketClosed('The socket was closed while reading.');
-            }
+        } finally {
+            $this->reading = false;
         }
     }
 
@@ -169,6 +173,7 @@ final class Socket implements Reader, Writer, Closer
             return;
         }
 
+        $this->pacer->pace();
         $written = 0;
 
         if ($this->writers === 0) {

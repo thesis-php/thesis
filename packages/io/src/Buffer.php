@@ -69,23 +69,23 @@ final class Buffer implements \Countable
     // ---------------------------------------------------------------- read
 
     /**
-     * Reads exactly $max bytes, an empty string for 0.
+     * Reads exactly $n bytes, an empty string for 0.
      *
-     * @param non-negative-int $max
-     * @return ($max is positive-int ? non-empty-string : string)
+     * @param non-negative-int $n
+     * @return ($n is positive-int ? non-empty-string : string)
      * @throws UnexpectedEof
      */
-    public function read(int $max): string
+    public function read(int $n): string
     {
         $o = $this->offset;
 
-        if (\strlen($this->bytes) - $o < $max) {
-            throw $this->eof($max);
+        if (\strlen($this->bytes) - $o < $n) {
+            throw $this->eof($n);
         }
 
-        $this->offset = $o + $max;
+        $this->offset = $o + $n;
 
-        return substr($this->bytes, $o, $max);
+        return substr($this->bytes, $o, $n);
     }
 
     /**
@@ -646,9 +646,11 @@ final class Buffer implements \Countable
     // ---------------------------------------------------------------- I/O
 
     /**
-     * Reads from $reader until at least $n unread bytes are buffered.
+     * Reads from $reader until at least $n unread bytes are buffered. If a read throws, the bytes read
+     * before stay buffered: nothing is lost, as a read that throws has taken nothing.
      *
      * @throws UnexpectedEof
+     * @throws IoException of the reader: {@see ReadFailed}, a closed stream
      */
     public function fill(Reader $reader, int $n): void
     {
@@ -676,6 +678,7 @@ final class Buffer implements \Countable
      * @param non-empty-string $delimiter
      * @param positive-int $maxLength max number of unread bytes to buffer while searching
      * @throws UnexpectedEof
+     * @throws IoException of the reader: {@see ReadFailed}, a closed stream
      * @throws \OverflowException if the delimiter is not found within $maxLength bytes
      */
     public function fillUntil(Reader $reader, string $delimiter, int $maxLength = 65_536): void
@@ -712,16 +715,27 @@ final class Buffer implements \Countable
     }
 
     /**
-     * Writes all unread bytes to $writer and clears the buffer.
+     * Writes all unread bytes to $writer and clears the buffer. If the write throws, the bytes are back
+     * at the start, before those written meanwhile (by another fiber while it waited): a writer that wrote
+     * nothing may be flushed again, and one that wrote a part is unusable anyway.
      *
-     * @throws WriteFailed
+     * @throws IoException of the writer
      */
     public function flush(Writer $writer): void
     {
         $bytes = $this->drain();
 
-        if ($bytes !== '') {
+        if ($bytes === '') {
+            return;
+        }
+
+        try {
             $writer->write($bytes);
+        } catch (\Throwable $error) {
+            $this->bytes = $bytes . substr($this->bytes, $this->offset);
+            $this->offset = 0;
+
+            throw $error;
         }
     }
 

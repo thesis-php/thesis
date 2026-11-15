@@ -14,8 +14,10 @@ use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class SocketTest
@@ -162,6 +164,51 @@ final class SocketTest
 
         Assert::same($cancelled, 'cancelled');
         Assert::same($right->read(1), 'x');
+    }
+
+    public function secondReaderIsAnErrorEvenIfBytesHaveArrivedForTheFirst(): void
+    {
+        [$left, $right] = socketPair();
+        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the socket.');
+
+        // without the error, the first reader would wait forever for the bytes the second has taken
+        timeout(sec(1), static fn() => group(static function (Group $group) use ($left, $right) {
+            $group->spawn(static fn() => $right->read(100));
+            delay(ms(1));
+            $left->write('for the first');
+            $right->read(100);
+        }));
+    }
+
+    public function writesThatNeverWaitStillLetOtherCallbacksRun(): void
+    {
+        [$left, $right] = socketPair();
+        $progress = new \stdClass();
+        $progress->writes = 0;
+        $progress->writesWhenTicked = null;
+        EventLoop::defer(static function () use ($progress) {
+            $progress->writesWhenTicked = $progress->writes;
+        });
+
+        // few enough to fit into the buffer of the socket: each small write costs it far more than a byte
+        for (; $progress->writes < 100; ++$progress->writes) {
+            $left->write('x');
+        }
+
+        Assert::true(\is_int($progress->writesWhenTicked) && $progress->writesWhenTicked < 100);
+        unset($right);
+    }
+
+    public function readDoesNotAllocateTheWholeMaxUpFront(): void
+    {
+        [$left, $right] = socketPair();
+        $left->write('x');
+        memory_reset_peak_usage();
+        $before = memory_get_peak_usage();
+
+        $right->read(512 * 1_048_576);
+
+        Assert::true(memory_get_peak_usage() - $before < 4 * 1_048_576);
     }
 
     public function writeCancelledAfterSendingAPartClosesTheSocket(): void
