@@ -47,19 +47,6 @@ sync: vendor ## Regenerate files derived from the manifests, then update the loc
 	@touch vendor
 .PHONY: sync
 
-new-package: vendor ## Scaffold a package: NAME=byte-buffer LAYER=primitive DESC='Growable byte buffer'
-	$(RUN) bin/monorepo new '$(NAME)' '$(LAYER)' '$(DESC)'
-	$(COMPOSER) normalize --no-check-lock --no-update-lock
-	$(COMPOSER) update --minimal-changes
-	@touch vendor
-.PHONY: new-package
-
-monorepo-check: vendor ## Validate manifests, layers and dependencies, fail if a generated file is stale
-	$(RUN) bin/monorepo check
-	$(COMPOSER) validate --strict
-	$(COMPOSER) normalize --dry-run --diff
-.PHONY: monorepo-check
-
 # Quality
 
 fixer: var ## Fix code style [P=]
@@ -99,7 +86,7 @@ infect: var vendor ## Run mutation testing [P=]
 fix: fixer rector ## Fix code style and apply Rector rules [P=]
 .PHONY: fix
 
-check: monorepo-check fixer-check rector-check phpstan deps-analyze test ## Run all checks
+check: fixer-check rector-check phpstan deps-analyze test ## Run all checks
 .PHONY: check
 
 # ---

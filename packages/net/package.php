@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-use Thesis\Monorepo\Layer;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
     description: 'Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree.',
-    layer: Layer::Io,
-    uses: ['async', 'io'],
+    licenseSince: 2_026,
     require: [
         'ext-filter' => '*',
         'ext-openssl' => '*',
-        'revolt/event-loop' => '^1.0.9',
+        'thesis/async' => '*',
+        'thesis/io' => '*',
     ],
     requireDev: [
         'ext-intl' => '*',
         'ext-sockets' => '*',
+        'revolt/event-loop' => '^1.0.9',
         'testo/assert' => '^0.1.17',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',

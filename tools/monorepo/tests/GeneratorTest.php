@@ -24,7 +24,7 @@ final readonly class GeneratorTest
             'license' => 'MIT',
             'type' => 'library',
             'require' => ['php' => '^8.5', 'revolt/event-loop' => '^1.0', 'thesis/bytes' => '^0.1'],
-            'require-dev' => ['amphp/amp' => '^3.0'],
+            'require-dev' => ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
             'autoload' => ['psr-4' => ['Thesis\Async\\' => 'src/']],
             'autoload-dev' => ['psr-4' => ['Thesis\Async\\' => 'tests/']],
             'config' => ['sort-packages' => true],
@@ -39,7 +39,10 @@ final readonly class GeneratorTest
 
         Assert::same(Json::decode($files['composer.json'] ?? '', 'root'), [
             'name' => 'thesis/monorepo',
-            'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'revolt/event-loop' => '^1.0'],
+            'description' => 'Fixture.',
+            'license' => 'MIT',
+            'type' => 'project',
+            'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'psr/clock' => '^1.1', 'revolt/event-loop' => '^1.0'],
             'require-dev' => ['amphp/amp' => '^3.0'],
             'replace' => ['thesis/async' => 'self.version', 'thesis/bytes' => 'self.version'],
             'autoload' => [
@@ -48,6 +51,7 @@ final readonly class GeneratorTest
             'autoload-dev' => [
                 'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
             ],
+            'config' => ['sort-packages' => true],
         ]);
     }
 
@@ -59,7 +63,18 @@ final readonly class GeneratorTest
 
         Assert::string($files['AGENTS.md'] ?? '')
             ->contains("- `bytes`: Package bytes.\n")
-            ->contains("- `async`: Package async. Uses: bytes.\n")
+            ->contains("- `async`: Package async. Requires: bytes.\n")
+        ;
+    }
+
+    public static function writesLicenseFromTheYearOfManifest(): void
+    {
+        $fixture = new Fixture()->package('bytes', licenseSince: 2_024);
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files['packages/bytes/LICENSE'] ?? '')
+            ->startsWith("MIT License\n\nCopyright (c) 2024-present Fixture\n")
         ;
     }
 
@@ -99,12 +114,10 @@ final readonly class GeneratorTest
     private static function fixture(): Fixture
     {
         return new Fixture()
-            ->package('bytes', "layer: Layer::Primitive, require: ['ext-bcmath' => '*']")
+            ->package('bytes', "require: ['ext-bcmath' => '*', 'psr/clock' => '^1.0']")
             ->package('async', <<<'PHP'
-                layer: Layer::Runtime,
-                uses: ['bytes'],
-                require: ['revolt/event-loop' => '^1.0'],
-                requireDev: ['amphp/amp' => '^3.0'],
+                require: ['revolt/event-loop' => '^1.0', 'thesis/bytes' => '*'],
+                requireDev: ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
                 PHP)
         ;
     }

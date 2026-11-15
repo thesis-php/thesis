@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use Thesis\Monorepo\Layer;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
-    layer: Layer::Runtime,
+    licenseSince: 2_026,
     require: [
         'revolt/event-loop' => '^1.0.9',
     ],

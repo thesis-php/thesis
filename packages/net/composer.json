@@ -5,21 +5,29 @@
     "type": "library",
     "authors": [
         {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
             "name": "Valentin Udaltsov",
             "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
         }
     ],
     "require": {
         "php": "^8.5",
         "ext-filter": "*",
         "ext-openssl": "*",
-        "revolt/event-loop": "^1.0.9",
         "thesis/async": "^0.1",
         "thesis/io": "^0.1"
     },
     "require-dev": {
         "ext-intl": "*",
         "ext-sockets": "*",
+        "revolt/event-loop": "^1.0.9",
         "testo/assert": "^0.1.17",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29"

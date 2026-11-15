@@ -1,12 +1,20 @@
 {
     "name": "thesis/monorepo",
-    "description": "Thesis: an asynchronous PHP ecosystem built on revolt/event-loop",
+    "description": "Thesis: an asynchronous PHP ecosystem",
     "license": "MIT",
     "type": "project",
     "authors": [
         {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
             "name": "Valentin Udaltsov",
             "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
         }
     ],
     "require": {
@@ -21,8 +29,8 @@
         "ext-pcntl": "*",
         "ext-posix": "*",
         "ext-sockets": "*",
-        "ext-tokenizer": "*",
         "amphp/amp": "^3",
+        "composer/semver": "^3.4",
         "internal/container": "^1.1",
         "llm/skills": "^1.17",
         "symfony/console": "^8.0",

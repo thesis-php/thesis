@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use Thesis\Monorepo\Layer;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
     description: 'Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.',
-    layer: Layer::Io,
+    licenseSince: 2_026,
     require: [
         'php-64bit' => '*',
     ],

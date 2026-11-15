@@ -4,19 +4,13 @@
 declare(strict_types=1);
 
 use Symfony\Component\Console\Application;
-use Thesis\Monorepo\Internal\Command\CheckCommand;
-use Thesis\Monorepo\Internal\Command\NewPackageCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
 
 $root = dirname(__DIR__);
 
 require $root . '/vendor/autoload.php';
 
-$sync = new SyncCommand($root);
-
 $application = new Application('monorepo');
-$application->addCommand($sync);
-$application->addCommand(new CheckCommand($root));
-$application->addCommand(new NewPackageCommand($root, $sync));
+$application->addCommand(new SyncCommand($root));
 
 exit($application->run());

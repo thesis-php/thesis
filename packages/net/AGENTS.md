@@ -1,6 +1,6 @@
 # thesis/net
 
-Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Layer: `io`.
+Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree.
 Uses `async` (every wait) and `io` (`Socket` is a `Reader`/`Writer`/`Closer`, DNS messages are coded with `Buffer`).
 The API and the guarantees are in `README.md` — read it first.
 

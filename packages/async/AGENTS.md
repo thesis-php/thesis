@@ -1,6 +1,6 @@
 # thesis/async
 
-An experimental structured concurrency library on top of `revolt/event-loop`. Layer: `runtime`.
+An experimental structured concurrency library on top of `revolt/event-loop`.
 The model, the API and the guarantees are described in `README.md` — read it first.
 Design sketches of this and several alternative models live in `docs/ideas/async/` of the monorepo.
 

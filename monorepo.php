@@ -8,11 +8,16 @@ use Thesis\Monorepo\Config;
 return new Config(
     php: '^8.5',
     version: '^0.1',
+    description: 'Thesis: an asynchronous PHP ecosystem',
+    copyrightHolder: 'Valentin Udaltsov',
+    licenseSince: 2_026,
     authors: [
+        ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],
         ['name' => 'Valentin Udaltsov', 'email' => 'udaltsov.valentin@gmail.com'],
+        ['name' => 'Contributors', 'homepage' => 'https://github.com/thesis-php/thesis/graphs/contributors'],
     ],
     requireDev: [
-        'ext-tokenizer' => '*',
+        'composer/semver' => '^3.4',
         'llm/skills' => '^1.17',
         'symfony/console' => '^8.0',
         'symfony/var-dumper' => '^8.0',
@@ -23,5 +28,8 @@ return new Config(
     autoloadDev: [
         'Thesis\Monorepo\\' => 'tools/monorepo/src/',
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',
+    ],
+    allowPlugins: [
+        'llm/skills' => true,
     ],
 );

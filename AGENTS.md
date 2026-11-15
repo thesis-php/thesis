@@ -6,11 +6,11 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 ## Layout
 
 - `packages/<name>/` is one package, published as `thesis/<name>` after the split. It holds `package.php` (the manifest),
-  `src/`, `tests/`, `README.md`, `AGENTS.md` and optionally `skills/`.
+  `src/`, `tests/`, `README.md`, `AGENTS.md`, `LICENSE` and optionally `skills/`.
+  A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
+  the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
-- `monorepo.php` is the root config: PHP constraint, authors, tools of the root.
-- `docs/roadmap.md` holds the plans, the migration of the old packages and the rejected alternatives.
-  Read it before proposing a change to how the monorepo works.
+- `monorepo.php` is the root config: PHP constraint, authors, tools and composer plugins of the root.
 
 ## Instructions are layered
 
@@ -29,10 +29,11 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 ## Manifests and generated files
 
 `packages/<name>/package.php` returns a `Thesis\Monorepo\Manifest` and is the only place to declare a package's
-description, layer and dependencies. Generated from the manifests and `monorepo.php` by `make sync`, never edit them by hand:
+description and dependencies. Generated from the manifests and `monorepo.php` by `make sync`, never edit them by hand:
 
 - `packages/<name>/composer.json`,
-- the root `composer.json`: `require`, `require-dev`, `replace`, `autoload`, `autoload-dev`,
+- the root `composer.json`,
+- `LICENSE` of the root and of every package, from the year in the manifest,
 - `skills.json` (`sources`),
 - `testo.php`: one suite per package, named after its directory. A package that needs Testo plugins
   returns a list of them from `packages/<name>/testo.plugins.php`,
@@ -40,11 +41,15 @@ description, layer and dependencies. Generated from the manifests and `monorepo.
 
 ## Dependencies
 
-- One `vendor/` and one lock for the whole monorepo. The root `composer.json` is the union of the packages.
-- An external dependency has one constraint across the monorepo: bump it in every manifest at once.
-- A package lists monorepo packages it needs in `uses` (and `usesDev`), by directory name.
-  The code of a package may only reference namespaces of itself and of its `uses`: `make check` verifies this,
-  because the shared autoloader would hide a missing dependency.
+- A package declares what it needs in `require` and `requireDev` of its manifest, with its own constraints.
+  Which packages may depend on which is decided case by case, the tooling enforces no structure.
+- A monorepo package is required as `'thesis/async' => '*'`: the generator writes `Config::$version` instead,
+  so a release does not touch the manifests.
+- One `vendor/` and one lock for the whole monorepo. The root `composer.json` takes, for every external dependency,
+  the constraint that lies within all the others, so no package is tested with a version it does not allow.
+  When there is none, `make sync` fails: narrow one of the constraints.
+- The shared autoloader hides a dependency missing in a manifest: the code of a package references only itself
+  and the monorepo packages it requires (`requireDev` counts for `tests/`).
 
 ## Commands
 
@@ -52,9 +57,9 @@ Everything runs in Docker through `make`. `P=<name>` narrows a command to one pa
 the whole monorepo is for the final check.
 
 - `make test P=async`, `make phpstan P=async`, `make fixer P=async`, `make rector P=async`
-- `make new-package NAME=byte-buffer LAYER=primitive DESC='Growable byte buffer'`
 - `make sync` after changing a manifest or `monorepo.php`
-- `make check` runs everything CI runs
+- `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
+  so commit the generated files
 
 ## Git
 
@@ -109,8 +114,7 @@ the whole monorepo is for the final check.
 - Every top-level symbol (class, interface, trait, enum, function, constant) in `src/` is marked either `@api`
   or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
   (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
-  Tests are not marked: they are not part of the API. `make check` verifies this in `packages/*/src`
-  and `tools/monorepo/src`.
+  Tests are not marked: they are not part of the API.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
 - A PHPDoc of a declaration (class, method, function, property, constant, enum case) is multi-line,
@@ -137,42 +141,12 @@ the whole monorepo is for the final check.
 When you change the public API of a package, find its users (`grep -rl 'Thesis\\Async\\' packages/*/src`) and fix them
 in the same change. Atomic changes across packages are the reason this is a monorepo.
 
-## Packages by layer
-
-Layers go from the lowest to the highest. A package may depend on packages of its own layer or of a lower one,
-without cycles. Layers are declared in `tools/monorepo/src/Layer.php`.
+## Packages
 
 <!-- packages:start (generated by bin/monorepo sync, do not edit) -->
 
-### primitive
-
-Pure building blocks: bytes, time, small value objects. No event loop.
-
-No packages yet.
-
-### runtime
-
-Structured concurrency on top of revolt/event-loop.
-
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree.
-
-### io
-
-Streams, sockets, files, processes.
-
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
-- `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Uses: async, io.
-
-### protocol
-
-Clients and servers of wire protocols.
-
-No packages yet.
-
-### application
-
-Frameworks and integrations: DI, message bus, ORM, console.
-
-No packages yet.
+- `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io.
 
 <!-- packages:end -->

@@ -1,7 +1,7 @@
 # thesis/io
 
 Fast binary I/O: `Buffer` with typed big/little-endian encoding and varints, the `Reader`, `Writer`, `Closer`
-interfaces and `Stream` over a blocking PHP stream resource. Layer: `io`. No event loop, no extensions.
+interfaces and `Stream` over a blocking PHP stream resource. No event loop, no extensions.
 The API and the design decisions are described in `README.md` — read it first.
 
 This file is for agents changing this package. It is not loaded while an agent works in another package,

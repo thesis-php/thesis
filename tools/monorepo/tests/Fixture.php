@@ -17,27 +17,32 @@ final readonly class Fixture
         $this->file('monorepo.php', <<<'PHP'
             <?php
 
-            return new Thesis\Monorepo\Config(php: '^8.5', version: '^0.1');
+            return new Thesis\Monorepo\Config(
+                php: '^8.5',
+                version: '^0.1',
+                description: 'Fixture.',
+                copyrightHolder: 'Fixture',
+                licenseSince: 2026,
+            );
             PHP);
-        $this->file('composer.json', "{\"name\": \"thesis/monorepo\"}\n");
         $this->file('skills.json', "{}\n");
-        $this->file('LICENSE', "MIT\n");
         $this->file('AGENTS.md', "# Fixture\n\n" . Generator::CATALOG_START . "\n" . Generator::CATALOG_END . "\n");
     }
 
     /**
-     * @param string $arguments named arguments of Manifest after the description, as PHP code
+     * @param string $arguments named arguments of Manifest after the description and the license year, as PHP code
      */
-    public function package(string $dir, string $arguments): self
+    public function package(string $dir, string $arguments = '', int $licenseSince = 2_026): self
     {
         $this->file("packages/{$dir}/package.php", <<<PHP
             <?php
 
-            use Thesis\\Monorepo\\Layer;
-
-            return new Thesis\\Monorepo\\Manifest(description: 'Package {$dir}.', {$arguments});
+            return new Thesis\\Monorepo\\Manifest(
+                description: 'Package {$dir}.',
+                licenseSince: {$licenseSince},
+                {$arguments}
+            );
             PHP);
-        $this->file("packages/{$dir}/AGENTS.md", "# {$dir}\n");
 
         return $this;
     }
