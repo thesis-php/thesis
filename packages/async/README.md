@@ -843,6 +843,76 @@ The tests of this library run this way: a plugin for [Testo](https://github.com/
 `VirtualTimePlugin`, runs every test of the suite in its own `run()`, and the `#[VirtualTime]` attribute does the same
 for a class or a test. It is not shipped with the package and not part of its API: it is to become a package of its own.
 
+### Streams: `StreamWatcher`
+
+A `StreamWatcher` owns the waits on one stream: `readable()` and `writable()` suspend until a read or a write
+would not block, and are cancelled by the task tree as any wait. The owner of the stream calls `close()` before closing it:
+a Revolt watcher of a closed stream is an error, and a fiber waiting for it would never wake up.
+`close()` ends every wait with `false`, and every later wait returns `false` at once, so the waiting fibers learn
+that the stream is gone:
+
+```php
+use Thesis\Async\StreamWatcher;
+
+final class Connection
+{
+    private readonly StreamWatcher $watcher;
+
+    public function __construct(
+        private readonly mixed $stream,
+    ) {
+        stream_set_blocking($stream, false);
+        $this->watcher = new StreamWatcher($stream);
+    }
+
+    public function read(): string
+    {
+        while (($bytes = fread($this->stream, 65_536)) === '') {
+            if (!$this->watcher->readable()) {
+                throw new ConnectionClosed();
+            }
+        }
+
+        return $bytes;
+    }
+
+    public function close(): void
+    {
+        $this->watcher->close(); // first: a waiting read() wakes up with false
+        fclose($this->stream);
+    }
+}
+```
+
+Read before waiting: TLS keeps decrypted bytes where the event loop does not see them.
+Any number of fibers may wait at once. `delay()` of a watcher is a sleep that `close()` ends too,
+for a backoff between attempts that must not outlive the stream. A wait after `close()` does not suspend,
+so it is not a cancellation point, like a `receive()` from a closed channel.
+
+### A source that never pauses: `Pacer`
+
+An operation that completes without a wait never yields either: a read that always finds bytes, an accept that always
+finds a connection. A peer that sends without a pause then starves the other tasks and the timers, as a CPU-bound loop does.
+`Pacer::pace()`, called before every such operation, yields for one tick through `checkpoint()` after `$perTick` calls
+within one tick of the event loop. The count starts anew every tick, so code that waits now and then never pays for a yield.
+Keep one pacer per source of work, shared by its callers, as the watcher is:
+
+```php
+public function read(): string
+{
+    $this->pacer->pace(); // $this->pacer = new Pacer(perTick: 16) in the constructor
+
+    while (($bytes = fread($this->stream, 65_536)) === '') {
+        // ...
+    }
+
+    return $bytes;
+}
+```
+
+It yields before the operation, so a `pace()` that throws `Cancelled` leaves the operation undone.
+It is a cancellation point only when it yields: the other calls only count.
+
 ### Your own primitives: `suspend()`
 
 Every wait in the library goes through a single function. Build queues, locks and I/O on it and they are cancellable for free:
@@ -869,6 +939,7 @@ function readable(mixed $stream): void
 
 Only a closure is taken for `$unregister`: anything else `$register` returns is ignored, so an arrow function may return
 whatever its expression gives (a Revolt callback id is a string, and `"die"` is callable).
+For a stream, take `StreamWatcher` instead of this `readable()`: it also ends the waits once the stream is closed.
 
 `Continuation::resume()` returns `false` if the continuation has already fired. A channel uses it to keep a value that was not delivered.
 `Continuation::throw()` rejects `Cancelled` with `\ValueError`, for the same reason as `Deferred::fail()`:
@@ -960,6 +1031,8 @@ all([user, orders])              orders fails after 50 ms
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
+| `Pacer(int $perTick)`: `pace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
+| `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(float $seconds): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |

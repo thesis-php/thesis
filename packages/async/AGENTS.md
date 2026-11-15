@@ -74,6 +74,16 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   A new worker is started only when the item just taken leaves no worker free.
   The callable gets the value only (`$fn($value)`, so an internal function fits); only `map()` uses the key, for its result.
   `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
+- `StreamWatcher` is an object owned with the stream, not free functions like `awaitReadable($stream)`: the owner must be
+  able to end every wait before `fclose()` (a Revolt watcher of a closed stream is an error, the fiber would never wake up).
+  `close()` resumes the waits with `false` and cancels their watchers; a wait after `close()` returns `false` without
+  suspending or a cancellation check, like `receive()` of a closed channel. Its `delay()` is there for the owner's backoff
+  (an accept loop), which a closed stream must end too; it follows `delay()`: `NAN` throws, `<= 0` is zero.
+- `Pacer` is separate from `StreamWatcher`: fairness of a fast path has nothing to do with streams
+  (a hot channel needs it too). It counts calls per tick and is reset by an `EventLoop::defer()` registered
+  by the first call of the tick; past the limit it calls `checkpoint()` *before* the operation,
+  so a `Cancelled` from it means the operation did not happen.
+  Calls under the limit do not check cancellation: a fast path stays a counter increment.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly and a child holds its parent: every created `Internal\Scope` must be closed
   with `close()`, the tasks and daemons scopes of a group too, or they form a cycle that only the cycle collector frees.
