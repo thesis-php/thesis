@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis) and continues
-the version series of it.
+The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis).
 
 ### Changed
 
