@@ -30,6 +30,10 @@ final readonly class Manifest
      *     its errors are ignored in the code, by a phpstan-ignore comment with an identifier and a reason
      * @param list<non-empty-string> $dist top-level paths of the package that src/ needs at runtime (a polyfill,
      *     resources). Composer installs only them, src/, composer.json, LICENSE, README.md and skills/
+     * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
+     *     installs by its type
+     * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names
+     *     outside src/ goes to $dist too
      */
     public function __construct(
         public string $description,
@@ -44,5 +48,7 @@ final readonly class Manifest
         public array $optional = [],
         public array $skip = [],
         public array $dist = [],
+        public string $type = 'library',
+        public array $extra = [],
     ) {}
 }

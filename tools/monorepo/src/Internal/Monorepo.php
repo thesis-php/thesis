@@ -43,6 +43,7 @@ final readonly class Monorepo
                     class: Manifest::class,
                 ),
                 hasSkills: is_dir($dir . '/skills'),
+                hasTests: is_dir($dir . '/tests'),
             );
         }
 

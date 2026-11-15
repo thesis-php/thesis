@@ -6,7 +6,8 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 ## Layout
 
 - `packages/<name>/` is one package, published as `thesis/<name>` after the split. It holds `package.php` (the manifest),
-  `src/`, `tests/`, `README.md`, `AGENTS.md`, `LICENSE` and optionally `skills/`.
+  `src/`, `tests/`, `README.md`, `AGENTS.md`, `LICENSE` and optionally `skills/`. Without `tests/`
+  (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite and no `autoload-dev`.
   A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`), see its `AGENTS.md`.
@@ -47,7 +48,7 @@ description and dependencies. Generated from the manifests and `monorepo.php` by
 - `packages/<name>/.gitattributes`: the archive that composer installs has only `src/`, `composer.json`, `LICENSE`,
   `README.md`, `skills/` and the paths in `dist` of the manifest (a polyfill, resources that `src/` loads),
 - `skills.json` (`sources`),
-- `testo.php`: one suite per package and per `tools/<name>/tests`, named after the directory.
+- `testo.php`: one suite per `packages/<name>/tests` and `tools/<name>/tests`, named after the directory.
   A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
 - `tools/manifests.php`: what the configs of fixer, rector and dependency-analyser take from the manifests.
   An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in `tools/*.php`.
@@ -178,6 +179,10 @@ the whole monorepo is for the final check.
 
 When you change the public API of a package, find its users (`grep -rl 'Thesis\\Async\\' packages/*/src`) and fix them
 in the same change. Atomic changes across packages are the reason this is a monorepo.
+`phpstan-extension` gives the types that PHPDoc cannot express (a type per key of `all()`), knowing
+the functions of other packages by name and semantics. The PHPDoc stays the contract and is fixed in the package
+wherever generics can express the type. A change of a function the extension describes changes it too:
+its `types/` fixtures fail in `make phpstan` otherwise.
 
 ## Packages
 
@@ -187,6 +192,7 @@ in the same change. Atomic changes across packages are the reason this is a mono
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree. Requires: time.
 - `io`: Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
+- `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `testo-plugin`: Testo plugins for thesis packages: tests on the virtual time of thesis/async. Requires: async.
 - `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.
 

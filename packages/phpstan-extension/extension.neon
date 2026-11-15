@@ -1,0 +1,10 @@
+services:
+    -
+        class: Thesis\PhpstanExtension\Internal\AllReturnType
+        tags: [phpstan.broker.dynamicFunctionReturnTypeExtension]
+    -
+        class: Thesis\PhpstanExtension\Internal\AllSettledReturnType
+        tags: [phpstan.broker.dynamicFunctionReturnTypeExtension]
+    -
+        class: Thesis\PhpstanExtension\Internal\MapReturnType
+        tags: [phpstan.broker.dynamicFunctionReturnTypeExtension]

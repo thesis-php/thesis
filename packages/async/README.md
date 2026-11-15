@@ -78,8 +78,11 @@ $report = new Report($sales, $costs);
 `all()`, `allSettled()`, `race()`, `some()`, `map()` and `each()` cover most cases without a task handle. All of them are built on `group()`.
 
 `all()` keeps the keys but not a type per key: its signature is `array<K, callable(): T>` → `array<K, T>`,
-so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. When the results have different types,
-spawn the tasks in a `group()` and await their handles: a `Task<T>` is typed precisely.
+so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. With [`thesis/phpstan-extension`](../phpstan-extension/README.md)
+PHPStan gives it a type per key: `array{sales: Sales, costs: Costs}`, the same for `allSettled()`,
+and `all()` and `map()` of a list return a list.
+Without it, when the results have different types, spawn the tasks in a `group()` and await their handles:
+a `Task<T>` is typed precisely.
 
 ```php
 use Thesis\Async\Group;
@@ -1116,12 +1119,6 @@ all([user, orders])              orders fails after 50 ms
   which lists the stuck fibers. Those tasks are orphaned; the alternative is to hang forever.
   Even if the group has already failed with an error of its own, the deadlock error is the one thrown, since the tasks
   were not joined; the group's error is among its `suppressed()` ones.
-
-## TODO
-
-Ideas that are not implemented yet.
-
-- **A PHPStan extension** that maps the array shape of the callables passed to `all()` to the shape of its result.
 
 ## Prior art
 

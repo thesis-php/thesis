@@ -273,8 +273,9 @@ function suppressed(\Throwable $error): array
  * All results in the order of $tasks, or the first failure (the rest are cancelled and joined).
  *
  * The result has the keys of $tasks, but one value type for all of them: `['user' => ..., 'orders' => ...]`
- * gives `array<'user'|'orders', User|list<Order>>`. For results of different types, spawn tasks in a {@see group()}
- * and await their handles, which are typed precisely.
+ * gives `array<'user'|'orders', User|list<Order>>`. thesis/phpstan-extension gives a type per key:
+ * `array{user: User, orders: list<Order>}`. Without it, for results of different types, spawn tasks
+ * in a {@see group()} and await their handles, which are typed precisely.
  *
  * @api
  * @template K of array-key

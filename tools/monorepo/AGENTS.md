@@ -12,9 +12,11 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   every commit is slow and nobody gains from it: users install the archive); a list of excluded files
   (a forgotten one leaks into every install).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
-  a property does not exist, so nothing is read back from the current file. Rejected: a raw array of
-  composer.json keys merged last, it bypasses the model; a library modelling composer.json
-  (symplify/composer-json-manipulator is abandoned), our DTOs are that model.
+  a property does not exist, so nothing is read back from the current file. `type` (default `library`)
+  and `extra` are written as given: `extra` is free-form by the design of composer, a config of a plugin
+  (phpstan/extension-installer for `packages/phpstan-extension`). Rejected: a raw array of composer.json keys
+  merged last, it bypasses the model; a library modelling composer.json (symplify/composer-json-manipulator
+  is abandoned), our DTOs are that model.
 - Exceptions of a package to the quality tools are typed fields of `Manifest`, with paths relative to the package,
   so a renamed package or file does not leave a stale entry in `tools/*.php`: `optional` (a dev dependency used in
   `src/` behind a check) for composer-dependency-analyser, `FixerSkip` and `RectorSkip` with a required reason.

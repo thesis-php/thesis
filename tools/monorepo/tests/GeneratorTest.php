@@ -141,6 +141,20 @@ final readonly class GeneratorTest
         Generator::generate($fixture->load());
     }
 
+    public static function writesTypeAndExtraOfManifest(): void
+    {
+        $fixture = new Fixture()->package('stan', <<<'PHP'
+            type: 'phpstan-extension',
+            extra: ['phpstan' => ['includes' => ['extension.neon']]],
+            PHP);
+
+        $files = Generator::generate($fixture->load());
+
+        $composer = Json::decode($files['packages/stan/composer.json'] ?? '', 'stan');
+        Assert::same($composer['type'] ?? null, 'phpstan-extension');
+        Assert::same($composer['extra'] ?? null, ['phpstan' => ['includes' => ['extension.neon']]]);
+    }
+
     public static function writesTestoSuitesWithPlugins(): void
     {
         $fixture = self::fixture()->file('packages/async/testo.plugins.php', "<?php\n\nreturn [];\n");
@@ -159,6 +173,28 @@ final readonly class GeneratorTest
 
                 PHP)
         ;
+    }
+
+    public static function writesNoTestsOfPackageWithoutTests(): void
+    {
+        $fixture = self::fixture()->package('stan');
+
+        $files = Generator::generate($fixture->load());
+
+        Assert
+            ::string($files['testo.php'] ?? '')
+            ->contains("        __DIR__ . '/packages/stan/src',\n")
+            ->notContains("name: 'stan'")
+        ;
+        $package = Json::decode($files['packages/stan/composer.json'] ?? '', 'stan');
+        Assert::false(isset($package['autoload-dev']));
+        $root = Json::decode($files['composer.json'] ?? '', 'root');
+        Assert::same(
+            actual: $root['autoload-dev'] ?? null,
+            expected: [
+                'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
+            ],
+        );
     }
 
     public static function writesTestoSuiteOfEveryToolWithTests(): void
@@ -281,6 +317,8 @@ final readonly class GeneratorTest
     private static function fixture(): Fixture
     {
         return new Fixture()
+            ->file('packages/async/tests/Internal/ScopeTest.php', "<?php\n")
+            ->file('packages/bytes/tests/BytesTest.php', "<?php\n")
             ->package('bytes', "require: ['ext-bcmath' => '*', 'psr/clock' => '^1.0']")
             ->package('async', <<<'PHP'
                 require: ['revolt/event-loop' => '^1.0', 'thesis/bytes' => '*'],

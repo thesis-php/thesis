@@ -90,7 +90,7 @@ final readonly class Generator
             'name' => $package->name(),
             'description' => $manifest->description,
             'license' => 'MIT',
-            'type' => 'library',
+            'type' => $manifest->type,
             'authors' => $config->authors,
             'require' => self::sortRequire([
                 'php' => $config->php,
@@ -105,9 +105,10 @@ final readonly class Generator
                 'files' => $manifest->files,
             ]),
             'autoload-dev' => array_filter([
-                'psr-4' => [$package->namespace() => 'tests/'],
+                'psr-4' => $package->hasTests ? [$package->namespace() => 'tests/'] : [],
                 'files' => $manifest->devFiles,
             ]),
+            'extra' => $manifest->extra,
         ];
 
         return array_filter($composer, static fn(mixed $value) => $value !== []);
@@ -142,7 +143,11 @@ final readonly class Generator
             $path = $package->path();
             $replace[$package->name()] = 'self.version';
             $psr4[$package->namespace()] = $path . '/src/';
-            $psr4Dev[$package->namespace()] = $path . '/tests/';
+
+            if ($package->hasTests) {
+                $psr4Dev[$package->namespace()] = $path . '/tests/';
+            }
+
             $prefix = static fn(string $file) => $path . '/' . $file;
             $files = [...$files, ...array_map($prefix, $package->manifest->files)];
             $filesDev = [...$filesDev, ...array_map($prefix, $package->manifest->devFiles)];
@@ -280,6 +285,12 @@ final readonly class Generator
         foreach ($this->monorepo->packages as $package) {
             $path = $package->path();
             $src .= \sprintf("        __DIR__ . '/%s/src',\n", $path);
+
+            // Testo fails a suite without tests: packages/phpstan-extension has none, PHPStan checks it
+            if (!$package->hasTests) {
+                continue;
+            }
+
             $suites .= is_file($this->monorepo->root . '/' . $path . '/' . $plugins)
                 ? <<<PHP
                             new SuiteConfig(

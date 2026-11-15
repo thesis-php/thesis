@@ -18,6 +18,7 @@ final readonly class Package
         public string $dir,
         public Manifest $manifest,
         public bool $hasSkills,
+        public bool $hasTests,
     ) {}
 
     /**

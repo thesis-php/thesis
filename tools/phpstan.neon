@@ -1,5 +1,6 @@
 includes:
     - /composer/vendor/phpstan/phpstan-strict-rules/rules.neon
+    - ../packages/phpstan-extension/extension.neon
 
 parameters:
     level: max

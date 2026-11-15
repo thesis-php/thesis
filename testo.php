@@ -13,6 +13,7 @@ return new ApplicationConfig(
         __DIR__ . '/packages/async/src',
         __DIR__ . '/packages/io/src',
         __DIR__ . '/packages/net/src',
+        __DIR__ . '/packages/phpstan-extension/src',
         __DIR__ . '/packages/testo-plugin/src',
         __DIR__ . '/packages/time/src',
     ],
