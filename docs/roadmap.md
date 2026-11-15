@@ -50,8 +50,7 @@ of its package, and a step that is done is deleted from here.
 
 - Merged: `byte-*`, `endian`, `varint`, `amp-bridge` into `io`; `time-span`, `clock` into `time`.
 - Not needed: `sync-once` (see "Decisions" of `async`), `package-version` (`Composer\InstalledVersions`).
-- Rewritten: `exceptionally`.
-- To decide: `formatter`.
+- Rewritten: `exceptionally`, `formatter`.
 - Later, with message-bus and norm: `message`, `transaction`, `dispatcher`, `serde`.
 - Rewritten on the new stack: see the phases below.
 

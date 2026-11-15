@@ -22,5 +22,9 @@ return [
             // type.
             'packages/async/src/LocalSemaphore.php',
         ],
+        \Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector::class => [
+            // The tests format a callable given as an array, a first-class callable is another case.
+            'packages/formatter/tests/FormatCodeTest.php',
+        ],
     ],
 ];

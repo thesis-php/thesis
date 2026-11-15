@@ -1,0 +1,43 @@
+{
+    "name": "thesis/formatter",
+    "description": "Formats PHP values, classes, functions and parameters into short strings for error messages.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/data": "^0.1.10",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Formatter\\": "src/"
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Formatter\\": "tests/"
+        }
+    }
+}

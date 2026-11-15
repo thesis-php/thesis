@@ -210,6 +210,7 @@ its `types/` fixtures fail in `make phpstan` otherwise.
 - `amqp`: AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects. Requires: async, io, net, time.
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree. Requires: time.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
+- `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages.
 - `io`: Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio. Requires: async, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
