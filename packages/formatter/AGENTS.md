@@ -10,7 +10,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Formatting never fails and never grows without a bound: it runs while an error is reported, often on a value
   from outside. Every function takes any input of its native type and formats what it does not recognize
   as a value or a string literal (`formatFunction(42)` is `42()`), never asserts on it.
-- `format()` writes into one buffer (`ValueFormatter::$output`): items stop once it reaches `MAX_LENGTH`,
+- `formatValue()` writes into one buffer (`ValueFormatter::$output`): items stop once it reaches `MAX_LENGTH`,
   and a string or a key gets only what is left of it, so the output goes past `MAX_LENGTH` by the punctuation
   around the last item (515 bytes in the tests) and by a name of a class or a closure, which do not come from
   outside. Nesting stops at `MAX_DEPTH`, which also ends cycles of objects and references.
@@ -52,5 +52,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `@phpstan-ignore` for it.
 - Rejected: `formatReflectedType()` of the older package, `(string) $type` does the same and puts the parentheses
   of a DNF type (`(A&B)|C`), which it lost. Rejected: a parameter by position (`f($0)`), nobody used it.
-- The functions are in `Thesis\Formatter\`, the namespace of the older package, unlike `Thesis\exceptionally()`:
-  `format()` alone is too generic a name for `Thesis\`.
+- `formatValue()`, not `format()` of the older package: a bare `format` reads like a format string
+  (`sprintf()`, `DateTime::format()`), and all the functions are `format<What>()`.
+- The functions are in `Thesis\Formatter\`, unlike `Thesis\exceptionally()`: the package has an `Internal\`
+  of its own instead of sharing `Thesis\Internal\` with exceptionally, and nine functions with common verbs
+  do not take names in the root of the whole ecosystem.

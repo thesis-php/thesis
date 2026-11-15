@@ -11,7 +11,7 @@ use Testo\Data\DataProvider;
 use Testo\Test;
 
 /**
- * Random strings of pieces that need escaping: the result of format() is a PHP literal of the same bytes,
+ * Random strings of pieces that need escaping: the result of formatValue() is a PHP literal of the same bytes,
  * valid UTF-8 where nothing is invisible but U+0020. To reproduce a failure, run the reported seed alone.
  */
 #[Test]
@@ -47,7 +47,7 @@ final class FormatFuzzTest
                 $string .= self::PIECES[$random->getInt(0, \count(self::PIECES) - 1)];
             }
 
-            $formatted = format($string);
+            $formatted = formatValue($string);
             $message = \sprintf('seed %d, case %d: %s', $seed, $case, bin2hex($string));
 
             Assert::same(actual: eval("return {$formatted};"), expected: $string, message: $message);

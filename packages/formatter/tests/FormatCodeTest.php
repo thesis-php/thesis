@@ -93,7 +93,7 @@ final class FormatCodeTest
     {
         Assert::same(formatFunction('strlen'), 'strlen()');
         Assert::same(formatFunction(strlen(...)), 'strlen()');
-        Assert::same(formatFunction(format(...)), 'Thesis\Formatter\format()');
+        Assert::same(formatFunction(formatValue(...)), 'Thesis\Formatter\formatValue()');
     }
 
     public function formatsMethod(): void

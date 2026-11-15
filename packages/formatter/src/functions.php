@@ -10,7 +10,7 @@ use Thesis\Formatter\Internal\ValueFormatter;
  * @api
  * @return non-empty-string
  */
-function format(mixed $value): string
+function formatValue(mixed $value): string
 {
     return ValueFormatter::format($value);
 }

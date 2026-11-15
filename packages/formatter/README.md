@@ -6,10 +6,10 @@
 Formats PHP values, classes, functions and parameters into short strings for error messages.
 
 ```php
-use function Thesis\Formatter\format;
+use function Thesis\Formatter\formatValue;
 use function Thesis\Formatter\formatParameter;
 
-throw new \ValueError(\sprintf('%s must be positive, got %s.', formatParameter($fn, 'limit'), format($limit)));
+throw new \ValueError(\sprintf('%s must be positive, got %s.', formatParameter($fn, 'limit'), formatValue($limit)));
 // Thesis\Example\Client::fetch($limit) must be positive, got -1.
 ```
 
@@ -23,25 +23,25 @@ Requires 64-bit PHP 8.5+. No extensions.
 
 ## Values
 
-`format(mixed $value): string` writes a value in the notation of PHPStan types, so that it reads like a type:
+`formatValue(mixed $value): string` writes a value in the notation of PHPStan types, so that it reads like a type:
 
 ```php
-format(null);                  // null
-format(42);                    // 42
-format(1.0);                   // 1.0, apart from an int
-format("it's");                // 'it\'s'
-format("line\n");              // "line\n"
-format("Приве\xD1");           // "Приве\xD1"
-format("abc\u{202E}");         // "abc\u{202E}"
-format([]);                    // array{}
-format([1, 2]);                // list{1, 2}
-format(['id' => 1, 'a b' => 2]); // array{id: 1, 'a b': 2}
-format((object) ['x' => 1]);   // object{x: 1}
-format(Suit::Hearts);          // App\Suit::Hearts
-format(new Service());         // App\Service
-format(new class {});          // class@/app/src/foo.php:12
-format(static fn() => null);   // function@/app/src/foo.php:12()
-format($stream);               // resource (stream)
+formatValue(null);                    // null
+formatValue(42);                      // 42
+formatValue(1.0);                     // 1.0, apart from an int
+formatValue("it's");                  // 'it\'s'
+formatValue("line\n");                // "line\n"
+formatValue("Приве\xD1");             // "Приве\xD1"
+formatValue("abc\u{202E}");           // "abc\u{202E}"
+formatValue([]);                      // array{}
+formatValue([1, 2]);                  // list{1, 2}
+formatValue(['id' => 1, 'a b' => 2]); // array{id: 1, 'a b': 2}
+formatValue((object) ['x' => 1]);     // object{x: 1}
+formatValue(Suit::Hearts);            // App\Suit::Hearts
+formatValue(new Service());           // App\Service
+formatValue(new class {});            // class@/app/src/foo.php:12
+formatValue(static fn() => null);     // function@/app/src/foo.php:12()
+formatValue($stream);                 // resource (stream)
 ```
 
 A string is a PHP literal of the same bytes. It is single-quoted while every character shows as itself,

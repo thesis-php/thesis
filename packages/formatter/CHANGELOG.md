@@ -12,21 +12,22 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 ### Changed
 
 - **BC break:** Requires 64-bit PHP 8.5+.
-- **BC break:** `format()` writes an empty array as `array{}`, not `list{}`, as PHPStan does.
-- **BC break:** `format()` writes a float by `var_export()` and keeps it apart from an int: `1.0`, not `1`.
-- **BC break:** `format()` quotes a key of an array or a property of `\stdClass` that is not a name: `'a b'`, `''`.
-- **BC break:** `format()` writes a resource as `get_debug_type()` does: `resource (stream)`.
-- **BC break:** `format()` writes a subclass of `\stdClass` as its class, not as `object{...}` with its properties.
+- **BC break:** `format()` is renamed to `formatValue()`: a bare `format` reads like a format string.
+- **BC break:** `formatValue()` writes an empty array as `array{}`, not `list{}`, as PHPStan does.
+- **BC break:** `formatValue()` writes a float by `var_export()` and keeps it apart from an int: `1.0`, not `1`.
+- **BC break:** `formatValue()` quotes a key of an array or a property of `\stdClass` that is not a name: `'a b'`, `''`.
+- **BC break:** `formatValue()` writes a resource as `get_debug_type()` does: `resource (stream)`.
+- **BC break:** `formatValue()` writes a subclass of `\stdClass` as its class, not as `object{...}` with its properties.
 - **BC break:** A string that is not a name of PHP is formatted as a string literal by `formatClass()`,
   `formatFunction()`, `formatParameter()` and `formatProperty()`.
 - **BC break:** The parameter `$function` of `formatFunction()` and `formatParameter()` is renamed to `$fn`.
-- `format()` stays short and finishes for any value: items stop once the result reaches 500 bytes, a string shows
+- `formatValue()` stays short and finishes for any value: items stop once the result reaches 500 bytes, a string shows
   at most 100 characters and what is left of the 500 bytes, arrays and objects deeper than 3 levels are written
   as `{...}`. A cycle of objects or references used to exhaust the stack.
-- `format()` writes a string as a valid PHP literal of the same bytes: a backslash before a quote or at the end
+- `formatValue()` writes a string as a valid PHP literal of the same bytes: a backslash before a quote or at the end
   is escaped, and a string with a byte that is not UTF-8, a control, a format (bidi, zero-width) or a space
   other than U+0020 is double-quoted with only those escaped (`"Приве\xD1"`, `"abc\u{202E}"`).
-- `format()` formats a closed resource. It used to fail an assertion.
+- `formatValue()` formats a closed resource. It used to fail an assertion.
 - `formatClass()` and `formatProperty()` take any string, `formatFunction()` and `formatParameter()` a string
   or a pair that is not callable: an error may be about a class or a method that does not exist.
   What is not a callable at all is formatted as a value.

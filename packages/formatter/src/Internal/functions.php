@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Formatter\Internal;
 
-use function Thesis\Formatter\format;
+use function Thesis\Formatter\formatValue;
 
 /**
  * An anonymous class is named "<parent>@anonymous\0<file>:<line>$<n>" and is formatted by its name, not reflected:
@@ -36,7 +36,7 @@ function name(string $name): string
         return $name;
     }
 
-    return format($name);
+    return formatValue($name);
 }
 
 /**
@@ -75,7 +75,7 @@ function functionName(mixed $fn): string
         return className($fn::class);
     }
 
-    return format($fn);
+    return formatValue($fn);
 }
 
 /**
