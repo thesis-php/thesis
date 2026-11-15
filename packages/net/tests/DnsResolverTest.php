@@ -99,7 +99,11 @@ final class DnsResolverTest
         [$addresses, $queries] = self::resolve(['big.test' => $zone], 'big.test');
 
         Assert::same($addresses, ['10.0.0.1']);
-        Assert::same($queries, ['udp big.test AAAA', 'udp big.test A', 'tcp big.test AAAA', 'tcp big.test A']);
+        Assert::same(\array_slice($queries, 0, 2), ['udp big.test AAAA', 'udp big.test A']);
+        // Both families connect over TCP at once, and the driver decides whose connection is ready first (EvDriver).
+        $tcp = \array_slice($queries, 2);
+        sort($tcp);
+        Assert::same($tcp, ['tcp big.test A', 'tcp big.test AAAA']);
     }
 
     public function asksTheNextServerIfOneFailsOrIsSilent(): void

@@ -81,7 +81,8 @@ the whole monorepo is for the final check.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
   so commit the generated files. CI runs the tests on PHP 8.5 and 8.6 (`PHP_VERSION=8.6 make test`)
-  and on the Revolt drivers `StreamSelect` and `Uv` (`DRIVER=StreamSelect make test`), the other checks on 8.5 only
+  and on every Revolt driver: `StreamSelect`, `Uv`, `Ev`, `Event` (`DRIVER=Ev make test`), the other checks
+  on 8.5 only. A test does not rely on the order of callbacks that become ready in one tick: drivers differ in it
 
 ## Git
 
