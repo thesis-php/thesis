@@ -378,8 +378,9 @@ final class VirtualTimeDriver implements Driver
      */
     private function enqueue(VirtualTimer $timer): void
     {
-        $now = $this->clock->now;
-        $expiration = $timer->interval > PHP_INT_MAX - $now ? PHP_INT_MAX : $now + $timer->interval;
+        $expiration = $this->clock->now + $timer->interval;
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        $expiration = \is_int($expiration) ? $expiration : PHP_INT_MAX;
         $timer->expiration = $expiration;
         $timer->order = ++$this->order;
         $this->queue->insert([$expiration, $timer->order, $timer->callbackId]);

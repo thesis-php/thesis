@@ -47,7 +47,7 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
         private readonly float $perSecond,
         private readonly int $burst,
     ) {
-        if (!($perSecond > 0)) {
+        if (is_nan($perSecond) || $perSecond <= 0) {
             throw new \ValueError(\sprintf(
                 'LocalTokenBucketRateLimiter needs a positive rate, got %s.',
                 is_nan($perSecond) ? 'NAN' : $perSecond,

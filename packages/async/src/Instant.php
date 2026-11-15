@@ -53,16 +53,14 @@ final readonly class Instant
      */
     public function add(Duration $duration): self
     {
-        $nanoseconds = toNs($duration);
-        $overflows = $nanoseconds > 0
-            ? $this->nanoseconds > PHP_INT_MAX - $nanoseconds
-            : $this->nanoseconds < PHP_INT_MIN - $nanoseconds;
+        $sum = $this->nanoseconds + toNs($duration);
 
-        if ($overflows) {
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        if (!\is_int($sum)) {
             throw new TimeException('The instant is out of the range of the clock (roughly 292 years from its origin)');
         }
 
-        return new self($this->nanoseconds + $nanoseconds);
+        return new self($sum);
     }
 
     /**
@@ -73,15 +71,14 @@ final readonly class Instant
      */
     public function since(self $earlier): Duration
     {
-        $overflows = $earlier->nanoseconds < 0
-            ? $this->nanoseconds > PHP_INT_MAX + $earlier->nanoseconds
-            : $this->nanoseconds < PHP_INT_MIN + $earlier->nanoseconds;
+        $difference = $this->nanoseconds - $earlier->nanoseconds;
 
         // Beyond int, the difference is beyond Duration too: the same exception as ns() throws within int.
-        if ($overflows) {
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the difference into a float)
+        if (!\is_int($difference)) {
             throw new TimeException('The maximum representable range is 9_223_372_035 seconds (roughly 292 years)');
         }
 
-        return ns($this->nanoseconds - $earlier->nanoseconds);
+        return ns($difference);
     }
 }

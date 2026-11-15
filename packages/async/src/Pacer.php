@@ -43,10 +43,12 @@ final class Pacer
             $this->count = 0;
         }
 
-        if ($this->count++ === 0) {
+        if ($this->count === 0) {
             EventLoop::defer(function () {
                 $this->count = 0;
             });
         }
+
+        ++$this->count;
     }
 }

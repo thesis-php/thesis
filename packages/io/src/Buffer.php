@@ -182,6 +182,7 @@ final class Buffer implements \Countable
         $b = \ord(($this->bytes[$o] ?? throw $this->eof(1))[0]);
         $this->offset = $o + 1;
 
+        // sign extension: 0x80..0xFF become -128..-1, faster than a comparison
         return ($b ^ 0x80) - 0x80;
     }
 
@@ -208,6 +209,7 @@ final class Buffer implements \Countable
         $b = \ord(($this->bytes[$o + 1] ?? throw $this->eof(2))[0]);
         $this->offset = $o + 2;
 
+        // sign extension, as in readInt8()
         return (($this->big
             ? \ord($this->bytes[$o]) << 8 | $b
             : $b << 8 | \ord($this->bytes[$o])) ^ 0x8000) - 0x8000;
@@ -245,6 +247,7 @@ final class Buffer implements \Countable
         /** @var array{1: non-negative-int} $v */
         $v = unpack($this->u32, $this->bytes, $o);
 
+        // sign extension, as in readInt8()
         return ($v[1] ^ 0x80_00_00_00) - 0x80_00_00_00;
     }
 
@@ -399,6 +402,7 @@ final class Buffer implements \Countable
     {
         $u = $this->readUvarint();
 
+        // 0, 1, 2, 3, ... decode to 0, -1, 1, -2, ...: branchless, faster than a comparison
         return ($u >> 1 & PHP_INT_MAX) ^ -($u & 1);
     }
 
@@ -535,6 +539,7 @@ final class Buffer implements \Countable
      */
     public function writeVarint(int $v): self
     {
+        // 0, -1, 1, -2, ... encode to 0, 1, 2, 3, ...: branchless, as in readVarint()
         return $this->writeUvarint($v << 1 ^ $v >> 63);
     }
 

@@ -101,7 +101,8 @@ final class Server
                 // Readable, but nothing to accept: another fiber has taken it, or accept() itself fails.
                 $woken = false;
                 // The shift is capped: past MAX_BACKOFF anyway, and an int must not overflow.
-                $backoff = min(self::MIN_BACKOFF << min($failures++, 30), self::MAX_BACKOFF);
+                $backoff = min(self::MIN_BACKOFF << min($failures, 30), self::MAX_BACKOFF);
+                ++$failures;
 
                 if (!$this->watcher->delay(ns($backoff))) {
                     return null;

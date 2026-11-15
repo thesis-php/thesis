@@ -303,9 +303,10 @@ final class Scope
      */
     public static function after(int $nanoseconds): int
     {
-        $now = self::now();
+        $deadline = self::now() + $nanoseconds;
 
-        return $nanoseconds > PHP_INT_MAX - $now ? PHP_INT_MAX : $now + $nanoseconds;
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        return \is_int($deadline) ? $deadline : PHP_INT_MAX;
     }
 
     private function notify(): void

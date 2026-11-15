@@ -23,6 +23,7 @@ final readonly class Message
     private const int FLAG_RESPONSE = 0x8000;
     private const int FLAG_TRUNCATED = 0x0200;
     private const int FLAG_RECURSION_DESIRED = 0x0100;
+    private const int LABEL_POINTER = 0xC0;
 
     /**
      * @param int<0, 65535> $id
@@ -157,7 +158,7 @@ final readonly class Message
     private static function skipName(Buffer $buffer): void
     {
         while (($length = $buffer->readUint8()) !== 0) {
-            if (($length & 0xC0) === 0xC0) {
+            if (($length & self::LABEL_POINTER) === self::LABEL_POINTER) {
                 $buffer->skip(1);
 
                 return;

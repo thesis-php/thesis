@@ -147,6 +147,10 @@ the whole monorepo is for the final check.
   Tests are not marked: they are not part of the API.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
+- Code is read at a glance, not decoded. If a reader has to work out what an expression means (rearrange
+  an inequality, trace a bit trick, recount a bound), rewrite it to say what it means: a plainer form,
+  a named variable or a function. Obvious and a line longer beats clever and short. Only a benchmark
+  keeps a trick (the hot path of `Buffer`), and then a comment on that line says what it computes.
 - A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
   rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
   they stay.
