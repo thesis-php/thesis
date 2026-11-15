@@ -75,8 +75,8 @@ the whole monorepo is for the final check.
 
 - `make test P=async`, `make phpstan P=async`, `make fixer P=async`, `make rector P=async`
 - `make sync` after changing a manifest or `monorepo.php`
-- `make up` starts the services of `compose.yaml` (RabbitMQ) for integration tests. A test skips a service
-  that is not up, unless `CI` is set: CI starts them and fails instead
+- `make test` starts the services of `compose.yaml` (RabbitMQ) first (`make up`), `make down` stops them.
+  An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
   so commit the generated files
 

@@ -6,8 +6,6 @@ services:
     environment:
       IN_CONTAINER: true
       HISTFILE: /workspace/var/.docker_history
-      # Integration tests skip a service that is not up (make up), and fail instead in CI.
-      CI: ${CI:-}
       AMQP_URI: amqp://thesis:thesis@rabbitmq:5672/
     volumes:
       - .:/workspace

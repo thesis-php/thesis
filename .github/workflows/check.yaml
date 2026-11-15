@@ -18,5 +18,4 @@ jobs:
       # Generated files and the lock are checked by regenerating them: sync is the only source of truth.
       - run: make sync
       - run: git diff --exit-code
-      - run: make up
       - run: make check

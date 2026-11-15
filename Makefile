@@ -19,7 +19,7 @@ terminal: var ## (t) Open a shell in the PHP container
 .PHONY: t terminal
 
 up: ## Start services
-	$(DOCKER_COMPOSE) up --remove-orphans --detach --wait
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) up --remove-orphans --detach --wait)
 .PHONY: up
 
 down: ## Stop services
@@ -83,7 +83,7 @@ deps-analyze: vendor ## Check for unused and shadow dependencies
 	$(RUN) composer-dependency-analyser --config=tools/composer-dependency-analyser.php $(ARGS)
 .PHONY: deps-analyze
 
-test: var vendor ## Run tests [P=]
+test: var vendor up ## Run tests [P=]
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 
