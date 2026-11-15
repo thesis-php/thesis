@@ -96,8 +96,6 @@ of its package, and a step that is done is deleted from here.
 
 - Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
   or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
-- Run the child of `StdioTest` on the driver of the tests instead of `StreamSelectDriver`: on `UvDriver`
-  it shows the `O_NONBLOCK` left on stdio (`packages/io/AGENTS.md`).
 - Links between packages in a README (`[thesis/async](../async/README.md)` in `amqp`, `async`, `io`, `net`)
   work only in the monorepo: the split repository and Packagist have no `../async`. Replace them all at once
   with links to the repositories of the packages (`https://github.com/thesis-php/async`), and make `bin/monorepo`

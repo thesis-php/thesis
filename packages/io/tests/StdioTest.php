@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Io;
 
-use Revolt\EventLoop\Driver\StreamSelectDriver;
 use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
@@ -166,10 +165,6 @@ final class StdioTest
         Assert::true(str_ends_with($stdout, 'xafter'));
     }
 
-    /**
-     * The uv driver makes a descriptor non-blocking for as long as it watches it: see AGENTS.md,
-     * these tests run on the stream_select() driver until stdio is tested on every driver.
-     */
     public function stdinIsBlockingForOthersWhileAReadWaitsAndAfterItIsCancelled(): void
     {
         $code = <<<'PHP_WRAP'
@@ -190,7 +185,7 @@ final class StdioTest
             $check();
             PHP_WRAP;
 
-        $stderr = self::runOnSelectDriver($code, [0 => ['pipe', 'r'], 2 => ['pipe', 'w']], output: 2);
+        $stderr = self::runChild($code, [0 => ['pipe', 'r'], 2 => ['pipe', 'w']], output: 2);
 
         Assert::same($stderr, "blocking\nblocking\n");
     }
@@ -211,25 +206,24 @@ final class StdioTest
             });
             PHP_WRAP;
 
-        $stderr = self::runOnSelectDriver($code, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], output: 2);
+        $stderr = self::runChild($code, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], output: 2);
 
         Assert::same($stderr, 'blocking');
     }
 
     /**
-     * Runs $code in a child on the stream_select() driver and returns what it writes to the pipe $output.
+     * Runs $code in a child on the driver of the tests and returns what it writes to the pipe $output.
      * The other pipes are neither written nor read, so a read of the child waits and a write fills its pipe.
      *
      * @param array<int, list<string>> $descriptors
      */
-    private static function runOnSelectDriver(string $code, array $descriptors, int $output): string
+    private static function runChild(string $code, array $descriptors, int $output): string
     {
         $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
         $process = proc_open(
             command: [PHP_BINARY, '-r', "require '{$autoload}'; {$code}"],
             descriptor_spec: $descriptors,
             pipes: $pipes,
-            env_vars: [...getenv(), 'REVOLT_DRIVER' => StreamSelectDriver::class],
         );
         \assert(\is_resource($process) && isset($pipes[$output]));
 

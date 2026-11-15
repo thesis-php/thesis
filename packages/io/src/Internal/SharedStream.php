@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Io\Internal;
 
+use Revolt\EventLoop;
+use Revolt\EventLoop\Driver\UvDriver;
 use Thesis\Async\Cancelled;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Pacer;
@@ -15,12 +17,14 @@ use Thesis\Io\StreamClosed;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
+use function Thesis\Time\ms;
 
 /**
  * A stream over a descriptor whose open file description is shared with other processes: the standard ones.
  * `O_NONBLOCK` belongs to the description, so it would reach the shell, the jobs of the same terminal and
  * the children that inherit it, and they would get `EAGAIN`. So the mode is never touched: a read or a write
  * happens only once `stream_select()` says that it will not block, and a wait goes through the event loop.
+ * The uv driver sets the mode on every descriptor it watches, so under uv a wait is a timer between selects.
  *
  * A read or a write that the select allowed may still block briefly: another process may take the bytes
  * or the room in between. A write passes at most {@see PIPE_BUF} bytes per call, the size a pipe that is
@@ -96,7 +100,7 @@ final class SharedStream implements Reader, Writer, Closer
                 $stream = $this->stream ?? throw new StreamClosed('The stream is closed.');
 
                 if (!self::ready($stream, write: false)) {
-                    if (!$this->watcher->readable()) {
+                    if (!$this->wait(write: false)) {
                         throw new StreamClosed('The stream was closed while reading.');
                     }
 
@@ -145,7 +149,7 @@ final class SharedStream implements Reader, Writer, Closer
                 $sent = 0;
 
                 if (!self::ready($stream, write: true)) {
-                    if (!$this->watcher->writable()) {
+                    if (!$this->wait(write: true)) {
                         throw new StreamClosed('The stream was closed while writing.');
                     }
 
@@ -175,6 +179,20 @@ final class SharedStream implements Reader, Writer, Closer
         $this->stream = null;
         $this->watcher->close();
         @fclose($stream);
+    }
+
+    /**
+     * Waits until a read or a write may not block, false once the stream is closed.
+     * `uv_poll_init()` makes the descriptor non-blocking until the process ends, so under the uv driver
+     * the stream is never watched: it sleeps and the caller asks the select again.
+     */
+    private function wait(bool $write): bool
+    {
+        if (EventLoop::getDriver() instanceof UvDriver) {
+            return $this->watcher->delay(ms(10));
+        }
+
+        return $write ? $this->watcher->writable() : $this->watcher->readable();
     }
 
     /**

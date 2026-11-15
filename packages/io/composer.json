@@ -20,17 +20,17 @@
     "require": {
         "php": "^8.5",
         "php-64bit": "*",
-        "thesis/async": "^2.0"
+        "revolt/event-loop": "^1.0.9",
+        "thesis/async": "^2.0",
+        "thesis/time": "^2.0"
     },
     "require-dev": {
-        "revolt/event-loop": "^1.0.9",
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
         "testo/lifecycle": "^0.1.9",
         "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29",
-        "thesis/time": "^2.0"
+        "testo/testo": "^0.10.29"
     },
     "autoload": {
         "psr-4": {

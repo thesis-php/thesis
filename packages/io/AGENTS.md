@@ -49,6 +49,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   and the next commands of a pipeline, and they would get `EAGAIN` while it is on (or `echo` of our own process
   would drop output). A call is made only once `stream_select()` with a zero timeout says it will not block,
   a write passes at most `PIPE_BUF` (4096) bytes, and the waits go through a `StreamWatcher`.
+  Under `UvDriver` stdio is never watched: `uv_poll_init()` sets `O_NONBLOCK` and libuv never clears it,
+  so a wait there is `StreamWatcher::delay()` of 10 ms and the select again. Ev and Event leave the mode alone.
+  The `StdioTest` checks of the mode run the child on the driver of the tests, so CI checks every driver.
   Toggling the mode around each call was rejected: a neighbour blocked on the same full pipe wakes with us
   and sees the flag (half of its writes failed in a measurement).
 - stdio streams are over duplicates (`php://stdout` dups the descriptor in the CLI), so `close()` leaves `STDOUT` open.
@@ -69,18 +72,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   Rejected: constants (`const STDOUT = new Stream(...)`):
   a constant initializer cannot call `fopen()` for a duplicate, it runs when its file loads (for every process
   that loads it), and constants are not autoloaded.
+- Rejected for stdio under uv: one long-lived watcher per descriptor, since `O_NONBLOCK` stays on after
+  the first wait anyway, and restoring the mode after a wait, since it is on during the wait (toggling).
+  Polling costs up to 10 ms of latency and a wakeup per 10 ms while a wait lasts, on uv only.
 - Rejected for stdio: a descriptor non-blocking for the whole run, restored at shutdown (amphp, Node.js):
   others sharing it fail meanwhile. Reopening it for a description of our own (as libuv does for a terminal):
   `/proc/self/fd/N` reopens a pipe only on Linux, a file gets an offset of its own, a socket cannot be reopened.
 - `Stream` has no chunk size: with the PHP read buffer off a read asks the descriptor for the length it is given.
-
-## Known issues
-
-- The uv driver makes a descriptor non-blocking: `uv_poll_init()` sets `O_NONBLOCK`, and Revolt creates
-  a poll handle per wait. So under uv a `SharedStream` that waits leaves stdio non-blocking for others during
-  the wait and after it (cancelled or not), until the process ends. Not fixed until stdio is tested on every driver:
-  the `StdioTest` checks of the mode run on the stream_select() driver. Candidates: a timer that polls with
-  `stream_select()` instead of a watcher, or one long-lived watcher per descriptor.
 
 ## Tests
 
