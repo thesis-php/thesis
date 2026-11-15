@@ -29,7 +29,6 @@ final readonly class GeneratorTest
             'require-dev' => ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
             'autoload' => ['psr-4' => ['Thesis\Async\\' => 'src/']],
             'autoload-dev' => ['psr-4' => ['Thesis\Async\\' => 'tests/']],
-            'config' => ['sort-packages' => true],
         ]);
     }
 
@@ -53,7 +52,6 @@ final readonly class GeneratorTest
             'autoload-dev' => [
                 'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
             ],
-            'config' => ['sort-packages' => true],
         ]);
     }
 

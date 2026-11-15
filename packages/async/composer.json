@@ -54,8 +54,5 @@
         "files": [
             "tests/autoload.files.php"
         ]
-    },
-    "config": {
-        "sort-packages": true
     }
 }

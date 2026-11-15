@@ -108,7 +108,6 @@ final readonly class Generator
                 'psr-4' => [$package->namespace() => 'tests/'],
                 'files' => $manifest->devFiles,
             ]),
-            'config' => ['sort-packages' => true],
         ];
 
         return array_filter($composer, static fn(mixed $value) => $value !== []);
@@ -160,10 +159,7 @@ final readonly class Generator
             'replace' => self::sortRequire($replace),
             'autoload' => array_filter(['psr-4' => $psr4, 'files' => $files]),
             'autoload-dev' => array_filter(['psr-4' => $psr4Dev, 'files' => $filesDev]),
-            'config' => [
-                ...($config->allowPlugins === [] ? [] : ['allow-plugins' => $config->allowPlugins]),
-                'sort-packages' => true,
-            ],
+            'config' => array_filter(['allow-plugins' => $config->allowPlugins]),
         ];
 
         return Json::encode(array_filter($composer, static fn(mixed $value) => $value !== []));

@@ -38,8 +38,5 @@
         "psr-4": {
             "Thesis\\Io\\": "tests/"
         }
-    },
-    "config": {
-        "sort-packages": true
     }
 }
