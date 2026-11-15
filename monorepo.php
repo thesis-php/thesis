@@ -9,7 +9,7 @@ return new Config(
     php: '^8.5',
     version: '^2.0',
     description: 'Thesis: an asynchronous PHP ecosystem',
-    copyrightHolder: 'Valentin Udaltsov',
+    copyrightHolder: 'The Thesis Authors',
     licenseSince: 2026,
     authors: [
         ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],
