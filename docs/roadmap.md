@@ -13,7 +13,7 @@ of its package, and a step that is done is deleted from here.
 |---|---|---|
 | `amp`, `pipeline` | `async` | — (pipeline operators are generators with `each()`/`map()`) |
 | `sync` | `async` | Cross-process primitives (`PosixSemaphore`, `SharedMemoryParcel`): they belong to `parallel` |
-| `byte-stream` | `io` | stdio, zlib streams (inflate/deflate), an in-memory pipe |
+| `byte-stream` | `io` | zlib streams and an in-memory pipe, with HTTP (phase 5): nobody needs them before |
 | `parser` | `io` | — (`Buffer::readUntil()`) |
 | `socket` | `net` | UDP, a pool of connections, passing sockets between processes (for `cluster`) |
 | `dns` | `net` | Check the hosts file and `resolv.conf`; `windows-registry` only if Windows is supported |
@@ -57,7 +57,7 @@ of its package, and a step that is done is deleted from here.
 
 ## Phases
 
-1. **Foundation gaps.** `io`: stdio, zlib streams, an in-memory pipe. `net`: a pool of connections, UDP.
+1. **Foundation gaps.** `net`: a pool of connections, UDP.
    Integration tests against services in `compose.yaml` (rabbitmq, nats,
    postgres, memcached, ...) and a convention for a package to declare the service it needs.
 2. **`amqp`**, the reference client of ADR 0001. Then an ADR on what protocol clients share: framing, reconnects
@@ -70,6 +70,14 @@ of its package, and a step that is done is deleted from here.
 5. **HTTP.** `http` (messages, headers from the old `thesis/headers`, bodies as `io\Reader`), `http-client`
    (HTTP/1.1, keep-alive, the pool, CONNECT, cookies), `http-server` (graceful shutdown by `trapSignals()`,
    router, form parser), HTTP/2 with HPACK (needed by grpc; ALPN is in `net`), then `websocket`.
+   `Content-Encoding` needs zlib streams (decorators of `Reader`/`Writer`, in `io` or `http`). A first version
+   found: `deflate_add()` ignores a flush with empty input, so a writer keeps the last bytes to flush them with;
+   the output of one `inflate_add()` cannot be limited, so a reader feeds it 8 KiB at a time (deflate expands
+   up to ~1032 times); a reader stops at the end of the compressed stream, not reading the inner one further.
+   A request body needs an in-memory pipe from the parser to the handler. A first version found: a write waits
+   for room *before* it buffers, then buffers the whole write (a cancelled write delivers nothing, writes never
+   interleave); `closeWrite($error)` gives the reader `ReadFailed`, so a body cut short does not look complete;
+   `close()` by the reader stops the writer.
 6. **Processes.** `process`, then `parallel`, then `cluster`. On top of them: `hot-reload` (`process`,
    `http-server`, `trapSignals()`) and `cron` (the parser without async and a scheduler on `async`).
 7. **Storage and the rest.** `redis` with `cache`, `file`, `mysql`.

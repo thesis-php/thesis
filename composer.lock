@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a8370f782c4ae1dd8f6092f0938a7682",
+    "content-hash": "476efd16348845c551000f20b09486f4",
     "packages": [
         {
             "name": "internal/container",
@@ -2768,7 +2768,8 @@
         "ext-pcntl": "*",
         "ext-posix": "*",
         "ext-simplexml": "*",
-        "ext-sockets": "*"
+        "ext-sockets": "*",
+        "ext-zlib": "*"
     },
     "plugin-api-version": "2.11.0"
 }

@@ -4,7 +4,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/io)](https://github.com/thesis-php/io/releases)
 
 Fast binary I/O for PHP: an in-memory byte buffer with typed big/little-endian encoding and varints,
-plus minimal `Reader` / `Writer` / `Closer` interfaces for streams.
+minimal `Reader` / `Writer` / `Closer` interfaces for streams, and the streams themselves: non-blocking
+streams over PHP resources and stdio.
+Streams wait through [thesis/async](../async/README.md): every wait is cancelled by the task tree.
 
 It is the byte layer for binary protocol implementations (AMQP, Kafka, protobuf, gRPC, NATS, ...):
 codecs work on a `Buffer`, connections move bytes between a `Buffer` and a socket.
@@ -83,13 +85,15 @@ $buffer->readVarint();
 
 `Reader::read(int $max)` returns from 1 to `$max` bytes, throws `UnexpectedEof` at the end of the stream
 and `ReadFailed` if the read fails otherwise (a connection reset),
-`Writer::write(string $bytes)` writes all the bytes. `Buffer` turns them into exact, buffered reads and batched writes:
+`Writer::write(string $bytes)` writes all the bytes. Both may suspend the fiber while they wait.
+A read that throws, `Cancelled` included, has taken nothing, so a `timeout()` around a read loses no bytes.
+`Buffer` turns them into exact, buffered reads and batched writes:
 
 ```php
 use Thesis\Io\Buffer;
-use Thesis\Io\Stream;
+use function Thesis\Net\connect;
 
-$socket = new Stream(stream_socket_client('tcp://localhost:5672'));
+$socket = connect('localhost', 5672); // thesis/net, a Reader and a Writer
 $in = new Buffer();
 $out = new Buffer();
 
@@ -119,8 +123,30 @@ if ($line === null) {
 }
 ```
 
-`Stream` adapts any blocking PHP stream resource to `Reader`, `Writer` and `Closer`.
+### Streams over resources and stdio
+
+`Stream` adapts a PHP stream resource (a pipe of `proc_open()`, a terminal, a file, a socket without TLS)
+to `Reader`, `Writer` and `Closer`. It makes the resource non-blocking: a read waits for bytes and a write
+for room in the pipe without blocking the event loop. As with sockets of thesis/net, one fiber reads at a time,
+writes of concurrent fibers never interleave, and a write that fails after a part of its bytes closes the stream.
 It raises the PHP stream chunk size to 64 KiB, so that a single read from a socket is not capped at 8 KiB.
+
+`stdin()`, `stdout()` and `stderr()` return such streams over the standard descriptors, the same object every time:
+
+```php
+use function Thesis\Io\stdin;
+use function Thesis\Io\stdout;
+
+$line = new Buffer();
+$line->fillUntil(stdin(), "\n");
+stdout()->write(strtoupper($line->readUntil("\n")) . "\n");
+```
+
+A descriptor shares its blocking mode with the shell, the other jobs of the terminal and the children
+that inherit it, so these streams leave it blocking and turn it non-blocking only for the time of each read
+and write. Nobody else ever sees a non-blocking descriptor, `echo` included: an `echo` while a write of
+`stdout()` waits for room blocks the process as usual and may land in the middle of that write.
+Not supported on Windows, where PHP cannot make a pipe non-blocking.
 
 ## Supported types
 

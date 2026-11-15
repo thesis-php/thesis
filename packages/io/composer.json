@@ -1,6 +1,6 @@
 {
     "name": "thesis/io",
-    "description": "Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.",
+    "description": "Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.",
     "license": "MIT",
     "type": "library",
     "authors": [
@@ -19,7 +19,8 @@
     ],
     "require": {
         "php": "^8.5",
-        "php-64bit": "*"
+        "php-64bit": "*",
+        "thesis/async": "^2.0"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
@@ -27,16 +28,23 @@
         "testo/data": "^0.1.10",
         "testo/lifecycle": "^0.1.9",
         "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29"
+        "testo/testo": "^0.10.29",
+        "thesis/time": "^2.0"
     },
     "autoload": {
         "psr-4": {
             "Thesis\\Io\\": "src/"
-        }
+        },
+        "files": [
+            "src/autoload.files.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
             "Thesis\\Io\\": "tests/"
-        }
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
     }
 }

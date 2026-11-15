@@ -20,6 +20,7 @@ return new Config(
         'php-64bit' => '*',
     ],
     requireDev: [
+        'ext-zlib' => '*',
         'composer/semver' => '^3.4',
         'llm/skills' => '^1.17',
         'symfony/console' => '^8.0',

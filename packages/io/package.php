@@ -5,8 +5,11 @@ declare(strict_types=1);
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'Fast binary I/O: byte buffer with typed big/little-endian encoding, reader and writer interfaces.',
+    description: 'Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.',
     licenseSince: 2026,
+    require: [
+        'thesis/async' => '*',
+    ],
     requireDev: [
         'testo/assert' => '^0.1.17',
         'testo/codecov' => '^0.2.5',
@@ -14,5 +17,8 @@ return new Manifest(
         'testo/lifecycle' => '^0.1.9',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
+        'thesis/time' => '*',
     ],
+    files: ['src/autoload.files.php'],
+    devFiles: ['tests/autoload.files.php'],
 );

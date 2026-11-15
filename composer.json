@@ -35,6 +35,7 @@
         "ext-posix": "*",
         "ext-simplexml": "*",
         "ext-sockets": "*",
+        "ext-zlib": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
         "llm/skills": "^1.17",
@@ -71,6 +72,7 @@
             "packages/amqp/src/autoload.files.php",
             "packages/async/src/autoload.files.php",
             "packages/exceptionally/src/autoload.files.php",
+            "packages/io/src/autoload.files.php",
             "packages/net/src/autoload.files.php",
             "packages/time/src/autoload.files.php"
         ]
@@ -92,6 +94,7 @@
             "packages/amqp/tests/autoload.files.php",
             "packages/async/tests/autoload.files.php",
             "packages/exceptionally/tests/autoload.files.php",
+            "packages/io/tests/autoload.files.php",
             "packages/net/tests/autoload.files.php",
             "packages/time/tests/autoload.files.php"
         ]
