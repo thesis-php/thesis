@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
+use Thesis\Async\StreamWatcher;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Net\Internal\Connector;
@@ -11,7 +12,6 @@ use Thesis\Net\Internal\Dns\Cached;
 use Thesis\Net\Internal\Dns\Message;
 use Thesis\Net\Internal\Dns\Response;
 use Thesis\Net\Internal\Dns\SystemConfig;
-use Thesis\Net\Internal\Readiness;
 use function Thesis\Async\allSettled;
 use function Thesis\Async\now;
 use function Thesis\Async\timeoutOr;
@@ -239,7 +239,7 @@ final class DnsResolver implements Resolver
 
         try {
             stream_set_blocking($stream, false);
-            $readiness = new Readiness();
+            $watcher = new StreamWatcher($stream);
             error_clear_last();
 
             if (@fwrite($stream, $request) !== \strlen($request)) {
@@ -255,7 +255,7 @@ final class DnsResolver implements Resolver
                 }
 
                 if ($bytes === '') {
-                    $readiness->readable($stream);
+                    $watcher->readable();
 
                     continue;
                 }

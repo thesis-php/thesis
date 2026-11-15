@@ -6,6 +6,7 @@ namespace Thesis\Net\Internal;
 
 use Thesis\Async\Channel;
 use Thesis\Async\Group;
+use Thesis\Async\StreamWatcher;
 use Thesis\Net\ConnectFailed;
 use Thesis\Net\Socket;
 use function Thesis\Async\group;
@@ -189,7 +190,7 @@ final readonly class Connector
         }
 
         try {
-            new Readiness()->writable($stream);
+            new StreamWatcher($stream)->writable();
         } catch (\Throwable $exception) {
             fclose($stream);
 

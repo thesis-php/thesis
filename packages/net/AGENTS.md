@@ -10,10 +10,10 @@ skills ship with the package and reach its users through llm/skills.
 
 ## Invariants that must not be broken
 
-- No method takes a timeout or a cancellation: every wait goes through `Internal\Readiness`, which is `suspend()`.
+- No method takes a timeout or a cancellation: every wait goes through a `StreamWatcher` of thesis/async.
   Only DNS has timeouts of its own (`timeoutOr()` per server), because the protocol defines them.
-- A wait on a stream is registered in the `Readiness` of its owner, and `close()` calls `Readiness::close()` before
-  `fclose()`: a Revolt watcher of a closed stream is an error, and the waiting fiber would never wake up.
+- A wait on a stream goes through the `StreamWatcher` of its owner, and `close()` calls `StreamWatcher::close()`
+  before `fclose()`: a Revolt watcher of a closed stream is an error, and the waiting fiber would never wake up.
   After any wait, re-read `$this->stream`: it may have been closed meanwhile, even if the wait returned true.
 - Read first, wait only on an empty read, never the other way round. TLS keeps decrypted bytes inside OpenSSL
   where the uv/ev drivers cannot see them, so waiting for readability first would hang with data pending.
@@ -32,10 +32,10 @@ skills ship with the package and reach its users through llm/skills.
   OpenSSL requires it.
 - An `fwrite()` that returns 0 *with* an error has failed: OpenSSL reports a broken pipe this way, not as `false`,
   and waiting for writability then would spin forever.
-- `read()` and `accept()` call `Readiness::pace()` before they touch the stream: it yields for a tick after 16 calls
-  in one tick, so a peer that never pauses (or a flood of connections) does not starve the event loop. It yields
-  *before* the operation, so a cancelled read has taken nothing. Writes are not paced: a writer waits whenever
-  the peer reads slower.
+- `read()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch the stream:
+  it yields for a tick after 16 calls in one tick, so a peer that never pauses (or a flood of connections)
+  does not starve the event loop. It yields *before* the operation, so a cancelled read has taken nothing.
+  Writes are not paced: a writer waits whenever the peer reads slower.
 - A second concurrent reader is a `LogicException`, never a silent race.
 - `Server::accept()` never spins: a failed accept after a readiness wake-up backs off (5 ms doubling to 1 s),
   in a wait that `close()` ends.

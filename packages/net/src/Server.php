@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 use Thesis\Async\Cancelled;
-use Thesis\Net\Internal\Readiness;
+use Thesis\Async\Pacer;
+use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
 
 /**
@@ -23,6 +24,12 @@ final class Server
     private const float MAX_BACKOFF = 1.0;
 
     /**
+     * Accepts that find a connection at once before one yields, so that a flood of connections
+     * does not starve the ones already accepted.
+     */
+    private const int ACCEPTS_PER_TICK = 16;
+
+    /**
      * @internal
      * @param resource $stream a listening socket, owned from now on
      * @param ?non-empty-string $unixPath the path of a Unix socket, removed by {@see close()}
@@ -33,6 +40,7 @@ final class Server
 
         return new self(
             stream: $stream,
+            watcher: new StreamWatcher($stream),
             address: $unixPath === null
                 ? address(stream_socket_get_name($stream, false), unix: false)
                 : new UnixAddress(path: $unixPath),
@@ -44,7 +52,7 @@ final class Server
         get => $this->stream === null;
     }
 
-    private readonly Readiness $readiness;
+    private readonly Pacer $pacer;
 
     /**
      * @param ?resource $stream
@@ -52,13 +60,14 @@ final class Server
      */
     private function __construct(
         private mixed $stream,
+        private readonly StreamWatcher $watcher,
         /**
          * Where the server listens, with the port the OS has chosen if it was 0.
          */
         public readonly Address $address,
         private readonly ?string $unixPath,
     ) {
-        $this->readiness = new Readiness();
+        $this->pacer = new Pacer(self::ACCEPTS_PER_TICK);
     }
 
     /**
@@ -76,7 +85,7 @@ final class Server
      */
     public function accept(): ?Socket
     {
-        $this->readiness->pace();
+        $this->pacer->pace();
         $failures = 0;
         $woken = false;
 
@@ -92,10 +101,10 @@ final class Server
                 $woken = false;
                 $backoff = min(self::MIN_BACKOFF * 2 ** $failures++, self::MAX_BACKOFF);
 
-                if (!$this->readiness->sleep($backoff)) {
+                if (!$this->watcher->delay($backoff)) {
                     return null;
                 }
-            } elseif ($this->readiness->readable($this->stream)) {
+            } elseif ($this->watcher->readable()) {
                 $woken = true;
             } else {
                 return null;
@@ -118,7 +127,7 @@ final class Server
         }
 
         $this->stream = null;
-        $this->readiness->close();
+        $this->watcher->close();
         @fclose($stream);
 
         if ($this->unixPath !== null) {

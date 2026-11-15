@@ -6,13 +6,14 @@ namespace Thesis\Net;
 
 use Thesis\Async\Cancelled;
 use Thesis\Async\LocalMutex;
+use Thesis\Async\Pacer;
+use Thesis\Async\StreamWatcher;
 use Thesis\Io\Closer;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
-use Thesis\Net\Internal\Readiness;
 use function Thesis\Net\Internal\address;
 use function Thesis\Net\Internal\lastError;
 
@@ -32,6 +33,12 @@ final class Socket implements Reader, Writer, Closer
     private const int WRITE_CHUNK = 1_048_576;
 
     /**
+     * Reads that find bytes at once before one yields: enough to drain a burst without a wait for each,
+     * few enough that a peer sending without a pause cannot hold the event loop.
+     */
+    private const int READS_PER_TICK = 16;
+
+    /**
      * @internal
      * @param resource $stream a connected socket, owned from now on
      * @param ?non-empty-string $host the host it was connected to, the default peer name of {@see ClientTls}
@@ -45,6 +52,7 @@ final class Socket implements Reader, Writer, Closer
 
         return new self(
             stream: $stream,
+            watcher: new StreamWatcher($stream),
             localAddress: address(stream_socket_get_name($stream, false), $unix),
             remoteAddress: address(stream_socket_get_name($stream, true), $unix),
             host: $host,
@@ -60,7 +68,7 @@ final class Socket implements Reader, Writer, Closer
      */
     public private(set) ?TlsInfo $tls = null;
 
-    private readonly Readiness $readiness;
+    private readonly Pacer $pacer;
 
     /**
      * Whether a read waits: a second reader is a bug, the two would take bytes from each other.
@@ -81,11 +89,12 @@ final class Socket implements Reader, Writer, Closer
      */
     private function __construct(
         private mixed $stream,
+        private readonly StreamWatcher $watcher,
         public readonly Address $localAddress,
         public readonly Address $remoteAddress,
         private readonly ?string $host,
     ) {
-        $this->readiness = new Readiness();
+        $this->pacer = new Pacer(self::READS_PER_TICK);
     }
 
     /**
@@ -102,7 +111,7 @@ final class Socket implements Reader, Writer, Closer
      */
     public function read(int $max): string
     {
-        $this->readiness->pace();
+        $this->pacer->pace();
 
         while (true) {
             $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
@@ -132,7 +141,7 @@ final class Socket implements Reader, Writer, Closer
             $this->reading = true;
 
             try {
-                $readable = $this->readiness->readable($stream);
+                $readable = $this->watcher->readable();
             } finally {
                 $this->reading = false;
             }
@@ -252,7 +261,7 @@ final class Socket implements Reader, Writer, Closer
                     throw new TlsFailed('TLS handshake failed: the peer has closed the connection.');
                 }
 
-                if (!$this->readiness->readable($stream)) {
+                if (!$this->watcher->readable()) {
                     throw new SocketClosed('The socket was closed during the TLS handshake.');
                 }
             }
@@ -278,7 +287,7 @@ final class Socket implements Reader, Writer, Closer
         }
 
         $this->stream = null;
-        $this->readiness->close();
+        $this->watcher->close();
         @fclose($stream);
     }
 
@@ -306,7 +315,7 @@ final class Socket implements Reader, Writer, Closer
 
                     if ($n > 0) {
                         $written += $n;
-                    } elseif (!$this->readiness->writable($stream)) {
+                    } elseif (!$this->watcher->writable()) {
                         throw new SocketClosed('The socket was closed while writing.');
                     }
                 }

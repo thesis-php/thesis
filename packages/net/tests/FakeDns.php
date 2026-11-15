@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
-use Revolt\EventLoop;
-use Thesis\Async\Continuation;
 use Thesis\Async\Group;
+use Thesis\Async\StreamWatcher;
 use Thesis\Io\Buffer;
 use Thesis\Net\Internal\Dns\Message;
-use function Thesis\Async\suspend;
 
 /**
  * A name server on 127.0.0.1, UDP and TCP on the same port, answering from a zone. It runs in daemons of a group.
@@ -78,19 +76,13 @@ final class FakeDns
      */
     private function serveUdp(mixed $udp): never
     {
+        $watcher = new StreamWatcher($udp);
+
         while (true) {
             $query = stream_socket_recvfrom($udp, length: 512, flags: 0, address: $peer);
 
             if ($query === false || $query === '') {
-                suspend(static function (Continuation $continuation) use ($udp) {
-                    $callbackId = EventLoop::onReadable($udp, static function () use ($continuation) {
-                        $continuation->resume();
-                    });
-
-                    return static function () use ($callbackId) {
-                        EventLoop::cancel($callbackId);
-                    };
-                });
+                $watcher->readable();
 
                 continue;
             }
