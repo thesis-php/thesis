@@ -44,6 +44,8 @@ description and dependencies. Generated from the manifests and `monorepo.php` by
 - `packages/<name>/composer.json`,
 - the root `composer.json`,
 - `LICENSE` of the root and of every package, from the year in the manifest,
+- `packages/<name>/.gitattributes`: the archive that composer installs has only `src/`, `composer.json`, `LICENSE`,
+  `README.md`, `skills/` and the paths in `dist` of the manifest (a polyfill, resources that `src/` loads),
 - `skills.json` (`sources`),
 - `testo.php`: one suite per package and per `tools/<name>/tests`, named after the directory.
   A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,

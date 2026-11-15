@@ -20,6 +20,7 @@ return new Manifest(
     ],
     files: ['src/autoload.files.php'],
     devFiles: ['tests/autoload.files.php'],
+    dist: ['polyfill'],
     skip: [
         new FixerSkip(
             paths: ['polyfill/TimeException.php'],

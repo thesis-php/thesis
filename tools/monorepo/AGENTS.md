@@ -5,6 +5,12 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
   Keep them plain readonly DTOs with named arguments: humans and agents write them by hand. The rest is in `Internal\`.
+- `.gitattributes` of a package is an allowlist (`/* export-ignore`, then `-export-ignore` for what is kept):
+  the split repository stays an exact copy of the package (ADR 0002), only the archive is trimmed, and a new file
+  of the monorepo stays out of it without anyone remembering to exclude it. `sync` throws on a `dist` path that
+  does not exist. Rejected: excluding files from the split itself (splitsh-lite splits only a prefix, rewriting
+  every commit is slow and nobody gains from it: users install the archive); a list of excluded files
+  (a forgotten one leaks into every install).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
   a property does not exist, so nothing is read back from the current file. Rejected: a raw array of
   composer.json keys merged last, it bypasses the model; a library modelling composer.json

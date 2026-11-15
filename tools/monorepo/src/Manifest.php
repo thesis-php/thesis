@@ -28,6 +28,8 @@ final readonly class Manifest
      *     Tell the users about them in $suggest
      * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan is not here:
      *     its errors are ignored in the code, by a phpstan-ignore comment with an identifier and a reason
+     * @param list<non-empty-string> $dist top-level paths of the package that src/ needs at runtime (a polyfill,
+     *     resources). Composer installs only them, src/, composer.json, LICENSE, README.md and skills/
      */
     public function __construct(
         public string $description,
@@ -41,5 +43,6 @@ final readonly class Manifest
         public array $conflict = [],
         public array $optional = [],
         public array $skip = [],
+        public array $dist = [],
     ) {}
 }
