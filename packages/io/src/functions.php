@@ -10,7 +10,6 @@ use function Thesis\Io\Internal\stdio;
 /**
  * The standard input of the process, the same object on every call. A read waits through the event loop
  * without making the descriptor non-blocking: it is shared with the shell and other processes.
- * Throws `LogicException` on Windows.
  *
  * @api
  */
@@ -26,7 +25,6 @@ function stdin(): Reader&Closer
  * The standard output of the process, the same object on every call. A write waits through the event loop
  * without making the descriptor non-blocking, so `echo` and the processes that share it keep working.
  * A write cancelled after a part leaves the stream open: the next one goes on after the half.
- * Throws `LogicException` on Windows.
  *
  * @api
  */

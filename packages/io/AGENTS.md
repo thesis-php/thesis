@@ -72,8 +72,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Rejected for stdio: a descriptor non-blocking for the whole run, restored at shutdown (amphp, Node.js):
   others sharing it fail meanwhile. Reopening it for a description of our own (as libuv does for a terminal):
   `/proc/self/fd/N` reopens a pipe only on Linux, a file gets an offset of its own, a socket cannot be reopened.
-- Windows is not supported by stdio: a pipe can be neither selected nor watched there, so `stdio()` throws
-  `LogicException` instead of blocking the event loop.
 - `Stream` has no chunk size: with the PHP read buffer off a read asks the descriptor for the length it is given.
 
 ## Known issues

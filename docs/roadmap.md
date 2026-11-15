@@ -16,7 +16,7 @@ of its package, and a step that is done is deleted from here.
 | `byte-stream` | `io` | zlib streams and an in-memory pipe, with HTTP (phase 5): nobody needs them before |
 | `parser` | `io` | — (`Buffer::readUntil()`) |
 | `socket` | `net` | UDP, a pool of connections, passing sockets between processes (for `cluster`) |
-| `dns` | `net` | Check the hosts file and `resolv.conf`; `windows-registry` only if Windows is supported |
+| `dns` | `net` | Check the hosts file and `resolv.conf` |
 | `uri` | `Uri\WhatWg\Url` | — |
 | `phpunit-util` | Testo, `testo` | — |
 
@@ -43,8 +43,8 @@ of its package, and a step that is done is deleted from here.
   or not needed.
 - Stale or niche: `quic`, `ssh`, `beanstalk`, `stomp`, `dbus`, `react-adapter`, `react-stream-adapter`.
 - `injector`, `dependency-graph`: overlap with dic.
-- Infrastructure: `ext-uv` (a Revolt driver, used as is), `ext-fiber`, `green-thread`, `windows-process-wrapper`,
-  `php-cs-fixer-config`, `template`, the websites.
+- Infrastructure: `ext-uv` (a Revolt driver, used as is), `ext-fiber`, `green-thread`,
+  `windows-process-wrapper` (Windows is not supported, ADR 0005), `php-cs-fixer-config`, `template`, the websites.
 
 ## Older thesis → thesis
 
@@ -112,9 +112,5 @@ of its package, and a step that is done is deleted from here.
 2. Postgres: pure PHP on the wire protocol rather than ext-pgsql or pecl-pq?
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
-5. Windows: supported or not, and to what extent? Think it through before `process`: it decides `windows-registry`
-   for DNS and the Windows branch of `process`. Already affected: `stdio()` of `io` throws there (a pipe can be
-   neither selected nor watched), Unix sockets of `net`, `trapSignals()` of `async`. Supporting it means a Windows
-   job in CI, and nothing tests it now.
-6. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
-7. The cache: a package of its own or a part of `async`?
+5. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
+6. The cache: a package of its own or a part of `async`?

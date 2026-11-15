@@ -10,6 +10,9 @@ Structured concurrency for PHP fibers on top of [Revolt](https://revolt.run): ca
 composer require thesis/async
 ```
 
+Windows is not supported: the package triggers `E_USER_WARNING` when it is loaded there, and nothing is guaranteed
+to work. Need it? [Open an issue](https://github.com/thesis-php/thesis/issues).
+
 The amphp bridge, [`ampCancellable()`](#amphp-ampcancellable), needs `amphp/amp` v3, which is not installed with the package.
 
 ## The problem

@@ -17,6 +17,8 @@ from scratch: it is not a wrapper around amphp and does not depend on it.
 - `monorepo.php` is the root config: PHP constraint, authors, tools and composer plugins of the root.
   `platform` there is required by every package: all of them are 64-bit only (`php-64bit`), so code may rely
   on 64-bit int (nanoseconds, `pack('J')`) without checking `PHP_INT_SIZE`. A manifest does not repeat it.
+- Windows is not supported (ADR 0005): code is written for Unix only. The only `PHP_OS_FAMILY` check is the warning
+  that `async` triggers on load.
 - `docs/adr/NNNN-<slug>.md` holds decisions that span packages (Context, Decision, Consequences, Rejected).
   A decision of one package goes to the "Decisions" section of its `AGENTS.md` instead. An ADR is not rewritten
   when the decision changes: a new one replaces it, and the old one gets `Status: superseded by NNNN`.

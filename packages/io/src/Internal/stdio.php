@@ -10,14 +10,9 @@ namespace Thesis\Io\Internal;
  *
  * @internal
  * @param 'php://stdin'|'php://stdout'|'php://stderr' $path
- * @throws \LogicException on Windows, where a pipe can be neither selected nor watched
  */
 function stdio(string $path, string $mode): SharedStream
 {
-    if (PHP_OS_FAMILY === 'Windows') {
-        throw new \LogicException('Non-blocking stdio is not supported on Windows.');
-    }
-
     $resource = fopen($path, $mode);
 
     if ($resource === false) {
