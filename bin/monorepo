@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use Symfony\Component\Console\Application;
+use Thesis\Monorepo\Internal\Command\GitHubCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
 
 $root = dirname(__DIR__);
@@ -12,5 +13,6 @@ require $root . '/vendor/autoload.php';
 
 $application = new Application('monorepo');
 $application->addCommand(new SyncCommand($root));
+$application->addCommand(new GitHubCommand($root));
 
 exit($application->run());

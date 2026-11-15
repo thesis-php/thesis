@@ -24,8 +24,9 @@ for a new package. The organization is on the free plan of GitHub.
 4. **Settings come from the manifests.** `bin/monorepo github` brings every `thesis-php/<name>` to the state
    derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
    the description, the homepage (`packages/<name>` in the monorepo), the disabled features and the rulesets,
-   and registers the package on Packagist. GitHub itself is the state, the command is idempotent and deletes nothing:
-   a repository without a package is reported, to be archived by hand.
+   and registers the package on Packagist. GitHub itself is the state, the command is idempotent and deletes nothing.
+   It refuses a repository that exists without the rulesets of the split: the organization holds older packages
+   under the same names (`thesis-php/time`), and taking one over is a decision, not a side effect of a push.
 5. **One version, tags only where something changed.** All packages share the version series of `Config::$version`.
    A tag `vX.Y.Z` of the monorepo goes to a package only if `packages/<name>` changed since the previous tag
    of the same series. The first tag of a series (`v0.2.0`) goes to every package, so that `^0.2` resolves for all.
@@ -37,8 +38,8 @@ for a new package. The organization is on the free plan of GitHub.
 ## Consequences
 
 - A contribution is a pull request to the monorepo only. A split repository says so through its homepage.
-- A new package needs its repository before its first push to `main`: until `bin/monorepo github` runs in CI,
-  the split of a package without a repository fails.
+- CI runs `bin/monorepo github` before the split, so a new package gets its repository with its first push.
+  A package named like an older repository fails CI until that repository is renamed, deleted or taken over.
 - The root lock tests one combination of dependencies. Installing every package alone with the lowest
   and the highest allowed versions is a separate job, worth it once there are tags to resolve.
 - A forgotten lower bound breaks only the users who keep an older dependency. That job catches it.

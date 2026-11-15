@@ -1,6 +1,6 @@
 # tools/monorepo
 
-The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync`.
+The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync` and `github`.
 Rejected: a scaffolding command, a new package is copied by hand after an existing one.
 
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
@@ -20,3 +20,13 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.
   Rejected: layers, no cycles, a validator of code references against `require`.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
+- `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of ADR 0002: creates it, sets
+  the settings that differ, creates or replaces the two rulesets. It compares only the keys it sends
+  (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
+  locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`.
+- `github` throws on an existing repository without our rulesets: older packages of the organization share names
+  with new ones. Taking one over is done by hand, by adding the rulesets.
+- The organization, the default branch and the id of the app are constants of `Repositories`, not of `Config`:
+  they describe the infrastructure, not the packages, and nobody writes them by hand.
+- HTTP goes through `file_get_contents()` with a stream context behind the `Api` interface: a few JSON requests
+  do not need a client library. Tests use `FakeApi`.

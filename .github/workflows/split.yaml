@@ -20,14 +20,19 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # The app bypasses the rulesets that make thesis-php/<name> read-only.
+      # The app creates thesis-php/<name> and bypasses the rulesets that make it read-only.
       - id: token
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ vars.BOT_CLIENT_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: thesis-php
+          permission-administration: write
           permission-contents: write
+      # Before the split: a package needs its repository before the first push.
+      - run: make github
+        env:
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
       - run: make split REF=${{ github.ref }}
         env:
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php

@@ -53,6 +53,10 @@ split: ## Split packages/* of REF into thesis-php/<name>, pushes only with SPLIT
 	$(DOCKER_COMPOSE) run --rm --build split tools/split/split.sh $(REF)
 .PHONY: split
 
+github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs GITHUB_TOKEN [ARGS=--dry-run]
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_TOKEN php) bin/monorepo github $(ARGS)
+.PHONY: github
+
 # Quality
 
 fixer: var ## Fix code style [P=]
