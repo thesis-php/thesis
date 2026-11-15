@@ -135,9 +135,20 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.
 
+## Decisions
+
+- Rejected: `Once` (a lazy value computed once for concurrent callers, `Sync\Once` of the old thesis).
+  Under structured concurrency it has no single meaning: the init runs either in the scope of the first caller,
+  so cancelling that caller must make the next one retry, or in a group of an owner, so no caller's cancellation
+  reaches it. Both are a few lines already: `synchronized($mutex, fn() => $this->value ??= $this->init())`
+  (a cancelled caller releases the lock, the next one retries), or a `Task` of the owner's group kept in a property
+  and awaited by everyone. A `Once` would have to pick one of them and invites the lazy connect of a client
+  that ADR 0001 rejects. Shared DNS queries in thesis/net need the second meaning, dic singletons are dic's own.
+  Revisit when two packages repeat the same pattern with the same meaning of cancellation.
+
 ## Conventions
 
-- Every test runs on virtual time (`VirtualTimePlugin` in `testo.plugins.php`, from `tests/Testo`; no attribute is needed): delays are whole seconds
+- Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo in `testo.plugins.php`; no attribute is needed): delays are whole seconds
   (`delay(sec(1))`), a wait that only a cancellation ends is `never()` from `tests/functions.php`, durations are asserted
   exactly (`Assert::same(secondsSince($start), 20.0)`, `Assert::equals(remaining(), sec(990))`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
   Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
