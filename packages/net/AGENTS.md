@@ -65,6 +65,8 @@ skills ship with the package and reach its users through llm/skills.
   DNS and certificates know only the ASCII form, so the TLS peer name must be that form too.
 - `connect()` tries IPv6 first and has no connect timeout of its own: Happy Eyeballs makes a dead family cost 250 ms,
   not a timeout per address, and the caller bounds the whole call with `timeout()`.
+  A test of the delay keeps a margin below 250 ms: libuv counts a timer from the time cached at the start
+  of the loop iteration, so on Uv it fires early by as much as the iteration has run.
 - `listen()` leaves `IPV6_V6ONLY` to the OS: `::` is dual-stack on Linux by default, which is what a server wants.
   `noDelay` is on by default, and the backlog is 511, as in nginx.
 - Happy Eyeballs is a group of attempts reporting to a `Channel` sized for all of them, so no attempt waits to report;

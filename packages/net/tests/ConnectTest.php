@@ -98,7 +98,9 @@ final class ConnectTest
 
         Assert::same((string) $socket->remoteAddress, "[::1]:{$port}");
         $elapsed = Instant::now()->since($start);
-        Assert::true($elapsed >= ms(250));
+        // libuv counts a timer from the time cached at the start of the loop iteration, so Uv fires it early
+        // by as much as the iteration has run: the bound only tells the delay from an immediate second attempt.
+        Assert::true($elapsed >= ms(200));
         Assert::true($elapsed < sec(1));
         $full->close();
         $server->close();
