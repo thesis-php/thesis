@@ -1,0 +1,46 @@
+{
+    "name": "thesis/dispatcher",
+    "description": "Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "thesis/formatter": "^0.2"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/data": "^0.1.10",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Dispatcher\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Dispatcher\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.3.x-dev"
+        }
+    }
+}

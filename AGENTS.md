@@ -80,6 +80,7 @@ the whole monorepo is for the final check.
 - `amqp`: AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects. Requires: async, io, net, time.
 - `async`: Structured concurrency for PHP fibers: cancellation is a property of the task tree. Requires: source-location, time.
 - `cache`: Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex. Requires: async, time.
+- `dispatcher`: Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
 - `io`: Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio. Requires: async, time.
