@@ -43,12 +43,12 @@ final readonly class Package
     }
 
     /**
-     * @return non-empty-string
+     * @return non-empty-string the psr-4 prefix of src/ and tests/
      */
     public function namespace(): string
     {
-        if ($this->manifest->namespace !== null) {
-            return $this->manifest->namespace;
+        if ($this->manifest->rootEntry) {
+            return Monorepo::NAMESPACE;
         }
 
         $pascalCase = str_replace(

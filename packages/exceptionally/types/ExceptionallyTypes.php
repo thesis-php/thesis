@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Thesis;
+namespace Thesis\Exceptionally;
 
 use function PHPStan\Testing\assertType;
+use function Thesis\exceptionally;
 
 /**
  * Not called: `make phpstan` checks the assertions when it analyses the file.

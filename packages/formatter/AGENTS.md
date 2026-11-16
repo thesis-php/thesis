@@ -56,6 +56,5 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of a DNF type (`(A&B)|C`), which it lost. Rejected: a parameter by position (`f($0)`), nobody used it.
 - `formatValue()`, not `format()` of the older package: a bare `format` reads like a format string
   (`sprintf()`, `DateTime::format()`), and all the functions are `format<What>()`.
-- The functions are in `Thesis\Formatter\`, unlike `Thesis\exceptionally()`: the package has an `Internal\`
-  of its own instead of sharing `Thesis\Internal\` with exceptionally, and nine functions with common verbs
-  do not take names in the root of the whole ecosystem.
+- The functions are in `Thesis\Formatter\`, unlike `Thesis\exceptionally()`: nine peer functions with common
+  verbs are not one entry point named after the package, they do not take names in the root of the ecosystem.

@@ -14,10 +14,10 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
-    namespace: 'Thesis\\',
+    rootEntry: true,
     skip: [
         new FixerSkip(
-            paths: ['tests/helpers.php'],
+            paths: ['tests/Exceptionally/helpers.php'],
             reason: 'error_suppression puts @ before trigger_error() of E_USER_DEPRECATED, the tests need it unsuppressed.',
         ),
     ],

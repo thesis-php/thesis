@@ -24,6 +24,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 
 ## Decisions
 
+- The class is `Thesis\Dispatcher`, as in the older package: `Thesis\Dispatcher\Dispatcher` stutters.
+  The manifest sets `rootEntry: true`, `Internal\` and the fixtures of the tests are in `Thesis\Dispatcher\`.
+
 - Rejected: PSR-14 in the core. `StoppableEventInterface` makes the order of listeners part of their meaning and
   costs a check per listener, `dispatch(): object` serves mutable events, and nobody needs a foreign provider
   or dispatcher yet. A bridge is a separate package over `listens()` and the same resolution when someone does.

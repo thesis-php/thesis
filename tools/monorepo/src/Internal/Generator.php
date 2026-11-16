@@ -174,17 +174,17 @@ final readonly class Generator
         $replace = [];
         $psr4 = [];
         $files = [];
-        $psr4Dev = $config->autoloadDev;
+        $psr4Dev = [];
         $filesDev = [];
 
         foreach ($this->monorepo->packages as $package) {
             $path = $package->path();
             // The root is dev-main, which no ^0.Y of an external dependency on a package would accept.
             $replace[$package->name()] = Series::of($package)->alias();
-            $psr4[$package->namespace()] = $path . '/src/';
+            $psr4[$package->namespace()][] = $path . '/src/';
 
             if ($package->hasTests) {
-                $psr4Dev[$package->namespace()] = $path . '/tests/';
+                $psr4Dev[$package->namespace()][] = $path . '/tests/';
             }
 
             $prefix = static fn(string $file) => $path . '/' . $file;
@@ -201,12 +201,29 @@ final readonly class Generator
             'require' => self::sortRequire($requirements->require),
             'require-dev' => self::sortRequire($requirements->requireDev),
             'replace' => self::sortRequire($replace),
-            'autoload' => array_filter(['psr-4' => $psr4, 'files' => $files]),
-            'autoload-dev' => array_filter(['psr-4' => $psr4Dev, 'files' => $filesDev]),
+            'autoload' => array_filter(['psr-4' => self::psr4($psr4), 'files' => $files]),
+            'autoload-dev' => array_filter([
+                'psr-4' => [...$config->autoloadDev, ...self::psr4($psr4Dev)],
+                'files' => $filesDev,
+            ]),
             'config' => array_filter(['allow-plugins' => $config->allowPlugins]),
         ];
 
         return Json::encode(array_filter($composer, static fn(mixed $value) => $value !== []));
+    }
+
+    /**
+     * Thesis\ is the prefix of every package with a root entry, so a prefix may have several directories.
+     *
+     * @param array<non-empty-string, non-empty-list<non-empty-string>> $directories
+     * @return array<non-empty-string, non-empty-string|non-empty-list<non-empty-string>>
+     */
+    private static function psr4(array $directories): array
+    {
+        return array_map(
+            static fn(array $paths) => \count($paths) === 1 ? $paths[0] : $paths,
+            $directories,
+        );
     }
 
     /**

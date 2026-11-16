@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Dispatcher;
+namespace Thesis;
 
 use Thesis\Dispatcher\Internal\Listener;
 

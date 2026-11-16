@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis;
 
-use Thesis\Internal\ErrorHandler;
+use Thesis\Exceptionally\Internal\ErrorHandler;
 
 /**
  * Calls the function and throws its errors at the levels as \ErrorException, and its false too.

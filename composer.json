@@ -65,11 +65,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Thesis\\": "packages/exceptionally/src/",
+            "Thesis\\": [
+                "packages/dispatcher/src/",
+                "packages/exceptionally/src/"
+            ],
             "Thesis\\Amqp\\": "packages/amqp/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Cache\\": "packages/cache/src/",
-            "Thesis\\Dispatcher\\": "packages/dispatcher/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
@@ -103,11 +105,13 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Thesis\\": "packages/exceptionally/tests/",
+            "Thesis\\": [
+                "packages/dispatcher/tests/",
+                "packages/exceptionally/tests/"
+            ],
             "Thesis\\Amqp\\": "packages/amqp/tests/",
             "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Cache\\": "packages/cache/tests/",
-            "Thesis\\Dispatcher\\": "packages/dispatcher/tests/",
             "Thesis\\Formatter\\": "packages/formatter/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
@@ -125,7 +129,7 @@
             "packages/amqp/codegen/generate.php",
             "packages/async/tests/helpers.php",
             "packages/cache/tests/helpers.php",
-            "packages/exceptionally/tests/helpers.php",
+            "packages/exceptionally/tests/Exceptionally/helpers.php",
             "packages/io/tests/helpers.php",
             "packages/net/tests/helpers.php",
             "packages/time/tests/helpers.php"

@@ -30,6 +30,11 @@ or changing the public API of a package that others use. How the generator works
   `skills/`. Without `tests/` (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite
   and no `autoload-dev`. A package that continues an older repository of the same name keeps its `CHANGELOG.md`
   there (`exceptionally`).
+- `rootEntry: true` of the manifest puts the entry point named after the package in the root namespace
+  (`php.md`): the psr-4 prefix of `src/` and `tests/` becomes `Thesis\`, so the class is `src/Dispatcher.php`,
+  a function is in `src/api.php`, its test is `tests/DispatcherTest.php`, and the rest moves to `src/<Name>/`
+  and `tests/<Name>/` (`src/Dispatcher/Internal/`, `tests/Exceptionally/helpers.php`). The root `composer.json`
+  lists every such `src/` and `tests/` under `Thesis\`.
 - A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - Functions, constants and code run at load (the polyfill of `time`, the warning of `async` on Windows) live
@@ -65,6 +70,11 @@ or changing the public API of a package that others use. How the generator works
   its `types/` fixtures fail in `make phpstan` otherwise.
 
 ## Decisions
+
+- Rejected for the root entry: a free `namespace:` prefix in the manifest (it let `exceptionally` put
+  `Thesis\Internal\` and its test helpers in the root, where they would collide with those of another package),
+  and `Thesis\<Name>\` for `src/` with the root class in `classmap` (it saves `src/<Name>/`, but
+  `composer dump-autoload -o` of every user warns that the file does not comply with psr-4).
 
 - Rejected for eager files: one `autoload.files.php` per scope that `require_once`s them (most held
   a single line, a forgotten line showed only as an undefined function in the tests), listing every file

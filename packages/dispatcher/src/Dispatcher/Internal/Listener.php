@@ -8,7 +8,7 @@ use function Thesis\Formatter\formatReflectedFunction;
 use function Thesis\Formatter\formatReflectedParameter;
 
 /**
- * A listener of `Thesis\Dispatcher\Dispatcher` with the type of its parameter in the disjunctive normal form:
+ * A listener of `Thesis\Dispatcher` with the type of its parameter in the disjunctive normal form:
  * `(A&B)|C` is `[[A, B], [C]]`, so a plain class, a union and an intersection are matched by the same loop.
  *
  * @internal

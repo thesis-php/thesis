@@ -6,7 +6,7 @@
 Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class.
 
 ```php
-use Thesis\Dispatcher\Dispatcher;
+use Thesis\Dispatcher;
 
 $dispatcher = new Dispatcher(
     static function (UserRegistered $event): void { /* ... */ },

@@ -30,12 +30,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Thesis\\Dispatcher\\": "src/"
+            "Thesis\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Thesis\\Dispatcher\\": "tests/"
+            "Thesis\\": "tests/"
         }
     },
     "extra": {

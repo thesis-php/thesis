@@ -16,7 +16,6 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 ### Changed
 
 - **BC break:** Requires 64-bit PHP 8.5+.
-- **BC break:** `Thesis\Dispatcher` is now `Thesis\Dispatcher\Dispatcher`.
 - **BC break:** The listeners are given to the constructor: `new Dispatcher(...$listeners)`.
 - **BC break:** A listener gets the events of the type of its first parameter: a class, an interface, a union,
   an intersection, or every event for `object`. The constructor rejects a parameter that cannot take an event.

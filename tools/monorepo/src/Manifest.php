@@ -21,7 +21,10 @@ final readonly class Manifest
      *     (^0.Y below 1.0, ^X.0 above). A constraint within that range raises the lower bound: '^0.1.5'.
      *     php defaults to the constraint of monorepo.php
      * @param array<non-empty-string, non-empty-string> $requireDev the same, for the tests
-     * @param ?non-empty-string $namespace psr-4 prefix of src/ and tests/, defaults to Thesis\<PascalCaseDir>\
+     * @param bool $rootEntry the entry point of the package is named after it and lives in the root namespace:
+     *     the class Thesis\<PascalCaseDir> in src/<PascalCaseDir>.php or the function Thesis\<camelCaseDir>()
+     *     in src/api.php. The psr-4 prefix of src/ and tests/ is then Thesis\, the rest of them is
+     *     in src/<PascalCaseDir>/ and tests/<PascalCaseDir>/, the test of the entry is tests/<PascalCaseDir>Test.php
      * @param list<non-empty-string> $files autoload files outside src/, relative to the package. The PHP files
      *     of src/ without a class, an interface, a trait or an enum are autoloaded without being listed
      * @param list<non-empty-string> $devFiles the same, for autoload-dev and tests/
@@ -45,7 +48,7 @@ final readonly class Manifest
         public string $version,
         public array $require = [],
         public array $requireDev = [],
-        public ?string $namespace = null,
+        public bool $rootEntry = false,
         public array $files = [],
         public array $devFiles = [],
         public array $suggest = [],

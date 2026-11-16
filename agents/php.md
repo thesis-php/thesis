@@ -56,6 +56,12 @@ is not here: the tools fix the code anyway.
   or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
   (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
   Tests are not marked: they are not part of the API.
+- Everything of a package is in `Thesis\<Name>\`. The one exception is a package that *is* its entry point:
+  that symbol, named after the package, may live in the root namespace (`Thesis\Dispatcher`,
+  `Thesis\exceptionally()`). Nothing else goes to the root but its test (`Thesis\DispatcherTest`),
+  not `Internal`, not test helpers or fixtures: `Thesis\` is shared by all the packages, only the name
+  of a package is guaranteed to be free there. A package with several peers (`async`, `io`, `time`) keeps them
+  in its namespace. How the manifest declares it is in `manifests.md`.
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.

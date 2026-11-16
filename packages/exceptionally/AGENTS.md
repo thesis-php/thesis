@@ -31,7 +31,8 @@
 ## Decisions
 
 - The function is `Thesis\exceptionally()`, as in the old `thesis/exceptionally`: `Thesis\Exceptionally\...`
-  stutters. The manifest sets `namespace: 'Thesis\\'`.
+  stutters. The manifest sets `rootEntry: true`, the handler and the helpers of the tests are
+  in `Thesis\Exceptionally\`.
 - No dependency on `thesis/async`: the package is useful without an event loop. So the key of the fiber
   is inlined (`\Fiber::getCurrent() ?? $main`) instead of `Internal\fiberKey()` of async.
 - A fiber started inside the function does not inherit the levels: its errors are its own.
@@ -82,11 +83,12 @@
 ## Tests
 
 - `types/ExceptionallyTypes.php` holds `assertType()` fixtures, never executed: `make phpstan` checks them.
-- A deprecation is triggered by `deprecate()` of `tests/helpers.php`, never by `trigger_error()` in a test:
-  the `error_suppression` rule of PHP CS Fixer puts `@` before it, and a suppressed deprecation passes the tests
-  whatever `exceptionally()` does. The manifest excludes the file from the fixer.
+- A deprecation is triggered by `deprecate()` of `tests/Exceptionally/helpers.php`, never by `trigger_error()`
+  in a test: the `error_suppression` rule of PHP CS Fixer puts `@` before it, and a suppressed deprecation passes
+  the tests whatever `exceptionally()` does. The manifest excludes the file from the fixer.
 - Testo creates one instance of a test class for all its tests: `#[BeforeTest]` resets `$passedOn`.
-- `errorHandlers()` of `tests/helpers.php` returns the whole stack: `get_error_handler()` shows only the top.
+- `errorHandlers()` of `tests/Exceptionally/helpers.php` returns the whole stack: `get_error_handler()` shows
+  only the top.
 - A test that restores its own handler above a finished call makes one more call before asserting the stack:
   until then the handler of the finished call is on top. A failed test leaves its handlers behind,
   so a test of the stack compares with what was there before, not with the top alone.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis;
+namespace Thesis\Exceptionally;
 
 /**
  * An unsuppressed deprecation, see AGENTS.md.

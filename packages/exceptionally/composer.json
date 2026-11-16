@@ -39,7 +39,7 @@
             "Thesis\\": "tests/"
         },
         "files": [
-            "tests/helpers.php"
+            "tests/Exceptionally/helpers.php"
         ]
     },
     "extra": {

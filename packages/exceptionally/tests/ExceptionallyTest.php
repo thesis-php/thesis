@@ -9,6 +9,8 @@ use Testo\Expect;
 use Testo\Lifecycle\AfterTest;
 use Testo\Lifecycle\BeforeTest;
 use Testo\Test;
+use function Thesis\Exceptionally\deprecate;
+use function Thesis\Exceptionally\errorHandlers;
 
 #[Test]
 final class ExceptionallyTest

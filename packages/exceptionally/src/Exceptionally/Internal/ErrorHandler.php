@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Internal;
+namespace Thesis\Exceptionally\Internal;
 
 /**
  * The handler of `Thesis\exceptionally()`: one object per run of our copies on the stack, see AGENTS.md.

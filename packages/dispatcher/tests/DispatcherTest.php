@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Dispatcher;
+namespace Thesis;
 
 use Testo\Assert;
 use Testo\Data\DataProvider;
@@ -253,7 +253,7 @@ final class DispatcherTest
             // @phpstan-ignore class.notFound (a type that does not exist is the case)
             static function (Missing $event): void {},
             'event',
-            ' is typed with Thesis\Dispatcher\Missing, which is not a class or an interface.',
+            ' is typed with Thesis\Missing, which is not a class or an interface.',
         ];
 
         yield 'a variadic parameter' => [

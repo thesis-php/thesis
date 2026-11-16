@@ -140,6 +140,33 @@ final readonly class GeneratorTest
         ]);
     }
 
+    public static function mapsRootNamespaceToSrcAndTestsOfPackagesWithRootEntry(): void
+    {
+        $fixture = new Fixture()
+            ->file('packages/event-bus/tests/EventBusTest.php', "<?php\n\nfinal class EventBusTest {}\n")
+            ->file('packages/retry/tests/RetryTest.php', "<?php\n\nfinal class RetryTest {}\n")
+            ->package('event-bus', 'rootEntry: true')
+            ->package('retry', 'rootEntry: true')
+            ->package('time')
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $composer = Json::decode($files['packages/event-bus/composer.json'] ?? '', 'event-bus');
+        Assert::same($composer['autoload'] ?? null, ['psr-4' => ['Thesis\\' => 'src/']]);
+        Assert::same($composer['autoload-dev'] ?? null, ['psr-4' => ['Thesis\\' => 'tests/']]);
+        $root = Json::decode($files['composer.json'] ?? '', 'root');
+        Assert::same($root['autoload'] ?? null, [
+            'psr-4' => [
+                'Thesis\\' => ['packages/event-bus/src/', 'packages/retry/src/'],
+                'Thesis\Time\\' => 'packages/time/src/',
+            ],
+        ]);
+        Assert::same($root['autoload-dev'] ?? null, [
+            'psr-4' => ['Thesis\\' => ['packages/event-bus/tests/', 'packages/retry/tests/']],
+        ]);
+    }
+
     public static function requiresPlatformOfConfigInEveryComposerJson(): void
     {
         $fixture = new Fixture()
