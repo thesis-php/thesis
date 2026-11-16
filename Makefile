@@ -56,13 +56,11 @@ split: vendor ## Split packages/* of main into main of thesis-php/<name>, pushes
 	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN php) bin/monorepo split
 .PHONY: split
 
-# (The release takes COMMIT, BEFORE and PACKAGES through the environment, like a workflow passes its inputs.
-# After --, without globbing: an input that starts with - is not an option, a dispatch cannot pass --before)
+# (The release takes COMMIT through the environment, like the workflow. After --: a value that starts with -
+# is not an option)
 export COMMIT ?= HEAD
-export BEFORE ?=
-export PACKAGES ?=
-release: vendor ## Release the changelog headings a push added since BEFORE, or those of PACKAGES, at COMMIT; pushes only with SPLIT_REMOTE [COMMIT= BEFORE= PACKAGES=]
-	set -f; $(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN -e CHECKS_TOKEN php) bin/monorepo release $${BEFORE:+"--before=$$BEFORE"} -- "$$COMMIT" $$PACKAGES
+release: vendor ## Release the changelog headings at COMMIT without a tag; pushes only with SPLIT_REMOTE [COMMIT=]
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN php) bin/monorepo release -- "$$COMMIT"
 .PHONY: release
 
 github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs GITHUB_TOKEN [ARGS=--dry-run]

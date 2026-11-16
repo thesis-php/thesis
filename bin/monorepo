@@ -37,7 +37,6 @@ $application->addCommand(new ReleaseCommand(
     remote: $remote ?? 'https://github.com/' . Repositories::ORGANIZATION,
     push: $remote !== null,
     api: $api('GITHUB_TOKEN'),
-    checks: $api('CHECKS_TOKEN'),
 ));
 
 exit($application->run());

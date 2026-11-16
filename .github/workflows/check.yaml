@@ -4,17 +4,6 @@ on:
   push:
     branches: [main]
   pull_request: ~
-  # Repairs a release that failed: the version under [Unreleased] of the packages at a commit of main
-  # whose checks passed, with the tooling of the head of main. The checks do not run again: the image
-  # and the tools float, so an old commit could fail checks it passed.
-  workflow_dispatch:
-    inputs:
-      commit:
-        description: A commit of main whose checks passed
-        required: true
-      packages:
-        description: The packages to release, separated by spaces
-        required: true
 
 # Only a pull request cancels its older runs. A run of main is in a group of its own: a pending run of a shared group
 # would be replaced by a newer one, its release with it.
@@ -27,7 +16,6 @@ permissions:
 
 jobs:
   check:
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -40,7 +28,6 @@ jobs:
   # Time\Duration is a polyfill on PHP 8.5 and native on PHP 8.6: the code runs against both.
   # The Revolt drivers differ in signals, closed streams and the order of callbacks: the code runs on each.
   test:
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -54,21 +41,16 @@ jobs:
       - uses: actions/checkout@v6
       - run: make test
 
-  # A push of main releases the changelog headings it added (agents/releases.md), after every check passed.
-  # The name is that of Checks::RELEASE_JOB: a dispatch requires a run whose other jobs passed.
+  # A push of main whose checks passed releases every changelog heading that has no tag yet (agents/releases.md):
+  # a release that failed is released by the next push, or by a re-run of the failed jobs.
   release:
     needs: [check, test]
-    if: >-
-      ${{ !cancelled() && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch'
-      || (github.event_name == 'push' && needs.check.result == 'success' && needs.test.result == 'success')) }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Checks::passed() reads the runs of this workflow for a dispatch.
-      actions: read
     steps:
       # The whole history: the release splits the commit and compares it with the tags of the split repositories.
-      # The checkout of a dispatch is the head of main: its tooling releases an older commit.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -82,12 +64,8 @@ jobs:
           owner: thesis-php
           permission-administration: read
           permission-contents: write
-      # The inputs go through the environment, not into the script.
       - run: make release
         env:
-          COMMIT: ${{ inputs.commit || github.sha }}
-          BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
-          PACKAGES: ${{ inputs.packages }}
+          COMMIT: ${{ github.sha }}
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
-          CHECKS_TOKEN: ${{ github.token }}
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php

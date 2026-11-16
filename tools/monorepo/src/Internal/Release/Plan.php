@@ -19,10 +19,10 @@ use Thesis\Monorepo\Internal\Split\Split;
 use Thesis\Monorepo\Internal\Split\Splitter;
 
 /**
- * Decides what a push of main or a dispatch releases (agents/releases.md). Everything is read from the tree
- * of the commit and from the split repositories, nothing from the working tree: the tooling is that of the head
- * of main, the commit may be older. Everything is checked before anything is pushed, and a push is released whole
- * or not at all.
+ * Decides what a push of main releases (agents/releases.md): the version right under [Unreleased] of every package
+ * that has no tag in its split repository yet. Everything is read from the tree of the commit and from the split
+ * repositories, nothing from the working tree. Everything is checked before anything is pushed. A package that
+ * is refused keeps back itself and the packages that require it, the others are released.
  *
  * @internal
  */
@@ -33,9 +33,14 @@ final class Plan
     private const string ORIGIN_MAIN = 'refs/remotes/origin/' . Repositories::DEFAULT_BRANCH;
 
     /**
-     * @var list<string>
+     * @var list<Release> dependencies first
      */
-    private array $errors = [];
+    public private(set) array $releases = [];
+
+    /**
+     * @var array<string, list<string>> package => every reason not to release it
+     */
+    public private(set) array $refusals = [];
 
     /**
      * @var array<string, Refs> package => the refs of its split repository
@@ -43,12 +48,17 @@ final class Plan
     private array $refs = [];
 
     /**
+     * @var array<string, true> package => whether ls-remote of its split repository ran, failed or not
+     */
+    private array $listed = [];
+
+    /**
      * @var array<string, non-empty-string> package => its split commit
      */
     private array $splits = [];
 
     /**
-     * @var array<string, Version> package => the version the push releases
+     * @var array<string, Version> package => the version without a tag that the push releases
      */
     private array $versions = [];
 
@@ -59,52 +69,76 @@ final class Plan
 
     /**
      * @param non-empty-string $commit of main, resolved
-     * @param ?non-empty-string $before the head of main before the push, resolved: the push releases the headings
-     *     that its changelogs did not have
-     * @param list<string> $packages without $before: release the version under [Unreleased] of each (a dispatch)
-     * @return list<Release> dependencies first
-     * @throws MonorepoException with every reason not to release, one per line
      */
-    public static function of(
-        Git $git,
-        Api $api,
-        Remote $remote,
-        string $commit,
-        ?string $before,
-        array $packages,
-    ): array {
+    public static function of(Git $git, Api $api, Remote $remote, string $commit): self
+    {
         $plan = new self($git, $git->catFile(), $api, $remote, $commit);
-        $changelogs = $plan->changelogs($before, $packages);
+        $changelogs = $plan->changelogs();
 
         if ($changelogs === []) {
-            $plan->throwErrors();
-
-            return [];
+            return $plan;
         }
 
         $plan->splits = Splitter::split($git, $commit);
         $plan->mains = $plan->splitMains();
         $composers = [];
 
-        foreach ($changelogs as $package => $changelog) {
-            $composers[$package] = $plan->composer($commit, $package);
-            $plan->versions[$package] = $changelog->top()['version'];
+        foreach (array_keys($changelogs) as $package) {
+            try {
+                $composers[$package] = $plan->composer($commit, $package);
+            } catch (MonorepoException $exception) {
+                $plan->refusals[$package][] = $exception->getMessage();
+                unset($changelogs[$package]);
+            }
         }
 
-        $plan->fetchRefs(array_keys($changelogs), $composers);
+        $plan->fetchRefs(array_keys($changelogs));
         $releases = [];
+        $pending = [];
 
         foreach ($changelogs as $package => $changelog) {
-            $release = $plan->release($package, $changelog, $composers[$package] ?? []);
+            try {
+                $state = $plan->state($package, $changelog);
+            } catch (MonorepoException $exception) {
+                $plan->refusals[$package][] = \sprintf('%s: %s', $package, $exception->getMessage());
+
+                continue;
+            }
+
+            if ($state instanceof Version) {
+                $pending[$package] = $changelog;
+                $plan->versions[$package] = $state;
+            } elseif ($state !== null) {
+                $releases[$package] = $state;
+            }
+        }
+
+        $dependencies = [];
+
+        foreach (array_keys($pending) as $package) {
+            $dependencies = [...$dependencies, ...$plan->dependencies($composers[$package] ?? [])];
+        }
+
+        $plan->fetchRefs(array_values(array_unique($dependencies)));
+
+        foreach ($pending as $package => $changelog) {
+            try {
+                $release = $plan->release($package, $changelog, $composers[$package] ?? []);
+            } catch (MonorepoException $exception) {
+                $plan->refusals[$package][] = \sprintf('%s: %s', $package, $exception->getMessage());
+
+                continue;
+            }
 
             if ($release !== null) {
                 $releases[$package] = $release;
             }
         }
 
-        $plan->throwErrors();
+        $plan->refuseDependents($releases, $composers);
+        $plan->releases = self::dependenciesFirst($releases);
 
-        return self::dependenciesFirst($releases, $composers);
+        return $plan;
     }
 
     /**
@@ -119,57 +153,145 @@ final class Plan
     ) {}
 
     /**
-     * @param list<string> $packages
-     * @return array<non-empty-string, Changelog> package => its changelog at the commit, of what is released
+     * @return array<non-empty-string, Changelog> package => its changelog at the commit, of those with a version
      */
-    private function changelogs(?string $before, array $packages): array
+    private function changelogs(): array
     {
-        $existing = array_filter(
-            array_map(strval(...), array_keys($this->catFile->subtrees($this->commit . ':' . Monorepo::PACKAGES_DIR))),
-            static fn(string $package) => $package !== '',
-        );
+        $tree = $this->catFile->subtrees($this->commit . ':' . Monorepo::PACKAGES_DIR);
+        $packages = array_map(strval(...), array_keys($tree));
         $changelogs = [];
 
-        if ($before === null) {
-            foreach ($packages as $package) {
-                if ($package === '' || !\in_array($package, $existing, strict: true)) {
-                    $this->errors[] = \sprintf('%s: no such package at %s.', $package, $this->commit);
+        foreach ($packages as $package) {
+            if ($package === '') {
+                continue;
+            }
 
-                    continue;
-                }
+            $path = self::path($package) . '/' . self::CHANGELOG;
+            $content = $this->catFile->read($this->commit . ':' . $path, 'blob');
 
-                $changelog = $this->changelog($this->commit, $package);
+            try {
+                $changelog = $content === null ? null : Changelog::parse($content, $path);
+            } catch (MonorepoException $exception) {
+                $this->refusals[$package][] = $exception->getMessage();
 
-                if ($changelog === null) {
-                    $this->errors[] = \sprintf('%s: no %s at %s.', $package, self::CHANGELOG, $this->commit);
+                continue;
+            }
 
-                    continue;
-                }
-
+            if ($changelog?->topVersion() !== null) {
                 $changelogs[$package] = $changelog;
             }
-        } else {
-            foreach ($existing as $package) {
-                $changelog = $this->changelog($this->commit, $package);
-                $top = $changelog?->topVersion();
-                $added = $top !== null && !$this->hadVersion($before, $package, $top);
-
-                if ($changelog !== null && $added) {
-                    $changelogs[$package] = $changelog;
-                }
-            }
         }
 
-        foreach ($changelogs as $package => $changelog) {
-            try {
-                $changelog->top();
-            } catch (MonorepoException $exception) {
-                $this->errors[] = $exception->getMessage();
-                unset($changelogs[$package]);
-            }
+        return $changelogs;
+    }
+
+    /**
+     * What to do with the version right under [Unreleased].
+     *
+     * @param non-empty-string $package
+     * @return Version|Release|null a version without a tag; the GitHub Release of a tag that an earlier run pushed
+     *     but did not release; null when it is released or refused, or an older package of the name has the version
+     */
+    private function state(string $package, Changelog $changelog): null|Version|Release
+    {
+        $version = Version::parse($changelog->topVersion() ?? '');
+        $refs = $this->refs[$package] ?? null;
+
+        if ($version === null) {
+            // Refused with the reason why the heading is not of a release.
+            $this->notes($package, $changelog);
+
+            return null;
         }
 
-        return $this->errors === [] ? $changelogs : [];
+        if ($refs === null) {
+            return null;
+        }
+
+        $tags = $refs->tagsOf($version);
+
+        if ($tags === []) {
+            return $version;
+        }
+
+        $split = $this->splits[$package] ?? '';
+
+        foreach ($tags as $tag) {
+            if (!$this->isOurs($package, $tag['commit'], $split)) {
+                continue;
+            }
+
+            $notes = $this->notes($package, $changelog);
+            $tagNotes = $this->tagNotes($version, $tag['commit']);
+
+            // A tag of a later split (a newer push released it) may have notes amended before its release.
+            $since = $this->isAncestor($tag['commit'], $split);
+
+            if ($since && $notes !== null && $tagNotes !== null && $notes !== $tagNotes) {
+                $this->refusals[$package][] = \sprintf(
+                    '%s %s: its notes changed since the tag %s: list the changes after it under [Unreleased].',
+                    $package,
+                    $version->toString(),
+                    $tag['name'],
+                );
+            }
+
+            $repository = Repositories::ORGANIZATION . '/' . $package;
+            $existing = \sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($tag['name']));
+
+            if ($this->api->get($existing) !== null) {
+                return null;
+            }
+
+            $notes = $tagNotes ?? $notes;
+
+            return $notes === null ? null : new Release(
+                package: $package,
+                version: $version,
+                tag: $tag['name'],
+                commit: $tag['commit'],
+                notes: $notes,
+                tagged: true,
+                latest: self::isLatest($version, $refs),
+                requires: [],
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * The notes of the version in the changelog of its tag, the changelog of the split: the GitHub Release
+     * describes what the tag has, and a change listed under the heading after the tag is not in it.
+     *
+     * @return ?non-empty-string null if the tag has no changelog with the version on top (not written by the release)
+     */
+    private function tagNotes(Version $version, string $tag): ?string
+    {
+        $content = $this->catFile->read($tag . ':' . self::CHANGELOG, 'blob');
+
+        try {
+            $top = $content === null ? null : Changelog::parse($content, self::CHANGELOG)->top();
+        } catch (MonorepoException) {
+            return null;
+        }
+
+        return $top !== null && $top['version']->equals($version) ? $top['notes'] : null;
+    }
+
+    /**
+     * @return ?non-empty-string the notes of the version under [Unreleased], null if the package is refused
+     *     because it is not a heading of a release
+     */
+    private function notes(string $package, Changelog $changelog): ?string
+    {
+        try {
+            return $changelog->top()['notes'];
+        } catch (MonorepoException $exception) {
+            $this->refusals[$package][] = $exception->getMessage();
+
+            return null;
+        }
     }
 
     /**
@@ -178,7 +300,8 @@ final class Plan
      */
     private function release(string $package, Changelog $changelog, array $composer): ?Release
     {
-        ['version' => $version, 'notes' => $notes] = $changelog->top();
+        $version = $this->versions[$package] ?? throw new MonorepoException(\sprintf('%s: no version.', $package));
+        $notes = $this->notes($package, $changelog);
         $split = $this->splits[$package] ?? throw new MonorepoException(\sprintf('%s: no split.', $package));
         $refs = $this->refs[$package] ?? null;
         $series = Series::ofComposer($composer);
@@ -186,6 +309,17 @@ final class Plan
 
         if ($changelog->unreleased !== '') {
             $errors[] = \sprintf('[Unreleased] of %s lists changes that are not part of it.', $changelog->path);
+        }
+
+        $below = Version::parse($changelog->versionBelowTop() ?? '');
+
+        // Only the top heading is released: one under it without a tag would never be.
+        if ($below !== null && $refs !== null && $refs->tagsOf($below) === []) {
+            $errors[] = \sprintf(
+                '%s under it has no tag: release it first by a re-run of the job of its push, or merge it into %s.',
+                $below->toString(),
+                $version->toString(),
+            );
         }
 
         if ($series === null) {
@@ -202,26 +336,7 @@ final class Plan
             );
         }
 
-        $tag = $version->tag();
-        $tagged = false;
-
-        foreach ($refs?->tagsOf($version) ?? [] as $existing) {
-            if ($existing['commit'] === $split) {
-                $tag = $existing['name'];
-                $tagged = true;
-            } else {
-                $errors[] = \sprintf(
-                    'the tag %s exists at %s, not at the split %s.',
-                    $existing['name'],
-                    $existing['commit'],
-                    $split,
-                );
-            }
-        }
-
-        // A tag at the split is published already: the checks below guard a new tag, and a later version
-        // of the package or of a dependency must not keep a re-run from making the steps after it.
-        if ($series !== null && $refs !== null && !$tagged) {
+        if ($series !== null && $refs !== null) {
             $errors = [
                 ...$errors,
                 ...$this->foreignRefs($package, $version, $series, $refs, $split),
@@ -230,30 +345,73 @@ final class Plan
             ];
         }
 
-        if (!$tagged) {
-            $errors = [...$errors, ...$this->unreleasedDependencies($version, $composer)];
+        $errors = [...$errors, ...$this->unreleasedDependencies($version, $composer)];
+
+        foreach ($errors as $error) {
+            $this->refusals[$package][] = \sprintf('%s %s: %s', $package, $version->toString(), $error);
         }
 
-        if ($errors !== []) {
-            foreach ($errors as $error) {
-                $this->errors[] = \sprintf('%s %s: %s', $package, $version->toString(), $error);
-            }
-
+        if ($notes === null || isset($this->refusals[$package])) {
             return null;
         }
-
-        $highest = $refs?->highest('*', stable: true, except: $version);
 
         return new Release(
             package: $package,
             version: $version,
-            tag: $tag,
+            tag: $version->tag(),
             commit: $split,
             notes: $notes,
-            tagged: $tagged,
-            latest: !$version->preRelease
-                && ($highest === null || Comparator::greaterThan(Refs::normalize($version), $highest['normalized'])),
+            tagged: false,
+            latest: $refs === null || self::isLatest($version, $refs),
+            requires: $this->dependencies($composer),
         );
+    }
+
+    private static function isLatest(Version $version, Refs $refs): bool
+    {
+        $highest = $refs->highest('*', stable: true, except: $version);
+
+        return !$version->preRelease
+            && ($highest === null || Comparator::greaterThan(Refs::normalize($version), $highest['normalized']));
+    }
+
+    /**
+     * A package whose dependency is refused is refused too: it would require a version that is not there.
+     *
+     * @param array<non-empty-string, Release> $releases
+     * @param array<string, array<array-key, mixed>> $composers
+     */
+    private function refuseDependents(array &$releases, array $composers): void
+    {
+        do {
+            $refused = false;
+
+            foreach ($this->versions as $package => $version) {
+                if (isset($this->refusals[$package])) {
+                    continue;
+                }
+
+                foreach (self::require($composers[$package] ?? []) as $name => $constraint) {
+                    $dependency = $this->dependency($name);
+                    $dependencyVersion = $dependency === null ? null : ($this->versions[$dependency] ?? null);
+
+                    if ($dependency !== null && $dependencyVersion !== null && isset($this->refusals[$dependency])) {
+                        $this->refusals[$package][] = \sprintf(
+                            '%s %s: it requires %s %s, whose release %s is refused.',
+                            $package,
+                            $version->toString(),
+                            $name,
+                            $constraint,
+                            $dependencyVersion->toString(),
+                        );
+                        unset($releases[$package]);
+                        $refused = true;
+
+                        break;
+                    }
+                }
+            }
+        } while ($refused);
     }
 
     /**
@@ -437,7 +595,7 @@ final class Plan
 
             $released = $this->versions[$dependency] ?? null;
 
-            // A pre-release of the same push does not count for a stable release: its users install a stable tag.
+            // A pre-release released with it does not count for a stable release: its users install a stable tag.
             if ($released !== null
                 && (!$stable || !$released->preRelease)
                 && Semver::satisfies(Refs::normalize($released), $constraint)
@@ -450,7 +608,7 @@ final class Plan
 
             if ($tag === null) {
                 $errors[] = \sprintf(
-                    'it requires %s %s, which no %s tag meets: release %s of it in the same push.',
+                    'it requires %s %s, which no %s tag meets: release %s of it too.',
                     $name,
                     $constraint,
                     $stable ? 'stable' : 'existing',
@@ -458,7 +616,7 @@ final class Plan
                 );
             } elseif (!$this->shipsTheSame($dependency, $tag['commit'])) {
                 $errors[] = \sprintf(
-                    '%s changed since %s in the files it ships: release %s of it in the same push.',
+                    '%s changed since %s in the files it ships: release %s of it too.',
                     $name,
                     $tag['name'],
                     $what,
@@ -543,42 +701,51 @@ final class Plan
     }
 
     /**
-     * Lists the refs of every released package and of every monorepo package they require, all at once.
+     * Lists the refs of the split repositories of the packages, all at once, those listed already are skipped.
      *
-     * @param list<non-empty-string> $packages
-     * @param array<string, array<array-key, mixed>> $composers
+     * @param list<string> $packages
      */
-    private function fetchRefs(array $packages, array $composers): void
+    private function fetchRefs(array $packages): void
     {
-        $repositories = $packages;
-
-        foreach ($composers as $composer) {
-            foreach (array_keys(self::require($composer)) as $name) {
-                $dependency = $this->dependency($name);
-
-                if ($dependency !== null) {
-                    $repositories[] = $dependency;
-                }
-            }
-        }
-
         $commands = [];
 
-        foreach (array_unique($repositories) as $package) {
-            $commands[$package] = ['ls-remote', $this->remote->url($package), 'refs/heads/*', 'refs/tags/*'];
+        foreach ($packages as $package) {
+            if (!isset($this->listed[$package])) {
+                $this->listed[$package] = true;
+                $commands[$package] = ['ls-remote', $this->remote->url($package), 'refs/heads/*', 'refs/tags/*'];
+            }
         }
 
         foreach ($this->git->with($this->remote->env)->runAll($commands) as $package => $result) {
             $repository = Repositories::ORGANIZATION . '/' . $package;
 
             if ($result->code !== 0) {
-                $this->errors[] = \sprintf('%s: git ls-remote: %s', $repository, trim($result->stderr));
+                $this->refusals[$package][] = \sprintf('%s: git ls-remote: %s', $repository, trim($result->stderr));
 
                 continue;
             }
 
             $this->refs[$package] = Refs::parse($result->stdout, $repository);
         }
+    }
+
+    /**
+     * @param array<array-key, mixed> $composer
+     * @return list<non-empty-string> the directories of the monorepo packages it requires
+     */
+    private function dependencies(array $composer): array
+    {
+        $dependencies = [];
+
+        foreach (array_keys(self::require($composer)) as $name) {
+            $dependency = $this->dependency($name);
+
+            if ($dependency !== null) {
+                $dependencies[] = $dependency;
+            }
+        }
+
+        return $dependencies;
     }
 
     /**
@@ -605,52 +772,11 @@ final class Plan
     }
 
     /**
-     * A changelog that the push repaired is read by its headings alone: the push is not refused for a state
-     * its head no longer has, and a version it had before is not added by the repair.
-     */
-    private function hadVersion(string $commit, string $package, string $version): bool
-    {
-        $path = self::path($package) . '/' . self::CHANGELOG;
-        $content = $this->catFile->read($commit . ':' . $path, 'blob');
-
-        if ($content === null) {
-            return false;
-        }
-
-        try {
-            return Changelog::parse($content, $path)->has($version);
-        } catch (MonorepoException) {
-            return preg_match('/^## \[' . preg_quote($version, '/') . '\]/m', $content) === 1;
-        }
-    }
-
-    private function changelog(string $commit, string $package): ?Changelog
-    {
-        $path = self::path($package) . '/' . self::CHANGELOG;
-        $content = $this->catFile->read($commit . ':' . $path, 'blob');
-
-        try {
-            return $content === null ? null : Changelog::parse($content, $path);
-        } catch (MonorepoException $exception) {
-            $this->errors[] = $exception->getMessage();
-
-            return null;
-        }
-    }
-
-    /**
      * @return non-empty-string
      */
     private static function path(string $package): string
     {
         return Monorepo::PACKAGES_DIR . '/' . $package;
-    }
-
-    private function throwErrors(): void
-    {
-        if ($this->errors !== []) {
-            throw new MonorepoException(implode("\n", $this->errors));
-        }
     }
 
     /**
@@ -673,30 +799,18 @@ final class Plan
 
     /**
      * @param array<non-empty-string, Release> $releases
-     * @param array<string, array<array-key, mixed>> $composers
      * @return list<Release>
      */
-    private static function dependenciesFirst(array $releases, array $composers): array
+    private static function dependenciesFirst(array $releases): array
     {
         ksort($releases);
-        $prefix = Monorepo::VENDOR . '/';
-        $dependencies = [];
-
-        foreach (array_keys($releases) as $package) {
-            foreach (array_keys(self::require($composers[$package] ?? [])) as $name) {
-                if (str_starts_with($name, $prefix)) {
-                    $dependencies[$package][] = substr($name, \strlen($prefix));
-                }
-            }
-        }
-
         $ordered = [];
 
         while ($releases !== []) {
             $waiting = array_keys($releases);
             $ready = array_filter(
                 $releases,
-                static fn(Release $release) => array_intersect($dependencies[$release->package] ?? [], $waiting) === [],
+                static fn(Release $release) => array_intersect($release->requires, $waiting) === [],
             );
 
             if ($ready === []) {

@@ -6,89 +6,54 @@ namespace Thesis\Monorepo\Internal\Command;
 
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Thesis\Monorepo\Internal\Git\Git;
 use Thesis\Monorepo\Internal\GitHub\Api;
-use Thesis\Monorepo\Internal\GitHub\Checks;
+use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Release\Plan;
 use Thesis\Monorepo\Internal\Release\Publisher;
+use Thesis\Monorepo\Internal\Release\Release;
 use Thesis\Monorepo\Internal\Split\Remote;
 use Thesis\Monorepo\Internal\Split\Split;
 
 /**
  * @internal
  */
-#[AsCommand('release', 'Release the changelog headings that a push of main added, or those of the given packages')]
+#[AsCommand('release', 'Release the changelog headings of main that have no tag yet')]
 final readonly class ReleaseCommand
 {
     /**
      * @param string $remote where the split repositories are, with the credentials to push when $push
      * @param bool $push false to only print what would be released
      * @param ?Api $api GITHUB_TOKEN of the app: the split repositories and their releases
-     * @param ?Api $checks a token that reads the runs of the checks of the monorepo, for a dispatch
      */
     public function __construct(
         private string $root,
         private string $remote,
         private bool $push,
         private ?Api $api,
-        private ?Api $checks,
     ) {}
 
-    /**
-     * @param list<string> $packages
-     */
     public function __invoke(
         SymfonyStyle $io,
-        #[Argument('A commit of main to release')]
+        #[Argument('A commit of main whose checks passed')]
         string $commit,
-        #[Argument('Release the version under [Unreleased] of these packages, instead of --before')]
-        array $packages = [],
-        #[Option('The head of main before the push: the push releases the changelog headings it added')]
-        ?string $before = null,
     ): int {
         $git = new Git($this->root);
 
         try {
             $remote = Remote::parse($this->remote);
             $api = $this->api ?? throw new MonorepoException('Set GITHUB_TOKEN: it reads the split repositories.');
-
-            if (($before === null) === ($packages === [])) {
-                throw new MonorepoException('Give either --before (a push) or the packages to release (a dispatch).');
-            }
-
             $commit = self::commit($git, $commit);
 
             if (!$git->succeeds(['merge-base', '--is-ancestor', $commit, Split::REF])) {
                 throw new MonorepoException(\sprintf('%s is not reachable from %s.', $commit, Split::REF));
             }
 
-            if ($before === null) {
-                $checks = $this->checks ?? throw new MonorepoException(
-                    'Set CHECKS_TOKEN: a dispatch releases only a commit whose checks passed.',
-                );
-
-                if (!Checks::passed($checks, $commit)) {
-                    throw new MonorepoException(\sprintf(
-                        'No run of %s passed all its checks for %s: a dispatch releases only a commit that passed.',
-                        Checks::WORKFLOW,
-                        $commit,
-                    ));
-                }
-            }
-
-            $releases = Plan::of(
-                git: $git,
-                api: $api,
-                remote: $remote,
-                commit: $commit,
-                before: $before === null ? null : self::commit($git, $before),
-                packages: $packages,
-            );
+            $plan = Plan::of($git, $api, $remote, $commit);
         } catch (MonorepoException $exception) {
             // Raw and unwrapped: one reason per line, with paths and versions that must stay whole.
             $io->writeln($exception->getMessage(), OutputInterface::OUTPUT_RAW);
@@ -97,26 +62,69 @@ final readonly class ReleaseCommand
             return Command::FAILURE;
         }
 
-        if ($releases === []) {
+        foreach ($plan->refusals as $reasons) {
+            $io->writeln(implode("\n", $reasons), OutputInterface::OUTPUT_RAW);
+        }
+
+        if ($plan->releases === [] && $plan->refusals === []) {
             $io->writeln('Nothing to release.');
 
             return Command::SUCCESS;
         }
 
-        foreach ($releases as $release) {
+        foreach ($plan->releases as $release) {
             $io->writeln(\sprintf('%s: %s at %s', $release->package, $release->tag, $release->commit));
         }
 
-        if (!$this->push) {
-            $io->writeln('Set SPLIT_REMOTE to release.');
+        $failed = $this->push ? self::publish($io, $git, $remote, $api, $plan->releases) : [];
 
-            return Command::SUCCESS;
+        if (!$this->push && $plan->releases !== []) {
+            $io->writeln('Set SPLIT_REMOTE to release.');
         }
 
-        $publisher = new Publisher($git, $remote, $api);
+        if ($plan->refusals !== []) {
+            $io->error(\sprintf(
+                'Not released: %s. The next push of main that passes the checks releases what it fixes.',
+                implode(', ', array_keys($plan->refusals)),
+            ));
+        }
 
-        // Dependencies first, and none after a failure: a dependent would require a version that is not there.
+        if ($failed !== []) {
+            $io->error(\sprintf(
+                'The release of %s failed. Re-run the job, or the next push of main releases it.',
+                implode(', ', $failed),
+            ));
+        }
+
+        return $plan->refusals === [] && $failed === [] ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    /**
+     * Dependencies first. A package that failed keeps back the packages that require it: they would require
+     * a version that is not there.
+     *
+     * @param list<Release> $releases
+     * @return list<string> the package and the tag of every release that failed
+     */
+    private static function publish(SymfonyStyle $io, Git $git, Remote $remote, Api $api, array $releases): array
+    {
+        $publisher = new Publisher($git, $remote, $api);
+        $failed = [];
+
         foreach ($releases as $release) {
+            $failedDependencies = array_intersect($release->requires, array_keys($failed));
+
+            if ($failedDependencies !== []) {
+                $io->writeln(\sprintf(
+                    '%s: not released: it requires %s, whose release failed.',
+                    $release->package,
+                    implode(', ', array_map(self::name(...), $failedDependencies)),
+                ), OutputInterface::OUTPUT_RAW);
+                $failed[$release->package] = $release->package . ' ' . $release->tag;
+
+                continue;
+            }
+
             try {
                 foreach ($publisher->publish($release) as $step) {
                     $io->writeln(\sprintf('%s: %s', $release->package, $step), OutputInterface::OUTPUT_RAW);
@@ -124,17 +132,16 @@ final readonly class ReleaseCommand
             } catch (MonorepoException $exception) {
                 $error = \sprintf('%s: %s', $release->package, $exception->getMessage());
                 $io->writeln($error, OutputInterface::OUTPUT_RAW);
-                $io->error(\sprintf(
-                    'The release of %s %s failed. Re-run the job or dispatch the release of the same commit.',
-                    $release->package,
-                    $release->tag,
-                ));
-
-                return Command::FAILURE;
+                $failed[$release->package] = $release->package . ' ' . $release->tag;
             }
         }
 
-        return Command::SUCCESS;
+        return array_values($failed);
+    }
+
+    private static function name(string $package): string
+    {
+        return Monorepo::VENDOR . '/' . $package;
     }
 
     /**

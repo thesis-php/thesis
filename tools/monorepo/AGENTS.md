@@ -122,25 +122,32 @@ Decisions:
 
 ## release
 
-`make release` (`Internal\Release`, `ReleaseCommand`) releases the changelog headings that a push of `main` added
-(`BEFORE=<the head before the push>`), or those of `PACKAGES="a b"` (a dispatch), at `COMMIT` (default `HEAD`):
-the rules are in `agents/releases.md`. Without `SPLIT_REMOTE` it reads the public repositories and only prints
-what it would release, it needs `GITHUB_TOKEN` either way (`Repositories::isSplit()`), a dispatch also
-`CHECKS_TOKEN` (the `github.token` of the workflow with `actions: read`: the app has no access to the runs
-of the monorepo). CI runs it as the job `release` of `.github/workflows/check.yaml`.
+`make release` (`Internal\Release`, `ReleaseCommand`) releases the changelog headings at `COMMIT` (default `HEAD`)
+that have no tag in the split repositories: the rules are in `agents/releases.md`. Without `SPLIT_REMOTE` it reads
+the public repositories and only prints what it would release, it needs `GITHUB_TOKEN` either way
+(`Repositories::isSplit()`, the GitHub Releases): `GITHUB_TOKEN=$(gh auth token) COMMIT=origin/main make release`.
+CI runs it as the job `release` of `.github/workflows/check.yaml`.
 
 Invariants:
 
-- Everything is read from the objects of the commit, never from the working tree or by running PHP of it:
-  a dispatch releases an older commit with the tooling of the head. The series is the `branch-alias`
-  of the generated `composer.json` (`Series::ofComposer()`), which CI keeps in sync with the manifest.
-- `Plan::of()` decides everything and throws with every reason at once before `Publisher` pushes anything.
+- Everything is read from the objects of the commit, never from the working tree or by running PHP of it.
+  The series is the `branch-alias` of the generated `composer.json` (`Series::ofComposer()`), which CI keeps
+  in sync with the manifest.
+- `Plan::of()` decides everything before `Publisher` pushes anything: the releases, dependencies first,
+  and the refusals per package, a refused dependency refusing its dependents. A `MonorepoException`
+  while deciding about one package (GitHub, `ls-remote`, its `composer.json`) is a refusal of that package.
+  Only a commit not of `main` or a cycle of packages releases nothing.
+- Whether a heading is released is decided by its tag alone, `ls-remote` of the packages with a heading:
+  a tag of an older package of the same name (not in the history of a split of `main`) skips the heading,
+  a tag of ours without a GitHub Release (`GET releases/tags/<tag>`) continues it at the commit of the tag,
+  with the notes of `CHANGELOG.md` of the split commit of the tag. A tag of ours is always local (`isOurs()`),
+  so its changelog is read from the objects.
 - The refs of a split repository are listed by `git ls-remote`, nothing is fetched: a tag the split wrote
   points to a split commit, which the release computes again locally, so a tag whose commit is not local
   is not ours and fails `merge-base --is-ancestor`. A clone has only the splits it computes: the release splits
   the commit and every head of main it knows (`refs/heads/main`, `refs/remotes/origin/main`), so a tag
-  of a later commit is ours too. It fetches `main` of `origin` first: `actions/checkout` of a push sets both refs
-  to the commit of the push even when `main` has moved on, so only a dispatch would see the newer one.
+  of a later commit is ours too. It fetches `main` of `origin` first: `actions/checkout` of a push (and of a re-run
+  of it) sets both refs to the commit of the push even when `main` has moved on, so no run would see the newer one.
   `ReleaseCommandTest` runs these cases in a clone (`new Repository(cloneOf:)`) shaped as each checkout leaves it:
   in the repository that wrote the tags every split is local, and the bug does not show.
   The previous release's `composer.json` is read from there too.

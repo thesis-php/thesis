@@ -110,6 +110,14 @@ final readonly class Changelog
     }
 
     /**
+     * The version of the section under the one right under [Unreleased], null if there is none.
+     */
+    public function versionBelowTop(): ?string
+    {
+        return $this->versions[1] ?? null;
+    }
+
+    /**
      * The version right under [Unreleased] with the notes of its release.
      *
      * @return array{version: Version, notes: non-empty-string}
