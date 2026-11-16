@@ -21,6 +21,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   dispatches from other fibers see a consistent table. A ban on suspending belongs to the user of the dispatcher
   (the trace of thesis/async calls its listeners inside a wait), not here.
 - An error names the listener or its parameter through thesis/formatter, never by hand.
+- The constructor rejects every listener that would not do its work when called, not only a wrong parameter:
+  a generator is rejected, its body would never run. Trap: `?object` is a `ReflectionNamedType` named `object`,
+  so a check by name alone takes it for every event; only `mixed` allows `null` and still means every event.
 
 ## Decisions
 
@@ -35,7 +38,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of its type and nothing comes back: an observer, named as in PSR-14, Symfony and Laravel. A package that uses
   the dispatcher may call its points hooks in its own docs, the objects stay events. A callback that changes
   the outcome is another mechanism, not a rename of this one.
+- The constructor takes an `iterable` of listeners, not `callable ...$listeners`: no parameter can follow
+  a variadic one, so an option added later would go before the listeners and break every call.
+  An iterable, not an array: containers give their tagged services as one.
 - Rejected: priorities, until someone needs them.
+- Rejected: not caching `listens()` of a class that is not declared yet. Its parameter is a `class-string`,
+  and `is_a()` autoloads it, so only a class declared later by `eval()` or a condition is cached wrong:
+  a check of `class_exists()` per miss for a case the type already excludes.
 - Rejected: collecting the exceptions of all the listeners: the first one is thrown, the rest are not called,
   so the failure points at the listener that failed.
 - Rejected: stripping `null` from `?A`: the dispatcher never passes `null`, a nullable type is a mistake

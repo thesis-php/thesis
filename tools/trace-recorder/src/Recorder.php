@@ -61,7 +61,7 @@ final class Recorder
     public static function record(callable $program): array
     {
         $recorder = new self();
-        run(static fn() => observe(new Dispatcher($recorder), $program));
+        run(static fn() => observe(new Dispatcher([$recorder]), $program));
 
         return ['rows' => array_values($recorder->rows), 'events' => $recorder->events];
     }

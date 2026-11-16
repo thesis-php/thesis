@@ -45,7 +45,7 @@ final class CancelledFirstTest
     {
         $checker = new TraceChecker();
 
-        Assert::same(observe(new Dispatcher($checker), self::mismatches(...)), []);
+        Assert::same(observe(new Dispatcher([$checker]), self::mismatches(...)), []);
         Assert::true($checker->events > 0);
         Assert::same($checker->violations, []);
         Assert::same($checker->unfinished(), []);

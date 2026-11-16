@@ -261,9 +261,9 @@ final class TraceTest
         $inner = new TraceLog();
 
         $result = null;
-        observe(new Dispatcher($outer), static function () use ($inner, &$result) {
+        observe(new Dispatcher([$outer]), static function () use ($inner, &$result) {
             shield(static fn() => null);
-            $result = observe(new Dispatcher($inner), static fn() => shield(static fn() => 42));
+            $result = observe(new Dispatcher([$inner]), static fn() => shield(static fn() => 42));
             shield(static fn() => null);
         });
         shield(static fn() => null);
@@ -280,7 +280,7 @@ final class TraceTest
             $lines[] = '#' . $event->scope . ' ' . new \ReflectionClass($event)->getShortName();
         };
 
-        observe(new Dispatcher($listener), static fn() => group(static function (Group $group) {
+        observe(new Dispatcher([$listener]), static fn() => group(static function (Group $group) {
             $handle = $group->spawn(static fn() => never());
             delay(sec(1));
             $handle->cancel();
@@ -296,7 +296,7 @@ final class TraceTest
             $scopes[] = $event->scope;
         };
 
-        observe(new Dispatcher($listener), static fn() => group(static function (Group $group) {
+        observe(new Dispatcher([$listener]), static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => shield(static fn() => null));
         }));
 
@@ -307,7 +307,7 @@ final class TraceTest
     {
         $log = new TraceLog();
 
-        $error = thrown(static fn() => observe(new Dispatcher($log), static fn() => throw new \RuntimeException()));
+        $error = thrown(static fn() => observe(new Dispatcher([$log]), static fn() => throw new \RuntimeException()));
         shield(static fn() => null);
 
         Assert::instanceOf($error, \RuntimeException::class);
@@ -320,7 +320,7 @@ final class TraceTest
     private static function record(callable $fn): TraceLog
     {
         $log = new TraceLog();
-        observe(new Dispatcher($log), $fn);
+        observe(new Dispatcher([$log]), $fn);
 
         return $log;
     }

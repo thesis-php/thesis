@@ -25,15 +25,15 @@ final class DispatcherTest
      */
     public static function listenersByType(): iterable
     {
-        yield 'a class' => [static function (Base $event): void {}, [Base::class, Child::class]];
-        yield 'a final class' => [static function (Child $event): void {}, [Child::class]];
-        yield 'an interface' => [static function (Event $event): void {}, [Base::class, Child::class, Other::class]];
-        yield 'a union' => [static function (Other|Unrelated $event): void {}, [Other::class, Unrelated::class]];
-        yield 'an intersection' => [static function (Event&Named $event): void {}, [Child::class]];
-        yield 'a DNF' => [static function ((Event&Named)|Unrelated $event): void {}, [Child::class, Unrelated::class]];
-        yield 'object' => [static function (object $event): void {}, self::ALL];
-        yield 'mixed' => [static function (mixed $event): void {}, self::ALL];
-        yield 'no type' => [static function ($event): void {}, self::ALL];
+        yield 'a class' => [static function (Base $event) {}, [Base::class, Child::class]];
+        yield 'a final class' => [static function (Child $event) {}, [Child::class]];
+        yield 'an interface' => [static function (Event $event) {}, [Base::class, Child::class, Other::class]];
+        yield 'a union' => [static function (Other|Unrelated $event) {}, [Other::class, Unrelated::class]];
+        yield 'an intersection' => [static function (Event&Named $event) {}, [Child::class]];
+        yield 'a DNF' => [static function ((Event&Named)|Unrelated $event) {}, [Child::class, Unrelated::class]];
+        yield 'object' => [static function (object $event) {}, self::ALL];
+        yield 'mixed' => [static function (mixed $event) {}, self::ALL];
+        yield 'no type' => [static function ($event) {}, self::ALL];
         yield 'self' => [new Child()->onSelf(...), [Base::class, Child::class]];
         yield 'parent' => [new Child()->onParent(...), [Base::class, Child::class]];
     }
@@ -46,7 +46,7 @@ final class DispatcherTest
     #[DataProvider('listenersByType')]
     public function getsTheEventsOfTheTypeOfItsParameter(callable $listener, array $classes): void
     {
-        $dispatcher = new Dispatcher($listener);
+        $dispatcher = new Dispatcher([$listener]);
 
         Assert::same(array_values(array_filter(self::ALL, $dispatcher->listens(...))), $classes);
     }
@@ -54,20 +54,20 @@ final class DispatcherTest
     public function callsTheListenersInTheOrderTheyAreGiven(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher(
-            static function (Event $event) use (&$calls): void {
+        $dispatcher = new Dispatcher([
+            static function (Event $event) use (&$calls) {
                 $calls[] = 'event';
             },
-            static function (Child $event) use (&$calls): void {
+            static function (Child $event) use (&$calls) {
                 $calls[] = 'child';
             },
-            static function (object $event) use (&$calls): void {
+            static function (object $event) use (&$calls) {
                 $calls[] = 'object';
             },
-            static function (Unrelated $event) use (&$calls): void {
+            static function (Unrelated $event) use (&$calls) {
                 $calls[] = 'unrelated';
             },
-        );
+        ]);
 
         $dispatcher->dispatch(new Child());
         $dispatcher->dispatch(new Other());
@@ -75,12 +75,30 @@ final class DispatcherTest
         Assert::same($calls, ['event', 'child', 'object', 'event', 'object']);
     }
 
+    public function takesTheListenersFromAnIterable(): void
+    {
+        $calls = [];
+        $listeners = (static function () use (&$calls) {
+            yield 'b' => static function (Other $event) use (&$calls) {
+                $calls[] = 'b';
+            };
+            yield 'a' => static function (Other $event) use (&$calls) {
+                $calls[] = 'a';
+            };
+        })();
+        $dispatcher = new Dispatcher($listeners);
+
+        $dispatcher->dispatch(new Other());
+
+        Assert::same($calls, ['b', 'a']);
+    }
+
     public function callsAListenerOnceForAnEventOfSeveralTypesOfItsUnion(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher(static function (Named|Event|Base $event) use (&$calls): void {
+        $dispatcher = new Dispatcher([static function (Named|Event|Base $event) use (&$calls) {
             $calls[] = $event;
-        });
+        }]);
         $event = new Child();
 
         $dispatcher->dispatch($event);
@@ -92,7 +110,7 @@ final class DispatcherTest
     public function passesTheEvent(): void
     {
         $listener = new Child();
-        $dispatcher = new Dispatcher($listener->onSelf(...), $listener->onSelf(...));
+        $dispatcher = new Dispatcher([$listener->onSelf(...), $listener->onSelf(...)]);
 
         $dispatcher->dispatch(new Child());
         $dispatcher->dispatch(new Unrelated());
@@ -113,7 +131,7 @@ final class DispatcherTest
                 $this->calls[] = $event;
             }
         };
-        $dispatcher = new Dispatcher($listener);
+        $dispatcher = new Dispatcher([$listener]);
         $event = new Other();
 
         $dispatcher->dispatch($event);
@@ -124,9 +142,9 @@ final class DispatcherTest
     public function takesAListenerWithOptionalParametersAfterTheEvent(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher(static function (Other $event, int $times = 2) use (&$calls): void {
+        $dispatcher = new Dispatcher([static function (Other $event, int $times = 2) use (&$calls) {
             $calls[] = $times;
-        });
+        }]);
 
         $dispatcher->dispatch(new Other());
 
@@ -145,21 +163,24 @@ final class DispatcherTest
     public function stopsAtTheListenerThatThrows(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher(
-            static function (Other $event): void {
+        $dispatcher = new Dispatcher([
+            static function (Other $event) {
                 throw new \RuntimeException('Failed.');
             },
-            static function (Other $event) use (&$calls): void {
+            static function (Other $event) use (&$calls) {
                 $calls[] = $event;
             },
-        );
+        ]);
+
+        $thrown = null;
 
         try {
             $dispatcher->dispatch(new Other());
         } catch (\RuntimeException $exception) {
-            Assert::same($exception->getMessage(), 'Failed.');
+            $thrown = $exception->getMessage();
         }
 
+        Assert::same($thrown, 'Failed.');
         Assert::same($calls, []);
     }
 
@@ -167,15 +188,15 @@ final class DispatcherTest
     {
         $calls = [];
         $dispatcher = null;
-        $dispatcher = new Dispatcher(
-            static function (Other $event) use (&$dispatcher, &$calls): void {
+        $dispatcher = new Dispatcher([
+            static function (Other $event) use (&$dispatcher, &$calls) {
                 $calls[] = Other::class;
                 $dispatcher?->dispatch(new Unrelated());
             },
-            static function (Unrelated $event) use (&$calls): void {
+            static function (Unrelated $event) use (&$calls) {
                 $calls[] = Unrelated::class;
             },
-        );
+        ]);
 
         $dispatcher->dispatch(new Other());
 
@@ -185,14 +206,14 @@ final class DispatcherTest
     public function letsAListenerSuspendTheFiber(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher(
-            static function (Other $event) use (&$calls): void {
+        $dispatcher = new Dispatcher([
+            static function (Other $event) use (&$calls) {
                 $calls[] = \Fiber::suspend('suspended');
             },
-            static function (Other $event) use (&$calls): void {
+            static function (Other $event) use (&$calls) {
                 $calls[] = 'after';
             },
-        );
+        ]);
         $fiber = new \Fiber($dispatcher->dispatch(...));
 
         Assert::same($fiber->start(new Other()), 'suspended');
@@ -206,7 +227,7 @@ final class DispatcherTest
 
     public function resolvesAClassLoadedAfterTheListenerIsGiven(): void
     {
-        $dispatcher = new Dispatcher(static function (Event $event): void {});
+        $dispatcher = new Dispatcher([static function (Event $event) {}]);
         $event = new class implements Event {};
 
         Assert::true($dispatcher->listens($event::class));
@@ -217,60 +238,75 @@ final class DispatcherTest
      */
     public static function invalidListeners(): iterable
     {
-        yield 'no parameter' => [static function (): void {}, null, ' must take the event as its first parameter.'];
+        yield 'no parameter' => [static function () {}, null, ' must take the event as its first parameter.'];
 
         yield 'a nullable class' => [
-            static function (?Other $event): void {},
+            static function (?Other $event) {},
             'event',
             ' must be typed with classes, interfaces or object, got ?Thesis\Dispatcher\Fixtures\Other.',
         ];
 
+        yield 'a nullable object' => [
+            static function (?object $event) {},
+            'event',
+            ' must be typed with classes, interfaces or object, got ?object.',
+        ];
+
         yield 'a union with null' => [
-            static function (null|Other|Unrelated $event): void {},
+            static function (null|Other|Unrelated $event) {},
             'event',
             ' must be typed with classes, interfaces or object, got Thesis\Dispatcher\Fixtures\Other|Thesis\Dispatcher\Fixtures\Unrelated|null.',
         ];
 
         yield 'a scalar' => [
-            static function (int $event): void {},
+            static function (int $event) {},
             'event',
             ' must be typed with classes, interfaces or object, got int.',
         ];
 
         yield 'a union with a scalar' => [
-            static function (Other|string $event): void {},
+            static function (Other|string $event) {},
             'event',
             ' must be typed with classes, interfaces or object, got Thesis\Dispatcher\Fixtures\Other|string.',
         ];
 
         yield 'iterable' => [
-            static function (iterable $event): void {},
+            static function (iterable $event) {},
             'event',
             ' must be typed with classes, interfaces or object, got iterable.',
         ];
 
         yield 'a class that does not exist' => [
             // @phpstan-ignore class.notFound (a type that does not exist is the case)
-            static function (Missing $event): void {},
+            static function (Missing $event) {},
             'event',
             ' is typed with Thesis\Missing, which is not a class or an interface.',
         ];
 
+        // @phpstan-ignore generator.valueType (a generator listener is the case)
+        yield 'a generator' => [
+            static function (Other $event) {
+                yield;
+            },
+            null,
+            ' must not be a generator: its body would not run.',
+        ];
+
         yield 'a variadic parameter' => [
-            static function (Other ...$events): void {},
+            static function (Other ...$events) {},
             'events',
             ' must take the event as a plain parameter, not a variadic one.',
         ];
 
         yield 'a parameter by reference' => [
-            static function (Other &$event): void {},
+            static function (Other &$event) {},
             'event',
             ' must take the event by value, not by reference.',
         ];
 
         // @phpstan-ignore generator.valueType (a listener with a second required parameter is the case)
         yield 'a second required parameter' => [
-            static function (Other $event, int $times): void {},
+            static function (Other $event, int $times) {},
             'times',
             ' must be optional: a listener is called with the event only.',
         ];
@@ -286,6 +322,6 @@ final class DispatcherTest
         $name = $parameter === null ? formatFunction($listener) : formatParameter($listener, $parameter);
         Expect::exception(\InvalidArgumentException::class)->withMessage($name . $error);
 
-        new Dispatcher($listener);
+        new Dispatcher([$listener]);
     }
 }

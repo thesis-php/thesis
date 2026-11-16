@@ -29,12 +29,12 @@ final class Dispatcher
     private array $listenersByClass = [];
 
     /**
-     * @param callable(never): void ...$listeners
-     * @throws \InvalidArgumentException if the parameter of a listener cannot take an event
+     * @param iterable<callable(never): void> $listeners called in the order of iteration, the keys are ignored
+     * @throws \InvalidArgumentException if a listener cannot take an event or is a generator
      */
-    public function __construct(callable ...$listeners)
+    public function __construct(iterable $listeners = [])
     {
-        $this->listeners = array_values(array_map(Listener::of(...), $listeners));
+        $this->listeners = array_map(Listener::of(...), iterator_to_array($listeners, preserve_keys: false));
     }
 
     /**

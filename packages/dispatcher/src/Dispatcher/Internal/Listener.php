@@ -25,6 +25,13 @@ final readonly class Listener
         $function = new \ReflectionFunction($fn);
         $parameters = $function->getParameters();
 
+        if ($function->isGenerator()) {
+            throw new \InvalidArgumentException(\sprintf(
+                '%s must not be a generator: its body would not run.',
+                formatReflectedFunction($function),
+            ));
+        }
+
         if ($parameters === []) {
             throw new \InvalidArgumentException(\sprintf(
                 '%s must take the event as its first parameter.',
@@ -101,7 +108,7 @@ final readonly class Listener
             return null;
         }
 
-        if ($type instanceof \ReflectionNamedType && \in_array($type->getName(), ['mixed', 'object'], strict: true)) {
+        if ($type instanceof \ReflectionNamedType && self::isEveryEvent($type)) {
             return null;
         }
 
@@ -120,6 +127,12 @@ final readonly class Listener
         }
 
         return $types;
+    }
+
+    private static function isEveryEvent(\ReflectionNamedType $type): bool
+    {
+        // mixed allows null by itself, ?object is rejected as a nullable type in class().
+        return $type->getName() === 'mixed' || ($type->getName() === 'object' && !$type->allowsNull());
     }
 
     /**

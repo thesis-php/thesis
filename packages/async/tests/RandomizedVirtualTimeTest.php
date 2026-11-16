@@ -48,7 +48,7 @@ final class RandomizedVirtualTimeTest
     public function traceChangesNothing(): void
     {
         $checker = new TraceChecker();
-        observe(new Dispatcher($checker), fn() => $this->seeds(count: 100, program: $this->pipes(...)));
+        observe(new Dispatcher([$checker]), fn() => $this->seeds(count: 100, program: $this->pipes(...)));
 
         Assert::true($checker->events > 0);
         Assert::same($checker->violations, []);

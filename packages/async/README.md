@@ -901,11 +901,11 @@ use Thesis\Async\Trace;
 use Thesis\Async\VirtualTime;
 use Thesis\Dispatcher;
 
-$printTrace = new Dispatcher(
-    static function (Trace\TaskCreated $event): void { print "#{$event->scope} spawned at {$event->location}\n"; },
-    static function (Trace\Suspended $event): void { print "#{$event->scope} waits in {$event->caller}\n"; },
-    static function (Trace\ScopeCancelled $event): void { print "#{$event->scope} cancelled: {$event->cause->name}\n"; },
-);
+$printTrace = new Dispatcher([
+    static function (Trace\TaskCreated $event) { print "#{$event->scope} spawned at {$event->location}\n"; },
+    static function (Trace\Suspended $event) { print "#{$event->scope} waits in {$event->caller}\n"; },
+    static function (Trace\ScopeCancelled $event) { print "#{$event->scope} cancelled: {$event->cause->name}\n"; },
+]);
 
 VirtualTime\run(static fn() => Trace\observe($printTrace, $program));
 // #2 spawned at /app/src/Worker.php:21
