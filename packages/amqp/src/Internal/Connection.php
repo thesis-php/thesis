@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Thesis\Amqp\Internal;
 
 use Thesis\Amqp\AmqpException;
-use Thesis\Amqp\AuthMechanism;
 use Thesis\Amqp\Channel;
 use Thesis\Amqp\ChannelClosed;
 use Thesis\Amqp\Config;
@@ -13,12 +12,6 @@ use Thesis\Amqp\ConnectionClosed;
 use Thesis\Amqp\Internal\Protocol\ConnectionBlocked;
 use Thesis\Amqp\Internal\Protocol\ConnectionClose;
 use Thesis\Amqp\Internal\Protocol\ConnectionCloseOk;
-use Thesis\Amqp\Internal\Protocol\ConnectionOpen;
-use Thesis\Amqp\Internal\Protocol\ConnectionOpenOk;
-use Thesis\Amqp\Internal\Protocol\ConnectionStart;
-use Thesis\Amqp\Internal\Protocol\ConnectionStartOk;
-use Thesis\Amqp\Internal\Protocol\ConnectionTune;
-use Thesis\Amqp\Internal\Protocol\ConnectionTuneOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionUnblocked;
 use Thesis\Amqp\Internal\Protocol\ConnectionUpdateSecretOk;
 use Thesis\Amqp\Internal\Protocol\Method;
@@ -28,14 +21,10 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Net\Socket;
-use function Thesis\Amqp\Internal\Protocol\decodeMethod;
-use function Thesis\Amqp\Internal\Protocol\writeTable;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Time\ms;
-use function Thesis\Time\toSec;
 
 /**
  * One AMQP connection over one socket: the handshake, the reader that dispatches frames to the channels,
@@ -45,16 +34,6 @@ use function Thesis\Time\toSec;
  */
 final class Connection
 {
-    private const array CAPABILITIES = [
-        'publisher_confirms' => true,
-        'exchange_exchange_bindings' => true,
-        'basic.nack' => true,
-        'consumer_cancel_notify' => true,
-        'connection.blocked' => true,
-        'authentication_failure_close' => true,
-        'per_consumer_qos' => true,
-    ];
-
     /**
      * Why the connection is closed, null while it is open.
      */
@@ -108,38 +87,14 @@ final class Connection
     ) {}
 
     /**
-     * Performs the handshake on a connected socket. Closes the socket if it fails.
+     * Performs the {@see Handshake} on a connected socket. Closes the socket if it fails.
      *
      * @throws ConnectionClosed
      */
     public static function open(Socket $socket, Config $config): self
     {
-        $in = new Buffer();
-
         try {
-            $socket->write(Frames::PROTOCOL_HEADER);
-            $start = self::expect($socket, $in, ConnectionStart::class);
-            [$mechanism, $response] = self::authenticate($config, $start);
-            self::sendDirectly($socket, new ConnectionStartOk(
-                clientProperties: self::clientProperties($config),
-                mechanism: $mechanism->value,
-                response: $response,
-                locale: 'en_US',
-            ));
-
-            $tune = self::expect($socket, $in, ConnectionTune::class);
-            /** @var int<0, 65535> $channelMax */
-            $channelMax = self::negotiate($config->channelMax, $tune->channelMax);
-            /** @var int<0, 4294967295> $frameMax */
-            $frameMax = self::negotiate($config->frameMax, $tune->frameMax);
-            // Rounded up: a heartbeat under a second must not become 0, which takes the interval of the server.
-            $seconds = toSec($config->heartbeat, \RoundingMode::PositiveInfinity);
-            /** @var int<0, 65535> $heartbeat */
-            $heartbeat = self::negotiate(min(65535, max(0, $seconds)), $tune->heartbeat);
-            self::sendDirectly($socket, new ConnectionTuneOk($channelMax, $frameMax, $heartbeat));
-
-            self::sendDirectly($socket, new ConnectionOpen($config->vhost));
-            self::expect($socket, $in, ConnectionOpenOk::class);
+            [$in, $tune] = Handshake::perform($socket, $config);
         } catch (IoException|ProtocolError $exception) {
             $socket->close();
 
@@ -156,9 +111,9 @@ final class Connection
         return new self(
             socket: $socket,
             in: $in,
-            channelMax: $channelMax === 0 ? 65535 : $channelMax,
-            frameMax: $frameMax,
-            heartbeat: $heartbeat,
+            channelMax: $tune->channelMax === 0 ? 65535 : $tune->channelMax,
+            frameMax: $tune->frameMax,
+            heartbeat: $tune->heartbeat,
         );
     }
 
@@ -185,7 +140,7 @@ final class Connection
                 }
 
                 while ($this->closed === null) {
-                    [$channel, $frame] = self::readFrame($this->socket, $this->in, $this->frameMax);
+                    [$channel, $frame] = Frames::read($this->socket, $this->in, $this->frameMax);
                     $this->received = true;
 
                     if ($channel === 0) {
@@ -373,7 +328,7 @@ final class Connection
             ),
             $frame instanceof ConnectionBlocked => $this->unblocked ??= new Deferred(),
             $frame instanceof ConnectionUnblocked => $this->unblock(),
-            default => throw new ProtocolError(ReplyCode::UnexpectedFrame, self::describe($frame) . ' on channel 0.'),
+            default => throw new ProtocolError(ReplyCode::UnexpectedFrame, Frames::describe($frame) . ' on channel 0.'),
         };
     }
 
@@ -478,188 +433,5 @@ final class Connection
             message: "No channel can open: all {$this->channelMax} channels of the connection are open.",
             replyCode: null,
         );
-    }
-
-    /**
-     * @template T of Method
-     * @param class-string<T> $class
-     * @return T
-     * @throws IoException
-     * @throws ProtocolError
-     * @throws ConnectionClosed if the server closes the connection instead
-     */
-    private static function expect(Socket $socket, Buffer $in, string $class): Method
-    {
-        while (true) {
-            // Bounded before the limit is negotiated: a peer that is not a broker must not make us buffer 4 GiB.
-            [$channel, $frame] = self::readFrame($socket, $in, Frames::DEFAULT_MAX);
-
-            if ($frame === null) {
-                continue;
-            }
-
-            if ($channel === 0 && $frame instanceof $class) {
-                return $frame;
-            }
-
-            if ($frame instanceof ConnectionClose) {
-                self::sendDirectly($socket, new ConnectionCloseOk());
-
-                throw new ConnectionClosed(
-                    message: "The server has closed the connection: {$frame->replyCode} {$frame->replyText}.",
-                    replyCode: ReplyCode::tryFrom($frame->replyCode),
-                );
-            }
-
-            throw new ProtocolError(
-                ReplyCode::UnexpectedFrame,
-                \sprintf('Expected %s, got %s on channel %d.', $class, self::describe($frame), $channel),
-            );
-        }
-    }
-
-    /**
-     * @return array{int<0, 65535>, Method|ContentHeader|string|null} the channel and the frame:
-     *     a method, a content header, a piece of a body, or null for a heartbeat
-     * @throws IoException
-     * @throws ProtocolError
-     */
-    private static function readFrame(Socket $socket, Buffer $in, int $frameMax): array
-    {
-        $in->fill($socket, 7);
-        $type = $in->readUint8();
-        $channel = $in->readUint16();
-        $size = $in->readUint32();
-
-        if ($type === \ord('A')) {
-            throw new ProtocolError(ReplyCode::FrameError, 'The server does not support AMQP 0-9-1.');
-        }
-
-        if ($frameMax > 0 && $size + Frames::OVERHEAD > $frameMax) {
-            throw new ProtocolError(
-                replyCode: ReplyCode::FrameError,
-                message: "A frame of {$size} bytes exceeds the maximum of {$frameMax}.",
-            );
-        }
-
-        $in->fill($socket, $size + 1);
-        $payload = $in->slice($size);
-
-        try {
-            $frame = match ($type) {
-                Frames::METHOD => decodeMethod($payload),
-                Frames::HEADER => ContentHeader::decode($payload),
-                Frames::BODY => $payload->drain(),
-                Frames::HEARTBEAT => null,
-                default => throw new ProtocolError(ReplyCode::FrameError, "Unknown frame type {$type}."),
-            };
-        } catch (UnexpectedEof) {
-            throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is shorter than its fields.");
-        }
-
-        if ($payload->count() !== 0) {
-            throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is longer than its fields.");
-        }
-
-        if ($in->readUint8() !== Frames::END) {
-            throw new ProtocolError(ReplyCode::FrameError, 'A frame does not end with the frame end octet.');
-        }
-
-        return [$channel, $frame];
-    }
-
-    /**
-     * @throws IoException
-     */
-    private static function sendDirectly(Socket $socket, Method $method): void
-    {
-        $buffer = new Buffer();
-        Frames::method($buffer, 0, $method);
-        $socket->write($buffer->drain());
-    }
-
-    /**
-     * @return array{AuthMechanism, string}
-     * @throws ConnectionClosed if the server supports none of the mechanisms of the config
-     */
-    private static function authenticate(Config $config, ConnectionStart $start): array
-    {
-        $supported = explode(' ', $start->mechanisms);
-
-        foreach ($config->authMechanisms as $mechanism) {
-            if (!\in_array($mechanism->value, $supported, true)) {
-                continue;
-            }
-
-            $response = match ($mechanism) {
-                AuthMechanism::Plain => "\0{$config->user}\0{$config->password}",
-                AuthMechanism::AmqPlain => self::amqPlain($config),
-                AuthMechanism::External => '',
-            };
-
-            return [$mechanism, $response];
-        }
-
-        throw new ConnectionClosed(\sprintf(
-            'The server supports none of the mechanisms %s, only %s.',
-            implode(', ', array_map(static fn(AuthMechanism $mechanism) => $mechanism->value, $config->authMechanisms)),
-            $start->mechanisms,
-        ));
-    }
-
-    /**
-     * A field table without its length.
-     */
-    private static function amqPlain(Config $config): string
-    {
-        $buffer = new Buffer();
-        writeTable($buffer, ['LOGIN' => $config->user, 'PASSWORD' => $config->password]);
-        $buffer->skip(4);
-
-        return $buffer->drain();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function clientProperties(Config $config): array
-    {
-        $properties = [
-            'product' => 'thesis/amqp',
-            'platform' => 'PHP ' . PHP_VERSION,
-            'capabilities' => self::CAPABILITIES,
-        ];
-
-        if ($config->connectionName !== null) {
-            $properties['connection_name'] = $config->connectionName;
-        }
-
-        return $properties;
-    }
-
-    /**
-     * As RabbitMQ: 0 is no limit, so if either side has none, the other one's counts, otherwise the lower one.
-     *
-     * @param non-negative-int $client
-     * @param non-negative-int $server
-     * @return non-negative-int
-     */
-    private static function negotiate(int $client, int $server): int
-    {
-        if ($client === 0 || $server === 0) {
-            return max($client, $server);
-        }
-
-        return min($client, $server);
-    }
-
-    private static function describe(null|Method|ContentHeader|string $frame): string
-    {
-        return match (true) {
-            $frame === null => 'a heartbeat',
-            \is_string($frame) => 'a content body',
-            $frame instanceof ContentHeader => 'a content header',
-            default => $frame::class,
-        };
     }
 }

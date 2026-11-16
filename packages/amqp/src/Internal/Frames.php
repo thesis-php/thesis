@@ -6,10 +6,16 @@ namespace Thesis\Amqp\Internal;
 
 use Thesis\Amqp\Internal\Protocol\BasicProperties;
 use Thesis\Amqp\Internal\Protocol\Method;
+use Thesis\Amqp\Internal\Protocol\ProtocolError;
+use Thesis\Amqp\ReplyCode;
 use Thesis\Io\Buffer;
+use Thesis\Io\IoException;
+use Thesis\Io\UnexpectedEof;
+use Thesis\Net\Socket;
+use function Thesis\Amqp\Internal\Protocol\decodeMethod;
 
 /**
- * Encodes frames into a buffer: a frame is a type, a channel, a size, the payload and the end octet.
+ * Encodes and reads frames: a frame is a type, a channel, a size, the payload and the end octet.
  *
  * @internal
  */
@@ -84,5 +90,65 @@ final class Frames
     public static function heartbeat(Buffer $buffer): void
     {
         $buffer->writeUint8(self::HEARTBEAT)->writeUint16(0)->writeUint32(0)->writeUint8(self::END);
+    }
+
+    /**
+     * @return array{int<0, 65535>, Method|ContentHeader|string|null} the channel and the frame:
+     *     a method, a content header, a piece of a body, or null for a heartbeat
+     * @throws IoException
+     * @throws ProtocolError
+     */
+    public static function read(Socket $socket, Buffer $in, int $frameMax): array
+    {
+        $in->fill($socket, 7);
+        $type = $in->readUint8();
+        $channel = $in->readUint16();
+        $size = $in->readUint32();
+
+        if ($type === \ord('A')) {
+            throw new ProtocolError(ReplyCode::FrameError, 'The server does not support AMQP 0-9-1.');
+        }
+
+        if ($frameMax > 0 && $size + self::OVERHEAD > $frameMax) {
+            throw new ProtocolError(
+                replyCode: ReplyCode::FrameError,
+                message: "A frame of {$size} bytes exceeds the maximum of {$frameMax}.",
+            );
+        }
+
+        $in->fill($socket, $size + 1);
+        $payload = $in->slice($size);
+
+        try {
+            $frame = match ($type) {
+                self::METHOD => decodeMethod($payload),
+                self::HEADER => ContentHeader::decode($payload),
+                self::BODY => $payload->drain(),
+                self::HEARTBEAT => null,
+                default => throw new ProtocolError(ReplyCode::FrameError, "Unknown frame type {$type}."),
+            };
+        } catch (UnexpectedEof) {
+            throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is shorter than its fields.");
+        }
+
+        if ($payload->count() !== 0) {
+            throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is longer than its fields.");
+        }
+
+        if ($in->readUint8() !== self::END) {
+            throw new ProtocolError(ReplyCode::FrameError, 'A frame does not end with the frame end octet.');
+        }
+
+        return [$channel, $frame];
+    }
+
+    public static function describe(null|Method|ContentHeader|string $frame): string
+    {
+        return match (true) {
+            $frame === null => 'a heartbeat',
+            \is_string($frame) => 'a content body',
+            $frame instanceof ContentHeader => 'a content header',
+            default => $frame::class,
+        };
     }
 }
