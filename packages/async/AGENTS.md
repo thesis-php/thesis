@@ -187,6 +187,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   without one, the pump stops while the inner driver waits, and the jump past a ready stream is never seen.
 - An outer cancellation is tested against everything the group may have cancelled itself before it:
   daemons, `Task::cancel()`, `cancelTasks()`, the losers of `race()` and `some()`.
+- A behaviour that depends on combinations is also checked on generated programs: `RandomizedVirtualTimeTest`
+  (random pipes, relays, raw timers and daemons: when the clock may jump) and `CancelledFirstTest` (every
+  combination against a model of who cancelled first). A new way to wait on virtual time or to cancel a task
+  is added to them. Rejected: a random stress of groups, channels and semaphores with general checks.
+  It never found a defect, not even the ones a review found by reading, and its seed reproduces only on one driver.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,
