@@ -18,6 +18,7 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
 | `socket` | `net` | UDP, a pool of connections, passing sockets between processes (for `cluster`) |
 | `dns` | `net` | Check the hosts file and `resolv.conf` |
 | `uri` | `Uri\WhatWg\Url` | — |
+| `cache` | `cache` | A Redis cache, with `redis` |
 | `phpunit-util` | Testo, `testo` | — |
 
 ### To do
@@ -33,7 +34,6 @@ What amphp has, then what thesis makes of it.
 - WebSocket (`websocket`, `websocket-client`, `websocket-server`): `websocket`.
 - SQL (`postgres`, `mysql`, `sql`, `sql-common`): `postgres`, later `mysql`; a common `sql` only with the second driver.
 - Redis (`redis`): `redis`: RESP3, pub/sub, distributed `Mutex`/`RateLimiter` behind the interfaces of `async`.
-- Cache (`cache`): a cache interface and a local cache with TTL; the Redis one in `redis`.
 - Processes (`process`): `process`.
 - Parallelism (`parallel`, `parallel-functions`, `serialization`): `parallel`: workers on `proc_open`
   (ext-parallel optional), an IPC channel, a pool.
@@ -88,7 +88,7 @@ What amphp has, then what thesis makes of it.
 6. **Processes.** `process`, then `parallel` (ideas: [parallel-ideas.md](parallel-ideas.md)), then `cluster`.
    On top of them: `hot-reload` (`process`, `http-server`, `trapSignals()`) and `cron` (the parser without async
    and a scheduler on `async`).
-7. **Storage and the rest.** `redis` with `cache`, `file`, `mysql`.
+7. **Storage and the rest.** `redis` with a Redis cache, `file`, `mysql`.
 8. **Cleanup.** After 2.0, the replaced repositories (`amp-bridge`, `byte-*`, `endian`, `varint`, `clock`,
    `time-span`, `sync-once`, `package-version`) are marked abandoned on Packagist with their replacement,
    and their README points to the monorepo.
@@ -159,4 +159,3 @@ grow from what `async` already has and amphp lacks, so they come first.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
 5. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
-6. The cache: a package of its own or a part of `async`?
