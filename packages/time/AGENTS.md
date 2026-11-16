@@ -35,6 +35,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Short names, like Go: `ns()`, `us()`, `ms()`, `sec()`, `minutes()`, `hours()` create, `to*()` convert.
   A full unit is plural: the function takes an amount (`minutes(1.5)`), unlike the unit constants of Go
   (`5 * time.Minute`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, possibly with a loss.
+- No duration constants, not even `ZERO`: `Time\Duration` has no constructor for `const` and `Duration::ZERO`
+  belongs to PHP, so only `define()` is left. A default of a duration parameter is `null` ("no limit"), not zero,
+  so a constant would replace only `ns(0)`, and it invites `$duration === ZERO`, which compares identity
+  (and sometimes passes, PHP 8.6 caches the last duration). The check is `isZero()`.
 - No function is named after a built-in one (`min()`, `max()`): imported, it shadows the built-in in the whole
   file, and a userland function ignores extra arguments, so `min($a, $b)` silently returns a duration.
   Hence `minutes()`, and `shortest()` and `longest()` for the minimum and the maximum.
