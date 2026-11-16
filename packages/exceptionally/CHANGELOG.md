@@ -20,6 +20,8 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 - Errors suppressed by the `error_reporting` ini setting are not converted either.
 - The callable may suspend a fiber: while it is suspended, errors of other fibers are not converted,
   and fibers that finish in any order leave the error handlers as they were.
+- A handler set by other code while the callable runs stays set when it returns. It used to be restored
+  in place of the handler of `exceptionally()`.
 
 ### Removed
 

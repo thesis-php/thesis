@@ -200,6 +200,178 @@ final class ExceptionallyTest
         Assert::same(get_error_handler(), $this->previous);
     }
 
+    public function keepsAHandlerSetWhileSuspended(): void
+    {
+        $fiber = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+        $fiber->start();
+        $late = static fn() => true;
+        set_error_handler($late);
+
+        $fiber->resume();
+
+        Assert::same(get_error_handler(), $late);
+        restore_error_handler();
+        exceptionally(static fn() => null);
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function keepsAHandlerSetInsideTheFunction(): void
+    {
+        $late = static fn() => true;
+
+        exceptionally(static fn() => set_error_handler($late));
+
+        Assert::same(get_error_handler(), $late);
+        restore_error_handler();
+        exceptionally(static fn() => null);
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function throwsAboveAHandlerOfOtherCodeAfterAnotherFiberFinishes(): void
+    {
+        $swallow = static fn() => true;
+        $first = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+        $nested = new \Fiber(static fn() => exceptionally(static function () use ($swallow) {
+            set_error_handler($swallow);
+
+            try {
+                exceptionally(static function () {
+                    \Fiber::suspend();
+                    trigger_error('nested', E_USER_WARNING);
+                });
+            } finally {
+                restore_error_handler();
+            }
+        }));
+        $first->start();
+        $nested->start();
+        $first->resume();
+
+        $error = self::errorOf($nested->resume(...));
+
+        Assert::same($error->getMessage(), 'nested');
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function keepsTheHandlerBelowAfterItsOwnWasRestoredByOtherCode(): void
+    {
+        $below = errorHandlers();
+        $fiber = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+        $fiber->start();
+        restore_error_handler();
+
+        $fiber->resume();
+
+        Assert::same(errorHandlers(), $below);
+    }
+
+    public function keepsTheHandlerThatRunsWhileAFiberIsDestroyed(): void
+    {
+        $fiber = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+        $fiber->start();
+        $destroy = static function () use (&$fiber) {
+            $fiber = null;
+
+            return true;
+        };
+        set_error_handler($destroy);
+
+        trigger_error('destroy', E_USER_WARNING);
+
+        Assert::same(get_error_handler(), $destroy);
+        restore_error_handler();
+        exceptionally(static fn() => null);
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function throwsInsideAHandler(): void
+    {
+        $thrown = [];
+        set_error_handler(static function () use (&$thrown) {
+            try {
+                exceptionally(static fn() => trigger_error('inside', E_USER_WARNING));
+            } catch (\ErrorException $error) {
+                $thrown[] = $error->getMessage();
+            }
+
+            return true;
+        });
+        $fiber = new \Fiber(static fn() => exceptionally(\Fiber::suspend(...)));
+        $fiber->start();
+        $before = errorHandlers();
+
+        trigger_error('outside', E_USER_WARNING);
+
+        Assert::same($thrown, ['inside']);
+        Assert::same(errorHandlers(), $before);
+        $fiber->resume();
+        restore_error_handler();
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function setsNoMoreHandlersThanCallsThatRun(): void
+    {
+        $loop = static function () {
+            for ($calls = 0; $calls <= 10; ++$calls) {
+                exceptionally(\Fiber::suspend(...));
+            }
+        };
+        $first = new \Fiber($loop);
+        $second = new \Fiber($loop);
+        $first->start();
+        $second->start();
+        $handlers = \count(errorHandlers());
+
+        for ($i = 0; $i < 10; ++$i) {
+            $first->resume();
+            $second->resume();
+        }
+
+        Assert::same(\count(errorHandlers()), $handlers);
+        unset($first, $second);
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function takesItsHandlerOffWhenAnAbandonedFiberIsCollected(): void
+    {
+        new \Fiber(static function () {
+            $cycle = \Fiber::getCurrent();
+            exceptionally(\Fiber::suspend(...));
+        })->start();
+
+        gc_collect_cycles();
+
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    /**
+     * The collector starts when the buffer of roots is full, at any release of a value: here inside exceptionally(),
+     * at the first, the second, ... release after the buffer was filled. It destroys the abandoned fiber there.
+     */
+    public function keepsTheHandlerBelowWhenTheCollectorRunsInside(): void
+    {
+        for ($free = 0; $free < 24; ++$free) {
+            gc_collect_cycles();
+            new \Fiber(static function () {
+                $cycle = \Fiber::getCurrent();
+                exceptionally(\Fiber::suspend(...));
+            })->start();
+            $roots = [];
+            $status = gc_status();
+
+            for ($missing = $status['threshold'] - $status['roots'] - $free; $missing > 0; --$missing) {
+                $roots[] = $root = new \stdClass();
+                unset($root);
+            }
+
+            exceptionally(static fn() => null);
+            gc_collect_cycles();
+            exceptionally(static fn() => null);
+
+            Assert::same(get_error_handler(), $this->previous);
+        }
+    }
+
     /**
      * @param callable(): mixed $fn
      */

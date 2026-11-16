@@ -12,3 +12,26 @@ function deprecate(string $message): void
 {
     trigger_error($message, E_USER_DEPRECATED);
 }
+
+/**
+ * The error handlers on the stack, the top one last: PHP shows only the top, so they are taken off and set again.
+ *
+ * @return list<callable(int, string, string, int): mixed>
+ */
+function errorHandlers(): array
+{
+    $handlers = [];
+
+    while (($top = get_error_handler()) !== null) {
+        $handlers[] = $top;
+        restore_error_handler();
+    }
+
+    $handlers = array_reverse($handlers);
+
+    foreach ($handlers as $handler) {
+        set_error_handler($handler);
+    }
+
+    return $handlers;
+}

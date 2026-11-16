@@ -59,10 +59,17 @@ its errors are not thrown either.
 
 ## Other error handlers
 
-The error handlers of PHP form one stack for all fibers, and `exceptionally()` takes its handler off when
-the function returns. So:
+The error handlers of PHP form one stack for all fibers. `exceptionally()` sets its handler on top
+and takes off only its own handlers, and only from the top. So:
 
-- A handler set by other code while a fiber is suspended inside `exceptionally()` is taken off in its place,
-  and the handler of `exceptionally()` stays. Set the handler of the application before such calls start.
-- The previous handler must not suspend the fiber: while a handler runs, PHP has no handler for other fibers.
-- After `exit()` or a fatal error inside the function, its handler stays for the shutdown functions.
+- A handler set while the function runs, by the function itself or by another fiber while it is suspended,
+  stays. It is above the handler of `exceptionally()` and gets the errors first: they are thrown only if it passes
+  them on to the handler `set_error_handler()` returned. Set the handler of the application before such calls start.
+- A handler set before a call must not be restored while the call runs. `restore_error_handler()` then takes off
+  the handler of `exceptionally()`: the errors of the call are not thrown anymore, and the handler that was meant
+  stays set.
+- The previous handler must not suspend the fiber: while a handler runs, PHP has no handler, and if another fiber
+  sets one meanwhile, PHP forgets the one that was running. This breaks the handlers with or without
+  `exceptionally()`.
+- `exit()` and a fatal error do not finish the call: the shutdown functions run as if inside it,
+  their errors at its levels are thrown.
