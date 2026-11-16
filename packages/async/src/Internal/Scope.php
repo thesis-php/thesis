@@ -37,7 +37,7 @@ final class Scope
     public static ?VirtualClock $virtualClock = null;
 
     /**
-     * Bound while `Thesis\Async\Trace\observe()` runs. Every hook is `Scope::$tracer?->...`: without an observer,
+     * Bound while `Thesis\Async\Trace\observe()` runs. Every hook is `Scope::$tracer?->...`: without an observation,
      * one null check that does not evaluate the arguments. Here for the same reason as {@see $virtualClock}.
      */
     public static ?Tracer $tracer = null;

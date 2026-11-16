@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Dispatcher;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\run;
 use function Thesis\Time\sec;
@@ -44,7 +45,7 @@ final class CancelledFirstTest
     {
         $checker = new TraceChecker();
 
-        Assert::same(observe($checker, self::mismatches(...)), []);
+        Assert::same(observe(new Dispatcher($checker), self::mismatches(...)), []);
         Assert::true($checker->events > 0);
         Assert::same($checker->violations, []);
         Assert::same($checker->unfinished(), []);

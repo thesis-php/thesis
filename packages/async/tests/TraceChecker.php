@@ -7,7 +7,6 @@ namespace Thesis\Async;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
-use Thesis\Async\Trace\Observer;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
@@ -21,7 +20,7 @@ use Thesis\Async\Trace\TimeoutCreated;
  * with their wake-ups, a cancellation reaches only scopes that are still running, a scope ends once, after
  * its waits, and everything created has ended once the observation is over ({@see unfinished()}).
  */
-final class TraceChecker implements Observer
+final class TraceChecker
 {
     /**
      * @var list<string>
@@ -38,8 +37,7 @@ final class TraceChecker implements Observer
      */
     private array $states = [];
 
-    #[\Override]
-    public function handle(Event $event): void
+    public function __invoke(Event $event): void
     {
         ++$this->events;
         $scope = $event->scope;

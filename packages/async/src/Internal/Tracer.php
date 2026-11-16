@@ -11,7 +11,6 @@ use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Joining;
-use Thesis\Async\Trace\Observer;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
@@ -19,6 +18,7 @@ use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
+use Thesis\Dispatcher;
 use Thesis\SourceLocation\Caller;
 use Thesis\SourceLocation\Location;
 use Time\Duration;
@@ -26,10 +26,12 @@ use function Thesis\SourceLocation\caller;
 
 /**
  * Turns what happens to the scopes into the events of `Thesis\Async\Trace\observe()`. Bound to {@see Scope::$tracer}
- * only while an observer is attached: every hook of the library is `Scope::$tracer?->...`, so without one
- * a hook costs a null check and does not evaluate its arguments.
+ * only while a dispatcher is attached: every hook of the library is `Scope::$tracer?->...`, so without one
+ * a hook costs a null check and does not evaluate its arguments. An event that no listener gets is not built:
+ * the location of a scope and the caller of a wait cost a backtrace each.
  *
- * A scope is numbered when the tracer sees it first. The tasks and the daemons scopes of a group are not
+ * A scope is numbered when the tracer sees it first, whether anyone gets its event or not: the numbers
+ * do not depend on what is listened to. The tasks and the daemons scopes of a group are not
  * scopes of the model: they get the number of the body, whose group owns them.
  *
  * @internal
@@ -37,9 +39,16 @@ use function Thesis\SourceLocation\caller;
 final class Tracer
 {
     /**
-     * @var list<Observer>
+     * @var list<Dispatcher>
      */
-    private array $observers = [];
+    private array $dispatchers = [];
+
+    /**
+     * Whether any attached dispatcher listens to an event class, reset when the dispatchers change.
+     *
+     * @var array<class-string<Event>, bool>
+     */
+    private array $listens = [];
 
     /**
      * @var \WeakMap<Scope, positive-int>
@@ -59,10 +68,11 @@ final class Tracer
      */
     private int $lastId = 0;
 
-    public static function attach(Observer $observer): self
+    public static function attach(Dispatcher $dispatcher): self
     {
         $tracer = Scope::$tracer ??= new self();
-        $tracer->observers[] = $observer;
+        $tracer->dispatchers[] = $dispatcher;
+        $tracer->listens = [];
 
         return $tracer;
     }
@@ -76,32 +86,36 @@ final class Tracer
     /**
      * Observations may end in any order: their calls run in different fibers.
      */
-    public function detach(Observer $observer): void
+    public function detach(Dispatcher $dispatcher): void
     {
-        $index = array_search($observer, $this->observers, strict: true);
+        $index = array_search($dispatcher, $this->dispatchers, strict: true);
 
         if ($index !== false) {
-            array_splice($this->observers, $index, 1);
+            array_splice($this->dispatchers, $index, 1);
+            $this->listens = [];
         }
 
         // The next observation numbers its scopes from 1 again.
-        if ($this->observers === [] && Scope::$tracer === $this) {
+        if ($this->dispatchers === [] && Scope::$tracer === $this) {
             Scope::$tracer = null;
         }
     }
 
     public function groupCreated(Scope $body, Scope $tasks, Scope $daemons, Scope $parent): void
     {
-        $event = new GroupCreated(
-            scope: $this->created($body, $parent),
-            at: Instant::now(),
-            parent: $this->idOrNull($parent),
-            cancelled: $body->isCancelled(),
-            location: self::location(),
-        );
-        $this->ids[$tasks] = $event->scope;
-        $this->ids[$daemons] = $event->scope;
-        $this->emit($event);
+        $id = $this->created($body, $parent);
+        $this->ids[$tasks] = $id;
+        $this->ids[$daemons] = $id;
+
+        if ($this->listens(GroupCreated::class)) {
+            $this->emit(new GroupCreated(
+                scope: $id,
+                at: Instant::now(),
+                parent: $this->idOrNull($parent),
+                cancelled: $body->isCancelled(),
+                location: self::location(),
+            ));
+        }
     }
 
     /**
@@ -109,43 +123,59 @@ final class Tracer
      */
     public function taskCreated(Scope $scope, Scope $body, bool $daemon, callable $task): void
     {
-        $this->emit(new TaskCreated(
-            scope: $this->created($scope, $body),
-            at: Instant::now(),
-            group: $this->id($body),
-            daemon: $daemon,
-            task: $task,
-            cancelled: $scope->isCancelled(),
-            location: self::location(),
-        ));
+        $id = $this->created($scope, $body);
+
+        if ($this->listens(TaskCreated::class)) {
+            $this->emit(new TaskCreated(
+                scope: $id,
+                at: Instant::now(),
+                group: $this->id($body),
+                daemon: $daemon,
+                task: $task,
+                cancelled: $scope->isCancelled(),
+                location: self::location(),
+            ));
+        }
     }
 
     public function timeoutCreated(Scope $scope, Scope $parent, Duration $duration): void
     {
-        $this->emit(new TimeoutCreated(
-            scope: $this->created($scope, $parent),
-            at: Instant::now(),
-            parent: $this->idOrNull($parent),
-            duration: $duration,
-            cancelled: $scope->isCancelled(),
-            location: self::location(),
-        ));
+        $id = $this->created($scope, $parent);
+
+        if ($this->listens(TimeoutCreated::class)) {
+            $this->emit(new TimeoutCreated(
+                scope: $id,
+                at: Instant::now(),
+                parent: $this->idOrNull($parent),
+                duration: $duration,
+                cancelled: $scope->isCancelled(),
+                location: self::location(),
+            ));
+        }
     }
 
     public function shieldCreated(Scope $scope, Scope $parent): void
     {
-        $this->emit(new ShieldCreated(
-            scope: $this->created($scope, $parent),
-            at: Instant::now(),
-            parent: $this->idOrNull($parent),
-            cancelled: $scope->isCancelled(),
-            location: self::location(),
-        ));
+        $id = $this->created($scope, $parent);
+
+        if ($this->listens(ShieldCreated::class)) {
+            $this->emit(new ShieldCreated(
+                scope: $id,
+                at: Instant::now(),
+                parent: $this->idOrNull($parent),
+                cancelled: $scope->isCancelled(),
+                location: self::location(),
+            ));
+        }
     }
 
     public function taskStarted(Scope $scope): void
     {
-        $this->emit(new TaskStarted($this->id($scope), Instant::now()));
+        $id = $this->id($scope);
+
+        if ($this->listens(TaskStarted::class)) {
+            $this->emit(new TaskStarted($id, Instant::now()));
+        }
     }
 
     /**
@@ -161,7 +191,7 @@ final class Tracer
     {
         $id = $this->idOrNull($scope);
 
-        if ($id !== null) {
+        if ($id !== null && $this->listens(Suspended::class)) {
             $this->emit(new Suspended($id, Instant::now(), self::waitingCaller()));
         }
 
@@ -179,7 +209,7 @@ final class Tracer
             }
         }
 
-        if ($id !== null) {
+        if ($id !== null && $this->listens(Resumed::class)) {
             $this->emit(new Resumed($id, Instant::now(), $error));
         }
 
@@ -191,7 +221,7 @@ final class Tracer
     }
 
     /**
-     * Called after {@see Scope::notify()} has marked the subtree: the observer never runs in the middle of the walk.
+     * Called after {@see Scope::notify()} has marked the subtree: no listener runs in the middle of the walk.
      */
     public function cancelled(Scope $scope, CancelCause $cause, ?Scope $by): void
     {
@@ -210,24 +240,37 @@ final class Tracer
             unset($this->pending[$pending]);
         }
 
-        $this->emit(new ScopeCancelled(
-            scope: $this->id($scope),
-            at: Instant::now(),
-            cause: $cause,
-            by: $by === null ? null : $this->idOrNull($by),
-            reached: $reached,
-        ));
+        $id = $this->id($scope);
+        $byId = $by === null ? null : $this->idOrNull($by);
+
+        if ($this->listens(ScopeCancelled::class)) {
+            $this->emit(new ScopeCancelled(
+                scope: $id,
+                at: Instant::now(),
+                cause: $cause,
+                by: $byId,
+                reached: $reached,
+            ));
+        }
     }
 
     public function joining(Scope $body): void
     {
-        $this->emit(new Joining($this->id($body), Instant::now()));
+        $id = $this->id($body);
+
+        if ($this->listens(Joining::class)) {
+            $this->emit(new Joining($id, Instant::now()));
+        }
     }
 
     public function ended(Scope $scope, mixed $value, ?\Throwable $error): void
     {
         unset($this->pending[$scope]);
-        $this->emit(new Ended($this->id($scope), Instant::now(), $value, $error));
+        $id = $this->id($scope);
+
+        if ($this->listens(Ended::class)) {
+            $this->emit(new Ended($id, Instant::now(), $value, $error));
+        }
     }
 
     /**
@@ -262,10 +305,21 @@ final class Tracer
         return $scope === ROOT_SCOPE ? null : $this->id($scope);
     }
 
+    /**
+     * @param class-string<Event> $class
+     */
+    private function listens(string $class): bool
+    {
+        return $this->listens[$class] ??= array_any(
+            $this->dispatchers,
+            static fn(Dispatcher $dispatcher) => $dispatcher->listens($class),
+        );
+    }
+
     private function emit(Event $event): void
     {
-        foreach ($this->observers as $observer) {
-            $observer->handle($event);
+        foreach ($this->dispatchers as $dispatcher) {
+            $dispatcher->dispatch($event);
         }
     }
 

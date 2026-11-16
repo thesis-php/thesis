@@ -11,7 +11,6 @@ use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Joining;
-use Thesis\Async\Trace\Observer;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
@@ -19,6 +18,7 @@ use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
+use Thesis\Dispatcher;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\run;
 use function Thesis\Formatter\formatValue;
@@ -40,7 +40,7 @@ use function Thesis\Time\toNs;
  * }
  * @phpstan-type TraceEvent array{t: int|float, text: non-empty-string, kind: non-empty-string, scope: non-empty-string}
  */
-final class Recorder implements Observer
+final class Recorder
 {
     /**
      * @var array<positive-int, Row>
@@ -61,7 +61,7 @@ final class Recorder implements Observer
     public static function record(callable $program): array
     {
         $recorder = new self();
-        run(static fn() => observe($recorder, $program));
+        run(static fn() => observe(new Dispatcher($recorder), $program));
 
         return ['rows' => array_values($recorder->rows), 'events' => $recorder->events];
     }
@@ -79,8 +79,7 @@ final class Recorder implements Observer
 
     private function __construct() {}
 
-    #[\Override]
-    public function handle(Event $event): void
+    public function __invoke(Event $event): void
     {
         $this->start ??= $event->at;
         $t = toNs($event->at->since($this->start)) / 1e6;

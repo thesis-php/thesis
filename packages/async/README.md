@@ -889,7 +889,8 @@ every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute doe
 
 ### What the tree does: `Trace\observe()`
 
-`Trace\observe($observer, $fn)` gives an observer the events of the whole scope tree while `$fn` runs, of every fiber:
+`Trace\observe($dispatcher, $fn)` dispatches the events of the whole scope tree while `$fn` runs, of every fiber,
+to the listeners of a [`Thesis\Dispatcher`](https://github.com/thesis-php/dispatcher) by the type of their parameter:
 a group, a task or a daemon, a `timeout()` or a `shield()` is created (with its parent and where it is called from),
 a task starts, a scope waits and wakes up, an owner cancels (why, who, and every scope it reached), a group joins,
 a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `VirtualTime\run()`
@@ -898,21 +899,15 @@ the trace is the same on every run: the scopes are numbered from 1 in the order 
 ```php
 use Thesis\Async\Trace;
 use Thesis\Async\VirtualTime;
+use Thesis\Dispatcher;
 
-final class PrintTrace implements Trace\Observer
-{
-    public function handle(Trace\Event $event): void
-    {
-        match (true) {
-            $event instanceof Trace\TaskCreated => print "#{$event->scope} spawned at {$event->location}\n",
-            $event instanceof Trace\Suspended => print "#{$event->scope} waits in {$event->caller}\n",
-            $event instanceof Trace\ScopeCancelled => print "#{$event->scope} cancelled: {$event->cause->name}\n",
-            default => null,
-        };
-    }
-}
+$printTrace = new Dispatcher(
+    static function (Trace\TaskCreated $event): void { print "#{$event->scope} spawned at {$event->location}\n"; },
+    static function (Trace\Suspended $event): void { print "#{$event->scope} waits in {$event->caller}\n"; },
+    static function (Trace\ScopeCancelled $event): void { print "#{$event->scope} cancelled: {$event->cause->name}\n"; },
+);
 
-VirtualTime\run(static fn() => Trace\observe(new PrintTrace(), $program));
+VirtualTime\run(static fn() => Trace\observe($printTrace, $program));
 // #2 spawned at /app/src/Worker.php:21
 // #2 waits in Thesis\Async\delay() at /app/src/Worker.php:34
 // #1 cancelled: Failure
@@ -922,10 +917,11 @@ It answers what a stack trace cannot: who cancelled a task and why (`Cancelled` 
 running and where each task waits, which task never ended. On virtual time a trace is also a test of the order
 and the timing of a concurrent scenario, compared with an expected one.
 
-An observer only observes: it must not throw, wait or cancel, and must not keep the values and the errors
-of the events, or it holds them alive past their scope. Without an observer a wait costs one check of a static
-property more; with one, a wait costs about 4 µs (two events and a short backtrace to find where it is written).
-Observations nest: each observer gets the events until its own call returns.
+A listener only observes: it must not throw, wait or cancel, and must not keep the values and the errors
+of the events, or it holds them alive past their scope. An event that no listener gets is not built.
+Without an observation a wait costs one check of a static property more; with listeners of `Suspended`
+and `Resumed`, a wait costs about 4 µs (two events and a short backtrace to find where it is written).
+Observations nest: each dispatcher gets the events until its own call returns.
 
 ### Streams: `StreamWatcher`
 
@@ -1154,7 +1150,7 @@ all([user, orders])              orders fails after 50 ms
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
 | `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(Duration)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
-| `Trace\observe(Trace\Observer, callable(): T): T`; `Observer::handle(Trace\Event)` | the events of the scope tree while a callable runs |
+| `Trace\observe(Dispatcher, callable(): T): T`, listeners of `Trace\Event` and its classes | the events of the scope tree while a callable runs |
 
 ## Limitations
 

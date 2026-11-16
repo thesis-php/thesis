@@ -9,6 +9,7 @@ use Random\Randomizer;
 use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Dispatcher;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\run;
@@ -47,7 +48,7 @@ final class RandomizedVirtualTimeTest
     public function traceChangesNothing(): void
     {
         $checker = new TraceChecker();
-        observe($checker, fn() => $this->seeds(count: 100, program: $this->pipes(...)));
+        observe(new Dispatcher($checker), fn() => $this->seeds(count: 100, program: $this->pipes(...)));
 
         Assert::true($checker->events > 0);
         Assert::same($checker->violations, []);

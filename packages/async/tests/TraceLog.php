@@ -8,7 +8,6 @@ use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Joining;
-use Thesis\Async\Trace\Observer;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
@@ -21,7 +20,7 @@ use function Thesis\Time\toNs;
 /**
  * Writes the events as lines: "<seconds since the first event> #<scope> <what>".
  */
-final class TraceLog implements Observer
+final class TraceLog
 {
     /**
      * @var list<string>
@@ -35,8 +34,7 @@ final class TraceLog implements Observer
 
     private ?Instant $start = null;
 
-    #[\Override]
-    public function handle(Event $event): void
+    public function __invoke(Event $event): void
     {
         $this->events[] = $event;
         $this->start ??= $event->at;

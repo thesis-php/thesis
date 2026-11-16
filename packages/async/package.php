@@ -12,6 +12,7 @@ return new Manifest(
     version: '0.1',
     require: [
         'revolt/event-loop' => '^1.0.9',
+        'thesis/dispatcher' => '*',
         'thesis/source-location' => '*',
         'thesis/time' => '*',
     ],

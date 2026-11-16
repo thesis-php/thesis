@@ -6,9 +6,12 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\GroupCreated;
+use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
+use Thesis\Dispatcher;
 use Thesis\SourceLocation\Location;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
@@ -258,9 +261,9 @@ final class TraceTest
         $inner = new TraceLog();
 
         $result = null;
-        observe($outer, static function () use ($inner, &$result) {
+        observe(new Dispatcher($outer), static function () use ($inner, &$result) {
             shield(static fn() => null);
-            $result = observe($inner, static fn() => shield(static fn() => 42));
+            $result = observe(new Dispatcher($inner), static fn() => shield(static fn() => 42));
             shield(static fn() => null);
         });
         shield(static fn() => null);
@@ -270,11 +273,41 @@ final class TraceTest
         Assert::same(\count($outer->lines), 6);
     }
 
+    public function givesListenerOnlyEventsOfItsType(): void
+    {
+        $lines = [];
+        $listener = static function (ScopeCancelled|Ended $event) use (&$lines) {
+            $lines[] = '#' . $event->scope . ' ' . new \ReflectionClass($event)->getShortName();
+        };
+
+        observe(new Dispatcher($listener), static fn() => group(static function (Group $group) {
+            $handle = $group->spawn(static fn() => never());
+            delay(sec(1));
+            $handle->cancel();
+        }));
+
+        Assert::same($lines, ['#2 ScopeCancelled', '#2 Ended', '#1 Ended']);
+    }
+
+    public function numbersScopesWhetherTheirEventsAreListenedToOrNot(): void
+    {
+        $scopes = [];
+        $listener = static function (Ended $event) use (&$scopes) {
+            $scopes[] = $event->scope;
+        };
+
+        observe(new Dispatcher($listener), static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => shield(static fn() => null));
+        }));
+
+        Assert::same($scopes, [3, 2, 1]);
+    }
+
     public function stopsObservingWhenCallThrows(): void
     {
         $log = new TraceLog();
 
-        $error = thrown(static fn() => observe($log, static fn() => throw new \RuntimeException()));
+        $error = thrown(static fn() => observe(new Dispatcher($log), static fn() => throw new \RuntimeException()));
         shield(static fn() => null);
 
         Assert::instanceOf($error, \RuntimeException::class);
@@ -287,7 +320,7 @@ final class TraceTest
     private static function record(callable $fn): TraceLog
     {
         $log = new TraceLog();
-        observe($log, $fn);
+        observe(new Dispatcher($log), $fn);
 
         return $log;
     }
