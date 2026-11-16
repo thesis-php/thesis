@@ -41,7 +41,7 @@ final class Location
      */
     public static function of(string $file, int $line): self
     {
-        if (preg_match("/^(.+?)\\((\\d+)\\) : eval\\(\\)'d code/", $file, $matches) === 1) {
+        if (preg_match("/^(.+?)\\(([1-9]\\d*)\\) : eval\\(\\)'d code/s", $file, $matches) === 1) {
             /** @var non-empty-string $evalFile */
             $evalFile = $matches[1];
             /** @var positive-int $evalLine */
@@ -99,7 +99,8 @@ final class Location
         }
 
         // Like "/app/vendor/composer/../../": resolved, it can be compared with the paths of files.
-        $root = realpath(InstalledVersions::getRootPackage()['install_path']);
+        // A root outside open_basedir warns, and a path that is not shortened is an answer, not an error.
+        $root = @realpath(InstalledVersions::getRootPackage()['install_path']);
 
         if ($root === false || $root === \DIRECTORY_SEPARATOR) {
             return null;

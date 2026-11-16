@@ -27,13 +27,38 @@ final class CallerTest
         Assert::equals($caller, new Caller(new Location(__FILE__, $line), Library::class . '::call'));
     }
 
-    public function namesClosureCalledFromLibrary(): void
+    public function findsCallInClosureCalledByLibrary(): void
     {
         $caller = Library::callBack(static fn() => Library::call());
 
         Assert::same($caller?->location->file, __FILE__);
         Assert::same($caller->location->line, __LINE__ - 3);
         Assert::same($caller->callee, Library::class . '::call');
+    }
+
+    public function namesClosureAsPhpNamesIt(): void
+    {
+        $closure = Library::closure();
+        $caller = $closure();
+        $declaredAt = Location::ofFunction(new \ReflectionFunction($closure))?->line;
+
+        Assert::same($caller?->callee, '{closure:' . Library::class . '::closure():' . $declaredAt . '}');
+    }
+
+    public function namesMethodOfAnonymousClassWithoutWhereItIsDeclared(): void
+    {
+        $caller = Library::anonymousMethod()();
+
+        Assert::same($caller?->callee, 'class@anonymous::call');
+    }
+
+    public function namesClosureOfAnonymousClassWithoutWhereTheClassIsDeclared(): void
+    {
+        $closure = Library::closureOfAnonymousClass();
+        $caller = $closure();
+        $declaredAt = Location::ofFunction(new \ReflectionFunction($closure))?->line;
+
+        Assert::same($caller?->callee, '{closure:class@anonymous::make():' . $declaredAt . '}');
     }
 
     public function looksThroughLimitedFrames(): void

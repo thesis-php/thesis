@@ -32,6 +32,18 @@ final class LocationTest
         );
     }
 
+    public function keepsEvalOfLineZero(): void
+    {
+        $file = "/app/src/foo.php(0) : eval()'d code";
+
+        Assert::equals(Location::of($file, 3), new Location($file, 3));
+    }
+
+    public function resolvesEvalOfFileWithNewline(): void
+    {
+        Assert::equals(Location::of("/app/a\nb/foo.php(7) : eval()'d code", 3), new Location("/app/a\nb/foo.php", 7));
+    }
+
     public function locatesFunction(): void
     {
         $closure = static fn() => null;
@@ -57,6 +69,33 @@ final class LocationTest
         $file = 'packages/source-location/tests/LocationTest.php';
 
         Assert::same(new Location(__FILE__, 1)->shortFile, $file);
+    }
+
+    public function keepsFileIfProjectRootIsOutsideOpenBasedir(): void
+    {
+        $code = <<<'PHP'
+            require $argv[1] . '/vendor/autoload.php';
+            set_error_handler(static function (int $type, string $message) {
+                if ((error_reporting() & $type) !== 0) {
+                    throw new \ErrorException($message);
+                }
+
+                return false;
+            });
+            ini_set('open_basedir', $argv[1] . '/packages:' . $argv[1] . '/vendor');
+            echo new \Thesis\SourceLocation\Location('/elsewhere/foo.php', 1)->shortFile;
+            PHP;
+        $process = proc_open(
+            command: [PHP_BINARY, '-r', $code, \dirname(__DIR__, 3)],
+            descriptor_spec: [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            pipes: $pipes,
+        );
+        \assert(\is_resource($process) && isset($pipes[1], $pipes[2]));
+
+        $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+
+        Assert::same(proc_close($process), 0, $output);
+        Assert::same($output, '/elsewhere/foo.php');
     }
 
     public function keepsFileOutsideProjectRoot(): void

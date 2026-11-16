@@ -13,7 +13,8 @@ final readonly class Caller
 {
     /**
      * @param non-empty-string $callee the function or the method called, like `Thesis\Async\delay`
-     *     or `App\Client::send`, a closure as PHP names it (`{closure:App\Client::send():12}`)
+     *     or `App\Client::send`, a closure as PHP names it (`{closure:App\Client::send():12}`),
+     *     an anonymous class without where it is declared (`class@anonymous::send`)
      */
     public function __construct(
         public Location $location,

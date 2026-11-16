@@ -54,6 +54,10 @@ $caller->callee;   // App\Library\Container::register
 (string) $caller;  // App\Library\Container::register() at /app/src/Handler.php:42
 ```
 
+A closure is named as PHP names it (`{closure:App\Client::send():12}`), an anonymous class without where
+it is declared (`class@anonymous::send`, `{closure:class@anonymous::send():12}`): the full name of the class
+has a NUL byte, which ends the string in a log.
+
 It returns `null` if no call within `$limit` frames is outside `$skip`: a call made by the engine itself
 (a callback of the event loop) is written nowhere and is passed over. Skip the directory of the event loop too
 when the library runs its own code in its callbacks.

@@ -9,7 +9,7 @@ return new Manifest(
     licenseSince: 2026,
     version: '0.1',
     require: [
-        'composer-runtime-api' => '^2.0',
+        'composer-runtime-api' => '^2.1',
     ],
     requireDev: [
         'testo/assert' => '^0.1.17',

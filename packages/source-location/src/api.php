@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\SourceLocation;
 
+use function Thesis\SourceLocation\Internal\callee;
+
 /**
  * The first call of the stack, from the innermost, that is written in a file outside the directories of $skip:
  * the call of a library from the code that uses it. Null if there is none within $limit frames.
@@ -38,11 +40,10 @@ function caller(array $skip, int $limit = 20): ?Caller
             }
         }
 
-        $class = $frame['class'] ?? null;
-        /** @var non-empty-string $callee the engine names every function it calls */
-        $callee = $class === null ? $frame['function'] : $class . '::' . $frame['function'];
+        /** @var non-empty-string $function the engine names every function it calls */
+        $function = $frame['function'];
 
-        return new Caller(Location::of($file, $line), $callee);
+        return new Caller(Location::of($file, $line), callee($function, $frame['class'] ?? null));
     }
 
     return null;

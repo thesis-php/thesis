@@ -20,7 +20,7 @@
     "require": {
         "php": "^8.5",
         "php-64bit": "*",
-        "composer-runtime-api": "^2.0"
+        "composer-runtime-api": "^2.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
@@ -32,6 +32,7 @@
             "Thesis\\SourceLocation\\": "src/"
         },
         "files": [
+            "src/Internal/internal.php",
             "src/api.php"
         ]
     },
