@@ -10,7 +10,7 @@ require_once __DIR__ . '/VirtualTime/functions.php';
 
 if (PHP_OS_FAMILY === 'Windows') {
     trigger_error(
-        'thesis does not support Windows, nothing is guaranteed to work. Need it? Open an issue: https://github.com/thesis-php/thesis/issues',
-        E_USER_WARNING,
+        message: 'thesis does not support Windows, nothing is guaranteed to work. Need it? Open an issue: https://github.com/thesis-php/thesis/issues',
+        error_level: E_USER_WARNING,
     );
 }

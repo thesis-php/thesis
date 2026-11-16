@@ -31,6 +31,11 @@ final class GroupImpl implements Group
      */
     private ?Cancelled $cancelled = null;
 
+    /**
+     * whether {@see cancelTasks()} has cancelled the tasks, before anything else did.
+     */
+    private bool $tasksCancelled = false;
+
     private int $tasks = 0;
 
     private int $daemons = 0;
@@ -41,12 +46,6 @@ final class GroupImpl implements Group
      * @var ?ContinuationImpl<null>
      */
     private ?ContinuationImpl $joiner = null;
-
-    private function __construct(
-        private readonly Scope $bodyScope,
-        private readonly Scope $tasksScope,
-        private readonly Scope $daemonsScope,
-    ) {}
 
     /**
      * Implementation of `Thesis\Async\group()`.
@@ -113,6 +112,12 @@ final class GroupImpl implements Group
         return $result;
     }
 
+    private function __construct(
+        private readonly Scope $bodyScope,
+        private readonly Scope $tasksScope,
+        private readonly Scope $daemonsScope,
+    ) {}
+
     public function spawn(callable $task): Task
     {
         return $this->start($this->tasksScope, $task);
@@ -125,7 +130,10 @@ final class GroupImpl implements Group
 
     public function cancelTasks(): void
     {
-        $this->tasksScope->cancel();
+        if (!$this->tasksScope->isCancelled()) {
+            $this->tasksCancelled = true;
+            $this->tasksScope->cancel();
+        }
     }
 
     private function fail(\Throwable $error): void
@@ -228,7 +236,9 @@ final class GroupImpl implements Group
                 $scope->throwIfCancelled();
                 // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
                 $handle->complete(
-                    $values === [] ? $scope->run($task) : Context::run($values, static fn() => $scope->run($task)),
+                    value: $values === []
+                        ? $scope->run($task)
+                        : Context::run($values, static fn() => $scope->run($task)),
                 );
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
@@ -236,7 +246,14 @@ final class GroupImpl implements Group
                     $handle->fail(new TaskCancelled($error));
 
                     // But if it came from outside, the group's work is incomplete, even if the body never awaits.
-                    if (!$daemon && $this->bodyScope->isCancelled()) {
+                    // Not if the group had cancelled the task before: an outer cancellation during its unwinding
+                    // has cut nothing short.
+                    if (
+                        !$daemon
+                        && !$this->tasksCancelled
+                        && !$handle->cancelledByHandle
+                        && $this->bodyScope->isCancelled()
+                    ) {
                         $this->cancelled ??= $error;
                     }
                 } else {

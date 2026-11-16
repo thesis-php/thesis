@@ -21,10 +21,6 @@ use function Thesis\Time\toNs;
  */
 final readonly class Expired
 {
-    private function __construct(
-        public Cancelled $cancelled,
-    ) {}
-
     /**
      * @template T
      * @param callable(): T $body
@@ -63,4 +59,8 @@ final readonly class Expired
             $scope->close();
         }
     }
+
+    private function __construct(
+        public Cancelled $cancelled,
+    ) {}
 }

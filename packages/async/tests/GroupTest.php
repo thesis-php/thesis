@@ -380,6 +380,74 @@ final class GroupTest
         Assert::same($result, 'result');
     }
 
+    public function outerCancellationOfTaskCancelledByHandleDoesNotDiscardResult(): void
+    {
+        $result = timeout(sec(2), static fn() => group(static function (Group $group) {
+            $handle = $group->spawn(static function () {
+                try {
+                    never();
+                } finally {
+                    shield(static fn() => delay(sec(3)));
+                }
+            });
+
+            delay(sec(1));
+            $handle->cancel();
+
+            return 'result';
+        }));
+
+        Assert::same($result, 'result');
+    }
+
+    public function outerCancellationOfTasksCancelledByGroupDoesNotDiscardResult(): void
+    {
+        $result = timeout(sec(2), static fn() => group(static function (Group $group) {
+            $group->spawn(static function () {
+                try {
+                    never();
+                } finally {
+                    shield(static fn() => delay(sec(3)));
+                }
+            });
+
+            delay(sec(1));
+            $group->cancelTasks();
+
+            return 'result';
+        }));
+
+        Assert::same($result, 'result');
+    }
+
+    public function outerCancellationOfTaskCancelledByHandleAfterItStillThrows(): void
+    {
+        Expect::exception(TimedOut::class);
+
+        timeout(sec(1), static fn() => group(static function (Group $group) {
+            $handle = $group->spawn(never(...));
+
+            untilCancelled();
+            $handle->cancel();
+
+            return 'result';
+        }));
+    }
+
+    public function outerCancellationOfTasksCancelledByGroupAfterItStillThrows(): void
+    {
+        Expect::exception(TimedOut::class);
+
+        timeout(sec(1), static fn() => group(static function (Group $group) {
+            $group->spawn(never(...));
+
+            untilCancelled();
+            $group->cancelTasks();
+
+            return 'result';
+        }));
+    }
+
     public function taskFailureWinsOverOuterCancellation(): void
     {
         Expect::exception(\RuntimeException::class)->withMessage('connection reset');

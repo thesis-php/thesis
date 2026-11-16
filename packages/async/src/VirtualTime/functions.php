@@ -46,7 +46,7 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
         $driver = new EventLoop\DriverFactory()->create();
     } elseif ($driver === EventLoop::getDriver() || $driver->isRunning() || $driver->getIdentifiers() !== []) {
         throw new \LogicException(
-            'VirtualTime\run() needs a fresh driver: not the current one, not running and with no callbacks.',
+            message: 'VirtualTime\run() needs a fresh driver: not the current one, not running and with no callbacks.',
         );
     }
 

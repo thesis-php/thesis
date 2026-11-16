@@ -23,6 +23,12 @@ final class TaskImpl implements Task
     }
 
     /**
+     * whether {@see cancel()} has cancelled it, before anything else did: then an outer cancellation
+     * that comes later has not cut it short, its group has.
+     */
+    public private(set) bool $cancelledByHandle = false;
+
+    /**
      * @var Deferred<T>
      */
     private readonly Deferred $result;
@@ -35,7 +41,10 @@ final class TaskImpl implements Task
 
     public function cancel(): void
     {
-        $this->scope->cancel();
+        if (!$this->scope->isCancelled()) {
+            $this->cancelledByHandle = true;
+            $this->scope->cancel();
+        }
     }
 
     public function await(): mixed

@@ -108,3 +108,7 @@ is not here: the tools fix the code anyway.
 
 - Rejected: a mechanical rule for named arguments like "name every argument of a call with more than two",
   it is noise around the standard library.
+- Rejected: a Rector or PHP CS Fixer rule for the named arguments of a multi-line call and for the order
+  of static constructors. Both are fragile (the parameters of a method are known only through reflection,
+  a static constructor is not always one that returns `self`) and cost much code to write and maintain.
+  The reviews catch them.

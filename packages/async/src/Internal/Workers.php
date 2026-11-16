@@ -44,6 +44,18 @@ final class Workers
     private int $busy = 0;
 
     /**
+     * @template TKey
+     * @template TValue
+     * @param iterable<TKey, TValue> $items
+     * @param positive-int $concurrency
+     * @param \Closure(TValue, TKey): mixed $fn
+     */
+    public static function start(Group $group, iterable $items, int $concurrency, \Closure $fn): void
+    {
+        new self(group: $group, items: $items, concurrency: $concurrency, fn: $fn)->spawn();
+    }
+
+    /**
      * @param iterable<K, T> $items
      * @param positive-int $concurrency
      * @param \Closure(T, K): mixed $fn
@@ -56,18 +68,6 @@ final class Workers
     ) {
         $this->items = (static fn() => yield from $items)();
         $this->mutex = \is_array($items) ? null : new LocalMutex();
-    }
-
-    /**
-     * @template TKey
-     * @template TValue
-     * @param iterable<TKey, TValue> $items
-     * @param positive-int $concurrency
-     * @param \Closure(TValue, TKey): mixed $fn
-     */
-    public static function start(Group $group, iterable $items, int $concurrency, \Closure $fn): void
-    {
-        new self(group: $group, items: $items, concurrency: $concurrency, fn: $fn)->spawn();
     }
 
     private function spawn(): void

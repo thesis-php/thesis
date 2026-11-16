@@ -19,11 +19,6 @@ namespace Thesis\Async;
  */
 final class Cancelled extends \Error
 {
-    private function __construct()
-    {
-        parent::__construct('The scope is cancelled.');
-    }
-
     /**
      * @internal thrown only by the library, where the current scope is cancelled
      */
@@ -36,5 +31,10 @@ final class Cancelled extends \Error
         $cancelled->line = $caller['line'] ?? $cancelled->line;
 
         return $cancelled;
+    }
+
+    private function __construct()
+    {
+        parent::__construct('The scope is cancelled.');
     }
 }

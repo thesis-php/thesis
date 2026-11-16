@@ -46,7 +46,7 @@ final class ContinuationImpl implements Continuation
         // Cancellation of a wait is the scope's business: it goes through interrupt().
         if ($error instanceof Cancelled) {
             throw new \ValueError(
-                'A continuation cannot be thrown Cancelled: the waiting scope is not cancelled. Throw a regular exception.',
+                message: 'A continuation cannot be thrown Cancelled: the waiting scope is not cancelled. Throw a regular exception.',
             );
         }
 

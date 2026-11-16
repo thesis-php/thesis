@@ -564,14 +564,16 @@ function awaitSignal(int $signal, int ...$signals): int
  * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
  * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
  *
- * Outside $fn, and before the next tick of the loop, when Revolt installs
- * the handlers, a signal gets the default action.
+ * Outside $fn a signal gets the default action. Revolt installs the handlers at the next tick of the loop,
+ * so trapSignals() waits for it before calling $fn: it is a cancellation point, and $fn does not run
+ * in a cancelled scope.
  *
  * @api
  * @template T
  * @param non-empty-array<positive-int> $signals
  * @param callable(SignalTrap): T $fn
  * @return T
+ * @throws Cancelled if the scope is cancelled before $fn runs
  * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
  */
 function trapSignals(array $signals, callable $fn): mixed

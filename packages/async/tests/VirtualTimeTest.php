@@ -271,6 +271,49 @@ final class VirtualTimeTest
         assertNoCallbacksLeft();
     }
 
+    public function streamReadyInsideProcessIsNotJumpedPastWhileAnotherTimerIsPending(): void
+    {
+        /** @var array{resource, resource} $pair */
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
+        [$reader, $writer] = $pair;
+        stream_set_blocking($reader, false);
+        $watcher = new StreamWatcher($reader);
+        $start = Instant::now();
+
+        $elapsed = timeout(sec(100), static function () use ($writer, $watcher, $start) {
+            delay(sec(1));
+            fwrite($writer, 'ping');
+            $watcher->readable();
+            delay(sec(1));
+
+            return secondsSince($start);
+        });
+
+        $watcher->close();
+        Assert::same($elapsed, 2.0);
+        assertNoCallbacksLeft();
+    }
+
+    public function signalInsideProcessIsNotJumpedPastWhileAnotherTimerIsPending(): void
+    {
+        $start = Instant::now();
+
+        $elapsed = timeout(sec(100), static fn() => trapSignals(
+            signals: [SIGUSR1],
+            fn: static function (SignalTrap $trap) use ($start) {
+                delay(sec(1));
+                posix_kill(posix_getpid(), SIGUSR1);
+                $trap->receive();
+                delay(sec(1));
+
+                return secondsSince($start);
+            },
+        ));
+
+        Assert::same($elapsed, 2.0);
+        assertNoCallbacksLeft();
+    }
+
     public function runRestoresPreviousDriver(): void
     {
         $driver = EventLoop::getDriver();

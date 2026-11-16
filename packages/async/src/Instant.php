@@ -23,17 +23,17 @@ use function Thesis\Time\toNs;
  */
 final readonly class Instant
 {
+    public static function now(): self
+    {
+        return new self(Scope::now());
+    }
+
     /**
      * @param int $nanoseconds since the unknown origin of the clock, as `Internal\Scope::now()`
      */
     private function __construct(
         private int $nanoseconds,
     ) {}
-
-    public static function now(): self
-    {
-        return new self(Scope::now());
-    }
 
     /**
      * How long $fn takes, waits included. Its result is dropped: capture it by reference if needed.

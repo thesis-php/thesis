@@ -46,7 +46,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   The flag check alone is the internal `Scope::throwIfCancelled()`.
 - If the event source fires before the cancellation, `suspend()` returns the value instead of throwing.
 - A signal never cancels a scope by itself: a shutdown is a group whose body returns after `awaitSignal()`.
-  `trapSignals()` holds referenced Revolt callbacks while its callable runs; `awaitSignal()` is a trap around one `receive()`,
+  `trapSignals()` holds referenced Revolt callbacks while its callable runs, and calls it only after a `checkpoint()`:
+  Revolt installs a signal handler at the next tick, and a signal before it gets the default action; `awaitSignal()` is a trap around one `receive()`,
   so a signal outside the wait gets the default action (a second Ctrl+C kills the process).
   `SignalTrap` is not a queue and not a `Channel`: like the OS, at most one pending signal per number, in the order
   they first came, so a repeated signal never pushes out another one. It hands a signal over like `Channel` hands a value:
@@ -56,7 +57,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `Group::cancelTasks()` cancels the tasks and daemons, not the body, and it is sticky: a task spawned afterwards
   never runs. A failure cancels the body too.
 - Cancelling a task does not fail its group; a task failure does, and the first failure is the one rethrown.
-  A regular task cut short by an outer cancellation makes `group()` throw `Cancelled` after join.
+  A regular task cut short by an outer cancellation makes `group()` throw `Cancelled` after join. One that the group
+  has cancelled before (`Task::cancel()`, `cancelTasks()`, the losers of `race()`) is not cut short by an outer
+  cancellation that comes while it unwinds: the result of the body stands. Who cancelled first is kept
+  in `TaskImpl::$cancelledByHandle` and `GroupImpl::$tasksCancelled`, the flags of the scopes cannot tell.
 - A task cancelled before it started never runs.
 - `race()` is `some(1, ...)`. `some()` decides once: after `$count` successes failures are dropped, after more than
   `count($tasks) - $count` failures successes are dropped and every later failure goes to `suppressed()` of the first.
@@ -110,7 +114,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The clock is not read in `suspend()`.
   The virtual clock starts at `Scope::now()` rounded up to a whole second, not at zero: a time captured before `run()`
   stays in the past.
-- `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run since the previous pump.
+- `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run during two pumps in a row:
+  the pump is a defer, and the defers of a tick run before the stream and signal callbacks found ready in it,
+  so after one idle pump a stream written to inside the process may still be ready behind it.
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
   `VirtualTime\run()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is finished.
@@ -177,6 +183,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   on every call, invisible on virtual time otherwise), with the longest `Duration` or an extreme rate, and, if it keeps
   a callback in the loop across calls, after that callback is dropped with its driver (`VirtualTime\run()` drops
   what is left). None of these was tested, and each hid a defect.
+- A stream or a signal on virtual time is tested with another timer pending (a `timeout()` around it):
+  without one, the pump stops while the inner driver waits, and the jump past a ready stream is never seen.
+- An outer cancellation is tested against everything the group may have cancelled itself before it:
+  daemons, `Task::cancel()`, `cancelTasks()`, the losers of `race()` and `some()`.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,

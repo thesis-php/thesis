@@ -50,7 +50,7 @@ final class Deferred
     {
         if ($error instanceof Cancelled) {
             throw new \ValueError(
-                'A deferred cannot fail with Cancelled: its awaiters are not cancelled. Fail it with a regular exception.',
+                message: 'A deferred cannot fail with Cancelled: its awaiters are not cancelled. Fail it with a regular exception.',
             );
         }
 

@@ -26,7 +26,7 @@ function never(): never
 {
     suspend(
         /** @param Continuation<null> $_ */
-        static fn(Continuation $_) => static function () {},
+        register: static fn(Continuation $_) => static function () {},
     );
 
     throw new \LogicException('A wait without an event source has returned.');

@@ -429,7 +429,8 @@ The two differ in when a signal gets its default action, which for most signals 
 `trapSignals()` handles them until it returns, so a SIGHUP that comes during `reload()` waits in the trap.
 Like the OS, a trap keeps at most one pending signal per number: ten SIGHUPs during a reload ask for one more.
 
-Revolt installs the handlers at the next tick of the event loop. Both are waits like any other: cancellable,
+Revolt installs the handlers at the next tick of the event loop: `trapSignals()` waits for it before calling
+its callable, so a signal sent from inside it is caught. Both are waits like any other: cancellable,
 and they keep the event loop running. They need a driver that supports signals: ext-pcntl, ext-ev or ext-uv.
 
 ### CPU-bound loops: `checkpoint()`

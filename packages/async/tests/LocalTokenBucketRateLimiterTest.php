@@ -252,7 +252,7 @@ final class LocalTokenBucketRateLimiterTest
     public function rateMustBePositive(float $perSecond, string $shown): void
     {
         $exception = withoutWarnings(
-            static fn() => thrown(static fn() => new LocalTokenBucketRateLimiter($perSecond, 1)),
+            fn: static fn() => thrown(static fn() => new LocalTokenBucketRateLimiter($perSecond, 1)),
         );
 
         Assert::instanceOf($exception, \ValueError::class);

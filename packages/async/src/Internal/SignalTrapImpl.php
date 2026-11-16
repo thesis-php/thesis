@@ -8,6 +8,7 @@ use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
 use Thesis\Async\SignalTrap;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\suspend;
 
 /**
@@ -28,11 +29,6 @@ final class SignalTrapImpl implements SignalTrap
 
     private bool $released = false;
 
-    private function __construct()
-    {
-        $this->receivers = new WaitQueue();
-    }
-
     /**
      * The core of `Thesis\Async\trapSignals()`.
      *
@@ -40,6 +36,7 @@ final class SignalTrapImpl implements SignalTrap
      * @param non-empty-array<positive-int> $signals
      * @param callable(SignalTrap): T $fn
      * @return T
+     * @throws Cancelled if the scope is cancelled before $fn runs
      * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
      */
     public static function trap(array $signals, callable $fn): mixed
@@ -56,6 +53,9 @@ final class SignalTrapImpl implements SignalTrap
                 $callbackIds[] = EventLoop::onSignal($signal, $callback);
             }
 
+            // Revolt installs the handlers at the next tick: until then, a signal would get its default action.
+            checkpoint();
+
             return $fn($trap);
         } finally {
             foreach ($callbackIds as $callbackId) {
@@ -64,6 +64,11 @@ final class SignalTrapImpl implements SignalTrap
 
             $trap->release();
         }
+    }
+
+    private function __construct()
+    {
+        $this->receivers = new WaitQueue();
     }
 
     public function receive(): int

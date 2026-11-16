@@ -20,8 +20,10 @@ use Revolt\EventLoop\Suspension;
  * Everything but the timers is the inner driver's: streams and signals are real, and so are the suspensions.
  * While a timer is pending, a pump (a defer of the inner driver) runs on every tick and keeps the inner loop
  * from blocking. Every callback given to this driver counts as activity, when it is given, enabled and when it runs;
- * when there has been none since the previous run of the pump, nothing can run, and the clock jumps. So a stream that
- * is to become ready from outside the process may be jumped past. Without a timer there is no pump, and the inner
+ * when there has been none during two runs of the pump in a row, nothing can run, and the clock jumps. One is not
+ * enough: the pump is a defer, and the defers of a tick run before the callbacks of the streams and signals
+ * the inner driver has found ready in it. So only a stream that is to become ready from outside the process
+ * may be jumped past. Without a timer there is no pump, and the inner
  * driver blocks on the streams and signals for real. When nothing at all is left,
  * Revolt ends the loop: a deadlock fails at once.
  *
@@ -70,6 +72,11 @@ final class VirtualTimeDriver implements Driver
     private int $activity = 0;
 
     private int $activityAtPump = 0;
+
+    /**
+     * how many runs of the pump in a row have seen no activity since the previous one.
+     */
+    private int $idlePumps = 0;
 
     /**
      * the inner defer of the pump, while there is one.
@@ -443,6 +450,8 @@ final class VirtualTimeDriver implements Driver
                 $this->pumpCallbackId = null;
             }
 
+            $this->idlePumps = 0;
+
             return;
         }
 
@@ -465,12 +474,14 @@ final class VirtualTimeDriver implements Driver
         unset($this->own[$this->pumpCallbackId]);
         $this->pumpCallbackId = null;
 
-        $idle = $this->activity === $this->activityAtPump;
+        $this->idlePumps = $this->activity === $this->activityAtPump ? $this->idlePumps + 1 : 0;
         $this->activityAtPump = $this->activity;
 
-        if ($idle && ($timer = $this->next()) !== null) {
-            // Nothing has run since the previous pump: nothing can run, let the time pass at once.
+        // The second idle run in a row: the callbacks found ready with the first one have run since, and none was.
+        if ($this->idlePumps >= 2 && ($timer = $this->next()) !== null) {
+            // Nothing can run: let the time pass at once.
             $this->clock->jump($timer->expiration);
+            $this->idlePumps = 0;
         }
 
         while (($timer = $this->next()) !== null && $timer->expiration <= $this->clock->now) {

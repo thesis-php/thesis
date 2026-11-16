@@ -156,6 +156,26 @@ final class AllAndRaceTest
         Assert::true($loserCleanedUp);
     }
 
+    public function raceWonIsNotDiscardedByOuterCancellationWhileLosersUnwind(): void
+    {
+        $result = timeout(sec(2), static fn() => race([
+            static function () {
+                delay(sec(1));
+
+                return 'winner';
+            },
+            static function () {
+                try {
+                    never();
+                } finally {
+                    shield(static fn() => delay(sec(3)));
+                }
+            },
+        ]));
+
+        Assert::same($result, 'winner');
+    }
+
     public function raceWonSynchronouslyDoesNotStartTheRest(): void
     {
         $started = false;

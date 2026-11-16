@@ -116,6 +116,36 @@ final class SignalTest
         assertNoCallbacksLeft();
     }
 
+    public function trapSignalsCatchesSignalSentAtOnce(): void
+    {
+        $received = trapSignals([SIGUSR1], static function (SignalTrap $trap) {
+            posix_kill(posix_getpid(), SIGUSR1);
+
+            return $trap->receive();
+        });
+
+        Assert::same($received, SIGUSR1);
+        assertNoCallbacksLeft();
+    }
+
+    public function trapSignalsInCancelledScopeDoesNotRunCallable(): void
+    {
+        $called = false;
+
+        // A deadline of zero cancels the scope at once, and the body runs in it.
+        $exception = thrown(static function () use (&$called) {
+            timeout(sec(0), static function () use (&$called) {
+                trapSignals([SIGUSR1], static function () use (&$called) {
+                    $called = true;
+                });
+            });
+        });
+
+        Assert::instanceOf($exception, TimedOut::class);
+        Assert::false($called);
+        assertNoCallbacksLeft();
+    }
+
     public function trapSignalsMergesSignalThatComesAgain(): void
     {
         $nothingMore = null;

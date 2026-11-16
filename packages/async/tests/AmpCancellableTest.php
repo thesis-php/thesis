@@ -38,7 +38,7 @@ final class AmpCancellableTest
 
         $elapsed = elapsed(static function () use (&$exception) {
             $exception = thrown(static fn() => timeout(sec(10), static fn() => ampCancellable(
-                static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
+                fn: static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
             )));
         });
 
@@ -55,14 +55,14 @@ final class AmpCancellableTest
         Expect::exception(TimedOut::class);
 
         timeout(sec(1), static fn() => ampCancellable(
-            static fn($cancellation) => $deferred->getFuture()->await($cancellation),
+            fn: static fn($cancellation) => $deferred->getFuture()->await($cancellation),
         ));
     }
 
     public function ownCancellationOfOperationIsRethrownAsIs(): void
     {
         $exception = thrown(static fn() => timeout(sec(1000), static fn() => ampCancellable(
-            static fn() => ampDelay(10_000, cancellation: new TimeoutCancellation(1)),
+            fn: static fn() => ampDelay(10_000, cancellation: new TimeoutCancellation(1)),
         )));
 
         Assert::instanceOf($exception, CancelledException::class);
@@ -107,7 +107,7 @@ final class AmpCancellableTest
     {
         $exception = group(static function (Group $group) {
             $handle = $group->spawn(static fn() => ampCancellable(
-                static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
+                fn: static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
             ));
 
             ampDelay(1);
@@ -125,7 +125,7 @@ final class AmpCancellableTest
         $exception = thrown(static fn() => group(static function (Group $group) {
             foreach (range(1, 3) as $_) {
                 $group->spawn(static fn() => ampCancellable(
-                    static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
+                    fn: static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
                 ));
             }
 
@@ -150,10 +150,10 @@ final class AmpCancellableTest
         // On virtual time they always do, so one round is enough.
         $exception = thrown(static fn() => timeout(sec(2), static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => ampCancellable(
-                static fn($cancellation) => ampDelay(2, cancellation: $cancellation),
+                fn: static fn($cancellation) => ampDelay(2, cancellation: $cancellation),
             ));
             $group->spawn(static fn() => ampCancellable(
-                static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
+                fn: static fn($cancellation) => ampDelay(10_000, cancellation: $cancellation),
             ));
         })));
 

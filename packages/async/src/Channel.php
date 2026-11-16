@@ -195,7 +195,7 @@ final class Channel implements \IteratorAggregate, \Countable
     {
         if ($reason instanceof Cancelled) {
             throw new \ValueError(
-                'A channel cannot be closed with Cancelled: its receivers are not cancelled. Close it with a regular exception.',
+                message: 'A channel cannot be closed with Cancelled: its receivers are not cancelled. Close it with a regular exception.',
             );
         }
 
