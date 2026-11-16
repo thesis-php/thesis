@@ -22,8 +22,9 @@ final readonly class Manifest
      *     php defaults to the constraint of monorepo.php
      * @param array<non-empty-string, non-empty-string> $requireDev the same, for the tests
      * @param ?non-empty-string $namespace psr-4 prefix of src/ and tests/, defaults to Thesis\<PascalCaseDir>\
-     * @param list<non-empty-string> $files autoload files, relative to the package
-     * @param list<non-empty-string> $devFiles autoload-dev files, relative to the package
+     * @param list<non-empty-string> $files autoload files outside src/, relative to the package. The PHP files
+     *     of src/ without a class, an interface, a trait or an enum are autoloaded without being listed
+     * @param list<non-empty-string> $devFiles the same, for autoload-dev and tests/
      * @param array<non-empty-string, non-empty-string> $suggest
      * @param array<non-empty-string, non-empty-string> $conflict
      * @param list<non-empty-string> $optional packages and extensions of requireDev that src/ uses only when

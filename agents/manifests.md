@@ -32,11 +32,12 @@ or changing the public API of a package that others use. How the generator works
   there (`exceptionally`).
 - A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
-- Functions and constants are loaded by one file per scope: `src/autoload.files.php` in `files` of the manifest,
-  `tests/autoload.files.php` in `devFiles`. A new file of functions is added there with `require_once`,
-  so neither the manifest nor the autoloader changes. Only files without a class-like declaration go there:
-  a constant declared next to a class (`const ROOT_SCOPE = new Scope()`) is loaded with it by PSR-4.
-  There is no check for a forgotten `require_once`: the tests fail on an undefined function.
+- Functions, constants and code run at load (the polyfill of `time`, the warning of `async` on Windows) live
+  in PHP files of `src/` and `tests/` without a class, an interface, a trait or an enum. `make sync` finds them
+  and writes them to `autoload.files` and `autoload-dev.files`, nothing lists them by hand, so CI fails
+  on a new one until `make sync` is run. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
+  is loaded with it by PSR-4. The files are sorted by path and must not depend on each other at load time.
+  `files`/`devFiles` of the manifest are only for files outside `src/` and `tests/` (`amqp/codegen/generate.php`).
 
 ### Dependencies
 
@@ -62,5 +63,7 @@ or changing the public API of a package that others use. How the generator works
 
 ## Decisions
 
-- Rejected for the files of functions: listing every file in the manifest (each new file rebuilds the autoloader),
-  runtime `glob()` (a cost for every user, magic by file name), static methods instead of functions (a worse API).
+- Rejected for the files of functions: one `autoload.files.php` per scope that `require_once`s them (most held
+  a single line, a forgotten line showed only as an undefined function in the tests), listing every file
+  in the manifest (bookkeeping that the code already says), runtime `glob()` (a cost for every user,
+  magic by file name), static methods instead of functions (a worse API).

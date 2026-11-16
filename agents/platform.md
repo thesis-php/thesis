@@ -11,8 +11,9 @@ Read before writing code that depends on the operating system or on the size of 
   no `PHP_OS_FAMILY` checks, no Windows branches, no Windows paths. `net` keeps Unix sockets, `socketPair()`
   on `STREAM_PF_UNIX` and the DNS configuration from `/etc/resolv.conf`. `process`, `parallel` and `cluster`
   are designed for Unix only.
-- The only `PHP_OS_FAMILY` check: `thesis/async`, which every package with I/O requires, triggers `E_USER_WARNING`
-  when it is loaded on Windows, so a user learns it at the first run instead of from a broken feature.
+- The only `PHP_OS_FAMILY` check: `src/platform.php` of `thesis/async`, which every package with I/O requires,
+  triggers `E_USER_WARNING` when it is loaded on Windows, so a user learns it at the first run instead of
+  from a broken feature.
   `thesis/time` has no I/O and does not warn. An error handler that turns warnings into exceptions (Symfony in dev)
   makes it fail the application on Windows, which is acceptable for a platform that is not supported.
 - A user who needs Windows opens an issue, and the decision is revisited here.

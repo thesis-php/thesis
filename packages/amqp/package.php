@@ -23,6 +23,6 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
     ],
-    files: ['src/autoload.files.php'],
-    devFiles: ['tests/autoload.files.php'],
+    // The test of the protocol layer compares the files in src/ with what generate() gives
+    devFiles: ['codegen/generate.php'],
 );

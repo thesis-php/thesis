@@ -43,7 +43,8 @@
             "Thesis\\Net\\": "src/"
         },
         "files": [
-            "src/autoload.files.php"
+            "src/Internal/functions.php",
+            "src/functions.php"
         ]
     },
     "autoload-dev": {
@@ -51,7 +52,7 @@
             "Thesis\\Net\\": "tests/"
         },
         "files": [
-            "tests/autoload.files.php"
+            "tests/functions.php"
         ]
     },
     "extra": {

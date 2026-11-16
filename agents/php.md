@@ -99,7 +99,7 @@ is not here: the tools fix the code anyway.
 ### Tests
 
 - Write the failing test first, then the fix.
-- No traits for test helpers: plain functions (in `tests/autoload.files.php`) or a base class.
+- No traits for test helpers: plain functions (in `tests/functions.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
   the write is lost, and an assertion like `Assert::false($called)` passes on a broken library.

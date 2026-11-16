@@ -13,10 +13,15 @@ final readonly class Package
 {
     /**
      * @param non-empty-string $dir
+     * @param list<non-empty-string> $files autoload files, relative to the package: those of src/ without classes
+     *     (FunctionFiles), then those of the manifest
+     * @param list<non-empty-string> $devFiles the same, of tests/ and devFiles of the manifest
      */
     public function __construct(
         public string $dir,
         public Manifest $manifest,
+        public array $files,
+        public array $devFiles,
         public bool $hasSkills,
         public bool $hasTests,
     ) {}

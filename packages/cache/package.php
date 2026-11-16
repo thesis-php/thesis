@@ -19,5 +19,4 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
     ],
-    devFiles: ['tests/autoload.files.php'],
 );

@@ -57,7 +57,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `WallClock` (from the old `thesis/clock`) and `FrozenClock` live here: a clock and a duration go together
   (`$clock->advance(sec(30))`, `shift($clock->now(), $ttl)`), and `psr/clock` is an interface only.
   `FrozenClock` moves only when told: an implicit tick makes tests depend on the order of calls.
-- The polyfill is loaded eagerly by `src/autoload.files.php` behind `class_exists()`: Composer has no conditional
+- The polyfill is loaded eagerly by `src/polyfill.php` behind `class_exists()`: Composer has no conditional
   autoload, and a PSR-4 entry for `Time\` would claim a namespace of PHP.
 - The ISO 8601 parser replicates the timelib scanner instead of using `\DateInterval`: `\DateInterval` drops
   the start, the end and the recurrences, which the class rejects with their own messages.

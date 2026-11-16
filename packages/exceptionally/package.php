@@ -15,8 +15,6 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
     ],
     namespace: 'Thesis\\',
-    files: ['src/autoload.files.php'],
-    devFiles: ['tests/autoload.files.php'],
     skip: [
         new FixerSkip(
             paths: ['tests/functions.php'],

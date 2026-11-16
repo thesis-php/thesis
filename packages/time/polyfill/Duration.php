@@ -8,7 +8,7 @@ use Thesis\Time\Internal\IsoInterval;
 
 /**
  * Polyfill of the PHP 8.6 class (https://wiki.php.net/rfc/duration_class) for PHP 8.5, loaded by
- * src/autoload.files.php only when the class does not exist. It follows the C implementation
+ * src/polyfill.php only when the class does not exist. It follows the C implementation
  * (ext/date/time_duration.c and lib/duration.c of timelib) down to the exception messages.
  */
 final readonly class Duration

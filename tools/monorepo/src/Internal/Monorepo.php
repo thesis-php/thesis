@@ -33,15 +33,18 @@ final readonly class Monorepo
         foreach ($dirs as $dir) {
             $basename = basename($dir);
             \assert($basename !== '');
-            $manifest = self::PACKAGES_DIR . '/' . $basename . '/' . self::MANIFEST;
+            $path = self::PACKAGES_DIR . '/' . $basename;
+            $manifest = self::require(
+                root: $root,
+                file: $path . '/' . self::MANIFEST,
+                class: Manifest::class,
+            );
 
             $packages[$basename] = new Package(
                 dir: $basename,
-                manifest: self::require(
-                    root: $root,
-                    file: $manifest,
-                    class: Manifest::class,
-                ),
+                manifest: $manifest,
+                files: self::autoloadFiles($root, $path, 'src', 'files', $manifest->files),
+                devFiles: self::autoloadFiles($root, $path, 'tests', 'devFiles', $manifest->devFiles),
                 hasSkills: is_dir($dir . '/skills'),
                 hasTests: is_dir($dir . '/tests'),
             );
@@ -97,6 +100,40 @@ final readonly class Monorepo
         $content = @file_get_contents($this->root . '/' . $path);
 
         return $content === false ? null : $content;
+    }
+
+    /**
+     * @param non-empty-string $package
+     * @param non-empty-string $dir
+     * @param list<non-empty-string> $listed the files of the manifest
+     * @return list<non-empty-string> relative to the package
+     */
+    private static function autoloadFiles(
+        string $root,
+        string $package,
+        string $dir,
+        string $argument,
+        array $listed,
+    ): array {
+        $errors = [];
+
+        foreach ($listed as $file) {
+            if (str_starts_with($file, $dir . '/')) {
+                $errors[] = \sprintf(
+                    '%s/%s: %s is autoloaded as a file without classes in src/ or tests/, remove it from %s.',
+                    $package,
+                    self::MANIFEST,
+                    $file,
+                    $argument,
+                );
+            }
+        }
+
+        if ($errors !== []) {
+            throw new MonorepoException(implode("\n", $errors));
+        }
+
+        return [...FunctionFiles::in($root . '/' . $package, $dir), ...$listed];
     }
 
     /**

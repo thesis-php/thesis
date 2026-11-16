@@ -37,7 +37,9 @@
             "Thesis\\Io\\": "src/"
         },
         "files": [
-            "src/autoload.files.php"
+            "src/Internal/lastError.php",
+            "src/Internal/stdio.php",
+            "src/functions.php"
         ]
     },
     "autoload-dev": {
@@ -45,7 +47,7 @@
             "Thesis\\Io\\": "tests/"
         },
         "files": [
-            "tests/autoload.files.php"
+            "tests/functions.php"
         ]
     },
     "extra": {

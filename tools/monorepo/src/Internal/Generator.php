@@ -110,11 +110,11 @@ final readonly class Generator
             'suggest' => self::sortRequire($manifest->suggest),
             'autoload' => array_filter([
                 'psr-4' => [$package->namespace() => 'src/'],
-                'files' => $manifest->files,
+                'files' => $package->files,
             ]),
             'autoload-dev' => array_filter([
                 'psr-4' => $package->hasTests ? [$package->namespace() => 'tests/'] : [],
-                'files' => $manifest->devFiles,
+                'files' => $package->devFiles,
             ]),
             'extra' => [
                 ...$manifest->extra,
@@ -188,8 +188,8 @@ final readonly class Generator
             }
 
             $prefix = static fn(string $file) => $path . '/' . $file;
-            $files = [...$files, ...array_map($prefix, $package->manifest->files)];
-            $filesDev = [...$filesDev, ...array_map($prefix, $package->manifest->devFiles)];
+            $files = [...$files, ...array_map($prefix, $package->files)];
+            $filesDev = [...$filesDev, ...array_map($prefix, $package->devFiles)];
         }
 
         $composer = [

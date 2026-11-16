@@ -23,8 +23,6 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
-    files: ['src/autoload.files.php'],
-    devFiles: ['tests/autoload.files.php'],
     suggest: [
         'ext-intl' => 'To resolve internationalized host names (Пример.test)',
         'ext-sockets' => 'To report why a connection failed (refused, unreachable) instead of a generic message',

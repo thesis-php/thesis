@@ -34,7 +34,9 @@
             "Thesis\\Time\\": "src/"
         },
         "files": [
-            "src/autoload.files.php"
+            "src/Internal/functions.php",
+            "src/functions.php",
+            "src/polyfill.php"
         ]
     },
     "autoload-dev": {
@@ -42,7 +44,7 @@
             "Thesis\\Time\\": "tests/"
         },
         "files": [
-            "tests/autoload.files.php"
+            "tests/functions.php"
         ]
     },
     "extra": {

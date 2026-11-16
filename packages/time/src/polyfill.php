@@ -10,6 +10,3 @@ if (!class_exists(Duration::class, autoload: false)) {
     require_once dirname(__DIR__) . '/polyfill/TimeException.php';
     require_once dirname(__DIR__) . '/polyfill/Duration.php';
 }
-
-require_once __DIR__ . '/Internal/functions.php';
-require_once __DIR__ . '/functions.php';

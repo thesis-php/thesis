@@ -24,8 +24,6 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
     ],
-    files: ['src/autoload.files.php'],
-    devFiles: ['tests/autoload.files.php'],
     suggest: [
         'ext-pcntl' => 'To use awaitSignal() and trapSignals() with the default event loop driver (ext-ev and ext-uv handle signals too)',
     ],

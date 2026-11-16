@@ -35,6 +35,7 @@
         "ext-posix": "*",
         "ext-simplexml": "*",
         "ext-sockets": "*",
+        "ext-tokenizer": "*",
         "ext-zlib": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
@@ -73,13 +74,26 @@
             "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
-            "packages/amqp/src/autoload.files.php",
-            "packages/async/src/autoload.files.php",
-            "packages/exceptionally/src/autoload.files.php",
-            "packages/formatter/src/autoload.files.php",
-            "packages/io/src/autoload.files.php",
-            "packages/net/src/autoload.files.php",
-            "packages/time/src/autoload.files.php"
+            "packages/amqp/src/Internal/Protocol/decodeMethod.php",
+            "packages/amqp/src/Internal/Protocol/functions.php",
+            "packages/amqp/src/Internal/functions.php",
+            "packages/async/src/Internal/fiberKey.php",
+            "packages/async/src/Internal/holding.php",
+            "packages/async/src/Internal/some.php",
+            "packages/async/src/VirtualTime/functions.php",
+            "packages/async/src/functions.php",
+            "packages/async/src/platform.php",
+            "packages/exceptionally/src/functions.php",
+            "packages/formatter/src/Internal/functions.php",
+            "packages/formatter/src/functions.php",
+            "packages/io/src/Internal/lastError.php",
+            "packages/io/src/Internal/stdio.php",
+            "packages/io/src/functions.php",
+            "packages/net/src/Internal/functions.php",
+            "packages/net/src/functions.php",
+            "packages/time/src/Internal/functions.php",
+            "packages/time/src/functions.php",
+            "packages/time/src/polyfill.php"
         ]
     },
     "autoload-dev": {
@@ -98,13 +112,14 @@
             "Thesis\\Time\\": "packages/time/tests/"
         },
         "files": [
-            "packages/amqp/tests/autoload.files.php",
-            "packages/async/tests/autoload.files.php",
-            "packages/cache/tests/autoload.files.php",
-            "packages/exceptionally/tests/autoload.files.php",
-            "packages/io/tests/autoload.files.php",
-            "packages/net/tests/autoload.files.php",
-            "packages/time/tests/autoload.files.php"
+            "packages/amqp/tests/functions.php",
+            "packages/amqp/codegen/generate.php",
+            "packages/async/tests/functions.php",
+            "packages/cache/tests/functions.php",
+            "packages/exceptionally/tests/functions.php",
+            "packages/io/tests/functions.php",
+            "packages/net/tests/functions.php",
+            "packages/time/tests/functions.php"
         ]
     },
     "config": {

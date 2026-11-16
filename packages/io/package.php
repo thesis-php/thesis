@@ -21,6 +21,4 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
-    files: ['src/autoload.files.php'],
-    devFiles: ['tests/autoload.files.php'],
 );

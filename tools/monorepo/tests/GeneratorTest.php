@@ -225,6 +225,64 @@ final readonly class GeneratorTest
         Generator::generate($fixture->load());
     }
 
+    public static function autoloadsFilesWithoutClassLikeDeclarations(): void
+    {
+        $fixture = self
+            ::fixture()
+            ->file('packages/async/src/functions.php', "<?php\n\nfunction delay(): void {}\n")
+            ->file('packages/async/src/Internal/stdio.php', "<?php\n\nconst STDIO = new \\stdClass();\n")
+            ->file('packages/async/src/platform.php', "<?php\n\nif (PHP_OS_FAMILY === 'Windows') {}\n")
+            ->file('packages/async/src/anonymous.php', "<?php\n\nfunction any(): object { return new class {}; }\n")
+            ->file('packages/async/src/name.php', "<?php\n\nfunction name(): string { return Task::class; }\n")
+            ->file('packages/async/src/Task.php', "<?php\n\nfinal class Task {}\n")
+            ->file('packages/async/src/Awaitable.php', "<?php\n\ninterface Awaitable {}\n")
+            ->file('packages/async/src/Awaits.php', "<?php\n\ntrait Awaits {}\n")
+            ->file('packages/async/src/State.php', "<?php\n\nenum State {}\n")
+            ->file('packages/async/src/README.md', "# Not PHP\n")
+            ->file('packages/async/tests/functions.php', "<?php\n\nfunction fixture(): void {}\n")
+            ->file('packages/async/codegen/generate.php', "<?php\n\nfunction generate(): void {}\n")
+            ->package('async', "devFiles: ['codegen/generate.php']")
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $composer = Json::decode($files['packages/async/composer.json'] ?? '', 'async');
+        Assert::same($composer['autoload'] ?? null, [
+            'psr-4' => ['Thesis\Async\\' => 'src/'],
+            'files' => [
+                'src/Internal/stdio.php',
+                'src/anonymous.php',
+                'src/functions.php',
+                'src/name.php',
+                'src/platform.php',
+            ],
+        ]);
+        Assert::same($composer['autoload-dev'] ?? null, [
+            'psr-4' => ['Thesis\Async\\' => 'tests/'],
+            'files' => ['tests/functions.php', 'codegen/generate.php'],
+        ]);
+        $root = Json::decode($files['composer.json'] ?? '', 'root');
+        Assert::same($root['autoload-dev'] ?? null, [
+            'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
+            'files' => ['packages/async/tests/functions.php', 'packages/async/codegen/generate.php'],
+        ]);
+    }
+
+    #[DataSet(['files', 'src/functions.php'])]
+    #[DataSet(['devFiles', 'tests/functions.php'])]
+    public static function failsOnAutoloadFileOfManifestInSrcOrTests(string $argument, string $path): void
+    {
+        $fixture = new Fixture()->package('async', "{$argument}: ['{$path}']");
+
+        Expect::exception(MonorepoException::class)->withMessage(\sprintf(
+            'packages/async/package.php: %s is autoloaded as a file without classes in src/ or tests/, remove it from %s.',
+            $path,
+            $argument,
+        ));
+
+        Generator::generate($fixture->load());
+    }
+
     public static function writesTypeAndExtraOfManifest(): void
     {
         $fixture = new Fixture()->package('stan', <<<'PHP'
@@ -311,7 +369,7 @@ final readonly class GeneratorTest
     {
         $fixture = self
             ::fixture()
-            ->file('packages/async/src/Semaphore.php', "<?php\n")
+            ->file('packages/async/src/Semaphore.php', "<?php\n\nfinal class Semaphore {}\n")
             ->file('packages/bytes/polyfill/Bytes.php', "<?php\n")
             ->package('async', <<<'PHP'
                 optional: ['amphp/amp', 'ext-pcntl'],
@@ -404,8 +462,8 @@ final readonly class GeneratorTest
     private static function fixture(): Fixture
     {
         return new Fixture()
-            ->file('packages/async/tests/Internal/ScopeTest.php', "<?php\n")
-            ->file('packages/bytes/tests/BytesTest.php', "<?php\n")
+            ->file('packages/async/tests/Internal/ScopeTest.php', "<?php\n\nfinal class ScopeTest {}\n")
+            ->file('packages/bytes/tests/BytesTest.php', "<?php\n\nfinal class BytesTest {}\n")
             ->package('bytes', "require: ['ext-bcmath' => '*', 'psr/clock' => '^1.0']")
             ->package('async', <<<'PHP'
                 require: ['revolt/event-loop' => '^1.0', 'thesis/bytes' => '*'],

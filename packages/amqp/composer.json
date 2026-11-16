@@ -39,7 +39,9 @@
             "Thesis\\Amqp\\": "src/"
         },
         "files": [
-            "src/autoload.files.php"
+            "src/Internal/Protocol/decodeMethod.php",
+            "src/Internal/Protocol/functions.php",
+            "src/Internal/functions.php"
         ]
     },
     "autoload-dev": {
@@ -47,7 +49,8 @@
             "Thesis\\Amqp\\": "tests/"
         },
         "files": [
-            "tests/autoload.files.php"
+            "tests/functions.php",
+            "codegen/generate.php"
         ]
     },
     "extra": {
