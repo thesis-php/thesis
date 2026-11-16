@@ -80,26 +80,18 @@ final readonly class Changelog
                 'dated' => self::isDate($top['date']),
                 'notes' => trim(implode("\n", $top['lines'])),
             ],
-            versions: array_column($sections, 'version'),
         );
     }
 
     /**
      * @param non-empty-string $path
      * @param ?array{version: string, dated: bool, notes: string} $top the section right under [Unreleased]
-     * @param list<string> $versions of every section after [Unreleased]
      */
     private function __construct(
         public string $path,
         public string $unreleased,
         private ?array $top,
-        private array $versions,
     ) {}
-
-    public function has(string $version): bool
-    {
-        return \in_array($version, $this->versions, strict: true);
-    }
 
     /**
      * The version right under [Unreleased], null if there is none yet.
@@ -107,14 +99,6 @@ final readonly class Changelog
     public function topVersion(): ?string
     {
         return $this->top['version'] ?? null;
-    }
-
-    /**
-     * The version of the section under the one right under [Unreleased], null if there is none.
-     */
-    public function versionBelowTop(): ?string
-    {
-        return $this->versions[1] ?? null;
     }
 
     /**

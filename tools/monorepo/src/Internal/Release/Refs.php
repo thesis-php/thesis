@@ -7,19 +7,16 @@ namespace Thesis\Monorepo\Internal\Release;
 use Composer\Semver\Comparator;
 use Composer\Semver\VersionParser;
 use Thesis\Monorepo\Internal\MonorepoException;
-use Thesis\Monorepo\Internal\Series;
 
 /**
- * The tags and branches of a split repository as `git ls-remote` lists them. Versions are read as composer
- * reads them: v0.1.4 and 0.1.4 are one version, and an older package of the same name may have tags
- * in a format of its own.
+ * The tags of a split repository as `git ls-remote` lists them. Versions are read as composer reads them:
+ * v0.1.4 and 0.1.4 are one version, and an older package of the same name may have tags in a format of its own.
  *
  * @internal
  */
 final readonly class Refs
 {
     private const string TAGS = 'refs/tags/';
-    private const string BRANCHES = 'refs/heads/';
 
     /**
      * @param non-empty-string $repository for errors
@@ -45,15 +42,8 @@ final readonly class Refs
         }
 
         $tags = [];
-        $branches = [];
 
         foreach ($commits as $ref => $commit) {
-            if (str_starts_with($ref, self::BRANCHES)) {
-                $branches[] = substr($ref, \strlen(self::BRANCHES));
-
-                continue;
-            }
-
             if (!str_starts_with($ref, self::TAGS)) {
                 continue;
             }
@@ -71,17 +61,15 @@ final readonly class Refs
             }
         }
 
-        return new self($tags, $branches);
+        return new self($tags);
     }
 
     /**
      * @param list<array{name: non-empty-string, commit: non-empty-string, normalized: string}> $tags
      *     that composer reads as versions
-     * @param list<string> $branches
      */
     private function __construct(
         public array $tags,
-        private array $branches,
     ) {}
 
     /**
@@ -95,41 +83,11 @@ final readonly class Refs
     }
 
     /**
-     * Every other tag of the series or above it: what the split did not write is an older package of the same name.
-     *
-     * @return list<array{name: non-empty-string, commit: non-empty-string, normalized: string}>
-     */
-    public function tagsFrom(Series $series, Version $except): array
-    {
-        $lowest = $series->major . '.' . $series->minor . '.0.0-dev';
-        $normalized = self::normalize($except);
-
-        return array_values(array_filter(
-            $this->tags,
-            static fn(array $tag) => $tag['normalized'] !== $normalized
-                && Comparator::greaterThanOrEqualTo($tag['normalized'], $lowest),
-        ));
-    }
-
-    /**
-     * @return list<array{name: non-empty-string, commit: non-empty-string, normalized: string}>
-     */
-    public function tagsBelow(Series $series): array
-    {
-        $lowest = $series->major . '.' . $series->minor . '.0.0-dev';
-
-        return array_values(array_filter(
-            $this->tags,
-            static fn(array $tag) => Comparator::lessThan($tag['normalized'], $lowest),
-        ));
-    }
-
-    /**
      * The highest tag that satisfies the constraint, stable only if asked, null if there is none.
      *
      * @return ?array{name: non-empty-string, commit: non-empty-string, normalized: string}
      */
-    public function highest(string $constraint, bool $stable, ?Version $except = null): ?array
+    public function highest(string $constraint, bool $stable): ?array
     {
         $parser = new VersionParser();
 
@@ -141,12 +99,10 @@ final readonly class Refs
                 previous: $exception,
             );
         }
-        $except = $except === null ? null : self::normalize($except);
         $highest = null;
 
         foreach ($this->tags as $tag) {
-            if ($tag['normalized'] === $except
-                || ($stable && VersionParser::parseStability($tag['normalized']) !== 'stable')
+            if (($stable && VersionParser::parseStability($tag['normalized']) !== 'stable')
                 || !$allowed->matches($parser->parseConstraints($tag['normalized']))
             ) {
                 continue;
@@ -158,23 +114,6 @@ final readonly class Refs
         }
 
         return $highest;
-    }
-
-    /**
-     * A branch that composer would read as the series, 0.1.x or 0.1: it collides with the alias of main.
-     */
-    public function branchOf(Series $series): ?string
-    {
-        $parser = new VersionParser();
-        $alias = $parser->normalizeBranch($series->toString() . '.x');
-
-        foreach ($this->branches as $branch) {
-            if ($parser->normalizeBranch($branch) === $alias) {
-                return $branch;
-            }
-        }
-
-        return null;
     }
 
     public static function normalize(Version $version): string

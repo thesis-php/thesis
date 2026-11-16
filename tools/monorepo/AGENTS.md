@@ -130,33 +130,23 @@ CI runs it as the job `release` of `.github/workflows/check.yaml`.
 
 Invariants:
 
-- Everything is read from the objects of the commit, never from the working tree or by running PHP of it.
-  The series is the `branch-alias` of the generated `composer.json` (`Series::ofComposer()`), which CI keeps
+- The release knows two things: the tree of the commit (the changelogs and the generated `composer.json`
+  of the packages, read from the objects, never from the working tree or by running PHP of it) and the tags
+  of the split repositories (`git ls-remote` of the packages with a heading, nothing is fetched). Nothing else
+  decides: no other commit of the monorepo, no object of a split repository, no branch of it.
+  A new check must fit into that, or it is not added (`agents/releases.md`, "What the release does not check").
+  `continuesReleaseAtCommitOfItsTagInClone` runs in a clone, as CI does: the commit of a tag is not local there.
+- `Plan::of()` decides everything before `Publisher` pushes anything, and returns either the releases,
+  dependencies first, or the errors: with one error nothing is released. A `MonorepoException` while deciding
+  about one package (GitHub, its `composer.json`) is an error of that package, so the others still report theirs.
+- Whether a heading is released is decided by the tag `vX.Y.Z` alone: without a tag of the version it is checked
+  and released, with the tag only its GitHub Release is made if it is missing (`GET releases/tags/<tag>`),
+  and a tag of the version without `v` is of an older package of the same name.
+- The series is the `branch-alias` of the generated `composer.json` (`Series::ofComposer()`), which CI keeps
   in sync with the manifest.
-- `Plan::of()` decides everything before `Publisher` pushes anything: the releases, dependencies first,
-  and the refusals per package, a refused dependency refusing its dependents. A `MonorepoException`
-  while deciding about one package (GitHub, `ls-remote`, its `composer.json`) is a refusal of that package.
-  Only a commit not of `main` or a cycle of packages releases nothing.
-- Whether a heading is released is decided by its tag alone, `ls-remote` of the packages with a heading:
-  a tag of an older package of the same name (not in the history of a split of `main`) skips the heading,
-  a tag of ours without a GitHub Release (`GET releases/tags/<tag>`) continues it at the commit of the tag,
-  with the notes of `CHANGELOG.md` of the split commit of the tag. A tag of ours is always local (`isOurs()`),
-  so its changelog is read from the objects.
-- The refs of a split repository are listed by `git ls-remote`, nothing is fetched: a tag the split wrote
-  points to a split commit, which the release computes again locally, so a tag whose commit is not local
-  is not ours and fails `merge-base --is-ancestor`. A clone has only the splits it computes: the release splits
-  the commit and every head of main it knows (`refs/heads/main`, `refs/remotes/origin/main`), so a tag
-  of a later commit is ours too. It fetches `main` of `origin` first: `actions/checkout` of a push (and of a re-run
-  of it) sets both refs to the commit of the push even when `main` has moved on, so no run would see the newer one.
-  `ReleaseCommandTest` runs these cases in a clone (`new Repository(cloneOf:)`) shaped as each checkout leaves it:
-  in the repository that wrote the tags every split is local, and the bug does not show.
-  The previous release's `composer.json` is read from there too.
 - Versions in the split repositories are read by composer/semver (`Refs`), so `v0.1.4` and `0.1.4` are one
   version and an older tag in a format of its own still counts as a version. `Version` is only what the release
   writes: `X.Y.Z` and `-alphaN`, `-betaN`, `-RCN`.
-- The files a dependency ships are compared by `git diff-tree` of the paths that `.gitattributes`
-  keeps, and the lists of both commits must be the same: a change of its tests releases nothing,
-  a path that starts being shipped does.
 
 Decisions:
 
@@ -164,3 +154,6 @@ Decisions:
   with the classes of the head, and parsing PHP by hand breaks on the first refactoring.
 - Rejected: fetching the tags of every split repository into the monorepo: `ls-remote` answers the same questions
   without writing refs that a later run would have to prune.
+- Rejected: telling our tags from those of an older package by the history (`merge-base --is-ancestor`
+  with the split of every head of `main`, fetched first): a clone has only the splits it computes, and each
+  shape of a checkout in CI was a bug of its own. The `v` tells them apart.

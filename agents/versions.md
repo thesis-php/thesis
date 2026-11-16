@@ -27,15 +27,19 @@ the minor of all.
   with a minor of `amqp`, which is the price of stable packages on dependencies below 1.0.
   A package that knows another one without requiring it (`phpstan-extension` knows the functions of `async`)
   is outside the cascade: a new series of `async` releases it too when its types change.
-  The release refuses a forgotten new series of a dependent (`releases.md`).
+  The new series of a dependent is started by hand, in the commit that changes its range: the release
+  does not check it (`releases.md`).
 - **One branch.** Only `main` of the monorepo is split, to `main` of every package, the default branch:
   a series lives on `main` until the next one starts. There are no maintenance branches yet: a fix goes
   to the current series, and the branches of older series are designed with the first backport that someone needs.
   A series started by mistake is undone by a commit while it is unreleased: it changes only the alias of `main`.
 - **A new series is above every older version and branch of its name**: new packages start at 0.1,
-  `amqp` at 2.0, `exceptionally` at 0.4, `formatter` at 0.2, `nats` at 0.6, `time` at 0.3. The release refuses a version
-  that breaks it, so the older tags and branches never collide with ours and stay as they are, with their history:
-  Packagist keeps the old versions and the locks that point to their commits keep working.
+  `amqp` at 2.0, `dispatcher` at 0.3, `exceptionally` at 0.4, `formatter` at 0.2, `nats` at 0.6, `time` at 0.3.
+  So the older tags and branches never collide with ours and stay as they are, with their history:
+  Packagist keeps the old versions and the locks that point to their commits keep working. The series is chosen
+  by hand when a package takes an older name, after `git ls-remote` of its repository: a version or an alias
+  of `main` in a series that the older package has (`0.3.1` after its `0.3.0`, `0.3.x-dev` next to its branch
+  `0.3.x`) would continue that package. The release does not check it (`releases.md`).
 
 Open:
 

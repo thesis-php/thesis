@@ -11,11 +11,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Thesis\Monorepo\Internal\Git\Git;
 use Thesis\Monorepo\Internal\GitHub\Api;
-use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Release\Plan;
 use Thesis\Monorepo\Internal\Release\Publisher;
-use Thesis\Monorepo\Internal\Release\Release;
 use Thesis\Monorepo\Internal\Split\Remote;
 use Thesis\Monorepo\Internal\Split\Split;
 
@@ -62,11 +60,15 @@ final readonly class ReleaseCommand
             return Command::FAILURE;
         }
 
-        foreach ($plan->refusals as $reasons) {
-            $io->writeln(implode("\n", $reasons), OutputInterface::OUTPUT_RAW);
+        if ($plan->errors !== []) {
+            // Raw and unwrapped: one reason per line, with paths and versions that must stay whole.
+            $io->writeln(implode("\n", $plan->errors), OutputInterface::OUTPUT_RAW);
+            $io->error('Nothing is released. The next push of main that passes the checks releases what it fixes.');
+
+            return Command::FAILURE;
         }
 
-        if ($plan->releases === [] && $plan->refusals === []) {
+        if ($plan->releases === []) {
             $io->writeln('Nothing to release.');
 
             return Command::SUCCESS;
@@ -76,55 +78,16 @@ final readonly class ReleaseCommand
             $io->writeln(\sprintf('%s: %s at %s', $release->package, $release->tag, $release->commit));
         }
 
-        $failed = $this->push ? self::publish($io, $git, $remote, $api, $plan->releases) : [];
-
-        if (!$this->push && $plan->releases !== []) {
+        if (!$this->push) {
             $io->writeln('Set SPLIT_REMOTE to release.');
+
+            return Command::SUCCESS;
         }
 
-        if ($plan->refusals !== []) {
-            $io->error(\sprintf(
-                'Not released: %s. The next push of main that passes the checks releases what it fixes.',
-                implode(', ', array_keys($plan->refusals)),
-            ));
-        }
-
-        if ($failed !== []) {
-            $io->error(\sprintf(
-                'The release of %s failed. Re-run the job, or the next push of main releases it.',
-                implode(', ', $failed),
-            ));
-        }
-
-        return $plan->refusals === [] && $failed === [] ? Command::SUCCESS : Command::FAILURE;
-    }
-
-    /**
-     * Dependencies first. A package that failed keeps back the packages that require it: they would require
-     * a version that is not there.
-     *
-     * @param list<Release> $releases
-     * @return list<string> the package and the tag of every release that failed
-     */
-    private static function publish(SymfonyStyle $io, Git $git, Remote $remote, Api $api, array $releases): array
-    {
         $publisher = new Publisher($git, $remote, $api);
-        $failed = [];
 
-        foreach ($releases as $release) {
-            $failedDependencies = array_intersect($release->requires, array_keys($failed));
-
-            if ($failedDependencies !== []) {
-                $io->writeln(\sprintf(
-                    '%s: not released: it requires %s, whose release failed.',
-                    $release->package,
-                    implode(', ', array_map(self::name(...), $failedDependencies)),
-                ), OutputInterface::OUTPUT_RAW);
-                $failed[$release->package] = $release->package . ' ' . $release->tag;
-
-                continue;
-            }
-
+        // Dependencies first, and nothing after a failure: a dependent would require a version that is not there.
+        foreach ($plan->releases as $release) {
             try {
                 foreach ($publisher->publish($release) as $step) {
                     $io->writeln(\sprintf('%s: %s', $release->package, $step), OutputInterface::OUTPUT_RAW);
@@ -132,16 +95,17 @@ final readonly class ReleaseCommand
             } catch (MonorepoException $exception) {
                 $error = \sprintf('%s: %s', $release->package, $exception->getMessage());
                 $io->writeln($error, OutputInterface::OUTPUT_RAW);
-                $failed[$release->package] = $release->package . ' ' . $release->tag;
+                $io->error(\sprintf(
+                    'The release stopped at %s %s. Re-run the job, or the next push of main continues it.',
+                    $release->package,
+                    $release->tag,
+                ));
+
+                return Command::FAILURE;
             }
         }
 
-        return array_values($failed);
-    }
-
-    private static function name(string $package): string
-    {
-        return Monorepo::VENDOR . '/' . $package;
+        return Command::SUCCESS;
     }
 
     /**

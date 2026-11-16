@@ -141,78 +141,27 @@ final readonly class ReleaseCommandTest
 
     /**
      * The tag was pushed by an earlier run, the package changed since: the GitHub Release is of the tag.
+     * CI clones the monorepo, so the commit of the tag is not local: nothing reads it.
      */
-    public static function continuesReleaseAtCommitOfItsTag(): void
+    public static function continuesReleaseAtCommitOfItsTagInClone(): void
     {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
+        $source = new Repository();
+        $first = $source->commit('Add a', self::package('a', released: ['0.1.0']));
         $remotes = self::remotes();
-        $split = self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $split = self::tag($source, $remotes, $first, 'a', 'v0.1.0');
+        $source->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $clone = new Repository(cloneOf: $source);
         $api = new FakeApi(self::SPLITS);
 
-        [$code, $output] = self::run($repository, $remotes, $api);
+        [$code, $output] = self::run($clone, $remotes, $api);
 
         Assert::same($code, Command::SUCCESS, $output);
         Assert::same($api->bodies['POST repos/thesis-php/a/releases']['target_commitish'] ?? null, $split);
     }
 
     /**
-     * The GitHub Release of 0.1.0 failed, then 0.1.1 was released: a re-run of 0.1.0 still makes its release.
-     */
-    public static function continuesReleaseAfterLaterVersionWasTagged(): void
-    {
-        $repository = new Repository();
-        $repository->commit('Add a', self::package('a'));
-        $first = $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.0')]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $second = $repository->commit('Release a again', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
-        ]);
-        self::tag($repository, $remotes, $second, 'a', 'v0.1.1');
-        $api = new FakeApi(self::SPLITS);
-
-        [$code, $output] = self::run($repository, $remotes, $api, commit: $first);
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($api->writes, ['POST repos/thesis-php/a/releases']);
-    }
-
-    public static function makesNoGitHubReleaseThatExists(): void
-    {
-        $repository = new Repository();
-        $repository->commit('Add a', self::package('a'));
-        $head = $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.0')]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $head, 'a', 'v0.1.0');
-        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
-
-        [$code, $output] = self::run($repository, $remotes, $api);
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($api->writes, []);
-    }
-
-    public static function continuesReleaseWhoseTagHasNoV(): void
-    {
-        $repository = new Repository();
-        $repository->commit('Add a', self::package('a'));
-        $head = $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.0')]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $head, 'a', '0.1.0');
-        $api = new FakeApi(self::SPLITS);
-
-        [$code, $output] = self::run($repository, $remotes, $api);
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), null);
-        Assert::same($api->bodies['POST repos/thesis-php/a/releases']['tag_name'] ?? null, '0.1.0');
-    }
-
-    /**
-     * The changelog of an older package of the same name ends with its last version, which it has tagged.
+     * The release writes vX.Y.Z: a tag without v is of an older package of the same name, whose changelog
+     * ends with its last version.
      */
     public static function releasesNothingThatOlderPackageOfSameNameTagged(): void
     {
@@ -227,6 +176,7 @@ final readonly class ReleaseCommandTest
         [$code, $output] = self::run($repository, $remotes, $api);
 
         Assert::same([$code, $output], [Command::SUCCESS, "Nothing to release.\n"]);
+        Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), null);
         Assert::same($api->writes, []);
     }
 
@@ -251,10 +201,7 @@ final readonly class ReleaseCommandTest
     {
         $repository = new Repository();
         $repository->commit('Add a', self::package('a'));
-        $repository->commit('Release a', [
-            'packages/a/CHANGELOG.md' => "## [Unreleased]\n\n- Not released.\n\n"
-                . "## [0.2.0] - 2026-11-16\n\n- Released.\n",
-        ]);
+        $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::withUnreleased(self::changelog('0.2.0'))]);
 
         [$code, $output] = self::run($repository, self::remotes(), new FakeApi(self::SPLITS));
 
@@ -264,6 +211,22 @@ final readonly class ReleaseCommandTest
             ->contains('a 0.2.0: [Unreleased] of packages/a/CHANGELOG.md lists changes that are not part of it.')
             ->contains('a 0.2.0: it is not of the series 0.1 of packages/a.')
         ;
+    }
+
+    public static function releasesNewSeries(): void
+    {
+        $repository = new Repository();
+        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
+        $remotes = self::remotes();
+        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
+        $repository->commit('Break a', [
+            ...self::package('a', series: '0.2', source: 'a2', released: ['0.2.0', '0.1.0']),
+        ]);
+
+        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
+
+        Assert::same($code, Command::SUCCESS, $output);
+        Assert::notNull($remotes->head('a', 'refs/tags/v0.2.0'));
     }
 
     public static function refusesHeadingThatIsNotOfRelease(): void
@@ -280,29 +243,6 @@ final readonly class ReleaseCommandTest
         Assert::string($output)->contains('packages/a/CHANGELOG.md: [0.1.0] is not a heading of a release');
     }
 
-    public static function refusesTagsAndBranchesOfOlderPackageOfSameName(): void
-    {
-        $repository = new Repository();
-        $repository->commit('Add a', self::package('a'));
-        $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.0')]);
-        $remotes = self::remotes();
-        $older = new Repository();
-        $older->commit('Older a', ['A.php' => 'older']);
-        $older->git->run(['push', '--quiet', 'file://' . $remotes->dir . '/a.git', 'main:refs/tags/0.3.0']);
-        $older->git->run(['push', '--quiet', 'file://' . $remotes->dir . '/a.git', 'main:refs/tags/0.0.9']);
-        $older->git->run(['push', '--quiet', 'file://' . $remotes->dir . '/a.git', 'main:refs/heads/0.1.x']);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert
-            ::string($output)
-            ->contains('a 0.1.0: the tag 0.3.0 is not in the history of main of the split')
-            ->notContains('the tag 0.0.9')
-            ->contains('a 0.1.0: the branch 0.1.x of an older package collides with the series 0.1.')
-        ;
-    }
-
     public static function refusesRepositoryThatIsNotSplit(): void
     {
         $repository = new Repository();
@@ -314,6 +254,19 @@ final readonly class ReleaseCommandTest
 
         Assert::same($code, Command::FAILURE);
         Assert::string($output)->contains('a 0.1.0: thesis-php/a is not a split');
+    }
+
+    public static function refusesPackageWithoutComposerJson(): void
+    {
+        $repository = new Repository();
+        $files = self::package('a', released: ['0.1.0']);
+        unset($files['packages/a/composer.json']);
+        $repository->commit('Add a', $files);
+
+        [$code, $output] = self::run($repository, self::remotes(), new FakeApi(self::SPLITS));
+
+        Assert::same($code, Command::FAILURE, $output);
+        Assert::string($output)->contains('a 0.1.0: no packages/a/composer.json.');
     }
 
     public static function refusesCommitThatIsNotOfMain(): void
@@ -330,56 +283,75 @@ final readonly class ReleaseCommandTest
     }
 
     /**
-     * A refused package keeps back only itself and its dependents: the others are released, the job fails.
+     * Everything is checked before anything is pushed: one refused package releases none, with every reason.
      */
-    public static function releasesPackagesIndependentOfRefusedOne(): void
+    public static function releasesNothingWhenOnePackageIsRefused(): void
     {
         $repository = new Repository();
         $repository->commit('Add a, b and c', [
-            ...self::package('a'),
-            ...self::package('b', require: ['thesis/a' => '^0.1'], released: ['0.1.0']),
+            ...self::package('a', released: ['0.1.0']),
+            ...self::package('b', released: ['0.1.0']),
             ...self::package('c', released: ['0.1.0']),
-            'packages/a/CHANGELOG.md' => "## [Unreleased]\n\n- Not released.\n\n"
-                . "## [0.1.0] - 2026-11-16\n\n- Released.\n",
+            'packages/a/CHANGELOG.md' => self::withUnreleased(self::changelog('0.1.0')),
+            'packages/b/CHANGELOG.md' => "# Changelog\n\n## [0.1.0] - 2026-11-16\n",
         ]);
         $remotes = self::remotes();
+        $api = new FakeApi(self::SPLITS);
 
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
+        [$code, $output] = self::run($repository, $remotes, $api);
 
         Assert::same($code, Command::FAILURE, $output);
         Assert
             ::string($output)
             ->contains('a 0.1.0: [Unreleased] of packages/a/CHANGELOG.md lists changes that are not part of it.')
-            ->contains('b 0.1.0: it requires thesis/a ^0.1, whose release 0.1.0 is refused.')
+            ->contains('packages/b/CHANGELOG.md: the first section must be ## [Unreleased].')
+            ->contains('Nothing is released.')
         ;
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), null);
-        Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), null);
-        Assert::notNull($remotes->head('c', 'refs/tags/v0.1.0'));
+        Assert::same($remotes->head('c', 'refs/tags/v0.1.0'), null);
+        Assert::same($api->writes, []);
     }
 
-    public static function releasesPackagesWhoseChangelogIsWellFormed(): void
+    public static function releasesNothingWhenGitHubFailsToTell(): void
+    {
+        $repository = new Repository();
+        $first = $repository->commit('Add a and c', [
+            ...self::package('a', released: ['0.1.0']),
+            ...self::package('c', released: ['0.1.0']),
+        ]);
+        $remotes = self::remotes();
+        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
+        $api = new FakeApi(self::SPLITS, failing: ['repos/thesis-php/a/releases/tags/v0.1.0' => 'GitHub is down.']);
+
+        [$code, $output] = self::run($repository, $remotes, $api);
+
+        Assert::same($code, Command::FAILURE, $output);
+        Assert::string($output)->contains('a 0.1.0: GitHub is down.');
+        Assert::same($remotes->head('c', 'refs/tags/v0.1.0'), null);
+    }
+
+    public static function reportsFailedListingOfTagsOnce(): void
     {
         $repository = new Repository();
         $repository->commit('Add a and b', [
             ...self::package('a', released: ['0.1.0']),
-            ...self::package('b'),
-            'packages/b/CHANGELOG.md' => "# Changelog\n\n## [0.1.0] - 2026-11-16\n",
+            ...self::package('b', require: ['thesis/a' => '^0.1'], released: ['0.1.0']),
         ]);
         $remotes = self::remotes();
+        Fixture::remove($remotes->dir . '/a.git');
 
         [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
 
         Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains('packages/b/CHANGELOG.md: the first section must be ## [Unreleased].');
-        Assert::notNull($remotes->head('a', 'refs/tags/v0.1.0'));
+        Assert::same(substr_count($output, 'thesis-php/a: git ls-remote'), 1, $output);
+        Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), null);
     }
 
     public static function releasesDependenciesFirst(): void
     {
         $repository = new Repository();
         $repository->commit('Add a and b', [
-            ...self::package('a'),
-            ...self::package('b', require: ['thesis/a' => '^0.1']),
+            ...self::package('a', require: ['thesis/b' => '^0.1']),
+            ...self::package('b'),
         ]);
         $repository->commit('Release a and b', [
             'packages/a/CHANGELOG.md' => self::changelog('0.1.0'),
@@ -390,8 +362,8 @@ final readonly class ReleaseCommandTest
         [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
 
         Assert::same($code, Command::SUCCESS, $output);
-        Assert::true(strpos($output, 'a: tagged v0.1.0') < strpos($output, 'b: tagged v0.1.0'), $output);
-        Assert::notNull($remotes->head('b', 'refs/tags/v0.1.0'));
+        Assert::true(strpos($output, 'b: tagged v0.1.0') < strpos($output, 'a: tagged v0.1.0'), $output);
+        Assert::notNull($remotes->head('a', 'refs/tags/v0.1.0'));
     }
 
     public static function ordersByMonorepoPackagesOnly(): void
@@ -409,9 +381,9 @@ final readonly class ReleaseCommandTest
     }
 
     /**
-     * A dependent would require a version that is not there, a package that does not depend on it is released.
+     * A dependent would require a version that is not there: what comes after a failure is left to a re-run.
      */
-    public static function releasesNoDependentOfPackageThatFailed(): void
+    public static function stopsAtReleaseThatFailed(): void
     {
         $repository = new Repository();
         $repository->commit('Add a, b and c', [
@@ -428,214 +400,61 @@ final readonly class ReleaseCommandTest
         Assert
             ::string($output)
             ->contains('a: GitHub is down.')
-            ->contains('b: not released: it requires thesis/a, whose release failed.')
-            ->contains('The release of a v0.1.0, b v0.1.0 failed.')
+            ->contains('The release stopped at a v0.1.0.')
         ;
         Assert::notNull($remotes->head('a', 'refs/tags/v0.1.0'));
         Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), null);
-        Assert::notNull($remotes->head('c', 'refs/tags/v0.1.0'));
-        Assert::same($api->writes, ['POST repos/thesis-php/a/releases', 'POST repos/thesis-php/c/releases']);
+        Assert::same($remotes->head('c', 'refs/tags/v0.1.0'), null);
+        Assert::same($api->writes, ['POST repos/thesis-php/a/releases']);
     }
 
-    public static function refusesDependentOfDependencyThatChangedSinceItsTag(): void
+    /**
+     * The tests ran against the head of the dependency, and a user installs its tag.
+     */
+    public static function refusesDependentOfDependencyWithChangesUnderUnreleased(): void
     {
         $repository = new Repository();
         $first = $repository->commit('Add a and b', [
-            ...self::package('a'),
+            ...self::package('a', released: ['0.1.0']),
             ...self::package('b', require: ['thesis/a' => '^0.1']),
         ]);
         $remotes = self::remotes();
         self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Change a', ['packages/a/src/A.php' => 'a2']);
-        $repository->commit('Release b', ['packages/b/CHANGELOG.md' => self::changelog('0.1.0')]);
+        $repository->commit('Change a, release b', [
+            'packages/a/src/A.php' => 'a2',
+            'packages/a/CHANGELOG.md' => self::withUnreleased(self::changelog('0.1.0')),
+            'packages/b/CHANGELOG.md' => self::changelog('0.1.0'),
+        ]);
+        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
 
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
+        [$code, $output] = self::run($repository, $remotes, $api);
 
         Assert::same($code, Command::FAILURE);
         Assert::string($output)->contains(
-            'b 0.1.0: thesis/a changed since v0.1.0 in the files it ships: release a stable version of it too.',
+            'b 0.1.0: it requires thesis/a, whose [Unreleased] lists changes: release it too.',
         );
         Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), null);
     }
 
-    public static function releasesDependentOfDependencyThatChangedOnlyWhatItDoesNotShip(): void
+    public static function releasesDependentOfDependencyWithNothingUnderUnreleased(): void
     {
         $repository = new Repository();
         $first = $repository->commit('Add a and b', [
-            ...self::package('a'),
+            ...self::package('a', released: ['0.1.0']),
             ...self::package('b', require: ['thesis/a' => '^0.1']),
         ]);
         $remotes = self::remotes();
         self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Test a', ['packages/a/tests/ATest.php' => 'test']);
-        $repository->commit('Release b', ['packages/b/CHANGELOG.md' => self::changelog('0.1.0')]);
+        $repository->commit('Test a, release b', [
+            'packages/a/tests/ATest.php' => 'test',
+            'packages/b/CHANGELOG.md' => self::changelog('0.1.0'),
+        ]);
+        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
 
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
+        [$code, $output] = self::run($repository, $remotes, $api);
 
         Assert::same($code, Command::SUCCESS, $output);
         Assert::notNull($remotes->head('b', 'refs/tags/v0.1.0'));
-    }
-
-    /**
-     * .gitattributes is not shipped itself, but what it keeps is the archive.
-     */
-    public static function refusesDependentOfDependencyThatStartedShippingPath(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a'),
-            ...self::package('b', require: ['thesis/a' => '^0.1']),
-            'packages/a/stubs/A.stub' => 'stub',
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Ship the stubs of a', [
-            'packages/a/.gitattributes' => "/* export-ignore\n/composer.json -export-ignore\n/src -export-ignore\n"
-                . "/stubs -export-ignore\n",
-        ]);
-        $repository->commit('Release b', ['packages/b/CHANGELOG.md' => self::changelog('0.1.0')]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains('b 0.1.0: thesis/a changed since v0.1.0 in the files it ships');
-    }
-
-    public static function refusesStableReleaseOnDependencyWithoutStableTag(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a'),
-            ...self::package('b', require: ['thesis/a' => '^0.1']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0-beta1');
-        $repository->commit('Release b', ['packages/b/CHANGELOG.md' => self::changelog('0.1.0')]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains(
-            'b 0.1.0: it requires thesis/a ^0.1, which no stable tag meets: release a stable version of it too.',
-        );
-    }
-
-    public static function refusesLowerBoundThatNoTagMeets(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a'),
-            ...self::package('b', require: ['thesis/a' => '^0.1.3']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Release b', ['packages/b/CHANGELOG.md' => self::changelog('0.1.0-beta1')]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains(
-            'b 0.1.0-beta1: it requires thesis/a ^0.1.3, which no existing tag meets: release a version of it too.',
-        );
-    }
-
-    /**
-     * A user of the stable dependent installs the stable tag of the dependency, not the beta the tests ran against.
-     */
-    public static function refusesStableDependentOfDependencyReleasedOnlyAsPreRelease(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a', released: ['0.1.0']),
-            ...self::package('b', require: ['thesis/a' => '^0.1']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Change a, release a beta and b', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1-beta1', '0.1.0'),
-            'packages/b/CHANGELOG.md' => self::changelog('0.1.0'),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains('b 0.1.0: thesis/a changed since v0.1.0 in the files it ships');
-        Assert::notNull($remotes->head('a', 'refs/tags/v0.1.1-beta1'));
-        Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), null);
-    }
-
-    public static function releasesPreReleaseDependentOfDependencyReleasedAsPreRelease(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a', released: ['0.1.0']),
-            ...self::package('b', require: ['thesis/a' => '^0.1']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Change a, release betas of a and b', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1-beta1', '0.1.0'),
-            'packages/b/CHANGELOG.md' => self::changelog('0.1.0-beta1'),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::notNull($remotes->head('b', 'refs/tags/v0.1.0-beta1'));
-    }
-
-    /**
-     * A new series of a dependency starts a new series of the dependent: the older series stays installable
-     * with the older dependency.
-     */
-    public static function refusesNewRangeOfDependencyInSameSeries(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a', released: ['0.1.0']),
-            ...self::package('b', require: ['thesis/a' => '^0.1'], released: ['0.1.0']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        self::tag($repository, $remotes, $first, 'b', 'v0.1.0');
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a2', released: ['0.2.0', '0.1.0']),
-            ...self::package('b', require: ['thesis/a' => '^0.2'], released: ['0.1.1', '0.1.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains('b 0.1.1: it requires thesis/a ^0.2, v0.1.0 required ^0.1');
-        Assert::notNull($remotes->head('a', 'refs/tags/v0.2.0'));
-        Assert::same($remotes->head('b', 'refs/tags/v0.1.1'), null);
-    }
-
-    /**
-     * A new minor of a dependency above 1.0 keeps its range: the dependent needs no new series.
-     */
-    public static function releasesPatchOverNewMinorOfDependencyWithSameRange(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and b', [
-            ...self::package('a', series: '2.0', released: ['2.0.0']),
-            ...self::package('b', require: ['thesis/a' => '^2.0'], released: ['0.1.0']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v2.0.0');
-        self::tag($repository, $remotes, $first, 'b', 'v0.1.0');
-        $repository->commit('Add to a, fix b', [
-            ...self::package('a', series: '2.1', source: 'a2', released: ['2.1.0', '2.0.0']),
-            ...self::package('b', require: ['thesis/a' => '^2.1'], source: 'b2', released: ['0.1.1', '0.1.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::notNull($remotes->head('a', 'refs/tags/v2.1.0'));
-        Assert::notNull($remotes->head('b', 'refs/tags/v0.1.1'));
     }
 
     public static function releasesPreReleaseThatIsNotLatest(): void
@@ -653,255 +472,29 @@ final readonly class ReleaseCommandTest
     }
 
     /**
-     * CI clones the monorepo: only the splits of the commits it computes are local. A tag of a later series
-     * is at a split of a newer main, which a clone has only by splitting main.
+     * The run of an older push releases its version after a later push has tagged a higher series.
      */
-    public static function releasesVersionOfOlderCommitInCloneAfterHigherSeriesWasTagged(): void
+    public static function releasesVersionBelowHighestOneNotAsLatest(): void
     {
-        $source = new Repository();
-        $first = $source->commit('Add a', self::package('a', released: ['0.1.0']));
+        $repository = new Repository();
+        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
         $remotes = self::remotes();
-        self::tag($source, $remotes, $first, 'a', 'v0.1.0');
-        $fix = $source->commit('Fix a', [
+        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
+        $fix = $repository->commit('Fix a', [
             'packages/a/src/A.php' => 'a2',
             'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
         ]);
-        $break = $source->commit('Break a', [
+        $break = $repository->commit('Break a', [
             ...self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']),
         ]);
-        self::tag($source, $remotes, $break, 'a', 'v0.2.0');
-        $clone = new Repository(cloneOf: $source);
+        self::tag($repository, $remotes, $break, 'a', 'v0.2.0');
         $api = new FakeApi(self::SPLITS);
 
-        [$code, $output] = self::run($clone, $remotes, $api, commit: $fix);
+        [$code, $output] = self::run($repository, $remotes, $api, commit: $fix);
 
         Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), Splitter::split($source->git, $fix)['a'] ?? '');
+        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), Splitter::split($repository->git, $fix)['a'] ?? '');
         Assert::same($api->bodies['POST repos/thesis-php/a/releases']['make_latest'] ?? null, 'false');
-    }
-
-    /**
-     * actions/checkout of a push sets main and origin/main to the commit of the push, even when main has moved on.
-     */
-    public static function releasesVersionOfOlderPushInCloneWhoseMainIsAtItsCommit(): void
-    {
-        $source = new Repository();
-        $first = $source->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($source, $remotes, $first, 'a', 'v0.1.0');
-        $fix = $source->commit('Fix a', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
-        ]);
-        $break = $source->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']),
-        ]);
-        self::tag($source, $remotes, $break, 'a', 'v0.2.0');
-        $clone = new Repository(cloneOf: $source);
-        $clone->git->run(['update-ref', 'refs/remotes/origin/main', $fix]);
-        $clone->git->run(['checkout', '--quiet', '-B', 'main', $fix]);
-
-        [$code, $output] = self::run($clone, $remotes, new FakeApi(self::SPLITS), commit: $fix);
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), Splitter::split($source->git, $fix)['a'] ?? '');
-    }
-
-    /**
-     * A manifest that says 0.1 where 0.10 was meant would publish 0.1.0 below 0.9.0.
-     */
-    public static function refusesSeriesThatWentBack(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', series: '0.9', released: ['0.9.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.9.0');
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.1', source: 'a2', released: ['0.1.0', '0.9.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains(
-            'a 0.1.0: the tag v0.9.0 of a higher series is in the history of the split: the series 0.1 went back.',
-        );
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), null);
-    }
-
-    public static function refusesSeriesThatSkipsOne(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.3', source: 'a2', released: ['0.3.0', '0.1.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE);
-        Assert::string($output)->contains(
-            'a 0.3.0: the series 0.3 does not follow the series 0.1 of v0.1.0, expected 0.2 or 1.0.',
-        );
-    }
-
-    public static function releasesNewSeriesThatFollowsLastOne(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a2', released: ['0.2.0', '0.1.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::SUCCESS, $output);
-        Assert::notNull($remotes->head('a', 'refs/tags/v0.2.0'));
-    }
-
-    /**
-     * A change listed under the heading after an earlier run has tagged it is not in the tag.
-     */
-    public static function refusesNotesChangedSinceTag(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Fix a', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => "## [Unreleased]\n\n## [0.1.0] - 2026-11-16\n\n- Notes of 0.1.0.\n- A fix.\n",
-        ]);
-        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
-
-        [$code, $output] = self::run($repository, $remotes, $api);
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains(
-            'a 0.1.0: its notes changed since the tag v0.1.0: list the changes after it under [Unreleased].',
-        );
-        Assert::same($api->writes, []);
-    }
-
-    /**
-     * The GitHub Release of a tag has the notes the tag was made with.
-     */
-    public static function continuesReleaseWithNotesOfItsTag(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Fix a', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => "## [Unreleased]\n\n## [0.1.0] - 2026-11-16\n\n- Notes of 0.1.0.\n- A fix.\n",
-        ]);
-        $api = new FakeApi(self::SPLITS);
-
-        [$code, $output] = self::run($repository, $remotes, $api);
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::same($api->bodies['POST repos/thesis-php/a/releases']['body'] ?? null, '- Notes of 0.1.0.');
-    }
-
-    public static function releasesPackagesIndependentOfOneThatGitHubFailedToTell(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a and c', [
-            ...self::package('a', released: ['0.1.0']),
-            ...self::package('c', released: ['0.1.0']),
-        ]);
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $api = new FakeApi(self::SPLITS, failing: ['repos/thesis-php/a/releases/tags/v0.1.0' => 'GitHub is down.']);
-
-        [$code, $output] = self::run($repository, $remotes, $api);
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains('a: GitHub is down.');
-        Assert::notNull($remotes->head('c', 'refs/tags/v0.1.0'));
-    }
-
-    public static function releasesPackagesIndependentOfOneWithoutComposerJson(): void
-    {
-        $repository = new Repository();
-        $files = self::package('a', released: ['0.1.0']);
-        unset($files['packages/a/composer.json']);
-        $repository->commit('Add a and c', [...$files, ...self::package('c', released: ['0.1.0'])]);
-        $remotes = self::remotes();
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains('a: no packages/a/composer.json at');
-        Assert::notNull($remotes->head('c', 'refs/tags/v0.1.0'));
-    }
-
-    /**
-     * A new series on top of a version whose push failed would leave that version unreleased for good.
-     */
-    public static function refusesVersionAboveOneWithoutTag(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Fix a', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
-        ]);
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']),
-        ]);
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::string($output)->contains('a 0.2.0: 0.1.1 under it has no tag');
-        Assert::same($remotes->head('a', 'refs/tags/v0.2.0'), null);
-    }
-
-    public static function reportsFailedListingOfRefsOnce(): void
-    {
-        $repository = new Repository();
-        $repository->commit('Add a and b', [
-            ...self::package('a', released: ['0.1.0']),
-            ...self::package('b', require: ['thesis/a' => '^0.1'], released: ['0.1.0']),
-        ]);
-        $remotes = self::remotes();
-        Fixture::remove($remotes->dir . '/a.git');
-
-        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
-
-        Assert::same($code, Command::FAILURE, $output);
-        Assert::same(substr_count($output, 'thesis-php/a: git ls-remote'), 1, $output);
-    }
-
-    /**
-     * The run of an older push finds the tag that a later push made with the notes amended before the release.
-     */
-    public static function releasesNothingAtOlderCommitWhoseNotesLaterPushAmended(): void
-    {
-        $repository = new Repository();
-        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $older = $repository->commit('Fix a', [
-            'packages/a/src/A.php' => 'a2',
-            'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
-        ]);
-        $amended = str_replace('- Notes of 0.1.1.', '- Amended.', self::changelog('0.1.1', '0.1.0'));
-        $later = $repository->commit('Amend the notes of a', ['packages/a/CHANGELOG.md' => $amended]);
-        self::tag($repository, $remotes, $later, 'a', 'v0.1.1');
-        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.1' => ['id' => 1]]);
-
-        [$code, $output] = self::run($repository, $remotes, $api, commit: $older);
-
-        Assert::same([$code, $output], [Command::SUCCESS, "Nothing to release.\n"]);
     }
 
     /**
@@ -945,9 +538,6 @@ final readonly class ReleaseCommandTest
                 'require' => ['php' => '^8.5', ...$require],
                 'extra' => ['branch-alias' => ['dev-main' => $series . '.x-dev']],
             ]),
-            // Only composer.json and src/ are shipped.
-            "packages/{$dir}/.gitattributes" => "/* export-ignore\n/composer.json -export-ignore\n"
-                . "/src -export-ignore\n",
             "packages/{$dir}/src/A.php" => $source === '' ? $dir . '1' : $source,
             "packages/{$dir}/CHANGELOG.md" => self::changelog(...$released),
         ];
@@ -962,6 +552,11 @@ final readonly class ReleaseCommandTest
         }
 
         return $changelog;
+    }
+
+    private static function withUnreleased(string $changelog): string
+    {
+        return str_replace("## [Unreleased]\n", "## [Unreleased]\n\n- Not released.\n", $changelog);
     }
 
     /**

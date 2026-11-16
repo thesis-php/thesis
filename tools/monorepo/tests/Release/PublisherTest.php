@@ -140,7 +140,6 @@ final readonly class PublisherTest
             notes: '- Notes.',
             tagged: false,
             latest: true,
-            requires: [],
         );
     }
 

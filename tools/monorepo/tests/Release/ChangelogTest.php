@@ -39,8 +39,6 @@ final readonly class ChangelogTest
         Assert::same($changelog->unreleased, '');
         Assert::same($version->toString(), '0.1.1');
         Assert::same($notes, "### Fixed\n\n- A bug.");
-        Assert::true($changelog->has('0.1.0'));
-        Assert::false($changelog->has('0.1.2'));
     }
 
     public static function keepsLinkDefinitionsOutOfLastSection(): void
@@ -108,8 +106,6 @@ final readonly class ChangelogTest
             MD, 'packages/a/CHANGELOG.md');
 
         Assert::string($changelog->top()['notes'])->contains('## [0.2.0] - 2026-11-16');
-        Assert::false($changelog->has('0.2.0'));
-        Assert::true($changelog->has('0.1.0'));
     }
 
     public static function failsOnReleaseWithoutNotes(): void
