@@ -7,6 +7,7 @@ use Thesis\Monorepo\Manifest;
 return new Manifest(
     description: 'Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex.',
     licenseSince: 2026,
+    version: '0.1',
     require: [
         'thesis/async' => '*',
         'thesis/time' => '*',

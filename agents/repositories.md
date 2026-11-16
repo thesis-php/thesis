@@ -2,7 +2,7 @@
 
 Read before touching the split, the repositories of the packages on GitHub or their settings.
 The implementation (`bin/monorepo github`, `bin/monorepo split`) is in `tools/monorepo/AGENTS.md`,
-the versions and tags are in `versions.md`.
+the versions are in `versions.md`, the tags and the releases in `releases.md`.
 
 The monorepo `thesis-php/thesis` holds every package in `packages/<name>/`, while composer installs `thesis/<name>`
 from a repository of its own. Those repositories are exact copies of their directories with the history of them:
@@ -10,10 +10,10 @@ a change made there would be lost on the next split or would diverge from the mo
 
 ## Rules
 
-- **Split.** CI splits each `packages/<name>` with `bin/monorepo split` (`make split`) and pushes it to the same ref
-  of `thesis-php/<name>`. The split keeps the history of the directory and is deterministic, so the pushes are never
-  forced. Which refs are split is in `versions.md`. How a split commit is written is ours to keep stable: a change
-  to it rewrites every split repository.
+- **Split.** CI splits `packages/<name>` of `main` with `bin/monorepo split` (`make split`) and pushes it to `main`
+  of `thesis-php/<name>` (`versions.md`), the tags are pushed by the release (`releases.md`). The split keeps
+  the history of the directory and is deterministic, so the pushes are never forced. How a split commit is written
+  is ours to keep stable: a change to it rewrites every split repository.
 - **Push by an app.** A GitHub App of the organization pushes the splits and manages the repositories:
   its id and key are `vars.BOT_CLIENT_ID` and `secrets.BOT_PRIVATE_KEY` of the monorepo.
 - **Read-only.** A split repository has pull requests, issues, wiki, projects and discussions disabled.
@@ -29,9 +29,16 @@ a change made there would be lost on the next split or would diverge from the mo
 - **Older repositories of the same name.** `github` refuses a repository that exists without the rulesets
   of the split: the organization holds older packages under the same names, and taking one over is a decision,
   not a side effect of a push. A package named like an older repository fails CI until that repository is renamed,
-  deleted or taken over (`versions.md`). The old name of a renamed repository is free: it only redirects,
+  deleted or taken over (below). The old name of a renamed repository is free: it only redirects,
   and a reused name loses that redirect (`thesis-php/time` to `thesis-php/time-span`). The abandoned flag
   of a reused Packagist package is removed by hand.
+- **Taking over an older repository** is done once, by hand: its own rulesets are deleted, its open issues
+  are moved or closed (`github` turns the issues off), branches that are still needed are merged or moved
+  to the monorepo, and the rulesets of the split are added. Nothing is force-pushed: the split creates `main`
+  where it is missing and fast-forwards it where it pushed already (`amqp`, `exceptionally`).
+  The read-only ruleset covers every branch and tag, so the older series end there: they are installable
+  as before and get no more commits or tags. The split pushes nothing to a repository without the rulesets
+  of the split or to a name that redirects to a renamed one (`Repositories::isSplit()`).
 
 ## Decisions
 
@@ -49,3 +56,8 @@ a change made there would be lost on the next split or would diverge from the mo
   to a person, neither can create repositories for the organization.
 - Rejected: Terraform (a state of its own and a second description of the packages), the settings app of Probot
   (a configuration file in each repository and weak support of rulesets).
+- Rejected: leaving the older branches out of the read-only ruleset: an exception per package in the manifests
+  for series that nobody maintains.
+- Rejected: importing the history of an older repository into the monorepo to continue its branches: the split
+  drops signatures, so the commits of GitHub's web interface get other ids anyway, and the monorepo gets foreign
+  history.

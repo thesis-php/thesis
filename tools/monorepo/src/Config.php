@@ -14,7 +14,6 @@ final readonly class Config
 {
     /**
      * @param non-empty-string $php the PHP constraint of every package
-     * @param non-empty-string $version the constraint packages use to require each other
      * @param non-empty-string $description of the monorepo itself
      * @param non-empty-string $copyrightHolder in LICENSE of the root and of every package
      * @param positive-int $licenseSince the first year of the copyright in the root LICENSE
@@ -29,7 +28,6 @@ final readonly class Config
      */
     public function __construct(
         public string $php,
-        public string $version,
         public string $description,
         public string $copyrightHolder,
         public int $licenseSince,

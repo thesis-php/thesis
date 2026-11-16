@@ -1,6 +1,6 @@
 # tools/monorepo
 
-The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync`, `github` and `split`.
+The monorepo tooling behind `bin/monorepo` (Symfony Console): `sync`, `github`, `split` and `release`.
 Rejected: a scaffolding command, a new package is copied by hand after an existing one.
 
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
@@ -28,6 +28,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   PHPStan is not modelled: `@phpstan-ignore` in the code is precise and reports itself when it is no longer needed.
   A fixer skip excludes the whole file: the fixer cannot turn off one rule for one file.
 - `Monorepo::load()` reads the manifests, `Generator` builds every derived file, `sync` writes the changed ones.
+- `Series` is the only place that turns `Manifest::$version` into a range (`^0.Y`, `^X.0`) and an alias
+  (`X.Y.x-dev`), for `sync` and for the release alike (`agents/versions.md`).
 - No validator and no `check` command: a second source of truth. An error is whatever keeps `sync` from
   generating the files, thrown as `MonorepoException` (one line per problem, with a path and what to do)
   before anything is written. CI runs `make sync` and fails on any change in git.
@@ -63,32 +65,26 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 
 ## split
 
-`make split [REF=refs/heads/main]` (`Internal\Split`) splits every `packages/<name>` of a branch or a `v*` tag
-and pushes each split to the same ref of `thesis-php/<name>`, all pushes in parallel. Without `SPLIT_REMOTE`
+`make split` (`Internal\Split`) splits every `packages/<name>` of `refs/heads/main` and pushes each split to `main`
+of `thesis-php/<name>`, all pushes in parallel. Without `SPLIT_REMOTE`
 (`https://x-access-token:<token>@github.com/thesis-php`) it only prints the commits: that is how to try it locally.
-CI (`.github/workflows/split.yaml`) runs it after `github` on every push of a branch or a tag.
+CI (`.github/workflows/split.yaml`) runs it after `github` on every push of `main`. No other ref is split
+(`agents/versions.md`): a version is a tag that the release pushes.
 
 Invariants:
 
 - A split is deterministic: the same commit of the monorepo gives the same commit of a package on any machine,
   and the pushes are never forced. How a commit is written (the headers copied, the parents kept, their order)
-  is part of the ids of every published history: a change to it rewrites all split repositories, and since
-  every `*.*.x` branch and tag runs the splitter of its own checkout, it has to reach the maintained branches too.
+  is part of the ids of every published history: a change to it rewrites all split repositories.
   `givesTheSameIdsForEveryKindOfCommit` pins the ids, checked once against a model built with `git commit-tree`,
   and `givesTheSameIdsForLinearHistory` a history that splitsh-lite gave the same ids for: the switch from it
   needed no force push.
-- Only the commit the ref points to is split, resolved once (`show-ref --verify`, then `rev-parse`), never
-  the working tree and never a revision like `main~1`, which would push another commit under the name of the ref.
+- Only the commit `main` points to is split, resolved once (`show-ref --verify`, then `rev-parse`), never
+  the working tree or the checked-out branch.
 - Nothing outside the objects decides a split: git runs without the caller's `GIT_*` variables, without replace
-  refs and grafts (`Git::ENV`), and versions are compared in PHP (`Version`), not by `git tag --sort`,
-  whose order depends on the user's config.
+  refs and grafts (`Git::ENV`).
 - A failure is an exception before any push, never an `assert`: with assertions off an empty commit id would make
   the refspec `:<ref>`, which deletes the branch of the split repository, and the app bypasses the rulesets.
-- A tag is `vX.Y.Z` or `vX.Y.Z-alphaN`, `-betaN`, `-RCN`, anything else under `v*` fails. A stable tag goes to
-  a package only if `packages/<name>` changed (the tree ids differ, a package added counts) since the highest lower
-  version among the tags merged into it, and only if that one is stable and of the same minor series.
-  The first tag of a series, a pre-release and the first stable tag after a pre-release go to every package:
-  otherwise a package would keep only an alpha while the others are stable.
 
 Decisions:
 
@@ -116,11 +112,46 @@ Decisions:
 - A loose object left by an earlier run is kept only if it inflates to this very object: a run killed while
   writing leaves a broken one.
 - The credentials of `SPLIT_REMOTE` go to the environment of `git push` as `url.<with>.insteadOf <without>`
-  (`Remote`): the arguments of a process are visible to everyone in `ps`. The ref reaches `make split`
-  through the environment, quoted: a tag name may hold `;`, `$`, backquotes and quotes.
+  (`Remote`): the arguments of a process are visible to everyone in `ps`.
 - The check that every parent is split before its children is unreachable while `--topo-order` holds,
   no test can trigger it: it turns a broken order into an error instead of a split with a new root.
 - Rejected: `git subtree split` (a process per commit, slow as the history grows); a fork of splitsh with
   a prebuilt image (still cgo pinned to libgit2 1.5, plus an image and a registry to maintain); a tool in Go
   (a toolchain to distribute for what is git plumbing); an action that copies files into a new commit
   (no history, no deterministic commits); filtering files out of the split (see `.gitattributes` above).
+
+## release
+
+`make release` (`Internal\Release`, `ReleaseCommand`) releases the changelog headings that a push of `main` added
+(`BEFORE=<the head before the push>`), or those of `PACKAGES="a b"` (a dispatch), at `COMMIT` (default `HEAD`):
+the rules are in `agents/releases.md`. Without `SPLIT_REMOTE` it reads the public repositories and only prints
+what it would release, it needs `GITHUB_TOKEN` either way (`Repositories::isSplit()`), a dispatch also
+`CHECKS_TOKEN` (the `github.token` of the workflow with `actions: read`: the app has no access to the runs
+of the monorepo). CI runs it as the job `release` of `.github/workflows/check.yaml`.
+
+Invariants:
+
+- Everything is read from the objects of the commit, never from the working tree or by running PHP of it:
+  a dispatch releases an older commit with the tooling of the head. The series is the `branch-alias`
+  of the generated `composer.json` (`Series::ofComposer()`), which CI keeps in sync with the manifest.
+- `Plan::of()` decides everything and throws with every reason at once before `Publisher` pushes anything.
+- The refs of a split repository are listed by `git ls-remote`, nothing is fetched: a tag the split wrote
+  points to a split commit, which the release computes again locally, so a tag whose commit is not local
+  is not ours and fails `merge-base --is-ancestor`. A clone has only the splits it computes: the release splits
+  the commit and every head of main it knows (`refs/heads/main`, `refs/remotes/origin/main`), so a tag
+  of a later commit is ours too. `ReleaseCommandTest` runs such a case in a clone (`new Repository(cloneOf:)`):
+  in the repository that wrote the tags every split is local, and the bug does not show.
+  The previous release's `composer.json` is read from there too.
+- Versions in the split repositories are read by composer/semver (`Refs`), so `v0.1.4` and `0.1.4` are one
+  version and an older tag in a format of its own still counts as a version. `Version` is only what the release
+  writes: `X.Y.Z` and `-alphaN`, `-betaN`, `-RCN`.
+- The files a dependency ships are compared by `git diff-tree` of the paths that `.gitattributes`
+  keeps, and the lists of both commits must be the same: a change of its tests releases nothing,
+  a path that starts being shipped does.
+
+Decisions:
+
+- Rejected: reading the version from `package.php` of the commit: a manifest of another commit cannot be run
+  with the classes of the head, and parsing PHP by hand breaks on the first refactoring.
+- Rejected: fetching the tags of every split repository into the monorepo: `ls-remote` answers the same questions
+  without writing refs that a later run would have to prune.

@@ -14,8 +14,11 @@ final readonly class Manifest
     /**
      * @param non-empty-string $description one sentence, it also goes to the package catalog in AGENTS.md
      * @param positive-int $licenseSince the first year of the copyright in LICENSE
+     * @param non-empty-string $version the current series of the package, X.Y: '0.1', '2.0'. Changed by hand
+     *     in the commit that starts a series: a break below 1.0, a new minor above (agents/versions.md)
      * @param array<non-empty-string, non-empty-string> $require packages and platform requirements.
-     *     A monorepo package is required as 'thesis/<dir>' => '*', its constraint comes from Config::$version.
+     *     A monorepo package is required as 'thesis/<dir>' => '*', the range of its series is written instead
+     *     (^0.Y below 1.0, ^X.0 above). A constraint within that range raises the lower bound: '^0.1.5'.
      *     php defaults to the constraint of monorepo.php
      * @param array<non-empty-string, non-empty-string> $requireDev the same, for the tests
      * @param ?non-empty-string $namespace psr-4 prefix of src/ and tests/, defaults to Thesis\<PascalCaseDir>\
@@ -38,6 +41,7 @@ final readonly class Manifest
     public function __construct(
         public string $description,
         public int $licenseSince,
+        public string $version,
         public array $require = [],
         public array $requireDev = [],
         public ?string $namespace = null,

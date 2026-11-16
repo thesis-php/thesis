@@ -7,7 +7,6 @@ use Thesis\Monorepo\Config;
 /** Source of truth for the root composer.json together with packages/*\/package.php. Run `make sync` after a change. */
 return new Config(
     php: '^8.5',
-    version: '^2.0',
     description: 'Thesis: an asynchronous PHP ecosystem',
     copyrightHolder: 'The Thesis Authors',
     licenseSince: 2026,

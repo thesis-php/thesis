@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Monorepo\Tests;
 
 use Testo\Assert;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Monorepo\Internal\Generator;
@@ -29,7 +30,91 @@ final readonly class GeneratorTest
             'require-dev' => ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
             'autoload' => ['psr-4' => ['Thesis\Async\\' => 'src/']],
             'autoload-dev' => ['psr-4' => ['Thesis\Async\\' => 'tests/']],
+            'extra' => ['branch-alias' => ['dev-main' => '0.1.x-dev']],
         ]);
+    }
+
+    public static function requiresMonorepoPackageByRangeOfItsSeries(): void
+    {
+        $fixture = new Fixture()
+            ->package('time', version: '0.3')
+            ->package('net', version: '2.1')
+            ->package('amqp', "require: ['thesis/net' => '*'], requireDev: ['thesis/time' => '*']", version: '2.4')
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $composer = Json::decode($files['packages/amqp/composer.json'] ?? '', 'amqp');
+        Assert::same($composer['require'] ?? null, ['php' => '^8.5', 'thesis/net' => '^2.0']);
+        Assert::same($composer['require-dev'] ?? null, ['thesis/time' => '^0.3']);
+        Assert::same($composer['extra'] ?? null, ['branch-alias' => ['dev-main' => '2.4.x-dev']]);
+        $root = Json::decode($files['composer.json'] ?? '', 'root');
+        Assert::same(
+            actual: $root['replace'] ?? null,
+            expected: ['thesis/amqp' => '2.4.x-dev', 'thesis/net' => '2.1.x-dev', 'thesis/time' => '0.3.x-dev'],
+        );
+    }
+
+    #[DataSet(['^0.3.5'])]
+    #[DataSet(['~0.3.5'])]
+    #[DataSet(['>=0.3.2 <0.4'])]
+    public static function keepsConstraintThatRaisesLowerBoundWithinRange(string $constraint): void
+    {
+        $fixture = new Fixture()
+            ->package('time', version: '0.3')
+            ->package('async', "require: ['thesis/time' => '{$constraint}']")
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $composer = Json::decode($files['packages/async/composer.json'] ?? '', 'async');
+        Assert::same($composer['require'] ?? null, ['php' => '^8.5', 'thesis/time' => $constraint]);
+    }
+
+    #[DataSet(['^0.2'])]
+    #[DataSet(['^0.3 || ^0.4'])]
+    #[DataSet(['>=0.3'])]
+    #[DataSet(['one'])]
+    public static function failsOnConstraintOutsideRange(string $constraint): void
+    {
+        $fixture = new Fixture()
+            ->package('time', version: '0.3')
+            ->package('async', "require: ['thesis/time' => '{$constraint}']")
+        ;
+
+        Expect::exception(MonorepoException::class)->withMessage(\sprintf(
+            "packages/async/package.php: thesis/time is required as %s, outside ^0.3 of its series 0.3: require it as '*' or within ^0.3.",
+            $constraint,
+        ));
+
+        Generator::generate($fixture->load());
+    }
+
+    #[DataSet(['0.1.0'])]
+    #[DataSet(['1'])]
+    #[DataSet(['v0.1'])]
+    #[DataSet(['01.0'])]
+    public static function failsOnVersionThatIsNotSeries(string $version): void
+    {
+        $fixture = new Fixture()->package('time', version: $version);
+
+        Expect::exception(MonorepoException::class)->withMessage(\sprintf(
+            "packages/time/package.php: the version %s is not a series X.Y, e.g. version: '0.1'.",
+            $version,
+        ));
+
+        Generator::generate($fixture->load());
+    }
+
+    public static function failsOnBranchAliasInExtra(): void
+    {
+        $fixture = new Fixture()->package('time', "extra: ['branch-alias' => ['dev-main' => '1.0.x-dev']]");
+
+        Expect::exception(MonorepoException::class)->withMessage(
+            'packages/time/package.php: extra.branch-alias is generated from the version, remove it.',
+        );
+
+        Generator::generate($fixture->load());
     }
 
     public static function mergesPackagesIntoRootComposerJson(): void
@@ -45,7 +130,7 @@ final readonly class GeneratorTest
             'type' => 'project',
             'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'psr/clock' => '^1.1', 'revolt/event-loop' => '^1.0'],
             'require-dev' => ['amphp/amp' => '^3.0'],
-            'replace' => ['thesis/async' => 'self.version', 'thesis/bytes' => 'self.version'],
+            'replace' => ['thesis/async' => '0.1.x-dev', 'thesis/bytes' => '0.1.x-dev'],
             'autoload' => [
                 'psr-4' => ['Thesis\Async\\' => 'packages/async/src/', 'Thesis\Bytes\\' => 'packages/bytes/src/'],
             ],
@@ -63,7 +148,6 @@ final readonly class GeneratorTest
 
                 return new Thesis\Monorepo\Config(
                     php: '^8.5',
-                    version: '^0.1',
                     description: 'Fixture.',
                     copyrightHolder: 'Fixture',
                     licenseSince: 2026,
@@ -152,7 +236,10 @@ final readonly class GeneratorTest
 
         $composer = Json::decode($files['packages/stan/composer.json'] ?? '', 'stan');
         Assert::same($composer['type'] ?? null, 'phpstan-extension');
-        Assert::same($composer['extra'] ?? null, ['phpstan' => ['includes' => ['extension.neon']]]);
+        Assert::same($composer['extra'] ?? null, [
+            'phpstan' => ['includes' => ['extension.neon']],
+            'branch-alias' => ['dev-main' => '0.1.x-dev'],
+        ]);
     }
 
     public static function writesTestoSuitesWithPlugins(): void

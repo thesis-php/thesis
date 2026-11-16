@@ -5,9 +5,11 @@ declare(strict_types=1);
 
 use Symfony\Component\Console\Application;
 use Thesis\Monorepo\Internal\Command\GitHubCommand;
+use Thesis\Monorepo\Internal\Command\ReleaseCommand;
 use Thesis\Monorepo\Internal\Command\SplitCommand;
 use Thesis\Monorepo\Internal\Command\SyncCommand;
 use Thesis\Monorepo\Internal\GitHub\HttpApi;
+use Thesis\Monorepo\Internal\GitHub\Repositories;
 
 $root = dirname(__DIR__);
 
@@ -18,11 +20,24 @@ $application->addCommand(new SyncCommand($root));
 $application->addCommand(new GitHubCommand($root));
 // https://x-access-token:<token>@github.com/thesis-php in CI, unset to only print the splits.
 $remote = getenv('SPLIT_REMOTE');
-$token = getenv('GITHUB_TOKEN');
+$remote = $remote === false || $remote === '' ? null : $remote;
+$api = static function (string $variable): ?HttpApi {
+    $token = getenv($variable);
+
+    return $token === false || $token === '' ? null : new HttpApi($token);
+};
 $application->addCommand(new SplitCommand(
     root: $root,
-    remote: $remote === false || $remote === '' ? null : $remote,
-    api: $token === false || $token === '' ? null : new HttpApi($token),
+    remote: $remote,
+    api: $api('GITHUB_TOKEN'),
+));
+// Without SPLIT_REMOTE the release reads the public repositories and only prints what it would release.
+$application->addCommand(new ReleaseCommand(
+    root: $root,
+    remote: $remote ?? 'https://github.com/' . Repositories::ORGANIZATION,
+    push: $remote !== null,
+    api: $api('GITHUB_TOKEN'),
+    checks: $api('CHECKS_TOKEN'),
 ));
 
 exit($application->run());

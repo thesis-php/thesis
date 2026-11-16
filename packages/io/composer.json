@@ -21,8 +21,8 @@
         "php": "^8.5",
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
-        "thesis/async": "^2.0",
-        "thesis/time": "^2.0"
+        "thesis/async": "^0.1",
+        "thesis/time": "^0.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
@@ -47,5 +47,10 @@
         "files": [
             "tests/autoload.files.php"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
     }
 }

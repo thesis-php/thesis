@@ -7,6 +7,7 @@ use Thesis\Monorepo\Manifest;
 return new Manifest(
     description: 'AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects.',
     licenseSince: 2026,
+    version: '2.0',
     require: [
         'ext-filter' => '*',
         'ext-uri' => '*',

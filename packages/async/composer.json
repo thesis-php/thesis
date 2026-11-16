@@ -21,7 +21,7 @@
         "php": "^8.5",
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
-        "thesis/time": "^2.0"
+        "thesis/time": "^0.1"
     },
     "require-dev": {
         "ext-pcntl": "*",
@@ -31,7 +31,7 @@
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29",
-        "thesis/testo-plugin": "^2.0"
+        "thesis/testo-plugin": "^0.1"
     },
     "conflict": {
         "amphp/amp": "<3"
@@ -54,5 +54,10 @@
         "files": [
             "tests/autoload.files.php"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
     }
 }

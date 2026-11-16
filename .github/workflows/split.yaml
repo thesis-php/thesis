@@ -1,13 +1,13 @@
 name: Split
 
+# Only main is split, to main of every package: a version is a tag that the release of check.yaml pushes.
 on:
   push:
-    branches: [main, '*.*.x']
-    tags: ['v*']
+    branches: [main]
 
-# Pushes of one ref are split in order: a later split contains the earlier one, but a cancelled tag would be lost.
+# One split at a time: a pending one is replaced by a newer one, whose split contains it.
 concurrency:
-  group: split-${{ github.ref }}
+  group: split
 
 permissions:
   contents: read
@@ -37,10 +37,8 @@ jobs:
       # Even when github failed for some repositories: the others get their splits, the job fails anyway.
       # A repository without the rulesets of the split gets no push: an older package of the same name lacks main,
       # so a push would create it. A push is never forced.
-      # The ref goes through the environment, not into the script: a tag name may hold ; $ ` and quotes.
       - if: ${{ !cancelled() && steps.token.outcome == 'success' }}
         run: make split
         env:
-          REF: ${{ github.ref }}
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
           SPLIT_REMOTE: https://x-access-token:${{ steps.token.outputs.token }}@github.com/thesis-php

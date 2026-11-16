@@ -19,7 +19,6 @@ final readonly class Fixture
 
             return new Thesis\Monorepo\Config(
                 php: '^8.5',
-                version: '^0.1',
                 description: 'Fixture.',
                 copyrightHolder: 'Fixture',
                 licenseSince: 2026,
@@ -30,16 +29,22 @@ final readonly class Fixture
     }
 
     /**
-     * @param string $arguments named arguments of Manifest after the description and the license year, as PHP code
+     * @param string $arguments named arguments of Manifest after the description, the license year and the version,
+     *     as PHP code
      */
-    public function package(string $dir, string $arguments = '', int $licenseSince = 2026): self
-    {
+    public function package(
+        string $dir,
+        string $arguments = '',
+        int $licenseSince = 2026,
+        string $version = '0.1',
+    ): self {
         $this->file("packages/{$dir}/package.php", <<<PHP
             <?php
 
             return new Thesis\\Monorepo\\Manifest(
                 description: 'Package {$dir}.',
                 licenseSince: {$licenseSince},
+                version: '{$version}',
                 {$arguments}
             );
             PHP);

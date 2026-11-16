@@ -86,6 +86,14 @@ final readonly class Generator
         $manifest = $package->manifest;
         $config = $this->monorepo->config;
 
+        if (isset($manifest->extra['branch-alias'])) {
+            throw new MonorepoException(\sprintf(
+                '%s/%s: extra.branch-alias is generated from the version, remove it.',
+                $package->path(),
+                Monorepo::MANIFEST,
+            ));
+        }
+
         $composer = [
             'name' => $package->name(),
             'description' => $manifest->description,
@@ -95,9 +103,9 @@ final readonly class Generator
             'require' => self::sortRequire([
                 'php' => $config->php,
                 ...$config->platform,
-                ...$this->versioned($manifest->require),
+                ...$this->versioned($package, $manifest->require),
             ]),
-            'require-dev' => self::sortRequire($this->versioned($manifest->requireDev)),
+            'require-dev' => self::sortRequire($this->versioned($package, $manifest->requireDev)),
             'conflict' => self::sortRequire($manifest->conflict),
             'suggest' => self::sortRequire($manifest->suggest),
             'autoload' => array_filter([
@@ -108,22 +116,52 @@ final readonly class Generator
                 'psr-4' => $package->hasTests ? [$package->namespace() => 'tests/'] : [],
                 'files' => $manifest->devFiles,
             ]),
-            'extra' => $manifest->extra,
+            'extra' => [
+                ...$manifest->extra,
+                'branch-alias' => [Series::branch() => Series::of($package)->alias()],
+            ],
         ];
 
         return array_filter($composer, static fn(mixed $value) => $value !== []);
     }
 
     /**
+     * A monorepo package is required by the range of its series ('*' in the manifest), or by a constraint
+     * of the manifest that raises the lower bound within that range.
+     *
      * @param array<non-empty-string, non-empty-string> $require
      * @return array<non-empty-string, non-empty-string>
      */
-    private function versioned(array $require): array
+    private function versioned(Package $package, array $require): array
     {
-        foreach (array_keys($require) as $name) {
-            if ($this->monorepo->package($name) !== null) {
-                $require[$name] = $this->monorepo->config->version;
+        $errors = [];
+
+        foreach ($require as $name => $constraint) {
+            $dependency = $this->monorepo->package($name);
+
+            if ($dependency === null) {
+                continue;
             }
+
+            $series = Series::of($dependency);
+
+            if ($constraint === '*') {
+                $require[$name] = $series->range();
+            } elseif (!$series->allows($constraint)) {
+                $errors[] = \sprintf(
+                    "%s/%s: %s is required as %s, outside %s of its series %s: require it as '*' or within %5\$s.",
+                    $package->path(),
+                    Monorepo::MANIFEST,
+                    $name,
+                    $constraint,
+                    $series->range(),
+                    $series->toString(),
+                );
+            }
+        }
+
+        if ($errors !== []) {
+            throw new MonorepoException(implode("\n", $errors));
         }
 
         return $require;
@@ -141,7 +179,8 @@ final readonly class Generator
 
         foreach ($this->monorepo->packages as $package) {
             $path = $package->path();
-            $replace[$package->name()] = 'self.version';
+            // The root is dev-main, which no ^0.Y of an external dependency on a package would accept.
+            $replace[$package->name()] = Series::of($package)->alias();
             $psr4[$package->namespace()] = $path . '/src/';
 
             if ($package->hasTests) {

@@ -44,5 +44,10 @@
         "files": [
             "tests/autoload.files.php"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
     }
 }

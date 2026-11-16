@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Monorepo\Internal\Command;
 
-use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -20,7 +19,7 @@ use Thesis\Monorepo\Internal\Split\Split;
 /**
  * @internal
  */
-#[AsCommand('split', 'Split packages/* of a branch or a v* tag, push them to thesis-php/<name> with SPLIT_REMOTE')]
+#[AsCommand('split', 'Split packages/* of main, push them to main of thesis-php/<name> with SPLIT_REMOTE')]
 final readonly class SplitCommand
 {
     /**
@@ -33,24 +32,17 @@ final readonly class SplitCommand
         private ?Api $api,
     ) {}
 
-    public function __invoke(
-        SymfonyStyle $io,
-        #[Argument('A branch or a v* tag, e.g. refs/heads/main')]
-        string $ref,
-    ): int {
+    public function __invoke(SymfonyStyle $io): int
+    {
         $git = new Git($this->root);
 
         try {
             $remote = $this->remote === null ? null : Remote::parse($this->remote);
-            $split = Split::of($git, $ref);
+            $split = Split::of($git);
         } catch (MonorepoException $exception) {
             $io->error($exception->getMessage());
 
             return Command::FAILURE;
-        }
-
-        foreach ($split->unchanged as $package) {
-            $io->writeln(\sprintf('%s: unchanged since %s, skipped', $package, $split->since ?? ''));
         }
 
         if ($remote === null) {
@@ -94,7 +86,7 @@ final readonly class SplitCommand
             }
 
             // Never forced: a split that cannot fast-forward fails instead of rewriting a published history.
-            $pushes[$package] = ['push', $remote->url($package), $commit . ':' . $split->ref];
+            $pushes[$package] = ['push', $remote->url($package), $commit . ':' . Split::REF];
         }
 
         foreach ($git->with($remote->env)->runAll($pushes) as $package => $result) {

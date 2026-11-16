@@ -19,7 +19,11 @@ final readonly class Repository
 
     public Git $git;
 
-    public function __construct(string $objectFormat = 'sha1')
+    /**
+     * @param ?self $cloneOf a repository to clone with only the objects its refs reach, as CI has them:
+     *     without the split commits that the source wrote
+     */
+    public function __construct(string $objectFormat = 'sha1', ?self $cloneOf = null)
     {
         $this->dir = sys_get_temp_dir() . '/split-' . bin2hex(random_bytes(8));
         mkdir($this->dir);
@@ -33,7 +37,11 @@ final readonly class Repository
             'GIT_COMMITTER_EMAIL' => 'committer@example.com',
             'GIT_COMMITTER_DATE' => self::DATE,
         ]);
-        $this->git->run(['init', '--quiet', '--initial-branch=main', '--object-format=' . $objectFormat]);
+        if ($cloneOf === null) {
+            $this->git->run(['init', '--quiet', '--initial-branch=main', '--object-format=' . $objectFormat]);
+        } else {
+            $this->git->run(['clone', '--quiet', '--no-local', 'file://' . $cloneOf->dir, '.']);
+        }
     }
 
     /**

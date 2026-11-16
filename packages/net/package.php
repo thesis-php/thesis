@@ -7,6 +7,7 @@ use Thesis\Monorepo\Manifest;
 return new Manifest(
     description: 'Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree.',
     licenseSince: 2026,
+    version: '0.1',
     require: [
         'ext-filter' => '*',
         'ext-openssl' => '*',

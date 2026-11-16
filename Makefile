@@ -12,8 +12,6 @@ DRIVER ?=
 ifneq ($(DRIVER),)
 export REVOLT_DRIVER := Revolt\EventLoop\Driver\$(DRIVER)Driver
 endif
-# (REF is the branch or the tag to split, passed through the environment: a ref name may hold ; $ ` and quotes)
-export REF ?= $(shell git symbolic-ref --quiet HEAD)
 PATHS = $(if $(P),packages/$(P),bin/monorepo monorepo.php tools packages)
 
 # Container
@@ -54,9 +52,18 @@ sync: vendor ## Regenerate files derived from the manifests, then update the loc
 	@touch vendor
 .PHONY: sync
 
-split: vendor ## Split packages/* of REF into thesis-php/<name>, pushes only with SPLIT_REMOTE and GITHUB_TOKEN [REF=]
-	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN php) bin/monorepo split "$$REF"
+split: vendor ## Split packages/* of main into main of thesis-php/<name>, pushes only with SPLIT_REMOTE and GITHUB_TOKEN
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN php) bin/monorepo split
 .PHONY: split
+
+# (The release takes COMMIT, BEFORE and PACKAGES through the environment, like a workflow passes its inputs.
+# After --, without globbing: an input that starts with - is not an option, a dispatch cannot pass --before)
+export COMMIT ?= HEAD
+export BEFORE ?=
+export PACKAGES ?=
+release: vendor ## Release the changelog headings a push added since BEFORE, or those of PACKAGES, at COMMIT; pushes only with SPLIT_REMOTE [COMMIT= BEFORE= PACKAGES=]
+	set -f; $(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e SPLIT_REMOTE -e GITHUB_TOKEN -e CHECKS_TOKEN php) bin/monorepo release $${BEFORE:+"--before=$$BEFORE"} -- "$$COMMIT" $$PACKAGES
+.PHONY: release
 
 github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs GITHUB_TOKEN [ARGS=--dry-run]
 	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_TOKEN php) bin/monorepo github $(ARGS)

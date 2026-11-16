@@ -20,15 +20,15 @@
     "require": {
         "php": "^8.5",
         "php-64bit": "*",
-        "thesis/async": "^2.0",
-        "thesis/time": "^2.0"
+        "thesis/async": "^0.1",
+        "thesis/time": "^0.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29",
-        "thesis/testo-plugin": "^2.0"
+        "thesis/testo-plugin": "^0.1"
     },
     "autoload": {
         "psr-4": {
@@ -42,5 +42,10 @@
         "files": [
             "tests/autoload.files.php"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
     }
 }

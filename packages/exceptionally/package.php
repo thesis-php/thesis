@@ -8,6 +8,7 @@ use Thesis\Monorepo\Manifest;
 return new Manifest(
     description: 'Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.',
     licenseSince: 2026,
+    version: '0.4',
     requireDev: [
         'testo/assert' => '^0.1.17',
         'testo/test' => '^0.1.8',

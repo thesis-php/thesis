@@ -42,8 +42,9 @@ or changing the public API of a package that others use. How the generator works
 
 - A package declares what it needs in `require` and `requireDev` of its manifest, with its own constraints.
   Which packages may depend on which is decided case by case, the tooling enforces no structure.
-- A monorepo package is required as `'thesis/async' => '*'`: the generator writes `Config::$version` instead,
-  so a release does not touch the manifests (`versions.md` replaces it with the series of the dependency).
+- A monorepo package is required as `'thesis/async' => '*'`: the generator writes the range of the series
+  of the dependency instead (`^0.1`), so a release does not touch the manifests (`versions.md`). Every manifest
+  declares the series of its package, `version: '0.1'`.
 - One `vendor/` and one lock for the whole monorepo. The root `composer.json` takes, for every external dependency,
   the constraint that lies within all the others, so no package is tested with a version it does not allow.
   When there is none, `make sync` fails: narrow one of the constraints.

@@ -29,9 +29,9 @@ final readonly class SplitCommandTest
     public static function printsSplitsWithoutRemote(): void
     {
         $repository = self::repository();
-        $commits = Split::of($repository->git, 'refs/heads/main')->commits;
+        $commits = Split::of($repository->git)->commits;
 
-        [$code, $output] = self::run($repository, 'refs/heads/main', remote: null);
+        [$code, $output] = self::run($repository, remote: null);
 
         Assert::same($code, Command::SUCCESS);
         Assert::same($output, \sprintf("a: %s\nb: %s\n", $commits['a'] ?? '', $commits['b'] ?? ''));
@@ -41,33 +41,14 @@ final readonly class SplitCommandTest
     {
         $repository = self::repository();
         $remotes = self::remotes('a', 'b');
-        $commits = Split::of($repository->git, 'refs/heads/main')->commits;
+        $commits = Split::of($repository->git)->commits;
 
-        [$code] = self::run($repository, 'refs/heads/main', remote: 'file://' . $remotes->dir);
-        [$again] = self::run($repository, 'refs/heads/main', remote: 'file://' . $remotes->dir);
+        [$code] = self::run($repository, remote: 'file://' . $remotes->dir);
+        [$again] = self::run($repository, remote: 'file://' . $remotes->dir);
 
         Assert::same([$code, $again], [Command::SUCCESS, Command::SUCCESS]);
         Assert::same($remotes->head('a', 'refs/heads/main'), $commits['a'] ?? '');
         Assert::same($remotes->head('b', 'refs/heads/main'), $commits['b'] ?? '');
-    }
-
-    public static function pushesTagOnlyToChangedPackages(): void
-    {
-        $repository = self::repository();
-        $remotes = self::remotes('a', 'b');
-        $repository->git->run(['tag', 'v2.1.0']);
-        $repository->commit('Change a', ['packages/a/A.php' => 'a2']);
-        $repository->git->run(['tag', 'v2.1.1']);
-
-        [$code, $output] = self::run($repository, 'refs/tags/v2.1.1', remote: 'file://' . $remotes->dir);
-
-        Assert::same($code, Command::SUCCESS);
-        Assert::true(str_starts_with($output, "b: unchanged since v2.1.0, skipped\n"));
-        Assert::same(
-            actual: $remotes->head('a', 'refs/tags/v2.1.1'),
-            expected: Split::of($repository->git, 'refs/tags/v2.1.1')->commits['a'] ?? '',
-        );
-        Assert::same($remotes->head('b', 'refs/tags/v2.1.1'), null);
     }
 
     /**
@@ -81,13 +62,13 @@ final readonly class SplitCommandTest
         $other->commit('Unrelated', ['B.php' => 'other']);
         $other->git->run(['push', '--quiet', 'file://' . $remotes->dir . '/b.git', 'main']);
 
-        [$code, $output] = self::run($repository, 'refs/heads/main', remote: 'file://' . $remotes->dir);
+        [$code, $output] = self::run($repository, remote: 'file://' . $remotes->dir);
 
         Assert::same($code, Command::FAILURE);
         Assert::true(str_contains($output, 'The push of b failed.'));
         Assert::same(
             actual: $remotes->head('a', 'refs/heads/main'),
-            expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
+            expected: Split::of($repository->git)->commits['a'] ?? '',
         );
         Assert::same($remotes->head('b', 'refs/heads/main'), $other->head());
     }
@@ -105,7 +86,6 @@ final readonly class SplitCommandTest
 
         [$code, $output] = self::run(
             repository: $repository,
-            ref: 'refs/heads/main',
             remote: 'file://' . $remotes->dir,
             api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b/rulesets' => []]),
         );
@@ -115,7 +95,7 @@ final readonly class SplitCommandTest
         Assert::true(str_contains($output, 'The push of b failed.'));
         Assert::same(
             actual: $remotes->head('a', 'refs/heads/main'),
-            expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
+            expected: Split::of($repository->git)->commits['a'] ?? '',
         );
         Assert::same($remotes->head('b', 'refs/heads/main'), null);
     }
@@ -131,7 +111,6 @@ final readonly class SplitCommandTest
 
         [$code, $output] = self::run(
             repository: $repository,
-            ref: 'refs/heads/main',
             remote: 'file://' . $remotes->dir,
             api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b' => ['full_name' => 'thesis-php/b-renamed']]),
         );
@@ -148,7 +127,6 @@ final readonly class SplitCommandTest
 
         [$code, $output] = self::run(
             repository: $repository,
-            ref: 'refs/heads/main',
             remote: 'file://' . $remotes->dir,
             api: new FakeApi(self::SPLITS, failing: ['repos/thesis-php/b/rulesets' => 'GitHub is down.']),
         );
@@ -157,30 +135,9 @@ final readonly class SplitCommandTest
         Assert::true(str_contains($output, 'b: GitHub is down.'));
         Assert::same(
             actual: $remotes->head('a', 'refs/heads/main'),
-            expected: Split::of($repository->git, 'refs/heads/main')->commits['a'] ?? '',
+            expected: Split::of($repository->git)->commits['a'] ?? '',
         );
         Assert::same($remotes->head('b', 'refs/heads/main'), null);
-    }
-
-    public static function skipsRepositoryThatIsNotSplitForTag(): void
-    {
-        $repository = self::repository();
-        $remotes = self::remotes('a', 'b');
-        $repository->git->run(['tag', 'v2.1.0']);
-
-        [$code] = self::run(
-            repository: $repository,
-            ref: 'refs/tags/v2.1.0',
-            remote: 'file://' . $remotes->dir,
-            api: new FakeApi([...self::SPLITS, 'repos/thesis-php/b/rulesets' => []]),
-        );
-
-        Assert::same($code, Command::FAILURE);
-        Assert::same(
-            actual: $remotes->head('a', 'refs/tags/v2.1.0'),
-            expected: Split::of($repository->git, 'refs/tags/v2.1.0')->commits['a'] ?? '',
-        );
-        Assert::same($remotes->head('b', 'refs/tags/v2.1.0'), null);
     }
 
     public static function failsWithoutApiWhenPushing(): void
@@ -188,22 +145,10 @@ final readonly class SplitCommandTest
         $repository = self::repository();
         $remotes = self::remotes('a', 'b');
 
-        [$code, $output] = self::run($repository, 'refs/heads/main', remote: 'file://' . $remotes->dir, api: null);
+        [$code, $output] = self::run($repository, remote: 'file://' . $remotes->dir, api: null);
 
         Assert::same($code, Command::FAILURE);
         Assert::true(str_contains($output, 'Set GITHUB_TOKEN'));
-        Assert::same($remotes->head('a', 'refs/heads/main'), null);
-    }
-
-    public static function failsOnInvalidRefWithoutPushing(): void
-    {
-        $repository = self::repository();
-        $remotes = self::remotes('a', 'b');
-
-        [$code, $output] = self::run($repository, 'refs/heads/missing', remote: 'file://' . $remotes->dir);
-
-        Assert::same($code, Command::FAILURE);
-        Assert::true(str_contains($output, 'refs/heads/missing is not a ref of this repository.'));
         Assert::same($remotes->head('a', 'refs/heads/main'), null);
     }
 
@@ -212,14 +157,13 @@ final readonly class SplitCommandTest
      */
     private static function run(
         Repository $repository,
-        string $ref,
         ?string $remote,
         ?FakeApi $api = new FakeApi(self::SPLITS),
     ): array {
         $application = new Application();
         $application->addCommand(new SplitCommand($repository->dir, $remote, $api));
         $tester = new CommandTester($application->find('split'));
-        $code = $tester->execute(['ref' => $ref], ['decorated' => false]);
+        $code = $tester->execute([], ['decorated' => false]);
 
         return [$code, $tester->getDisplay()];
     }

@@ -39,5 +39,10 @@
         "psr-4": {
             "Thesis\\Formatter\\": "tests/"
         }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.2.x-dev"
+        }
     }
 }

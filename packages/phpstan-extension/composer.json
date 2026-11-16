@@ -23,7 +23,7 @@
         "phpstan/phpstan": "^2.3"
     },
     "require-dev": {
-        "thesis/async": "^2.0"
+        "thesis/async": "^0.1"
     },
     "autoload": {
         "psr-4": {
@@ -35,6 +35,9 @@
             "includes": [
                 "extension.neon"
             ]
+        },
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
         }
     }
 }

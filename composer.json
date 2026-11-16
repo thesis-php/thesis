@@ -48,16 +48,16 @@
         "testo/test": "^0.1.8"
     },
     "replace": {
-        "thesis/amqp": "self.version",
-        "thesis/async": "self.version",
-        "thesis/cache": "self.version",
-        "thesis/exceptionally": "self.version",
-        "thesis/formatter": "self.version",
-        "thesis/io": "self.version",
-        "thesis/net": "self.version",
-        "thesis/phpstan-extension": "self.version",
-        "thesis/testo-plugin": "self.version",
-        "thesis/time": "self.version"
+        "thesis/amqp": "2.0.x-dev",
+        "thesis/async": "0.1.x-dev",
+        "thesis/cache": "0.1.x-dev",
+        "thesis/exceptionally": "0.4.x-dev",
+        "thesis/formatter": "0.2.x-dev",
+        "thesis/io": "0.1.x-dev",
+        "thesis/net": "0.1.x-dev",
+        "thesis/phpstan-extension": "0.1.x-dev",
+        "thesis/testo-plugin": "0.1.x-dev",
+        "thesis/time": "0.1.x-dev"
     },
     "autoload": {
         "psr-4": {

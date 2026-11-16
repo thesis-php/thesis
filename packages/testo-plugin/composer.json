@@ -22,12 +22,12 @@
         "php-64bit": "*",
         "internal/container": "^1.1",
         "testo/testo": "^0.10.29",
-        "thesis/async": "^2.0"
+        "thesis/async": "^0.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
         "testo/test": "^0.1.8",
-        "thesis/time": "^2.0"
+        "thesis/time": "^0.1"
     },
     "autoload": {
         "psr-4": {
@@ -37,6 +37,11 @@
     "autoload-dev": {
         "psr-4": {
             "Thesis\\TestoPlugin\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
         }
     }
 }

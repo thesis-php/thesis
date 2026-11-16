@@ -66,7 +66,17 @@ final readonly class Git
      */
     public function succeeds(array $args): bool
     {
-        return self::wait($this->start($args))->code === 0;
+        return $this->result($args)->code === 0;
+    }
+
+    /**
+     * Runs a command that may fail as a part of the answer.
+     *
+     * @param list<string> $args
+     */
+    public function result(array $args): Result
+    {
+        return self::wait($this->start($args));
     }
 
     /**

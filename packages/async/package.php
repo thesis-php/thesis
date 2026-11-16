@@ -9,6 +9,7 @@ use Thesis\Monorepo\RectorSkip;
 return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
     licenseSince: 2026,
+    version: '0.1',
     require: [
         'revolt/event-loop' => '^1.0.9',
         'thesis/time' => '*',

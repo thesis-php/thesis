@@ -22,9 +22,9 @@
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
-        "thesis/async": "^2.0",
-        "thesis/io": "^2.0",
-        "thesis/time": "^2.0"
+        "thesis/async": "^0.1",
+        "thesis/io": "^0.1",
+        "thesis/time": "^0.1"
     },
     "require-dev": {
         "ext-intl": "*",
@@ -53,5 +53,10 @@
         "files": [
             "tests/autoload.files.php"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
     }
 }

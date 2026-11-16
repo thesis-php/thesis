@@ -22,10 +22,12 @@ final class FakeApi implements Api
     /**
      * @param array<string, array<array-key, mixed>> $resources path => what GET returns, a missing path is 404
      * @param array<string, string> $failing path => the message of the error that GET throws
+     * @param array<string, string> $failingWrites "METHOD path" => the message of the error that a write throws
      */
     public function __construct(
         private readonly array $resources = [],
         private readonly array $failing = [],
+        private readonly array $failingWrites = [],
     ) {}
 
     #[\Override]
@@ -44,6 +46,10 @@ final class FakeApi implements Api
         $write = $method . ' ' . $path;
         $this->writes[] = $write;
         $this->bodies[$write] = $body;
+
+        if (isset($this->failingWrites[$write])) {
+            throw new MonorepoException($this->failingWrites[$write]);
+        }
 
         return [];
     }
