@@ -20,4 +20,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ampCancellable()` to cancel an amphp operation with the task tree.
 - `Trace\observe()`: the events of the scope tree to the listeners of a `Thesis\Dispatcher`, who cancelled and why,
   where each task is spawned and waits, tasks named by `Group::spawn($task, name: ...)` or by their keys
-  in `all()` and `race()`, groups by the function that created them.
+  in `all()` and `race()`, groups by `group($body, name: ...)` and by the function that created them.

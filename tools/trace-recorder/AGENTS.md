@@ -3,7 +3,7 @@
 Records a program on the virtual time of thesis/async into the trace that the demos of the documentation site draw:
 `Recorder::record($program)` gives `{rows, events}`, `bin/record <demo.php>` prints it as JSON
 (the demo file returns the callable). A task is labelled by its name (`$group->spawn($task, name: 'fetch A')`, the keys of `all()` and `race()`),
-a group by the function that created it (`group`, `race`, `map`).
+a group by its name (`group($body, name: 'checkout')`) or by the function that created it (`group`, `race`, `map`).
 
 - The format is the site's: a row `{label, scope, parent, start, end, cancelAt, outcome}` per group, task, daemon,
   timeout and shield, an event `{t, text, kind, scope}`. Times are milliseconds since the first event, `outcome`

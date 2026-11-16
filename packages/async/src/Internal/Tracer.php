@@ -111,9 +111,16 @@ final class Tracer
 
     /**
      * @param non-empty-string $function
+     * @param ?non-empty-string $name
      */
-    public function groupCreated(Scope $body, Scope $tasks, Scope $daemons, Scope $parent, string $function): void
-    {
+    public function groupCreated(
+        Scope $body,
+        Scope $tasks,
+        Scope $daemons,
+        Scope $parent,
+        string $function,
+        ?string $name,
+    ): void {
         $id = $this->created($body, $parent);
         $this->ids[$tasks] = $id;
         $this->ids[$daemons] = $id;
@@ -124,6 +131,7 @@ final class Tracer
                 at: Instant::now(),
                 parent: $this->idOrNull($parent),
                 function: $function,
+                name: $name,
                 cancelled: $body->isCancelled(),
                 location: self::location(),
             ));

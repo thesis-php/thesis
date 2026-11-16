@@ -46,7 +46,7 @@ final class TraceLog
     {
         return match (true) {
             $event instanceof GroupCreated => str_replace('Thesis\Async\\', '', $event->function)
-                . ' in ' . self::scope($event->parent)
+                . ($event->name === null ? '' : ' ' . $event->name) . ' in ' . self::scope($event->parent)
                 . self::cancelled($event->cancelled),
             $event instanceof TaskCreated => ($event->daemon ? 'daemon' : 'task')
                 . ($event->name === null ? '' : ' ' . $event->name) . ' in #' . $event->group

@@ -54,16 +54,17 @@ final class GroupImpl implements Group
      * @template T
      * @param callable(Group): T $body
      * @param non-empty-string $function the public function that creates the group, for the trace: `__FUNCTION__`
+     * @param ?non-empty-string $name
      * @return T
      */
-    public static function run(callable $body, string $function): mixed
+    public static function run(callable $body, string $function, ?string $name = null): mixed
     {
         $parent = Scope::current();
         $bodyScope = new Scope($parent);
         $tasksScope = new Scope($bodyScope);
         $daemonsScope = new Scope($tasksScope);
         $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
-        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent, $function);
+        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent, $function, $name);
         $result = null;
         $error = null;
 

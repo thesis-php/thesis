@@ -333,6 +333,22 @@ final class TraceTest
         Assert::same($names, [null, null, null]);
     }
 
+    public function namesGroupAsCreated(): void
+    {
+        $log = self::record(static function () {
+            group(static fn(Group $group) => $group->spawn(static fn() => null), name: 'checkout');
+            group(static fn() => null);
+        });
+
+        $names = array_values(array_map(
+            static fn(GroupCreated $event) => $event->name,
+            array_filter($log->events, static fn(Event $event) => $event instanceof GroupCreated),
+        ));
+
+        Assert::same($names, ['checkout', null]);
+        Assert::same($log->lines[0] ?? null, '0 #1 group checkout in root');
+    }
+
     public function tellsGroupsByTheFunctionThatCreatesThem(): void
     {
         $log = self::record(static function () {

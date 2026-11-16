@@ -234,11 +234,12 @@ function timeoutOr(Duration $duration, callable $body, mixed $default = null): m
  * @api
  * @template T
  * @param callable(Group): T $body
+ * @param ?non-empty-string $name what the group is called in a trace (`Trace\GroupCreated::$name`), nowhere else
  * @return T
  */
-function group(callable $body): mixed
+function group(callable $body, ?string $name = null): mixed
 {
-    return GroupImpl::run($body, __FUNCTION__);
+    return GroupImpl::run($body, __FUNCTION__, $name);
 }
 
 /**

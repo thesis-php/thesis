@@ -62,6 +62,13 @@ final class RecorderTest
         Assert::same(array_column($trace['rows'], 'label'), ['race', 'eu', 'us']);
     }
 
+    public function labelsNamedGroupByItsName(): void
+    {
+        $trace = Recorder::record(static fn() => group(static fn() => null, name: 'checkout'));
+
+        Assert::same(array_column($trace['rows'], 'label'), ['checkout']);
+    }
+
     public function namesUnlabelledTasksByScope(): void
     {
         $trace = Recorder::record(static fn() => group(static function (Group $group) {

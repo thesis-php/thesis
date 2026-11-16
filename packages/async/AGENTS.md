@@ -165,9 +165,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the numbers never depend on what is listened to. Every `Scope::cancel()` names its `CancelCause` and the
   scope that cancels. The tasks and daemons scopes of a group get the number of its body: they are not in the model.
   The events hold no `Scope`: there is no public scope object, only its number.
-  The name of a task (`spawn()`/`daemon()`, the key in `all()`, `allSettled()`, `some()`, `race()`) and the function
-  of a group go to the tracer only, never into `Scope` or `TaskImpl`: a name in the scope would cost memory per task
-  without an observation. A worker of `each()`/`map()` has no name, its items are many.
+  The name of a task (`spawn()`/`daemon()`, the key in `all()`, `allSettled()`, `some()`, `race()`), the name
+  of a group (`group()` only: the group of `all()`, `race()` and the others is named by its function and its tasks
+  by their keys, a `name:` of each would widen every signature for a rare case) and its function go to the tracer
+  only, never into `Scope` or `TaskImpl`: a name in the scope would cost memory per task without an observation. A worker of `each()`/`map()` has no name, its items are many.
   `allSettled()`, `some()` and `race()` run each task in a wrapper that catches its outcome: the wrapper hands it
   to `Tracer::settled()`, and `Ended` of the task reports it instead of what the wrapper returns (`null`, a box).
   A new wrapper of a task does the same.

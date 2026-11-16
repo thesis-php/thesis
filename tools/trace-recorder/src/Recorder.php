@@ -78,7 +78,7 @@ final class Recorder
         [$kind, $text] = match (true) {
             $event instanceof GroupCreated => $this->created(
                 scope: $scope,
-                label: self::shortName($event->function),
+                label: $event->name ?? self::shortName($event->function),
                 parent: $event->parent,
                 cancelled: $event->cancelled,
                 t: $t,

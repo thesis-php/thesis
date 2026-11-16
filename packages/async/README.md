@@ -899,8 +899,9 @@ the trace is the same on every run: the scopes are numbered from 1 in the order 
 A task is named in the trace by `$group->spawn($task, name: 'fetch user')` (`daemon()` too) or by its key
 in `all()`, `allSettled()`, `some()` and `race()`: `race(['eu' => ..., 'us' => ...])` gives `TaskCreated::$name`
 `'eu'` and `'us'`, a list gives `'0'`, `'1'`. The workers of `each()` and `map()` are not named: each takes many items.
-A name goes nowhere but the trace. `GroupCreated::$function` tells which function has created the group:
-`Thesis\Async\group`, `Thesis\Async\race`, `Thesis\Async\map` and so on.
+A group is named by `group($body, name: 'checkout')`: one function that creates a group per request gives them all
+the same location, and a name tells them apart. A name goes nowhere but the trace. `GroupCreated::$function` tells
+which function has created the group: `Thesis\Async\group`, `Thesis\Async\race`, `Thesis\Async\map` and so on.
 
 ```php
 use Thesis\Async\Trace;
@@ -1116,7 +1117,7 @@ all([user, orders])              orders fails after 50 ms
 
 | | |
 |---|---|
-| `group(callable(Group): T): T` | run a body with a nursery, join all tasks |
+| `group(callable(Group): T, ?string $name = null): T` | run a body with a nursery, join all tasks |
 | `Group::spawn(callable(): T, ?string $name = null): Task<T>` | start a task the group waits for |
 | `Group::daemon(callable(): T, ?string $name = null): Task<T>` | start a task cancelled when the rest is done |
 | `Group::cancelTasks()` | cancel all tasks and daemons, including later ones, but not the body |
