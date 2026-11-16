@@ -1,7 +1,8 @@
 # Postgres: ideas
 
 A draft for phase 4 of the roadmap, not a decision. What survives the discussion goes to the "Decisions"
-of `packages/postgres/AGENTS.md` (or an ADR, if `sql` shares it with `mysql`), and this file is deleted.
+of `packages/postgres/AGENTS.md` (or to a topic of `agents/`, if `sql` shares it with `mysql`),
+and this file is deleted.
 
 ## The driver: pure PHP on the wire protocol
 
@@ -15,7 +16,7 @@ What we get that libpq does not give:
   when the task waiting for a query is cancelled.
 - Pipelining for free: the extended protocol sends Parse/Bind/Execute of many queries before one Sync.
 - The binary format per column, rows streamed instead of a buffered result, `COPY` as `io\Reader`/`Writer`,
-  `NOTIFY` as asynchronous messages in the reader loop of ADR 0001.
+  `NOTIFY` as asynchronous messages in the reader loop of `agents/clients.md`.
 - Tests on a fake server and on the virtual time of `testo-plugin`. No extension to install.
 
 Rejected:

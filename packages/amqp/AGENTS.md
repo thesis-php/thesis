@@ -1,7 +1,8 @@
 # thesis/amqp
 
 AMQP 0.9.1 client for RabbitMQ. Uses `net` (the socket), `io` (`Buffer` codes every frame), `async` (every wait,
-the group of `Client::run()`, ADR 0001) and `time`. The API and the guarantees are in `README.md` — read it first.
+the group of `Client::run()`, `agents/clients.md`) and `time`.
+The API and the guarantees are in `README.md` — read it first.
 
 This file is for agents changing this package. It is not loaded while an agent works in another package,
 so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.

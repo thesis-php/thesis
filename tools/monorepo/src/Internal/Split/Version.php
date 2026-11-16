@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Monorepo\Internal\Split;
 
 /**
- * A version tag of the monorepo: vX.Y.Z or a pre-release of it, vX.Y.Z-alphaN, -betaN or -RCN (ADR 0002).
+ * A version tag of the monorepo: vX.Y.Z or a pre-release of it, vX.Y.Z-alphaN, -betaN or -RCN
+ * (agents/versions.md).
  *
  * @internal
  */

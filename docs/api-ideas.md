@@ -1,7 +1,7 @@
 # Public API: ideas
 
 Conventions of naming and of the design of the public API that the packages already follow, and the places
-that break them. A backlog, not a decision: once a convention is agreed, it goes to the root `AGENTS.md`
+that break them. A backlog, not a decision: once a convention is agreed, it goes to `agents/php.md`
 and is deleted from here, and so is a deviation once it is fixed or accepted (then into the "Decisions"
 of its package). Found by reading `src/` of every package.
 

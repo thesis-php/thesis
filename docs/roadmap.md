@@ -2,8 +2,8 @@
 
 The packages that replace amphp and rewrite the older thesis packages. Out of scope for now: kafka, grpc, message-bus,
 dic, norm, the modules, and what depends on them (`etcd`, `ydb`, `opentelemetry-grpc-transport`, `schema-registry`,
-the protobuf family). This file is a plan, not a decision: a decision goes to an ADR or to the `AGENTS.md`
-of its package, and a step that is done is deleted from here.
+the protobuf family). This file is a plan, not a decision: a decision goes to a topic of `agents/`
+or to the `AGENTS.md` of its package, and a step that is done is deleted from here.
 
 ## amphp → thesis
 
@@ -44,7 +44,8 @@ of its package, and a step that is done is deleted from here.
 - Stale or niche: `quic`, `ssh`, `beanstalk`, `stomp`, `dbus`, `react-adapter`, `react-stream-adapter`.
 - `injector`, `dependency-graph`: overlap with dic.
 - Infrastructure: `ext-uv` (a Revolt driver, used as is), `ext-fiber`, `green-thread`,
-  `windows-process-wrapper` (Windows is not supported, ADR 0005), `php-cs-fixer-config`, `template`, the websites.
+  `windows-process-wrapper` (Windows is not supported, `agents/platform.md`), `php-cs-fixer-config`,
+  `template`, the websites.
 
 ## Older thesis → thesis
 
@@ -59,8 +60,9 @@ of its package, and a step that is done is deleted from here.
 1. **Foundation gaps.** `net`: a pool of connections, UDP.
    Integration tests against services in `compose.yaml` (rabbitmq, nats,
    postgres, memcached, ...) and a convention for a package to declare the service it needs.
-2. **`amqp`**, the reference client of ADR 0001. Then an ADR on what protocol clients share: framing, reconnects
-   with a backoff (`Async\Backoff`), configuration from a DSN, `ConnectionFailed`/`ConnectionClosed`.
+2. **`amqp`**, the reference client of `agents/clients.md`. Then a topic on what protocol clients share:
+   framing, reconnects with a backoff (`Async\Backoff`), configuration from a DSN,
+   `ConnectionFailed`/`ConnectionClosed`.
 3. **Protocol clients** on `net` and `io`: `nats` (the second client), `rabbitmq-stream`, `memcached`
    (the first user of the pool), `nsq` (TCP first, lookupd after HTTP), `cassandra`, `mongodb`
    (check what the old repository has; probably from scratch).
@@ -91,7 +93,7 @@ of its package, and a step that is done is deleted from here.
 1. Read the old repository: what was right, what we reject and why.
 2. Make `packages/<name>/` after an existing package, write `AGENTS.md` (invariants, decisions), `make sync`.
 3. Failing tests first, integration tests against the service in compose.
-4. A package that takes an older name gets its old tags by hand (ADR 0002, 7).
+4. A package that takes an older name is taken over as item 10 of `agents/versions.md` says.
 
 ## Tooling
 

@@ -143,7 +143,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   reaches it. Both are a few lines already: `synchronized($mutex, fn() => $this->value ??= $this->init())`
   (a cancelled caller releases the lock, the next one retries), or a `Task` of the owner's group kept in a property
   and awaited by everyone. A `Once` would have to pick one of them and invites the lazy connect of a client
-  that ADR 0001 rejects. Shared DNS queries in thesis/net need the second meaning, dic singletons are dic's own.
+  that `agents/clients.md` rejects. Shared DNS queries in thesis/net need the second meaning,
+  dic singletons are dic's own.
   Revisit when two packages repeat the same pattern with the same meaning of cancellation.
 - `Backoff` computes the delays and does not wait: the wait of each user ends differently (`StreamWatcher::delay()`
   that `close()` ends in thesis/net, a `timeoutOr()` that `Client::close()` ends in thesis/amqp).

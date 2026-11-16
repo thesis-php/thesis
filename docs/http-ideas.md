@@ -1,7 +1,7 @@
 # HTTP messages: ideas
 
-A draft for phase 5 of the roadmap, not a decision. What survives the discussion goes to an ADR
-(the messages span `http`, `http-client` and `http-server`), and this file is deleted.
+A draft for phase 5 of the roadmap, not a decision. What survives the discussion goes to a topic
+of `agents/` (the messages span `http`, `http-client` and `http-server`), and this file is deleted.
 
 ## One set of messages for both directions
 
@@ -124,7 +124,7 @@ The options:
 The proposal: the first one, with the incoming body bound to the scope of the task that called `send()`.
 The scope ends, the body is closed, the connection goes back or is dropped. A proxy works, and a leak lasts
 no longer than the task. To check on `async`: whether such a binding works without cycles (the trap of
-fiber keys in the root `AGENTS.md`).
+fiber keys in `agents/fibers.md`).
 
 ## Smaller points to settle early
 
@@ -132,7 +132,7 @@ fiber keys in the root `AGENTS.md`).
   RFC 3986, and WhatWG normalizes (percent-encoding, dot segments): the server and request signing (SigV4)
   lose the original request-target. `OPTIONS *` and the authority-form of CONNECT are not URLs either.
   `http` probably needs `Uri\Rfc3986\Uri`, or at least the raw `$target` beside it. This goes against the rule
-  of the root `AGENTS.md`, which would then need refining.
+  of `agents/php.md`, which would then need refining.
 - **`Headers`** come from the old `thesis/headers`: immutable, names case-insensitive, several values per name.
   Typed headers later, as functions.
 - **1xx.** The server sends `100 Continue` by itself on the first read of the body, `103 Early Hints`
@@ -246,7 +246,7 @@ HTTP/2 brings a class of its own (Rapid Reset, HPACK bombs, the CONTINUATION flo
 separately. TLS is the concern of `net`. At the level of the application (CSRF, XSS, CORS) the server can only
 stay out of the way and give safe defaults.
 
-## For an ADR
+## For a topic of agents
 
 1. One `Request`/`Response` in `http` for the client and the server, the transport in `Context`.
 2. The client and the handler are functions of one shape, middleware is shared.

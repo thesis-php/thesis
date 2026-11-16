@@ -20,7 +20,7 @@ use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
 /**
- * A connection to RabbitMQ that reconnects. A passive object until {@see run()} (ADR 0001):
+ * A connection to RabbitMQ that reconnects. A passive object until {@see run()} (agents/clients.md):
  *
  *     $client = new Client(Config::fromUri('amqp://guest:guest@localhost:5672/'));
  *

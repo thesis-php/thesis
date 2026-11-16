@@ -1,23 +1,37 @@
-# 4. Every package has versions of its own
+# Versions, tags and releases
 
-Status: accepted
+Read before touching versions, tags, changelogs, the release or the refs that the split pushes.
+The repositories themselves are in `repositories.md`.
 
-## Context
-
-ADR 0002 gives all packages one version series starting at 2.0, above the tags of the older packages whose names
-the monorepo reuses (`amqp` 1.0.2 and a branch `1.1.x`, `exceptionally` 0.3.0, `formatter` 0.1.0, `nats` 0.5.0).
-So a package written a week ago would come out as 2.0.0 and claim a maturity it does not have, and below 1.0,
-where every minor version breaks compatibility, a break in one package would bump the minor of all.
+The tooling still implements one version for all packages ("Now"). Versions per package are decided
+and replace it ("Next"): new work on releases implements "Next", and once it lands "Now" is deleted.
 No tag of the monorepo exists yet, so nothing published has to change.
 
-## Decision
+## Now: one version series
+
+- On every push of `main`, `*.*.x` or a `v*` tag, CI splits every package to the same ref of its repository.
+- All packages share the version series of `Config::$version`. A stable tag `vX.Y.Z` of the monorepo goes
+  to a package only if `packages/<name>` changed since the previous tag of the same series and that tag was stable.
+  Every other tag goes to every package: the first tag of a series (`v2.1.0`), so that `^2.1` resolves for all,
+  and a pre-release or the first stable tag after one, so that no package is left less stable than the others.
+  A `v*` tag is `vX.Y.Z`, `vX.Y.Z-alphaN`, `-betaN` or `-RCN`: any other one fails the split.
+- A dependency on a monorepo package is `'*'`, written as `Config::$version`. A manifest may give a narrower
+  constraint (`'thesis/io' => '^2.0.3'`) when it starts using an API that appeared later in the series.
+  `sync` fails when such a constraint is outside `Config::$version`.
+
+## Next: every package has versions of its own
+
+One series for all packages would put a package written a week ago at 2.0.0, above the tags of the older packages
+whose names the monorepo reuses (`amqp` 1.0.2 and a branch `1.1.x`, `exceptionally` 0.3.0, `formatter` 0.1.0,
+`nats` 0.5.0), and below 1.0 a break in one package would bump the minor of all.
 
 1. **A series per package.** The manifest declares the current series of the package: `version: '0.1'`.
    It is changed by hand, in the commit that starts the series (a break below 1.0, a new minor above).
    `sync` writes it into the generated `composer.json` of the package as `extra.branch-alias`
    (`dev-main` is `0.1.x-dev`), merged with the `extra` of the manifest (`phpstan-extension`). The release reads
    it from the tree of a commit with `git cat-file`: a manifest of another commit cannot be run.
-   `Config::$version` goes.
+   `Config::$version` goes. The root `composer.json` replaces every package with its series (`0.1.x-dev`),
+   not `self.version`: the root is `dev-main`, which no `^0.Y` of an external dependency would accept.
 2. **Constraints from the series.** `'thesis/async' => '*'` is generated as the range of versions compatible
    with the series of the dependency: `^0.Y` below 1.0, `^X.0` above. A manifest may raise the lower bound
    (`^0.1.5`, `^2.1`) inside that range, `sync` fails outside it. A new minor of `amqp` 2.x keeps the range
@@ -29,10 +43,9 @@ No tag of the monorepo exists yet, so nothing published has to change.
    A package that knows another one without requiring it (`phpstan-extension` knows the functions of `async`)
    is outside the cascade: a new series of `async` releases it too when its types change.
 3. **One branch.** Only `main` of the monorepo is split, to `main` of every package, the default branch.
-   The split of `*.*.x` branches and `v*` tags of ADR 0002 goes, with its triggers and its code:
-   a series lives on `main` until the next one starts. There are no maintenance branches yet: a fix goes
-   to the current series, and the branches of older series are designed with the first backport that someone
-   needs.
+   The split of `*.*.x` branches and `v*` tags goes, with its triggers and its code: a series lives on `main`
+   until the next one starts. There are no maintenance branches yet: a fix goes to the current series,
+   and the branches of older series are designed with the first backport that someone needs.
 4. **A release is a commit.** Every package has a `CHANGELOG.md` (Keep a Changelog), made with the package
    like the rest of it, and a release turns its `[Unreleased]` into `[0.1.4] - <date>` (or `[0.2.0-beta1]`).
    Several packages are released by one commit. A push of `main` releases the headings it added: a heading
@@ -40,7 +53,8 @@ No tag of the monorepo exists yet, so nothing published has to change.
    as it is at the head of the push. Nothing else is released on a push, so a release that failed is never
    retried with somebody else's later work: it is repaired by a re-run of its job or by `workflow_dispatch`
    (item 8). A push that starts a series of a package that others require also releases its first version:
-   until then no dependent can be released (item 5).
+   until then no dependent can be released (item 5). A series started by mistake is undone by a commit
+   while it is unreleased: it changes only the alias of `main`.
 5. **The headings of a push are released only if, for each of them,**
    - `[Unreleased]` of the package is empty: a listed change is not part of this version,
    - the version belongs to the series of the manifest and comes right after the last tag of that series
@@ -55,7 +69,8 @@ No tag of the monorepo exists yet, so nothing published has to change.
      has the same generated range (item 2), whatever its lower bound,
    - every monorepo package in `require` is, in the files it ships (`.gitattributes`), the same as its highest
      tag in the range, or is released by the same push: the tests ran against its head, and a user installs
-     a tag,
+     a tag. So a release of a package releases the dependencies it has changed since their tags,
+     and a fix across packages goes out together,
    - every lower bound of `require` on a monorepo package is met by an existing stable tag or by a heading
      of the same push, stable for a stable release: a stable version that needs a beta cannot be installed
      without `minimum-stability`. `require-dev` is not checked, it is not installed with the package.
@@ -63,6 +78,8 @@ No tag of the monorepo exists yet, so nothing published has to change.
    Everything is decided before anything is pushed, and a push is released whole or not at all. A tag
    of the version that exists already at the split being released counts as released, and the release goes on
    with the steps after it, so a re-run continues a release that failed halfway. A tag at any other commit fails.
+   A forgotten new series of a dependent fails the release, not the push: `main` of a package may hold commits
+   that need a newer series of a dependency than its alias says, until the next release.
 6. **The steps, per package, dependencies first**: the lightweight tag `vX.Y.Z` at the split of the head,
    pushed to the split repository (the push carries its commits, `main` there is left to the split job),
    then its GitHub Release with `target_commitish` set to that commit (GitHub tags the default branch
@@ -93,59 +110,53 @@ No tag of the monorepo exists yet, so nothing published has to change.
     as before and get no more commits or tags. The split pushes nothing to a repository without the rulesets
     of the split or to a name that redirects to a renamed one (`Repositories::isSplit()`).
 
-The read-only repositories and the app of ADR 0002 stay as they are.
+Open:
 
-## Consequences
-
-- A series started by mistake is undone by a commit while it is unreleased: it changes only the alias of `main`.
-  A series of a package that others require cannot stay unreleased (item 4).
-- A forgotten new series of a dependent fails the release, not the push: `main` of a package may hold commits
-  that need a newer series of a dependency than its alias says, until the next release.
-- A release of a package releases the dependencies it has changed since their tags (item 5), so a fix
-  across packages goes out together.
-- A version is chosen per package and release, and its changes are written in its own changelog,
-  where a user of the split repository reads them.
-- Stable 0.x versions need no `minimum-stability`, a pre-release is made only where it is needed.
-- The root `composer.json` replaces every package with its series (`0.1.x-dev`), not `self.version`:
-  the root is `dev-main`, which no `^0.Y` of an external dependency would accept.
-- The release assumes the package is registered on Packagist (ADR 0002, item 4), which is not automated yet.
+- The release assumes the package is registered on Packagist, which `github` does not automate yet.
 - The tests run with the newest version of every dependency, never with the lowest one that a range allows.
-  The job of ADR 0002 that installs every package alone with its lowest dependencies is still to be added.
+  A job that installs every package alone with its lowest and highest dependencies is still to be added:
+  it also catches a forgotten lower bound.
 
-## Rejected
+## Decisions
 
-- **One series for all packages** (ADR 0002): new packages at 2.0, and a break of one bumps all of them below 1.0.
+- Rejected: one series for all packages ("Now"): new packages at 2.0, and a break of one bumps all of them below 1.0.
   A shared series above every older tag and branch would have to start at 1.2 and promise stability nobody gives.
-- **Shared series for groups of packages**: two release mechanisms instead of one.
-- **No `main` in split repositories, a series is a branch**, as in the older repositories. Every review of it
+  Shared series for groups of packages: two release mechanisms instead of one.
+- Rejected: a tag in every package on every release (strict lockstep): empty releases of unchanged packages.
+- Rejected: lower bounds rewritten by the release to the latest tags of the dependencies: a release would change
+  the generated `composer.json` and would cascade a tag to every dependent package.
+- Rejected: no `main` in split repositories, a series is a branch, as in the older repositories. Every review of it
   found a new way to lose commits or block the split: the last commits of a series had to be pushed to its branch
   from the history at every change of the series, the ranges of a dependent had to be checked against that branch
   by the split, a series undone by hand came back, and the default branch switched with every series.
   With `main` a series is one line of an alias until it is released.
-- **Maintenance branches now** (`<name>/X.Y.x` split to `X.Y.x`): the most fragile part of every review.
+- Rejected: maintenance branches now (`<name>/X.Y.x` split to `X.Y.x`): the most fragile part of every review.
   A pushed branch runs the workflow and the tooling of its own old commit, the alias of `main` collides
   with a branch of its series, the commit to start from is ambiguous (a split commit is shared by every commit
   that leaves the package as it is), and a backport across packages is copied once per branch. Below 1.0
   nobody has asked for one yet.
-- **Releasing the top heading of every package on every push**: a release that failed would be retried
+- Rejected: releasing the top heading of every package on every push: a release that failed would be retried
   at the head of the next push, with its work in the tag, and every push would ask GitHub about every package.
-- **The release after the split job, or pushing `main` of the split repository itself**: the split job fails
+- Rejected: the release after the split job, or pushing `main` of the split repository itself: the split job fails
   when any package fails and a replaced run of it ends as cancelled, and a second writer of `main` races
   with the split. The pushed tag carries the commits.
-- **Releasing the headings that pass and stopping only the others**: everything is decided before the first push
-  anyway, the repair is the same dispatch, and a half-released push is harder to reason about.
-- **Running the checks again on a dispatch**: the image and the global tools float, so a commit that passed
+- Rejected: releasing the headings that pass and stopping only the others: everything is decided before the first
+  push anyway, the repair is the same dispatch, and a half-released push is harder to reason about.
+- Rejected: running the checks again on a dispatch: the image and the global tools float, so a commit that passed
   could fail for reasons it does not have.
-- **A version higher than the last tag** instead of the next one: a typo would publish a version for good.
-- **Tags of the monorepo** (`<name>/vX.Y.Z`): nothing needs them without maintenance branches.
-- **Releasing the commit that added the heading** (`git blame`): a fix on the same day does not change the line,
-  and a later edit of the line moves it away from the tag.
-- **Tags pushed by hand**: the version would be written twice, in the tag and in the changelog, and a tag
+- Rejected: a version higher than the last tag instead of the next one: a typo would publish a version for good.
+- Rejected: tags of the monorepo (`<name>/vX.Y.Z`): nothing needs them without maintenance branches.
+- Rejected: releasing the commit that added the heading (`git blame`): a fix on the same day does not change
+  the line, and a later edit of the line moves it away from the tag.
+- Rejected: tags pushed by hand: the version would be written twice, in the tag and in the changelog, and a tag
   is public before anything checks it. GitHub also starts no workflow for a push of more than three tags.
-- **Leaving the older branches out of the read-only ruleset**: an exception per package in the manifests
+- Rejected: leaving the older branches out of the read-only ruleset: an exception per package in the manifests
   for series that nobody maintains.
-- **Changesets** (a note per change, collected into a release): a second place for what `[Unreleased]` holds.
-- **Releases in the monorepo**: one feed of every package retelling their changelogs, and not the repository
+- Rejected: changesets (a note per change, collected into a release): a second place for what `[Unreleased]` holds.
+- Rejected: releases in the monorepo: one feed of every package retelling their changelogs, and not the repository
   that Packagist, Dependabot and the users of a package look at.
-- **Importing the history of an older repository into the monorepo** to continue its branches: the split drops
-  signatures, so the commits of GitHub's web interface get other ids anyway, and the monorepo gets foreign history.
+- Rejected: importing the history of an older repository into the monorepo to continue its branches: the split
+  drops signatures, so the commits of GitHub's web interface get other ids anyway, and the monorepo gets foreign
+  history.
+- Rejected: starting at 2.0 for every package (the plan of "Now", with old tags pushed by hand into the new
+  repository): a package written a week ago would claim a maturity it does not have.

@@ -6,10 +6,10 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
   Keep them plain readonly DTOs with named arguments: humans and agents write them by hand. The rest is in `Internal\`.
 - `.gitattributes` of a package is an allowlist (`/* export-ignore`, then `-export-ignore` for what is kept):
-  the split repository stays an exact copy of the package (ADR 0002), only the archive is trimmed, and a new file
-  of the monorepo stays out of it without anyone remembering to exclude it. `sync` throws on a `dist` path that
-  does not exist. Rejected: excluding files from the split itself (every split commit would differ from its directory
-  and nobody gains from it: users install the archive); a list of excluded files
+  the split repository stays an exact copy of the package (`agents/repositories.md`), only the archive is trimmed,
+  and a new file of the monorepo stays out of it without anyone remembering to exclude it. `sync` throws
+  on a `dist` path that does not exist. Rejected: excluding files from the split itself (every split commit
+  would differ from its directory and nobody gains from it: users install the archive); a list of excluded files
   (a forgotten one leaks into every install).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
   a property does not exist, so nothing is read back from the current file. `type` (default `library`)
@@ -38,8 +38,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.
   Rejected: layers, no cycles, a validator of code references against `require`.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
-- `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of ADR 0002: creates it, sets
-  the settings that differ, creates or replaces the two rulesets. It compares only the keys it sends
+- `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
+  creates it, sets the settings that differ, creates or replaces the two rulesets. It compares only the keys it sends
   (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
   locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`.
 - A failure of one package does not block the others, the job still fails: `github` collects an error
@@ -92,10 +92,11 @@ Invariants:
 
 Decisions:
 
-- Our own split instead of splitsh-lite (ADR 0003): splitsh needs libgit2 1.5 exactly, so CI built it in a Docker
-  image on every run. Ours is one `git rev-list --topo-order` and one `git cat-file --batch` for all packages
-  at once, ids are `sha1()` in PHP and the commits are written as loose objects directly. No cache: the cache
-  of splitsh was keyed by the name of the ref, so a ref moved back got its old split.
+- Our own split instead of splitsh-lite (`agents/repositories.md`): splitsh needs libgit2 1.5 exactly,
+  so CI built it in a Docker image on every run. Ours is one `git rev-list --topo-order` and one
+  `git cat-file --batch` for all packages at once, ids are `sha1()` in PHP and the commits are written
+  as loose objects directly. No cache: the cache of splitsh was keyed by the name of the ref, so a ref moved back
+  got its old split.
 - Only the frontier of the walk is in memory: the heads of a commit are dropped after its last child,
   and `SplitCommit` names its parents by id. Heads per package and commit exhausted the memory of a long history,
   and objects holding their parents crashed PHP when it freed a chain of about 60 000 of them.

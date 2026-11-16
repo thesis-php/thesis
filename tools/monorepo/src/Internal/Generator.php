@@ -171,9 +171,9 @@ final readonly class Generator
     }
 
     /**
-     * The split repository is an exact copy of the package (ADR 0002), so what only the monorepo needs is left out
-     * of the archive that composer installs from, not out of the split. An allowlist: a new file of the monorepo
-     * stays out of the archive without anyone remembering to exclude it.
+     * The split repository is an exact copy of the package (agents/repositories.md), so what only
+     * the monorepo needs is left out of the archive that composer installs from, not out of the split.
+     * An allowlist: a new file of the monorepo stays out of the archive without anyone remembering to exclude it.
      */
     private function gitattributes(Package $package): string
     {
