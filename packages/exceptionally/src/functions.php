@@ -7,9 +7,8 @@ namespace Thesis;
 use Thesis\Internal\ErrorHandler;
 
 /**
- * Calls the function and throws an error it triggers at one of the levels as an \ErrorException.
- * An error suppressed with @, at another level or of another fiber goes to the previous handler.
- * False is a failure: an \ErrorException is thrown when the function returns false and no error was thrown.
+ * Calls the function and throws its errors at the levels as \ErrorException, and its false too.
+ * Other errors (suppressed, at other levels, of other fibers) go to the previous handler.
  * The function may suspend the fiber.
  *
  * @api
@@ -20,8 +19,7 @@ use Thesis\Internal\ErrorHandler;
  */
 function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED): mixed
 {
-    // The handler stack is global, while a call of exceptionally() belongs to one fiber: while it is suspended,
-    // other fibers run under its handler. So the handler reads the levels of the current fiber.
+    // Per fiber: while a call is suspended, other fibers run under its handler
     /** @var \WeakMap<object, non-empty-list<int>> $levelsOfFibers */
     static $levelsOfFibers = new \WeakMap();
     // {main} has no \Fiber, so it gets a key of its own
@@ -46,9 +44,7 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
     try {
         $result = $fn();
     } finally {
-        // The top of the stack is not always the copy of this call: other code may have set its handler above
-        // (it stays), or a handler runs (PHP has none then). So the call only says that it has finished,
-        // and what is taken off is a handler of ours on top that a finished call has left.
+        // The top may be a handler of other code or none (a handler runs): only ours of finished calls go
         ++$handler->finishedCalls;
 
         // NOTHING may come between reading the number and restore_error_handler(): see AGENTS.md
@@ -68,7 +64,7 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
     }
 
     if ($result === false) {
-        // E_WARNING: the exception stands for the warning that a function of PHP fails with
+        // E_WARNING: it stands for the warning that a function of PHP fails with
         throw new \ErrorException('The function returned false and no error was thrown', severity: E_WARNING);
     }
 

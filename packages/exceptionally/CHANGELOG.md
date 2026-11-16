@@ -12,21 +12,16 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 ### Changed
 
 - **BC break:** Requires 64-bit PHP 8.5+.
-- **BC break:** The parameter `$function` of `exceptionally()` is renamed to `$fn`.
-- **BC break:** `exceptionally()` throws an `\ErrorException` of `E_WARNING` when the callable returns `false`
-  and no error was thrown (suppressed, at another level or none). It used to return `false` while its type
-  promised a `T` without `false`. The type now removes `false` from any result: `bool` becomes `true`.
-- An error that is not converted (another level, suppressed with `@`) goes to the previous error handler,
-  so the handler of the application still sees it. It used to bypass it.
-- Errors suppressed by the `error_reporting` ini setting are not converted either.
-- The callable may suspend a fiber: while it is suspended, errors of other fibers are not converted,
-  and fibers that finish in any order leave the error handlers as they were.
-- A handler set by other code while the callable runs stays set when it returns. It used to be restored
-  in place of the handler of `exceptionally()`.
-
-### Removed
-
-- **BC break:** `exceptional()`. Use `static fn() => exceptionally($function)` instead.
+- **BC break:** The parameters of `exceptionally()` are renamed: `$function` to `$fn`, `$errorLevels` to `$levels`.
+- **BC break:** When the callable returns `false` and no error was thrown, `exceptionally()` throws
+  an `\ErrorException` of `E_WARNING` instead of returning `false`, which its type did not allow.
+- An error that is not thrown (another level, suppressed with `@`) goes to the previous error handler
+  instead of bypassing it.
+- Levels turned off by the `error_reporting` ini setting are not thrown.
+- The callable may suspend a fiber: errors of other fibers are not thrown meanwhile, and fibers that finish
+  in any order leave the error handlers as they were.
+- A handler that other code sets while the callable runs stays set. It used to be taken off
+  instead of the handler of `exceptionally()`.
 
 ## [0.3.0] - 2026-03-30
 
