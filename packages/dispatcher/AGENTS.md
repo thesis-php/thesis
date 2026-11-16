@@ -30,6 +30,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Rejected: PSR-14 in the core. `StoppableEventInterface` makes the order of listeners part of their meaning and
   costs a check per listener, `dispatch(): object` serves mutable events, and nobody needs a foreign provider
   or dispatcher yet. A bridge is a separate package over `listens()` and the same resolution when someone does.
+- Rejected: calling them hooks. A hook is an extension point declared by its caller, with a fixed signature,
+  often able to change the outcome (return a value, cancel). Here an event of any class goes to the listeners
+  of its type and nothing comes back: an observer, named as in PSR-14, Symfony and Laravel. A package that uses
+  the dispatcher may call its points hooks in its own docs, the objects stay events. A callback that changes
+  the outcome is another mechanism, not a rename of this one.
 - Rejected: priorities, until someone needs them.
 - Rejected: collecting the exceptions of all the listeners: the first one is thrown, the rest are not called,
   so the failure points at the listener that failed.
