@@ -139,7 +139,9 @@ Invariants:
   points to a split commit, which the release computes again locally, so a tag whose commit is not local
   is not ours and fails `merge-base --is-ancestor`. A clone has only the splits it computes: the release splits
   the commit and every head of main it knows (`refs/heads/main`, `refs/remotes/origin/main`), so a tag
-  of a later commit is ours too. `ReleaseCommandTest` runs such a case in a clone (`new Repository(cloneOf:)`):
+  of a later commit is ours too. It fetches `main` of `origin` first: `actions/checkout` of a push sets both refs
+  to the commit of the push even when `main` has moved on, so only a dispatch would see the newer one.
+  `ReleaseCommandTest` runs these cases in a clone (`new Repository(cloneOf:)`) shaped as each checkout leaves it:
   in the repository that wrote the tags every split is local, and the bug does not show.
   The previous release's `composer.json` is read from there too.
 - Versions in the split repositories are read by composer/semver (`Refs`), so `v0.1.4` and `0.1.4` are one

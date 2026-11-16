@@ -43,7 +43,8 @@ the code in `tools/monorepo/AGENTS.md`.
   are skipped, since later tags of the package or of its dependencies would refuse it, and the release goes on
   with the steps after it, so a re-run continues a release that failed halfway. A tag at any other commit fails.
   A commit that fixes a refused heading without changing its version releases nothing: dispatch it.
-  A changelog that was malformed before the push counts as one without versions.
+  A changelog that was malformed before the push is read by its `## [X]` headings alone: the push that repairs it
+  is not refused, and releases none of the versions it had.
   A forgotten new series of a dependent fails the release, not the push: `main` of a package may hold commits
   that need a newer series of a dependency than its alias says, until the next release.
 - **The steps, per package, dependencies first**: the lightweight tag `vX.Y.Z` at the split of the head,

@@ -93,7 +93,8 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
 1. Read the old repository: what was right, what we reject and why.
 2. Make `packages/<name>/` after an existing package, write `AGENTS.md` (invariants, decisions), `make sync`.
 3. Failing tests first, integration tests against the service in compose.
-4. A package that takes an older name is taken over as "Taking over an older repository" of `agents/repositories.md` says.
+4. A package that takes an older name is taken over as "Taking over an older repository"
+   of `agents/repositories.md` says.
 
 ## Tooling
 

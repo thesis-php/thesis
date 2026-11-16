@@ -520,6 +520,61 @@ final readonly class ReleaseCommandTest
     }
 
     /**
+     * actions/checkout of a push sets main and origin/main to the commit of the push, even when main has moved on.
+     */
+    public static function releasesVersionOfOlderPushInCloneWhoseMainIsAtItsCommit(): void
+    {
+        $source = new Repository();
+        $first = $source->commit('Add a', self::package('a', released: ['0.1.0']));
+        $remotes = self::remotes();
+        self::tag($source, $remotes, $first, 'a', 'v0.1.0');
+        $fix = $source->commit('Fix a', [
+            'packages/a/src/A.php' => 'a2',
+            'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
+        ]);
+        $break = $source->commit('Break a', [
+            ...self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']),
+        ]);
+        self::tag($source, $remotes, $break, 'a', 'v0.2.0');
+        $clone = new Repository(cloneOf: $source);
+        $clone->git->run(['update-ref', 'refs/remotes/origin/main', $fix]);
+        $clone->git->run(['checkout', '--quiet', '-B', 'main', $fix]);
+
+        [$code, $output] = self::run($clone, $remotes, new FakeApi(self::SPLITS), before: $first, commit: $fix);
+
+        Assert::same($code, Command::SUCCESS, $output);
+        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), Splitter::split($source->git, $fix)['a'] ?? '');
+    }
+
+    /**
+     * The push that repairs a changelog adds none of the versions the changelog had before it was broken.
+     */
+    public static function releasesPushThatRepairsChangelogOfReleasedPackage(): void
+    {
+        $repository = new Repository();
+        $first = $repository->commit('Add a and b', [
+            ...self::package('a'),
+            ...self::package('b', released: ['0.1.0']),
+        ]);
+        $remotes = self::remotes();
+        self::tag($repository, $remotes, $first, 'b', 'v0.1.0');
+        $broken = $repository->commit('Break the changelog of b', [
+            'packages/b/src/B.php' => 'b2',
+            'packages/b/CHANGELOG.md' => str_replace("## [Unreleased]\n", '', self::changelog('0.1.0')),
+        ]);
+        $repository->commit('Repair the changelog of b, release a', [
+            'packages/a/CHANGELOG.md' => self::changelog('0.1.0'),
+            'packages/b/CHANGELOG.md' => self::changelog('0.1.0'),
+        ]);
+
+        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS), before: $broken);
+
+        Assert::same($code, Command::SUCCESS, $output);
+        Assert::notNull($remotes->head('a', 'refs/tags/v0.1.0'));
+        Assert::same($remotes->head('b', 'refs/tags/v0.1.0'), Splitter::split($repository->git, $first)['b'] ?? '');
+    }
+
+    /**
      * A manifest that says 0.1 where 0.10 was meant would publish 0.1.0 below 0.9.0.
      */
     public static function refusesSeriesThatWentBack(): void

@@ -30,6 +30,7 @@ final class Plan
 {
     private const string CHANGELOG = 'CHANGELOG.md';
     private const string COMPOSER = 'composer.json';
+    private const string ORIGIN_MAIN = 'refs/remotes/origin/' . Repositories::DEFAULT_BRANCH;
 
     /**
      * @var list<string>
@@ -515,15 +516,17 @@ final class Plan
     }
 
     /**
-     * A clone of CI has the main of the push, a dispatch the newest one, and origin/main may be ahead of both.
+     * actions/checkout of a push sets main and origin/main to the commit of the push, even when main has moved on:
+     * only a fetch of origin finds the newer main. A clone without origin, or offline, has what it has.
      *
      * @return list<array<string, non-empty-string>>
      */
     private function splitMains(): array
     {
+        $this->git->result(['fetch', '--quiet', '--no-tags', 'origin', '+' . Split::REF . ':' . self::ORIGIN_MAIN]);
         $mains = [];
 
-        foreach (array_unique([Split::REF, 'refs/remotes/origin/' . Repositories::DEFAULT_BRANCH]) as $ref) {
+        foreach ([Split::REF, self::ORIGIN_MAIN] as $ref) {
             $head = trim($this->git->result(['rev-parse', '--verify', '--quiet', $ref . '^{commit}'])->stdout);
 
             if ($head !== '' && $head !== $this->commit) {
@@ -602,18 +605,22 @@ final class Plan
     }
 
     /**
-     * A changelog that the push fixed was malformed before it: it had no version then, and the push is not refused
-     * for a state its head no longer has.
+     * A changelog that the push repaired is read by its headings alone: the push is not refused for a state
+     * its head no longer has, and a version it had before is not added by the repair.
      */
     private function hadVersion(string $commit, string $package, string $version): bool
     {
         $path = self::path($package) . '/' . self::CHANGELOG;
         $content = $this->catFile->read($commit . ':' . $path, 'blob');
 
-        try {
-            return $content !== null && Changelog::parse($content, $path)->has($version);
-        } catch (MonorepoException) {
+        if ($content === null) {
             return false;
+        }
+
+        try {
+            return Changelog::parse($content, $path)->has($version);
+        } catch (MonorepoException) {
+            return preg_match('/^## \[' . preg_quote($version, '/') . '\]/m', $content) === 1;
         }
     }
 
