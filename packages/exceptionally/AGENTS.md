@@ -41,8 +41,20 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A fiber started inside the function does not inherit the levels: its errors are its own.
 - The previous handler is called for every level, although it may have been set for some only:
   `set_error_handler()` does not return its levels. Accepted: the alternative is to track every handler.
-- `callable(): T` returns `T`. Rejected: `callable(): (T|false)` returning `T` of the old `thesis/exceptionally`,
-  it lies for functions that return `false` without an error (`strpos()`, `array_search()`).
+- `false` is a failure, checked after the call: the function is for the functions of PHP that fail
+  with a warning and `false`, and `false` comes back without an exception when the error was suppressed,
+  at another level, swallowed by another handler, or there was none (`curl_exec()`, `preg_match()`).
+  The type is `callable(): T` returning `(T is false ? never : T)`: PHPStan distributes it over a union,
+  so `bool` becomes `true` and `string|bool` becomes `string|true`, which `callable(): (T|false)` returning `T`
+  does not (`types/ExceptionallyTypes.php`). The exception has `E_WARNING`: it stands for the warning.
+  Accepted: `false` as an answer throws too (`fgets()` at the end, `unserialize()`), the function returns
+  something else instead (README).
+  Rejected: no check (the caller repeats `=== false` after every call, and forgets it); narrowing by
+  the PHPStan extension for a list of functions (suppression, levels and other handlers decide at runtime,
+  the type would be narrower than proven); a second function with the check, or wrappers per function
+  like `thecodingmachine/safe` (one more choice, and `false` as an answer is not what this function is for);
+  rethrowing the last error that was not thrown as the reason (a record per call and per error in the handler,
+  and a guess: a deprecation or a notice from elsewhere in the function would pass for the reason).
   Rejected: `exceptional()`, a wrapper that makes a callable exceptional: `static fn() => exceptionally(...)` is
   as short, and the old one was broken.
 - One `set_error_handler()` per call, even if ours is on top: the object is shared, the set is not skipped.
@@ -78,10 +90,14 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   breaks the API anyway.
 - Rejected: setting one handler once and never restoring it: code that sets a handler for a while and restores it
   (a test framework per test) would remove ours and leave its own forever.
-- Rejected: `@` with `error_get_last()`: the last error is global, after a suspension it may be of another fiber,
+- Rejected: `@` with `error_get_last()`, also for the reason of a `false`: it is empty when the handler
+  of the application returned `true`, and the last error is global, after a suspension it may be of another fiber,
   and it keeps only the last one.
 
 ## Tests
+
+- `types/ExceptionallyTypes.php` holds `assertType()` fixtures of the result type, never executed:
+  `make phpstan` checks them. A change of the PHPDoc of `exceptionally()` keeps them passing or changes them.
 
 - A deprecation is triggered by `deprecate()` of `tests/functions.php`, never by `trigger_error()` in a test:
   the `error_suppression` rule of PHP CS Fixer puts `@` before every `trigger_error()` of `E_USER_DEPRECATED`,

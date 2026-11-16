@@ -105,6 +105,34 @@ final class ExceptionallyTest
         Assert::same($this->passedOn, ['notice']);
     }
 
+    public function returnsAFalsyValueOtherThanFalse(): void
+    {
+        Assert::same(exceptionally(static fn() => 0), 0);
+        Assert::same(exceptionally(static fn() => ''), '');
+        Assert::null(exceptionally(static fn() => null));
+    }
+
+    public function throwsWhenFalseIsReturned(): void
+    {
+        $error = self::errorOf(static fn() => exceptionally(static fn() => false));
+
+        Assert::same($error->getMessage(), 'The function returned false and no error was thrown');
+        Assert::same($error->getSeverity(), E_WARNING);
+        Assert::same(get_error_handler(), $this->previous);
+    }
+
+    public function throwsWhenFalseIsReturnedAfterASuppressedError(): void
+    {
+        $error = self::errorOf(static fn() => exceptionally(static function () {
+            @trigger_error('suppressed', E_USER_WARNING);
+
+            return false;
+        }));
+
+        Assert::same($error->getMessage(), 'The function returned false and no error was thrown');
+        Assert::same($this->passedOn, ['suppressed']);
+    }
+
     public function appliesTheLevelsOfTheInnermostCall(): void
     {
         $error = self::errorOf(static fn() => exceptionally(static function () {

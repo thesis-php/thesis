@@ -13,8 +13,9 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 
 - **BC break:** Requires 64-bit PHP 8.5+.
 - **BC break:** The parameter `$function` of `exceptionally()` is renamed to `$fn`.
-- **BC break:** `exceptionally()` takes `callable(): T` and returns `T`. It used to take `callable(): (T|false)`
-  and promise a `T` without `false`, which was wrong for functions that return `false` without an error.
+- **BC break:** `exceptionally()` throws an `\ErrorException` of `E_WARNING` when the callable returns `false`
+  and no error was thrown (suppressed, at another level or none). It used to return `false` while its type
+  promised a `T` without `false`. The type now removes `false` from any result: `bool` becomes `true`.
 - An error that is not converted (another level, suppressed with `@`) goes to the previous error handler,
   so the handler of the application still sees it. It used to bypass it.
 - Errors suppressed by the `error_reporting` ini setting are not converted either.

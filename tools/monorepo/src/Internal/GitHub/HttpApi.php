@@ -70,7 +70,7 @@ final readonly class HttpApi implements Api
 
         $status = self::status(http_get_last_response_headers() ?? []);
 
-        if ($content === false || $status === null) {
+        if ($status === null) {
             throw new MonorepoException(\sprintf('GitHub: %s %s: no response.', $method, $path));
         }
 

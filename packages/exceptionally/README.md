@@ -26,6 +26,25 @@ Many functions of PHP report a failure with a warning and `false`. `exceptionall
 an error it triggers as an [`\ErrorException`](https://php.net/manual/class.errorexception.php),
 with the message, the level (`getSeverity()`), the file and the line of the error.
 
+`false` is a failure too, so the result type has no `false`: `string` above, not `string|false`,
+and `true` for a function that returns `bool`. When the function returns `false` and no error was thrown
+(suppressed, at another level, swallowed by another handler or none at all), `exceptionally()` throws
+an `\ErrorException` that says so, with the level `E_WARNING`.
+
+So `false` as an answer throws too: `fgets()` and `readdir()` at the end, `flock()` with `LOCK_NB`,
+`unserialize()` and `json_decode()` of a `false`. Return something else from the function instead:
+
+```php
+$line = exceptionally(static function () use ($handle) {
+    $line = fgets($handle);
+
+    return $line === false ? null : $line; // null at the end, a warning is still thrown
+});
+```
+
+A generator function returns its generator at once, and its body runs later, outside of `exceptionally()`:
+call `exceptionally()` inside it instead.
+
 ## Levels
 
 By default every level except `E_DEPRECATED` and `E_USER_DEPRECATED` is thrown: deprecations usually come
@@ -36,20 +55,21 @@ exceptionally($fn, E_USER_WARNING | E_USER_NOTICE);
 exceptionally($fn, E_ALL); // deprecations too
 ```
 
-An error at another level goes to the error handler that was set before, as without `exceptionally()`.
+An error at another level goes to the error handler that was set before, as without `exceptionally()`,
+but a `false` after it is thrown.
 In nested calls the innermost one decides.
 
 ## Suppressed errors
 
-An error suppressed with `@` is not thrown, it goes to the previous handler:
+An error suppressed with `@` is not thrown, it goes to the previous handler. But the `false` that the function
+returns makes `exceptionally()` throw:
 
 ```php
-$content = exceptionally(static fn() => @file_get_contents('/path/to/file')); // false, no exception
+exceptionally(static fn() => @file_get_contents('/path/to/file')); // throws: returned false and no error was thrown
 ```
 
-The same goes for `@` around the call itself and for levels turned off by the `error_reporting` ini setting:
-a result like `false` is then not a proof of success. As in PHP, `@` does not suppress `E_USER_ERROR`
-and `E_RECOVERABLE_ERROR`, they are thrown.
+The same goes for `@` around the call itself and for levels turned off by the `error_reporting` ini setting.
+As in PHP, `@` does not suppress `E_USER_ERROR` and `E_RECOVERABLE_ERROR`, they are thrown.
 
 ## Fibers
 

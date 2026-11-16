@@ -8,6 +8,8 @@ A bare call is never right: it warns and goes on. Such a function is called in o
 
 - `exceptionally()` of thesis/exceptionally where any warning is a failure and the path is cold: files, HTTP,
   a sequence of such calls, setup (`tools/monorepo`). The `\ErrorException` becomes an exception of the package.
+  It throws on `false` too, so no `=== false` after it. Where `false` is an answer (`fgets()` at the end),
+  the function returns `null` for it (`=== false ? null : $line`, not `?: null`, which takes `'0'` too).
 - `error_clear_last()`, `@call()`, then `Internal\lastError($default)` on a hot path (`fread()`/`fwrite()`
   of `Stream` and `Socket`) and where the result says what failed (`false`, `0`), not the warning.
   The default is needed: `fread()` and `fwrite()` may fail without an error. Nothing may suspend between the clear
@@ -19,4 +21,5 @@ A bare call is never right: it warns and goes on. Such a function is called in o
 ## Decisions
 
 - No `exceptionally()` on a hot path: it costs a closure and two handler calls per call, and under `@`
-  or `error_reporting` of the caller it throws nothing, while `error_get_last()` records a suppressed error too.
+  or `error_reporting` of the caller it throws only on `false`, without the reason, while `error_get_last()`
+  records a suppressed error too.

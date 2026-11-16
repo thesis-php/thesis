@@ -9,12 +9,13 @@ use Thesis\Internal\ErrorHandler;
 /**
  * Calls the function and throws an error it triggers at one of the levels as an \ErrorException.
  * An error suppressed with @, at another level or of another fiber goes to the previous handler.
+ * False is a failure: an \ErrorException is thrown when the function returns false and no error was thrown.
  * The function may suspend the fiber.
  *
  * @api
  * @template T
  * @param callable(): T $fn
- * @return T
+ * @return (T is false ? never : T)
  * @throws \ErrorException
  */
 function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED): mixed
@@ -43,7 +44,7 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
     set_error_handler($handler);
 
     try {
-        return $fn();
+        $result = $fn();
     } finally {
         // The top of the stack is not always the copy of this call: other code may have set its handler above
         // (it stays), or a handler runs (PHP has none then). So the call only says that it has finished,
@@ -65,4 +66,11 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
             $levelsOfFibers[\Fiber::getCurrent() ?? $main] = $stack;
         }
     }
+
+    if ($result === false) {
+        // E_WARNING: the exception stands for the warning that a function of PHP fails with
+        throw new \ErrorException('The function returned false and no error was thrown', severity: E_WARNING);
+    }
+
+    return $result;
 }
