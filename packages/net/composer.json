@@ -24,7 +24,7 @@
         "ext-openssl": "*",
         "thesis/async": "^0.1",
         "thesis/io": "^0.1",
-        "thesis/time": "^0.1"
+        "thesis/time": "^0.3"
     },
     "require-dev": {
         "ext-intl": "*",

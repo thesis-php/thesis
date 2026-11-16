@@ -25,7 +25,7 @@
         "thesis/async": "^0.1",
         "thesis/io": "^0.1",
         "thesis/net": "^0.1",
-        "thesis/time": "^0.1"
+        "thesis/time": "^0.3"
     },
     "require-dev": {
         "ext-simplexml": "*",

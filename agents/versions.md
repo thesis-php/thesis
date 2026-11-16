@@ -6,7 +6,7 @@ in `changelogs.md`, the repositories in `repositories.md`.
 
 Every package has versions of its own. One series for all packages would put a package written a week ago
 at 2.0.0, above the tags of the older packages whose names the monorepo reuses (`amqp` 1.0.2 and a branch `1.1.x`,
-`exceptionally` 0.3.0, `formatter` 0.1.0, `nats` 0.5.0), and below 1.0 a break in one package would bump
+`exceptionally` 0.3.0, `formatter` 0.1.0, `nats` 0.5.0, `time` 0.2.3), and below 1.0 a break in one package would bump
 the minor of all.
 
 ## Rules
@@ -33,7 +33,7 @@ the minor of all.
   to the current series, and the branches of older series are designed with the first backport that someone needs.
   A series started by mistake is undone by a commit while it is unreleased: it changes only the alias of `main`.
 - **A new series is above every older version and branch of its name**: new packages start at 0.1,
-  `amqp` at 2.0, `exceptionally` at 0.4, `formatter` at 0.2, `nats` at 0.6. The release refuses a version
+  `amqp` at 2.0, `exceptionally` at 0.4, `formatter` at 0.2, `nats` at 0.6, `time` at 0.3. The release refuses a version
   that breaks it, so the older tags and branches never collide with ours and stay as they are, with their history:
   Packagist keeps the old versions and the locks that point to their commits keep working.
 

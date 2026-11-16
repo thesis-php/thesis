@@ -22,7 +22,7 @@
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
         "thesis/async": "^0.1",
-        "thesis/time": "^0.1"
+        "thesis/time": "^0.3"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",

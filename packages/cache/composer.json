@@ -21,7 +21,7 @@
         "php": "^8.5",
         "php-64bit": "*",
         "thesis/async": "^0.1",
-        "thesis/time": "^0.1"
+        "thesis/time": "^0.3"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",
