@@ -44,6 +44,7 @@ from scratch: it is not a wrapper around amphp and does not depend on it. 64-bit
 - `repositories.md`: the split, the repositories of the packages and their settings on GitHub.
 - `versions.md`: versions, tags, changelogs and the release.
 - `platform.md`: code that depends on the operating system or on the size of `int`.
+- `reviews.md`: reviewing a change, acting on the findings of a review.
 
 @agents/php.md
 
