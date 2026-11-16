@@ -79,12 +79,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   others sharing it fail meanwhile. Reopening it for a description of our own (as libuv does for a terminal):
   `/proc/self/fd/N` reopens a pipe only on Linux, a file gets an offset of its own, a socket cannot be reopened.
 - `Stream` has no chunk size: with the PHP read buffer off a read asks the descriptor for the length it is given.
-- A failed call of PHP is `error_clear_last()`, `@call()`, then `Internal\lastError($default)` for the message.
-  Rejected: `exceptionally()` of thesis/exceptionally. Nothing suspends between the clear and the read, so the global
-  last error is this call's. `exceptionally()` would cost a closure and two handler calls per `fread()`/`fwrite()`
-  of the hot path, and it loses the message where `lastError()` keeps it: under `@` or `error_reporting` of the caller
-  it throws nothing, while `error_get_last()` records a suppressed error too. A default is needed anyway:
-  `fread()` and `fwrite()` may fail without an error.
 
 ## Tests
 

@@ -173,6 +173,19 @@ the whole monorepo is for the final check.
 - A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
   rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
   they stay.
+- A PHP function that fails with a warning (and `false`) is called in one of three ways. A bare call is never one:
+  it warns and goes on.
+  - `exceptionally()` of thesis/exceptionally where any warning is a failure and the path is cold: files, HTTP,
+    a sequence of such calls, setup (`tools/monorepo`). The `\ErrorException` becomes an exception of the package.
+  - `error_clear_last()`, `@call()`, then `Internal\lastError($default)` on a hot path (`fread()`/`fwrite()`
+    of `Stream` and `Socket`) and where the result says what failed (`false`, `0`), not the warning.
+    `exceptionally()` would cost a closure and two handler calls per call, and under `@` or `error_reporting`
+    of the caller it throws nothing, while `error_get_last()` records a suppressed error too. The default is needed:
+    `fread()` and `fwrite()` may fail without an error. Nothing may suspend between the clear and the read:
+    the last error is global, after a suspension it may be of another fiber. `lastError()` is internal,
+    so a package keeps a copy of its own (io, net).
+  - A bare `@` where a failure is an answer, not an error: `fclose()` while closing, the cleanup of a temporary file,
+    a read of a file that may be missing.
 - Functions and constants are loaded by one file per scope: `src/autoload.files.php` in `files` of the manifest,
   `tests/autoload.files.php` in `devFiles`. A new file of functions is added there with `require_once`,
   so neither the manifest nor the autoloader changes. Only files without a class-like declaration go there:

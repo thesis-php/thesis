@@ -54,10 +54,10 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   repository (`full_name` differs) is free: the repository is created, which ends the redirect.
 - The organization, the default branch and the id of the app are constants of `Repositories`, not of `Config`:
   they describe the infrastructure, not the packages, and nobody writes them by hand.
-- Files and HTTP are written and read inside `exceptionally()` of thesis/exceptionally, and the error goes into
-  the `MonorepoException` or the output of the command: a bare call only warns and goes on (`sync` used to
-  succeed without writing a file), `@` hides the reason. `@` stays where a failure is an answer, not an error:
-  `Monorepo::read()` of a missing file, the check of a loose object of an earlier run, the cleanup of a temporary file.
+- Files and HTTP go through `exceptionally()` (the root rule on warnings), the error goes into
+  the `MonorepoException` or the output of the command: `sync` used to succeed without writing a file.
+  `@` stays in `Monorepo::read()` of a missing file, the check of a loose object of an earlier run
+  and the cleanup of a temporary file.
 - HTTP goes through `file_get_contents()` with a stream context behind the `Api` interface: a few JSON requests
   do not need a client library. Tests use `FakeApi`.
 
