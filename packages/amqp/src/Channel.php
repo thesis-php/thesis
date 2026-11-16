@@ -6,6 +6,7 @@ namespace Thesis\Amqp;
 
 use Thesis\Amqp\Internal\Confirms;
 use Thesis\Amqp\Internal\Connection;
+use Thesis\Amqp\Internal\ConsumerState;
 use Thesis\Amqp\Internal\Content;
 use Thesis\Amqp\Internal\ContentHeader;
 use Thesis\Amqp\Internal\Frames;
@@ -117,17 +118,11 @@ final class Channel
     private readonly Content $content;
 
     /**
-     * Unbounded: the reader never waits for a consumer, a prefetch of {@see qos()} bounds what the server sends.
-     * A numeric consumer tag is an int key.
+     * By consumer tag: a numeric one is an int key.
      *
-     * @var array<array-key, AsyncChannel<Delivery>>
+     * @var array<array-key, ConsumerState>
      */
     private array $consumers = [];
-
-    /**
-     * @var array<string, bool>
-     */
-    private array $noAck = [];
 
     private int $consumerCount = 0;
 
@@ -359,8 +354,7 @@ final class Channel
 
         /** @var AsyncChannel<Delivery> $deliveries */
         $deliveries = new AsyncChannel(PHP_INT_MAX);
-        $this->consumers[$tag] = $deliveries;
-        $this->noAck[$tag] = $noAck;
+        $this->consumers[$tag] = new ConsumerState($deliveries, $noAck);
 
         try {
             // Shielded: a consumer started for a caller that is gone would take messages nobody reads.
@@ -377,7 +371,7 @@ final class Channel
                 BasicConsumeOk::class,
             ));
         } catch (\Throwable $exception) {
-            unset($this->consumers[$tag], $this->noAck[$tag]);
+            unset($this->consumers[$tag]);
 
             throw $exception;
         }
@@ -776,7 +770,8 @@ final class Channel
         }
 
         $consumerTag = $method instanceof BasicDeliver ? $method->consumerTag : null;
-        $noAck = $consumerTag === null ? $this->getNoAck : $this->noAck[$consumerTag] ?? true;
+        $consumer = $consumerTag === null ? null : $this->consumers[$consumerTag] ?? null;
+        $noAck = $consumerTag === null ? $this->getNoAck : $consumer->noAck ?? true;
         $delivery = new Delivery(
             settle: $this->settle(...),
             reply: $this->publishReply(...),
@@ -796,7 +791,7 @@ final class Channel
         }
 
         // A delivery for a consumer that is being cancelled: it is requeued when the channel closes.
-        ($this->consumers[$consumerTag] ?? null)?->trySend($delivery);
+        $consumer?->deliveries->trySend($delivery);
     }
 
     /**
@@ -897,9 +892,9 @@ final class Channel
 
     private function endConsumer(string $tag, ?AmqpException $reason): void
     {
-        $deliveries = $this->consumers[$tag] ?? null;
-        unset($this->consumers[$tag], $this->noAck[$tag]);
-        $deliveries?->close($reason);
+        $consumer = $this->consumers[$tag] ?? null;
+        unset($this->consumers[$tag]);
+        $consumer?->deliveries->close($reason);
     }
 
     private function closedByServer(ChannelClose $close): void
