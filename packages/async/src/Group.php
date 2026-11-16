@@ -18,10 +18,11 @@ interface Group
      *
      * @template T
      * @param callable(): T $task
+     * @param ?non-empty-string $name what the task is called in a trace (`Trace\TaskCreated::$name`), nowhere else
      * @return Task<T>
      * @throws \LogicException if {@see group()} has already returned
      */
-    public function spawn(callable $task): Task;
+    public function spawn(callable $task, ?string $name = null): Task;
 
     /**
      * Starts a background task (heartbeat, ping reader, metrics) the group does NOT wait for:
@@ -29,10 +30,11 @@ interface Group
      *
      * @template T
      * @param callable(): T $task
+     * @param ?non-empty-string $name what the daemon is called in a trace (`Trace\TaskCreated::$name`), nowhere else
      * @return Task<T>
      * @throws \LogicException if {@see group()} has already returned
      */
-    public function daemon(callable $task): Task;
+    public function daemon(callable $task, ?string $name = null): Task;
 
     /**
      * Cancels every task and daemon of the group, but not the body: the body is the owner of the group,

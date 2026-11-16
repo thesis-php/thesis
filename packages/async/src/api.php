@@ -238,7 +238,7 @@ function timeoutOr(Duration $duration, callable $body, mixed $default = null): m
  */
 function group(callable $body): mixed
 {
-    return GroupImpl::run($body);
+    return GroupImpl::run($body, __FUNCTION__);
 }
 
 /**
@@ -302,11 +302,11 @@ function suppressed(\Throwable $error): array
  */
 function all(array $tasks): array
 {
-    return group(static function (Group $group) use ($tasks) {
+    return GroupImpl::run(static function (Group $group) use ($tasks) {
         $handles = [];
 
         foreach ($tasks as $key => $task) {
-            $handles[$key] = $group->spawn($task);
+            $handles[$key] = $group->spawn($task, Internal\taskName($key));
         }
 
         $results = [];
@@ -316,7 +316,7 @@ function all(array $tasks): array
         }
 
         return $results;
-    });
+    }, function: __FUNCTION__);
 }
 
 /**
@@ -336,7 +336,7 @@ function all(array $tasks): array
  */
 function allSettled(array $tasks): array
 {
-    return group(static function (Group $group) use ($tasks) {
+    return GroupImpl::run(static function (Group $group) use ($tasks) {
         $handles = [];
 
         foreach ($tasks as $key => $task) {
@@ -349,7 +349,7 @@ function allSettled(array $tasks): array
                 } catch (\Throwable $error) {
                     return $error;
                 }
-            });
+            }, Internal\taskName($key));
         }
 
         $errors = [];
@@ -366,7 +366,7 @@ function allSettled(array $tasks): array
         }
 
         return [$results, $errors];
-    });
+    }, function: __FUNCTION__);
 }
 
 /**
@@ -429,7 +429,7 @@ function race(array $tasks): mixed
  */
 function each(iterable $items, int $concurrency, callable $fn): void
 {
-    group(static function (Group $group) use ($items, $concurrency, $fn) {
+    GroupImpl::run(static function (Group $group) use ($items, $concurrency, $fn) {
         // Not $fn(...) itself: Workers passes the key too, and an internal function rejects an extra argument.
         Workers::start(
             group: $group,
@@ -437,7 +437,7 @@ function each(iterable $items, int $concurrency, callable $fn): void
             concurrency: $concurrency,
             fn: static fn(mixed $item) => $fn($item),
         );
-    });
+    }, function: __FUNCTION__);
 }
 
 /**
@@ -456,7 +456,7 @@ function map(iterable $items, int $concurrency, callable $fn): array
 {
     $results = [];
 
-    group(static function (Group $group) use ($items, $concurrency, $fn, &$results) {
+    GroupImpl::run(static function (Group $group) use ($items, $concurrency, $fn, &$results) {
         Workers::start(
             group: $group,
             items: $items,
@@ -470,7 +470,7 @@ function map(iterable $items, int $concurrency, callable $fn): array
                 $results[$key] = $fn($item);
             },
         );
-    });
+    }, function: __FUNCTION__);
 
     /** @var array<K, R> Every reserved null has been replaced by a result, or the group has thrown. */
     return $results;

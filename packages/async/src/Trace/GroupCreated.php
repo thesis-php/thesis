@@ -17,6 +17,7 @@ final readonly class GroupCreated implements Event
     /**
      * @param positive-int $scope
      * @param ?positive-int $parent null for the root scope
+     * @param non-empty-string $function the function that has created it: `Thesis\Async\group`, `Thesis\Async\race`, ...
      * @param bool $cancelled whether it is created cancelled, by an ancestor
      * @param ?Location $location where it is called from, outside the library
      */
@@ -24,6 +25,7 @@ final readonly class GroupCreated implements Event
         public int $scope,
         public Instant $at,
         public ?int $parent,
+        public string $function,
         public bool $cancelled,
         public ?Location $location,
     ) {}

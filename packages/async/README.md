@@ -896,19 +896,25 @@ a task starts, a scope waits and wakes up, an owner cancels (why, who, and every
 a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `VirtualTime\run()`
 the trace is the same on every run: the scopes are numbered from 1 in the order the observation sees them.
 
+A task is named in the trace by `$group->spawn($task, name: 'fetch user')` (`daemon()` too) or by its key
+in `all()`, `allSettled()`, `some()` and `race()`: `race(['eu' => ..., 'us' => ...])` gives `TaskCreated::$name`
+`'eu'` and `'us'`, a list gives `'0'`, `'1'`. The workers of `each()` and `map()` are not named: each takes many items.
+A name goes nowhere but the trace. `GroupCreated::$function` tells which function has created the group:
+`Thesis\Async\group`, `Thesis\Async\race`, `Thesis\Async\map` and so on.
+
 ```php
 use Thesis\Async\Trace;
 use Thesis\Async\VirtualTime;
 use Thesis\Dispatcher;
 
 $printTrace = new Dispatcher([
-    static function (Trace\TaskCreated $event) { print "#{$event->scope} spawned at {$event->location}\n"; },
+    static function (Trace\TaskCreated $event) { print "#{$event->scope} {$event->name} spawned at {$event->location}\n"; },
     static function (Trace\Suspended $event) { print "#{$event->scope} waits in {$event->caller}\n"; },
     static function (Trace\ScopeCancelled $event) { print "#{$event->scope} cancelled: {$event->cause->name}\n"; },
 ]);
 
 VirtualTime\run(static fn() => Trace\observe($printTrace, $program));
-// #2 spawned at /app/src/Worker.php:21
+// #2 fetch user spawned at /app/src/Worker.php:21
 // #2 waits in Thesis\Async\delay() at /app/src/Worker.php:34
 // #1 cancelled: Failure
 ```
@@ -1111,8 +1117,8 @@ all([user, orders])              orders fails after 50 ms
 | | |
 |---|---|
 | `group(callable(Group): T): T` | run a body with a nursery, join all tasks |
-| `Group::spawn(callable(): T): Task<T>` | start a task the group waits for |
-| `Group::daemon(callable(): T): Task<T>` | start a task cancelled when the rest is done |
+| `Group::spawn(callable(): T, ?string $name = null): Task<T>` | start a task the group waits for |
+| `Group::daemon(callable(): T, ?string $name = null): Task<T>` | start a task cancelled when the rest is done |
 | `Group::cancelTasks()` | cancel all tasks and daemons, including later ones, but not the body |
 | `Task::await(): T`, `Task::cancel()`, `Task::$isDone` | task handle |
 | `all(array<K, callable(): T>): array<K, T>` | all results or the first failure |

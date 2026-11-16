@@ -101,7 +101,10 @@ final class Tracer
         }
     }
 
-    public function groupCreated(Scope $body, Scope $tasks, Scope $daemons, Scope $parent): void
+    /**
+     * @param non-empty-string $function
+     */
+    public function groupCreated(Scope $body, Scope $tasks, Scope $daemons, Scope $parent, string $function): void
     {
         $id = $this->created($body, $parent);
         $this->ids[$tasks] = $id;
@@ -112,6 +115,7 @@ final class Tracer
                 scope: $id,
                 at: Instant::now(),
                 parent: $this->idOrNull($parent),
+                function: $function,
                 cancelled: $body->isCancelled(),
                 location: self::location(),
             ));
@@ -119,9 +123,10 @@ final class Tracer
     }
 
     /**
+     * @param ?non-empty-string $name
      * @param callable(): mixed $task
      */
-    public function taskCreated(Scope $scope, Scope $body, bool $daemon, callable $task): void
+    public function taskCreated(Scope $scope, Scope $body, bool $daemon, ?string $name, callable $task): void
     {
         $id = $this->created($scope, $body);
 
@@ -131,6 +136,7 @@ final class Tracer
                 at: Instant::now(),
                 group: $this->id($body),
                 daemon: $daemon,
+                name: $name,
                 task: $task,
                 cancelled: $scope->isCancelled(),
                 location: self::location(),

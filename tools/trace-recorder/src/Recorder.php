@@ -66,17 +66,6 @@ final class Recorder
         return ['rows' => array_values($recorder->rows), 'events' => $recorder->events];
     }
 
-    /**
-     * @template T
-     * @param non-empty-string $label
-     * @param \Closure(): T $task
-     * @return Labelled<T>
-     */
-    public static function label(string $label, \Closure $task): Labelled
-    {
-        return new Labelled($label, $task);
-    }
-
     private function __construct() {}
 
     public function __invoke(Event $event): void
@@ -87,12 +76,16 @@ final class Recorder
         $scope = $event->scope;
 
         [$kind, $text] = match (true) {
-            $event instanceof GroupCreated => $this->created($scope, 'group', $event->parent, $event->cancelled, $t),
+            $event instanceof GroupCreated => $this->created(
+                scope: $scope,
+                label: self::shortName($event->function),
+                parent: $event->parent,
+                cancelled: $event->cancelled,
+                t: $t,
+            ),
             $event instanceof TaskCreated => $this->created(
                 scope: $scope,
-                label: $event->task instanceof Labelled
-                    ? $event->task->label
-                    : ($event->daemon ? 'daemon' : 'task') . ' #' . $scope,
+                label: $event->name ?? ($event->daemon ? 'daemon' : 'task') . ' #' . $scope,
                 parent: $event->group,
                 cancelled: $event->cancelled,
                 t: null,
@@ -111,7 +104,7 @@ final class Recorder
                 \sprintf(
                     '%s waits in %s()',
                     $this->name($scope),
-                    str_replace('Thesis\Async\\', '', $event->caller->callee ?? 'suspend'),
+                    self::shortName($event->caller->callee ?? 'suspend'),
                 ),
             ],
             $event instanceof Resumed => ['resume', $this->name($scope) . match (true) {
@@ -239,5 +232,17 @@ final class Recorder
         $class = new \ReflectionClass($error)->getShortName();
 
         return $error->getMessage() === '' ? $class : $class . ': ' . $error->getMessage();
+    }
+
+    /**
+     * A function of thesis/async without its namespace: `race`, `Task::await`.
+     *
+     * @param non-empty-string $name
+     * @return non-empty-string
+     */
+    private static function shortName(string $name): string
+    {
+        /** @var non-empty-string */
+        return str_replace('Thesis\Async\\', '', $name);
     }
 }

@@ -45,9 +45,11 @@ final class TraceLog
     private static function describe(Event $event): string
     {
         return match (true) {
-            $event instanceof GroupCreated => 'group in ' . self::scope($event->parent)
+            $event instanceof GroupCreated => str_replace('Thesis\Async\\', '', $event->function)
+                . ' in ' . self::scope($event->parent)
                 . self::cancelled($event->cancelled),
-            $event instanceof TaskCreated => ($event->daemon ? 'daemon' : 'task') . ' in #' . $event->group
+            $event instanceof TaskCreated => ($event->daemon ? 'daemon' : 'task')
+                . ($event->name === null ? '' : ' ' . $event->name) . ' in #' . $event->group
                 . self::cancelled($event->cancelled),
             $event instanceof TimeoutCreated => \sprintf('timeout %gs in ', toNs($event->duration) / 1e9)
                 . self::scope($event->parent) . self::cancelled($event->cancelled),

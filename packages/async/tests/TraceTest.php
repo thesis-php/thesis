@@ -7,6 +7,7 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Trace\Ended;
+use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
@@ -253,6 +254,73 @@ final class TraceTest
 
         Assert::instanceOf($created, TaskCreated::class);
         Assert::same($created->task, $task);
+    }
+
+    public function namesTasksAndDaemonsAsSpawned(): void
+    {
+        $log = self::record(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => null, name: 'fetch user');
+            $group->daemon(static fn() => null, name: 'heartbeat');
+            $group->spawn(static fn() => null);
+        }));
+
+        Assert::same(\array_slice($log->lines, 1, 3), [
+            '0 #2 task fetch user in #1',
+            '0 #3 daemon heartbeat in #1',
+            '0 #4 task in #1',
+        ]);
+    }
+
+    public function namesTasksOfAllAndRaceByTheirKeys(): void
+    {
+        $log = self::record(static function () {
+            all(['user' => static fn() => null, 'orders' => static fn() => null]);
+            allSettled(['user' => static fn() => null]);
+            some(1, ['eu' => static fn() => null]);
+            race([static fn() => null, static fn() => null]);
+        });
+
+        $names = array_values(array_map(
+            static fn(TaskCreated $event) => $event->name,
+            array_filter($log->events, static fn(Event $event) => $event instanceof TaskCreated),
+        ));
+
+        Assert::same($names, ['user', 'orders', 'user', 'eu', '0', '1']);
+    }
+
+    public function leavesWorkersOfEachAndMapUnnamed(): void
+    {
+        $log = self::record(static function () {
+            each(['a' => 1, 'b' => 2], concurrency: 2, fn: static fn() => delay(sec(1)));
+            map(['a' => 1], concurrency: 1, fn: static fn() => null);
+        });
+
+        $names = array_values(array_map(
+            static fn(TaskCreated $event) => $event->name,
+            array_filter($log->events, static fn(Event $event) => $event instanceof TaskCreated),
+        ));
+
+        Assert::same($names, [null, null, null]);
+    }
+
+    public function tellsGroupsByTheFunctionThatCreatesThem(): void
+    {
+        $log = self::record(static function () {
+            group(static fn() => null);
+            all([static fn() => null]);
+            allSettled([static fn() => null]);
+            some(1, [static fn() => null]);
+            race([static fn() => null]);
+            each([1], concurrency: 1, fn: static fn() => null);
+            map([1], concurrency: 1, fn: static fn() => null);
+        });
+
+        $functions = array_values(array_map(
+            static fn(GroupCreated $event) => str_replace(__NAMESPACE__ . '\\', '', $event->function),
+            array_filter($log->events, static fn(Event $event) => $event instanceof GroupCreated),
+        ));
+
+        Assert::same($functions, ['group', 'all', 'allSettled', 'some', 'race', 'each', 'map']);
     }
 
     public function givesEventsToEveryNestedObserverUntilItsCallReturns(): void

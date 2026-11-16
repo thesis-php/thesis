@@ -10,6 +10,7 @@ use Thesis\Async\Group;
 use Thesis\TraceRecorder\Recorder;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\race;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
@@ -20,12 +21,12 @@ final class RecorderTest
     public function recordsRowsAndEventsOfDeadline(): void
     {
         $trace = Recorder::record(static fn() => timeoutOr(sec(2), static fn() => group(static function (Group $group) {
-            $group->spawn(Recorder::label('fetch A', static function () {
+            $group->spawn(static function () {
                 delay(ms(500));
 
                 return 'a';
-            }));
-            $group->spawn(Recorder::label('fetch B', static fn() => delay(sec(3))));
+            }, name: 'fetch A');
+            $group->spawn(static fn() => delay(sec(3)), name: 'fetch B');
         })));
 
         Assert::same($trace['rows'], [
@@ -52,6 +53,13 @@ final class RecorderTest
             '2000 end group ends cancelled',
             '2000 end timeout 2s ends cancelled',
         ]);
+    }
+
+    public function labelsGroupsByTheirFunction(): void
+    {
+        $trace = Recorder::record(static fn() => race(['eu' => static fn() => delay(sec(2)), 'us' => static fn() => 'us']));
+
+        Assert::same(array_column($trace['rows'], 'label'), ['race', 'eu', 'us']);
     }
 
     public function namesUnlabelledTasksByScope(): void

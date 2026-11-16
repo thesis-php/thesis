@@ -49,20 +49,21 @@ final class GroupImpl implements Group
     private ?ContinuationImpl $joiner = null;
 
     /**
-     * Implementation of `Thesis\Async\group()`.
+     * Implementation of `Thesis\Async\group()` and of the functions that run on a group.
      *
      * @template T
      * @param callable(Group): T $body
+     * @param non-empty-string $function the public function that creates the group, for the trace: `__FUNCTION__`
      * @return T
      */
-    public static function run(callable $body): mixed
+    public static function run(callable $body, string $function): mixed
     {
         $parent = Scope::current();
         $bodyScope = new Scope($parent);
         $tasksScope = new Scope($bodyScope);
         $daemonsScope = new Scope($tasksScope);
         $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
-        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent);
+        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent, $function);
         $result = null;
         $error = null;
 
@@ -126,14 +127,14 @@ final class GroupImpl implements Group
         private readonly Scope $daemonsScope,
     ) {}
 
-    public function spawn(callable $task): Task
+    public function spawn(callable $task, ?string $name = null): Task
     {
-        return $this->start($this->tasksScope, $task);
+        return $this->start($this->tasksScope, $task, $name);
     }
 
-    public function daemon(callable $task): Task
+    public function daemon(callable $task, ?string $name = null): Task
     {
-        return $this->start($this->daemonsScope, $task);
+        return $this->start($this->daemonsScope, $task, $name);
     }
 
     public function cancelTasks(): void
@@ -220,9 +221,10 @@ final class GroupImpl implements Group
     /**
      * @template T
      * @param callable(): T $task
+     * @param ?non-empty-string $name
      * @return Task<T>
      */
-    private function start(Scope $parent, callable $task): Task
+    private function start(Scope $parent, callable $task, ?string $name): Task
     {
         if ($this->closed) {
             throw new \LogicException('The group is closed: a task can only be started until group() returns.');
@@ -234,7 +236,7 @@ final class GroupImpl implements Group
         $values = Context::capture();
         /** @var TaskImpl<T> */
         $handle = new TaskImpl($scope);
-        Scope::$tracer?->taskCreated($scope, $this->bodyScope, $daemon, $task);
+        Scope::$tracer?->taskCreated($scope, $this->bodyScope, $daemon, $name, $task);
 
         if ($daemon) {
             ++$this->daemons;

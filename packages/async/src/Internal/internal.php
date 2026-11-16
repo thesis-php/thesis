@@ -7,7 +7,6 @@ namespace Thesis\Async\Internal;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Group;
 use Thesis\Async\Lock;
-use function Thesis\Async\group;
 
 /**
  * The key of the current fiber in the per-fiber maps: {@see CURRENT_SCOPE}, {@see CONTEXT}
@@ -55,6 +54,17 @@ function holding(\ArrayAccess $locks, mixed $key, Lock $lock, callable $fn): mix
 }
 
 /**
+ * The name of a task of `all()`, `allSettled()`, `some()` and `race()` in a trace: its key.
+ *
+ * @internal
+ * @return ?non-empty-string null for the empty key
+ */
+function taskName(int|string $key): ?string
+{
+    return $key === '' ? null : (string) $key;
+}
+
+/**
  * `Thesis\Async\some()` and `Thesis\Async\race()`: $function names the caller in the error of too few tasks.
  *
  * @internal
@@ -84,7 +94,7 @@ function some(string $function, int $count, array $tasks): array
     $failure = null;
     $failures = 0;
 
-    group(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
+    GroupImpl::run(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
         foreach ($tasks as $key => $task) {
             $group->spawn(static function () use (
                 $key,
@@ -129,9 +139,9 @@ function some(string $function, int $count, array $tasks): array
                 if (\count($results) === $count) {
                     $group->cancelTasks();
                 }
-            });
+            }, taskName($key));
         }
-    });
+    }, function: 'Thesis\Async\\' . $function);
 
     if (\count($results) < $count) {
         /** @var \Throwable $failure */
