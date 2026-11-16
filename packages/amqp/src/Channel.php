@@ -460,40 +460,13 @@ final class Channel
         bool $mandatory = false,
     ): void {
         $this->ensureOpen();
-
-        if (!$this->confirming) {
-            if ($mandatory) {
-                throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
-            }
-
-            $buffer = new Buffer();
-            $this->encodePublish($buffer, $message, $exchange, $routingKey, mandatory: false);
-            $this->connection->awaitUnblocked();
-            $this->ensureOpen();
-            $this->connection->write($buffer->drain());
-
-            return;
-        }
-
+        $publish = new Publish($message, $exchange, $routingKey, $mandatory);
+        $buffer = new Buffer();
+        $returnId = $this->encodePublish($buffer, $publish);
         $this->connection->awaitUnblocked();
-        $confirm = synchronized($this->publishMutex, function () use ($message, $exchange, $routingKey, $mandatory) {
-            // The wait for the mutex may have outlived the channel.
-            $this->ensureOpen();
-            $returnId = null;
-
-            if ($mandatory) {
-                [$message, $returnId] = Confirms::returnable($message);
-            }
-
-            $buffer = new Buffer();
-            $this->encodePublish($buffer, $message, $exchange, $routingKey, $mandatory);
-            [[, $confirm]] = $this->confirms->expect([[null, $returnId]]);
-            $this->writeConfirmed($buffer->drain(), count: 1);
-
-            return $confirm;
-        });
-
-        $confirm->await();
+        // Without confirms there is none.
+        $confirm = $this->writePublishes($buffer->drain(), [[$publish, $returnId]])[0][1] ?? null;
+        $confirm?->await();
     }
 
     /**
@@ -537,25 +510,13 @@ final class Channel
         $chunk = [];
 
         foreach ($publishes as $publish) {
-            $message = $publish->message;
-            $returnId = null;
-
-            if ($publish->mandatory) {
-                if (!$this->confirming) {
-                    throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
-                }
-
-                [$message, $returnId] = Confirms::returnable($message);
-            }
-
-            $this->encodePublish($buffer, $message, $publish->exchange, $publish->routingKey, $publish->mandatory);
-            $chunk[] = [$publish, $returnId];
+            $chunk[] = [$publish, $this->encodePublish($buffer, $publish)];
 
             if ($buffer->count() < self::BATCH_BYTES) {
                 continue;
             }
 
-            foreach ($this->writeBatch($buffer->drain(), $chunk) as $written) {
+            foreach ($this->writePublishes($buffer->drain(), $chunk) as $written) {
                 $pending->enqueue($written);
             }
             $chunk = [];
@@ -564,7 +525,7 @@ final class Channel
         }
 
         if ($chunk !== []) {
-            foreach ($this->writeBatch($buffer->drain(), $chunk) as $written) {
+            foreach ($this->writePublishes($buffer->drain(), $chunk) as $written) {
                 $pending->enqueue($written);
             }
         }
@@ -881,30 +842,13 @@ final class Channel
     }
 
     /**
-     * Gives the last $count tags back if nothing reached the server: the next publish takes them.
+     * The tags are assigned and the bytes written under the mutex, in one order. Its wait may outlive the channel.
      *
-     * @param positive-int $count
-     * @throws AmqpException
-     */
-    private function writeConfirmed(string $bytes, int $count): void
-    {
-        try {
-            $this->connection->write($bytes);
-        } catch (\Throwable $exception) {
-            if ($this->connection->isIntact()) {
-                $this->confirms->giveBack($count);
-            }
-
-            throw $exception;
-        }
-    }
-
-    /**
      * @param non-empty-list<array{Publish, ?string}> $chunk with the return id of a mandatory message
      * @return list<array{Publish, Deferred<null>}> empty without confirms
      * @throws AmqpException
      */
-    private function writeBatch(string $bytes, array $chunk): array
+    private function writePublishes(string $bytes, array $chunk): array
     {
         if (!$this->confirming) {
             $this->ensureOpen();
@@ -916,7 +860,17 @@ final class Channel
         return synchronized($this->publishMutex, function () use ($bytes, $chunk) {
             $this->ensureOpen();
             $confirms = $this->confirms->expect($chunk);
-            $this->writeConfirmed($bytes, \count($confirms));
+
+            try {
+                $this->connection->write($bytes);
+            } catch (\Throwable $exception) {
+                // Nothing reached the server: the next publish takes the tags.
+                if ($this->connection->isIntact()) {
+                    $this->confirms->giveBack(\count($confirms));
+                }
+
+                throw $exception;
+            }
 
             return $confirms;
         });
@@ -1050,17 +1004,28 @@ final class Channel
     }
 
     /**
+     * @return ?string the return id of a mandatory message
+     * @throws \LogicException if mandatory without confirms
      * @throws \ValueError
      */
-    private function encodePublish(
-        Buffer $buffer,
-        Message $message,
-        string $exchange,
-        string $routingKey,
-        bool $mandatory,
-    ): void {
-        Frames::method($buffer, $this->id, new BasicPublish($exchange, $routingKey, $mandatory, immediate: false));
+    private function encodePublish(Buffer $buffer, Publish $publish): ?string
+    {
+        $message = $publish->message;
+        $returnId = null;
+
+        if ($publish->mandatory) {
+            if (!$this->confirming) {
+                throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
+            }
+
+            [$message, $returnId] = Confirms::returnable($message);
+        }
+
+        $method = new BasicPublish($publish->exchange, $publish->routingKey, $publish->mandatory, immediate: false);
+        Frames::method($buffer, $this->id, $method);
         Frames::content($buffer, $this->id, properties($message), $message->body, $this->connection->bodyFrameMax());
+
+        return $returnId;
     }
 
     /**
