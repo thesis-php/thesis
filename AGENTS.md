@@ -38,7 +38,7 @@ from scratch: it is not a wrapper around amphp and does not depend on it. 64-bit
 
 - `errors.md`: calling a PHP function that fails with a warning (files, streams, sockets, processes).
 - `fibers.md`: keeping state per fiber, a test that depends on the order of callbacks.
-- `manifests.md`: a manifest, a dependency, a new package or file of functions, the public API of a package
+- `manifests.md`: a manifest, a dependency, a new package or file of functions or constants, the public API of a package
   that others use.
 - `clients.md`: a client with work in the background (a connection, a reader loop, reconnects).
 - `repositories.md`: the split, the repositories of the packages and their settings on GitHub.

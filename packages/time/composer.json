@@ -34,8 +34,8 @@
             "Thesis\\Time\\": "src/"
         },
         "files": [
-            "src/Internal/functions.php",
-            "src/functions.php",
+            "src/Internal/internal.php",
+            "src/api.php",
             "src/polyfill.php"
         ]
     },
@@ -44,7 +44,7 @@
             "Thesis\\Time\\": "tests/"
         },
         "files": [
-            "tests/functions.php"
+            "tests/helpers.php"
         ]
     },
     "extra": {

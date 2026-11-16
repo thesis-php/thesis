@@ -21,7 +21,7 @@ final class MethodTest
             $name = basename($file, '.php');
             $class = __NAMESPACE__ . '\\' . $name;
 
-            // A file of functions is not a class: class_exists() would include it a second time.
+            // internal.php is not a class: class_exists() would include it a second time.
             if (lcfirst($name) === $name || !is_subclass_of($class, Method::class)) {
                 continue;
             }

@@ -133,7 +133,7 @@ final readonly class Monorepo
             throw new MonorepoException(implode("\n", $errors));
         }
 
-        return [...FunctionFiles::in($root . '/' . $package, $dir), ...$listed];
+        return [...EagerFiles::in($root . '/' . $package, $dir), ...$listed];
     }
 
     /**

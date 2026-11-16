@@ -84,6 +84,6 @@ skills ship with the package and reach its users through llm/skills.
 - Real sockets over loopback, real time: keep delays at 10–50 ms. `tests/FakeDns.php` is a name server
   (UDP and TCP on one port) answering from `Zone`s, run in daemons of the test's group.
 - A connection that hangs is a listener with `backlog: 1` and a full accept queue: Linux drops the SYNs.
-- Certificates are generated per process by `certificate()` in `tests/functions.php`: self-signed CAs valid for
+- Certificates are generated per process by `certificate()` in `tests/helpers.php`: self-signed CAs valid for
   their name, `localhost` and `127.0.0.1`.
 - Keep both ends of a `socketPair()` in variables: an end that goes out of scope closes, and the other sees EOF.

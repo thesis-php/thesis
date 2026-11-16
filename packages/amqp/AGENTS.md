@@ -14,7 +14,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   on a slow consumer would stop heartbeats, confirms and every other channel of the connection. It writes only
   the replies the protocol requires (close-ok, cancel-ok, flow-ok); a `ConnectionClosed` of such a write
   is caught in `run()`, which never throws.
-- `src/Internal/Protocol/*` (except `Method`, `ProtocolError`, `functions.php`) and `src/ReplyCode.php` are generated:
+- `src/Internal/Protocol/*` (except `Method`, `ProtocolError`, `internal.php`) and `src/ReplyCode.php` are generated:
   change `codegen/generate.php` and run `php packages/amqp/codegen/generate.php`. `CodegenTest` fails on a stale file.
   The generated code passes the fixer as it is: a change of the generator is checked with `make fixer P=amqp`.
 - A synchronous method holds `callMutex` until its reply arrives, even if the caller is cancelled meanwhile:

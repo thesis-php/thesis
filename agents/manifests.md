@@ -1,6 +1,6 @@
 # Manifests, dependencies and packages
 
-Read before changing a manifest or `monorepo.php`, adding a dependency, a package or a file of functions,
+Read before changing a manifest or `monorepo.php`, adding a dependency, a package or a file of functions or constants,
 or changing the public API of a package that others use. How the generator works is in `tools/monorepo/AGENTS.md`.
 
 ## Rules
@@ -33,8 +33,11 @@ or changing the public API of a package that others use. How the generator works
 - A new package is made by hand after an existing one, then `make sync`. Its `AGENTS.md` starts with
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - Functions, constants and code run at load (the polyfill of `time`, the warning of `async` on Windows) live
-  in PHP files of `src/` and `tests/` without a class, an interface, a trait or an enum. `make sync` finds them
-  and writes them to `autoload.files` and `autoload-dev.files`, nothing lists them by hand, so CI fails
+  in eager files: PHP files of `src/` and `tests/` without a class, an interface, a trait or an enum.
+  The functions and constants of a namespace are in `api.php`, those of an `Internal` namespace in `internal.php`,
+  test helpers in `tests/helpers.php`. Only code run at load and generated code get files of their own
+  (`polyfill.php`, `decodeMethod.php`). `make sync` finds them (`EagerFiles`) and writes them
+  to `autoload.files` and `autoload-dev.files`, nothing lists them by hand, so CI fails
   on a new one until `make sync` is run. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
   is loaded with it by PSR-4. The files are sorted by path and must not depend on each other at load time.
   `files`/`devFiles` of the manifest are only for files outside `src/` and `tests/` (`amqp/codegen/generate.php`).
@@ -63,7 +66,7 @@ or changing the public API of a package that others use. How the generator works
 
 ## Decisions
 
-- Rejected for the files of functions: one `autoload.files.php` per scope that `require_once`s them (most held
+- Rejected for eager files: one `autoload.files.php` per scope that `require_once`s them (most held
   a single line, a forgotten line showed only as an undefined function in the tests), listing every file
   in the manifest (bookkeeping that the code already says), runtime `glob()` (a cost for every user,
-  magic by file name), static methods instead of functions (a worse API).
+  magic by file name), static methods instead of functions (a worse API), `functions.php` (holds constants too).

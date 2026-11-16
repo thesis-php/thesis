@@ -17,7 +17,7 @@ return new Manifest(
     namespace: 'Thesis\\',
     skip: [
         new FixerSkip(
-            paths: ['tests/functions.php'],
+            paths: ['tests/helpers.php'],
             reason: 'error_suppression puts @ before trigger_error() of E_USER_DEPRECATED, the tests need it unsuppressed.',
         ),
     ],

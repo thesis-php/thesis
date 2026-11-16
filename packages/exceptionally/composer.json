@@ -31,7 +31,7 @@
             "Thesis\\": "src/"
         },
         "files": [
-            "src/functions.php"
+            "src/api.php"
         ]
     },
     "autoload-dev": {
@@ -39,7 +39,7 @@
             "Thesis\\": "tests/"
         },
         "files": [
-            "tests/functions.php"
+            "tests/helpers.php"
         ]
     },
     "extra": {

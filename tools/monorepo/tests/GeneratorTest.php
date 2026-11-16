@@ -229,8 +229,8 @@ final readonly class GeneratorTest
     {
         $fixture = self
             ::fixture()
-            ->file('packages/async/src/functions.php', "<?php\n\nfunction delay(): void {}\n")
-            ->file('packages/async/src/Internal/stdio.php', "<?php\n\nconst STDIO = new \\stdClass();\n")
+            ->file('packages/async/src/api.php', "<?php\n\nfunction delay(): void {}\n")
+            ->file('packages/async/src/Internal/internal.php', "<?php\n\nconst STDIO = new \\stdClass();\n")
             ->file('packages/async/src/platform.php', "<?php\n\nif (PHP_OS_FAMILY === 'Windows') {}\n")
             ->file('packages/async/src/anonymous.php', "<?php\n\nfunction any(): object { return new class {}; }\n")
             ->file('packages/async/src/name.php', "<?php\n\nfunction name(): string { return Task::class; }\n")
@@ -239,7 +239,7 @@ final readonly class GeneratorTest
             ->file('packages/async/src/Awaits.php', "<?php\n\ntrait Awaits {}\n")
             ->file('packages/async/src/State.php', "<?php\n\nenum State {}\n")
             ->file('packages/async/src/README.md', "# Not PHP\n")
-            ->file('packages/async/tests/functions.php', "<?php\n\nfunction fixture(): void {}\n")
+            ->file('packages/async/tests/helpers.php', "<?php\n\nfunction fixture(): void {}\n")
             ->file('packages/async/codegen/generate.php', "<?php\n\nfunction generate(): void {}\n")
             ->package('async', "devFiles: ['codegen/generate.php']")
         ;
@@ -250,26 +250,26 @@ final readonly class GeneratorTest
         Assert::same($composer['autoload'] ?? null, [
             'psr-4' => ['Thesis\Async\\' => 'src/'],
             'files' => [
-                'src/Internal/stdio.php',
+                'src/Internal/internal.php',
                 'src/anonymous.php',
-                'src/functions.php',
+                'src/api.php',
                 'src/name.php',
                 'src/platform.php',
             ],
         ]);
         Assert::same($composer['autoload-dev'] ?? null, [
             'psr-4' => ['Thesis\Async\\' => 'tests/'],
-            'files' => ['tests/functions.php', 'codegen/generate.php'],
+            'files' => ['tests/helpers.php', 'codegen/generate.php'],
         ]);
         $root = Json::decode($files['composer.json'] ?? '', 'root');
         Assert::same($root['autoload-dev'] ?? null, [
             'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
-            'files' => ['packages/async/tests/functions.php', 'packages/async/codegen/generate.php'],
+            'files' => ['packages/async/tests/helpers.php', 'packages/async/codegen/generate.php'],
         ]);
     }
 
-    #[DataSet(['files', 'src/functions.php'])]
-    #[DataSet(['devFiles', 'tests/functions.php'])]
+    #[DataSet(['files', 'src/api.php'])]
+    #[DataSet(['devFiles', 'tests/helpers.php'])]
     public static function failsOnAutoloadFileOfManifestInSrcOrTests(string $argument, string $path): void
     {
         $fixture = new Fixture()->package('async', "{$argument}: ['{$path}']");

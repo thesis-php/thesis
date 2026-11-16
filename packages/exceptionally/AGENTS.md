@@ -82,11 +82,11 @@
 ## Tests
 
 - `types/ExceptionallyTypes.php` holds `assertType()` fixtures, never executed: `make phpstan` checks them.
-- A deprecation is triggered by `deprecate()` of `tests/functions.php`, never by `trigger_error()` in a test:
+- A deprecation is triggered by `deprecate()` of `tests/helpers.php`, never by `trigger_error()` in a test:
   the `error_suppression` rule of PHP CS Fixer puts `@` before it, and a suppressed deprecation passes the tests
   whatever `exceptionally()` does. The manifest excludes the file from the fixer.
 - Testo creates one instance of a test class for all its tests: `#[BeforeTest]` resets `$passedOn`.
-- `errorHandlers()` of `tests/functions.php` returns the whole stack: `get_error_handler()` shows only the top.
+- `errorHandlers()` of `tests/helpers.php` returns the whole stack: `get_error_handler()` shows only the top.
 - A test that restores its own handler above a finished call makes one more call before asserting the stack:
   until then the handler of the finished call is on top. A failed test leaves its handlers behind,
   so a test of the stack compares with what was there before, not with the top alone.

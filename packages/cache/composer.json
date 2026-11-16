@@ -40,7 +40,7 @@
             "Thesis\\Cache\\": "tests/"
         },
         "files": [
-            "tests/functions.php"
+            "tests/helpers.php"
         ]
     },
     "extra": {

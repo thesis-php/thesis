@@ -8,11 +8,11 @@ use function Thesis\exceptionally;
 
 /**
  * The PHP files of a directory that PSR-4 does not load: those without a class, an interface, a trait or an enum.
- * Composer loads them eagerly, so a new file of functions needs no require_once and no line in the manifest.
+ * Composer loads them eagerly, so a new file of functions or constants needs no require_once and no line in the manifest.
  *
  * @internal
  */
-final readonly class FunctionFiles
+final readonly class EagerFiles
 {
     private const array CLASS_LIKE = [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM];
 

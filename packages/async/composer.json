@@ -44,11 +44,9 @@
             "Thesis\\Async\\": "src/"
         },
         "files": [
-            "src/Internal/fiberKey.php",
-            "src/Internal/holding.php",
-            "src/Internal/some.php",
-            "src/VirtualTime/functions.php",
-            "src/functions.php",
+            "src/Internal/internal.php",
+            "src/VirtualTime/api.php",
+            "src/api.php",
             "src/platform.php"
         ]
     },
@@ -57,7 +55,7 @@
             "Thesis\\Async\\": "tests/"
         },
         "files": [
-            "tests/functions.php"
+            "tests/helpers.php"
         ]
     },
     "extra": {
