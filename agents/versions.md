@@ -1,8 +1,8 @@
-# Versions and changelogs
+# Versions
 
-Read before touching the version of a package, a constraint on a monorepo package or a changelog.
-How a version is released (the checks, the tags, the workflow) is in `releases.md`, the repositories
-in `repositories.md`.
+Read before touching the version of a package or a constraint on a monorepo package.
+How a version is released (the checks, the tags, the workflow) is in `releases.md`, the changelogs
+in `changelogs.md`, the repositories in `repositories.md`.
 
 Every package has versions of its own. One series for all packages would put a package written a week ago
 at 2.0.0, above the tags of the older packages whose names the monorepo reuses (`amqp` 1.0.2 and a branch `1.1.x`,
@@ -32,13 +32,6 @@ the minor of all.
   a series lives on `main` until the next one starts. There are no maintenance branches yet: a fix goes
   to the current series, and the branches of older series are designed with the first backport that someone needs.
   A series started by mistake is undone by a commit while it is unreleased: it changes only the alias of `main`.
-- **A changelog per package.** Every package has a `CHANGELOG.md` (Keep a Changelog), made with the package
-  like the rest of it, starting with `## [Unreleased]`. A release turns `[Unreleased]` into `[0.1.4] - YYYY-MM-DD`
-  (or `[0.2.0-beta1]`, `-alphaN`, `-RCN`) above an empty `[Unreleased]`, and the push releases it (`releases.md`).
-  `[Unreleased]` is the difference from the last release, not a log of commits: a change to something
-  that is not released yet rewrites its entry instead of adding one. "Changed X" and then "Removed X"
-  leave only "Removed X", "Added X" and then "Changed X" leave "Added X" as it is now, "Added X"
-  and then "Removed X" leave nothing. A package that was never released has only "Added".
 - **A new series is above every older version and branch of its name**: new packages start at 0.1,
   `amqp` at 2.0, `exceptionally` at 0.4, `formatter` at 0.2, `nats` at 0.6. The release refuses a version
   that breaks it, so the older tags and branches never collide with ours and stay as they are, with their history:
@@ -69,6 +62,5 @@ Open:
   with a branch of its series, the commit to start from is ambiguous (a split commit is shared by every commit
   that leaves the package as it is), and a backport across packages is copied once per branch. Below 1.0
   nobody has asked for one yet.
-- Rejected: changesets (a note per change, collected into a release): a second place for what `[Unreleased]` holds.
 - Rejected: starting at 2.0 for every package (with old tags pushed by hand into the new repository):
   a package written a week ago would claim a maturity it does not have.

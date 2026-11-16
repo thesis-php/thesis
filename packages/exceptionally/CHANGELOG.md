@@ -13,15 +13,14 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 
 - **BC break:** Requires 64-bit PHP 8.5+.
 - **BC break:** The parameters of `exceptionally()` are renamed: `$function` to `$fn`, `$errorLevels` to `$levels`.
-- **BC break:** When the callable returns `false` and no error was thrown, `exceptionally()` throws
-  an `\ErrorException` of `E_WARNING` instead of returning `false`, which its type did not allow.
-- An error that is not thrown (another level, suppressed with `@`) goes to the previous error handler
-  instead of bypassing it.
-- Levels turned off by the `error_reporting` ini setting are not thrown.
-- The callable may suspend a fiber: errors of other fibers are not thrown meanwhile, and fibers that finish
-  in any order leave the error handlers as they were.
-- A handler that other code sets while the callable runs stays set. It used to be taken off
-  instead of the handler of `exceptionally()`.
+- **BC break:** `exceptionally()` throws an `\ErrorException` when the callable returns `false` without an error.
+- Levels turned off by `error_reporting` are not thrown.
+- The callable may suspend a fiber: errors of other fibers are not thrown meanwhile.
+
+### Fixed
+
+- An error that is not thrown goes to the previous error handler instead of bypassing it.
+- A handler that other code sets while the callable runs is no longer taken off.
 
 ## [0.3.0] - 2026-03-30
 

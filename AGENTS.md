@@ -42,8 +42,8 @@ from scratch: it is not a wrapper around amphp and does not depend on it. 64-bit
   that others use.
 - `clients.md`: a client with work in the background (a connection, a reader loop, reconnects).
 - `repositories.md`: the split, the repositories of the packages and their settings on GitHub.
-- `versions.md`: the version of a package (`version:` of a manifest), a constraint on a monorepo package,
-  a changelog.
+- `versions.md`: the version of a package (`version:` of a manifest), a constraint on a monorepo package.
+- `changelogs.md`: writing or editing a `CHANGELOG.md` of a package.
 - `releases.md`: the release, the tags and the GitHub Releases of the split repositories.
 - `platform.md`: code that depends on the operating system or on the size of `int`.
 - `reviews.md`: reviewing a change, acting on the findings of a review.

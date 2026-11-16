@@ -1,12 +1,12 @@
 # Releases
 
 Read before touching the release (`bin/monorepo release`, `make release`, the job `release` of `check.yaml`),
-the tags of the split repositories or their GitHub Releases. The versions and the changelogs are in `versions.md`,
-the code in `tools/monorepo/AGENTS.md`.
+the tags of the split repositories or their GitHub Releases. The versions are in `versions.md`,
+the changelogs in `changelogs.md`, the code in `tools/monorepo/AGENTS.md`.
 
 ## Rules
 
-- **A release is a commit.** It turns `[Unreleased]` of the changelogs into version headings (`versions.md`),
+- **A release is a commit.** It turns `[Unreleased]` of the changelogs into version headings (`changelogs.md`),
   several packages in one commit. A push of `main` releases the headings it added: a heading right under
   `[Unreleased]` whose version the changelog had not before the push (`github.event.before`). The package
   is released as it is at the head of the push. Nothing else is released on a push, so a release that failed
