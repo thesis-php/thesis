@@ -1,0 +1,46 @@
+{
+    "name": "thesis/cache",
+    "description": "Cache interface with Time\\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "thesis/async": "^2.0",
+        "thesis/time": "^2.0"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/data": "^0.1.10",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29",
+        "thesis/testo-plugin": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Cache\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Cache\\": "tests/"
+        },
+        "files": [
+            "tests/autoload.files.php"
+        ]
+    }
+}

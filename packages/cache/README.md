@@ -1,0 +1,101 @@
+# Thesis Cache
+
+[![PHP Version Requirement](https://img.shields.io/packagist/dependency-v/thesis/cache/php)](https://packagist.org/packages/thesis/cache)
+[![GitHub Release](https://img.shields.io/github/v/release/thesis-php/cache)](https://github.com/thesis-php/cache/releases)
+
+Cache interface with `Time\Duration` TTLs, a local LRU cache and stampede protection by a keyed mutex.
+
+```php
+use Thesis\Cache\AtomicCache;
+use Thesis\Cache\LocalCache;
+use function Thesis\Time\minutes;
+
+/** @var AtomicCache<User> $users */
+$users = new AtomicCache(new LocalCache(capacity: 10_000));
+
+// Concurrent requests for one user load it once: the others wait for the first.
+$user = $users->getOrCompute("user:{$id}", static fn() => $repository->find($id), minutes(5));
+```
+
+## Installation
+
+```shell
+composer require thesis/cache
+```
+
+Requires 64-bit PHP 8.5+. No extensions.
+
+## `Cache`
+
+`Cache<V>` has `get($key, $default = null)`, `set($key, $value, ?Duration $ttl = null)` and `delete($key)`.
+A TTL of `null` keeps the entry until it is deleted or evicted, zero or negative deletes it. Any positive TTL
+is accepted, and a read does not prolong it. A key is any string: empty, binary, of any length.
+
+There is no `has()`: another fiber may delete the entry between `has()` and `get()`. To store `null`, tell it from
+a miss by a default of your own:
+
+```php
+$missing = new \stdClass();
+$value = $cache->get($key, $missing);
+
+if ($value === $missing) {
+    // a miss
+}
+```
+
+## `LocalCache`
+
+An in-process cache: values are kept as they are, without serialization. With a `capacity`, the least recently used
+entry is evicted. Expiry follows the clock of `thesis/async`, so tests on `VirtualTime\run()` see entries expire.
+There is no timer: an expired entry is dropped when it is read or by the next `set()`. An entry that leaves the cache
+otherwise (deleted, replaced, evicted) is freed at once. A TTL beyond the range of the clock (about 292 years)
+is no expiry. Every operation is O(1), or O(log n) for an entry with a TTL. `count($cache)` is the number
+of entries that have not expired.
+
+## `AtomicCache`
+
+A decorator with `getOrCompute($key, $compute, $ttl)`: a missing value is computed once by the first caller while
+the others wait for the lock of the key. `$compute` gets the key. A hit takes no lock. A cancelled caller cancels only
+its own computation, and a failed one stores nothing: the next waiter computes the value. A zero or negative TTL
+stores nothing, so the callers compute one after another.
+
+`set()` and `delete()` take the lock too, so an invalidation that comes during a computation wins over it.
+Write through the `AtomicCache`, not to the inner cache, or a stale value may outlive the invalidation.
+An invalidation cancelled while it waits for the lock is not applied, so the one that must happen runs
+under `shield()`:
+
+```php
+use function Thesis\Async\shield;
+
+$repository->save($user);
+// Waits for a getOrCompute() of this user in progress, even if the request is cancelled meanwhile.
+shield(static fn() => $users->delete("user:{$user->id}"));
+```
+
+The lock is reentrant per fiber: a computation may call `getOrCompute()`, `set()` and `delete()` of any key,
+its own included. It is not reentrant per task tree: a child task of a computation (`group()`, `all()`) that touches
+the key of the computation waits for it forever, and so do two computations that nest the same two keys
+in opposite orders.
+
+The lock is a `Thesis\Async\KeyedMutex`, in-process by default; a distributed one protects several processes.
+
+## `PrefixCache`
+
+Adds a prefix to every key of the inner cache, so several caches share one store without seeing each other's keys:
+
+```php
+use Thesis\Cache\PrefixCache;
+
+$users = new PrefixCache($store, prefix: 'users:');
+$orders = new PrefixCache($store, prefix: 'orders:');
+
+$users->set('1', $user); // the key users:1 of $store
+```
+
+End the prefix with a separator: `user` and `users` collide (`user` + `s1` is `users` + `1`).
+An `AtomicCache` over a `PrefixCache` locks the key without the prefix, so AtomicCaches that share a distributed mutex
+over different prefixes wait for each other on equal keys: give each one a mutex of its own.
+
+## `NullCache`
+
+Stores nothing: every `get()` is a miss. It turns a cache off without changing the code that uses it.

@@ -11,6 +11,7 @@ return new ApplicationConfig(
     src: [
         __DIR__ . '/packages/amqp/src',
         __DIR__ . '/packages/async/src',
+        __DIR__ . '/packages/cache/src',
         __DIR__ . '/packages/exceptionally/src',
         __DIR__ . '/packages/formatter/src',
         __DIR__ . '/packages/io/src',
@@ -27,6 +28,11 @@ return new ApplicationConfig(
             name: 'async',
             location: [__DIR__ . '/packages/async/tests'],
             plugins: require __DIR__ . '/packages/async/testo.plugins.php',
+        ),
+        new SuiteConfig(
+            name: 'cache',
+            location: [__DIR__ . '/packages/cache/tests'],
+            plugins: require __DIR__ . '/packages/cache/testo.plugins.php',
         ),
         new SuiteConfig(name: 'exceptionally', location: [__DIR__ . '/packages/exceptionally/tests']),
         new SuiteConfig(name: 'formatter', location: [__DIR__ . '/packages/formatter/tests']),

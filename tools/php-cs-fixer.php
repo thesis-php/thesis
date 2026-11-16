@@ -105,6 +105,9 @@ return new Config()
         'phpdoc_separation' => false,
         'phpdoc_tag_casing' => true,
         'phpdoc_to_comment' => false,
+        // Both take any class named *Test that extends another for a PHPUnit test, and tests are not marked.
+        'php_unit_internal_class' => false,
+        'php_unit_test_class_requires_covers' => false,
         'phpdoc_types_order' => false,
         'regular_callable_call' => true,
         'return_assignment' => false,
