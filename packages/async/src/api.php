@@ -343,12 +343,18 @@ function allSettled(array $tasks): array
             $handles[$key] = $group->spawn(static function () use ($task) {
                 // A result is boxed: it may itself be a \Throwable.
                 try {
-                    return [$task()];
+                    $value = $task();
                 } catch (Cancelled $cancelled) {
                     throw $cancelled;
                 } catch (\Throwable $error) {
+                    Scope::$tracer?->settled(Scope::current(), null, $error);
+
                     return $error;
                 }
+
+                Scope::$tracer?->settled(Scope::current(), $value, null);
+
+                return [$value];
             }, Internal\taskName($key));
         }
 

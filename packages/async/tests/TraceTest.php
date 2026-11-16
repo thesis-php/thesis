@@ -288,6 +288,36 @@ final class TraceTest
         Assert::same($names, ['user', 'orders', 'user', 'eu', '0', '1']);
     }
 
+    public function endsTasksOfSomeRaceAndAllSettledWithTheirOwnOutcome(): void
+    {
+        $log = self::record(static function () {
+            some(1, ['a' => static fn() => throw new \RuntimeException(), 'b' => static fn() => 'b']);
+            race(['x' => static fn() => 'x']);
+            allSettled(['ok' => static fn() => 1, 'failed' => static fn() => throw new \LogicException()]);
+        });
+
+        $names = [];
+        $outcomes = [];
+
+        foreach ($log->events as $event) {
+            if ($event instanceof TaskCreated) {
+                $names[$event->scope] = $event->name;
+            } elseif ($event instanceof Ended && isset($names[$event->scope])) {
+                $outcomes[] = $names[$event->scope] . ': ' . ($event->error === null
+                    ? 'returned ' . json_encode($event->value)
+                    : 'threw ' . $event->error::class);
+            }
+        }
+
+        Assert::same($outcomes, [
+            'a: threw RuntimeException',
+            'b: returned "b"',
+            'x: returned "x"',
+            'ok: returned 1',
+            'failed: threw LogicException',
+        ]);
+    }
+
     public function leavesWorkersOfEachAndMapUnnamed(): void
     {
         $log = self::record(static function () {

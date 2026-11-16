@@ -64,6 +64,13 @@ final class Tracer
     private readonly \WeakMap $pending;
 
     /**
+     * The outcomes of the tasks whose wrapper has caught them ({@see settled()}), until the tasks end.
+     *
+     * @var \WeakMap<Scope, array{mixed, ?\Throwable}>
+     */
+    private readonly \WeakMap $outcomes;
+
+    /**
      * @var non-negative-int
      */
     private int $lastId = 0;
@@ -81,6 +88,7 @@ final class Tracer
     {
         $this->ids = new \WeakMap();
         $this->pending = new \WeakMap();
+        $this->outcomes = new \WeakMap();
     }
 
     /**
@@ -269,10 +277,27 @@ final class Tracer
         }
     }
 
+    /**
+     * The outcome of the callable of a task of `allSettled()`, `some()` or `race()`: their wrapper catches it,
+     * so the task itself ends with what the wrapper returns. {@see Ended()} reports this one instead.
+     */
+    public function settled(Scope $scope, mixed $value, ?\Throwable $error): void
+    {
+        // Kept until the task ends: not a moment longer, and not at all if nobody gets it.
+        if ($this->listens(Ended::class)) {
+            $this->outcomes[$scope] = [$value, $error];
+        }
+    }
+
     public function ended(Scope $scope, mixed $value, ?\Throwable $error): void
     {
         unset($this->pending[$scope]);
         $id = $this->id($scope);
+
+        if (isset($this->outcomes[$scope])) {
+            [$value, $error] = $this->outcomes[$scope];
+            unset($this->outcomes[$scope]);
+        }
 
         if ($this->listens(Ended::class)) {
             $this->emit(new Ended($id, Instant::now(), $value, $error));

@@ -111,6 +111,8 @@ function some(string $function, int $count, array $tasks): array
                 } catch (Cancelled $cancelled) {
                     throw $cancelled;
                 } catch (\Throwable $error) {
+                    Scope::$tracer?->settled(Scope::current(), null, $error);
+
                     if (\count($results) === $count) {
                         return;
                     }
@@ -127,6 +129,8 @@ function some(string $function, int $count, array $tasks): array
 
                     return;
                 }
+
+                Scope::$tracer?->settled(Scope::current(), $value, null);
 
                 // Once failures are decided, the successes left can no longer reach $count:
                 // a late one only lands in $results, which is dropped.

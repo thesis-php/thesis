@@ -168,6 +168,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   The name of a task (`spawn()`/`daemon()`, the key in `all()`, `allSettled()`, `some()`, `race()`) and the function
   of a group go to the tracer only, never into `Scope` or `TaskImpl`: a name in the scope would cost memory per task
   without an observation. A worker of `each()`/`map()` has no name, its items are many.
+  `allSettled()`, `some()` and `race()` run each task in a wrapper that catches its outcome: the wrapper hands it
+  to `Tracer::settled()`, and `Ended` of the task reports it instead of what the wrapper returns (`null`, a box).
+  A new wrapper of a task does the same.
   The function is passed as `__FUNCTION__`, never as a literal: `'Thesis\Async\group'` is the interface `Group`
   to Rector (it rewrites it to `group::class`) and to PHPStan, class names being case-insensitive. A new way to create a scope,
   to wait or to cancel adds its event, and `TraceChecker` (whole traces on the generated programs) checks it.
