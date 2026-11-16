@@ -64,8 +64,9 @@ of its package, and a step that is done is deleted from here.
 3. **Protocol clients** on `net` and `io`: `nats` (the second client), `rabbitmq-stream`, `memcached`
    (the first user of the pool), `nsq` (TCP first, lookupd after HTTP), `cassandra`, `mongodb`
    (check what the old repository has; probably from scratch).
-4. **SQL.** `postgres` on the wire protocol (pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, `COPY`),
-   designed with norm in mind. Then `pgmq`.
+4. **SQL.** Ideas and a benchmark of the driver: [postgres-ideas.md](postgres-ideas.md). `postgres` on the wire
+   protocol (pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, `COPY`), designed with norm in mind.
+   Then `pgmq`.
 5. **HTTP.** Ideas for the messages: [http-ideas.md](http-ideas.md). `http` (messages, headers from the old
    `thesis/headers`, bodies as `io\Reader`), `http-client` (HTTP/1.1, keep-alive, the pool, CONNECT, cookies),
    `http-server` (graceful shutdown by `trapSignals()`, router, form parser), HTTP/2 with HPACK
@@ -104,7 +105,8 @@ of its package, and a step that is done is deleted from here.
 ## Open questions
 
 1. Protobuf: wait for grpc, or rewrite it earlier as a standalone serializer?
-2. Postgres: pure PHP on the wire protocol rather than ext-pgsql or pecl-pq?
+2. Postgres: pure PHP on the wire protocol rather than ext-pgsql or pecl-pq? The benchmark says yes
+   ([postgres-ideas.md](postgres-ideas.md)): typed rows 1.8 times faster than ext-pgsql, pipelining it lacks.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
 5. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
