@@ -10,7 +10,10 @@ use function Thesis\Time\ns;
 /**
  * In-process {@see RateLimiter}: a token bucket. It holds up to $burst tokens and gains $perSecond of them a second;
  * a call takes one. After a pause, $burst calls start at once, then one every 1 / $perSecond seconds.
- * It bounds the average, not every window: within any T seconds at most $burst + $perSecond * T calls start.
+ * It bounds the average, not every window: within any T seconds at most $burst + $perSecond * T calls start,
+ * and one more after a call the event loop has woken up late by less than a token interval: the schedule catches up,
+ * so a real timer, a little late on every call, does not slow the rate down. A wake-up later than that has lost
+ * a token to the full bucket, and the counting starts anew from it.
  * For a server that rejects more than N calls in any T seconds, use {@see LocalSlidingWindowRateLimiter}.
  *
  * There is no timer that refills the bucket and no clock read until the first call: the limiter keeps the absolute
@@ -69,13 +72,23 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
                 $this->taken = 0;
             }
 
-            // The caller sleeps once and does not compare the clock again: Revolt's timers are float seconds,
+            // The caller sleeps once and does not wait again: Revolt's timers are float seconds,
             // and a wake-up a hair early would loop on a delay too small to move the clock.
             // A cancelled delay() throws before the token is taken.
-            $wait = $this->tokenAt($this->taken - $this->burst + 1) - $now;
+            $tokenAt = $this->tokenAt($this->taken - $this->burst + 1);
 
-            if ($wait > 0) {
-                delay(ns($wait));
+            if ($tokenAt > $now) {
+                delay(ns(min($tokenAt - $now, Scope::LONGEST_DURATION)));
+                $now = Scope::now();
+
+                // The bucket has been full for a whole token interval (the loop was blocked): counted from the old
+                // start, it would be full again right after this token, and $burst + 1 calls would start at once.
+                // A wake-up late by less keeps the schedule: a timer is late on every call,
+                // and the delays would add up.
+                if ($this->tokenAt($this->taken + 1) <= $now) {
+                    $this->fullAt = $now;
+                    $this->taken = 0;
+                }
             }
 
             ++$this->taken;
@@ -87,9 +100,24 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
     /**
      * When the $tokens-th token after {@see $fullAt} comes. Computed afresh from $fullAt, so the rounding of a token
      * interval that is not a whole number of nanoseconds does not add up.
+     * Saturated like a deadline: a token centuries away never comes, one centuries ago has long come.
      */
     private function tokenAt(int $tokens): int
     {
-        return $this->fullAt + (int) round($tokens * 1e9 / $this->perSecond);
+        $offset = round($tokens * 1e9 / $this->perSecond);
+
+        if ($offset >= PHP_INT_MAX) {
+            return PHP_INT_MAX;
+        }
+
+        if ($offset <= PHP_INT_MIN) {
+            return PHP_INT_MIN;
+        }
+
+        $at = $this->fullAt + (int) $offset;
+
+        // A negative $offset never overflows: $fullAt is a time of the clock then, not PHP_INT_MIN.
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        return \is_int($at) ? $at : PHP_INT_MAX;
     }
 }

@@ -73,13 +73,14 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         try {
             $oldestStart = $this->starts[$this->oldest] ?? null;
             $leavesAt = $oldestStart === null ? PHP_INT_MIN : $oldestStart + $this->window;
-            $wait = $leavesAt - Scope::now();
+            // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+            $leavesAt = \is_int($leavesAt) ? $leavesAt : PHP_INT_MAX;
+            $now = Scope::now();
 
-            // Sleeps once and does not compare the clock again: Revolt's timers are float seconds, and a wake-up
-            // a hair early would loop on a delay too small to move the clock. A cancelled delay() throws before
-            // the call is counted.
-            if ($wait > 0) {
-                delay(ns($wait));
+            // Sleeps once and does not sleep again: Revolt's timers are float seconds, and a wake-up a hair early
+            // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
+            if ($leavesAt > $now) {
+                delay(ns(min($leavesAt - $now, Scope::LONGEST_DURATION)));
             }
 
             $this->starts[$this->oldest] = max($leavesAt, Scope::now());

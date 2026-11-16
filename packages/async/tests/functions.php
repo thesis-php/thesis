@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /**
  * Helpers shared by the tests. Every test runs in {main}: the library drives the Revolt loop from there itself.
- * Every test runs on virtual time (VirtualTimePlugin in testo.plugins.php): durations are exact, and CPU work takes none.
+ * Every test runs on virtual time (VirtualTimePlugin in testo.plugins.php): durations are exact,
+ * and CPU work takes none.
  */
 
 namespace Thesis\Async\Tests;
@@ -70,7 +71,7 @@ function thrown(callable $fn): \Throwable
  */
 function withoutWarnings(callable $fn): mixed
 {
-    set_error_handler(static function (int $severity, string $message, string $file, int $line): never {
+    set_error_handler(static function (int $severity, string $message, string $file, int $line) {
         throw new \ErrorException(message: $message, severity: $severity, filename: $file, line: $line);
     });
 

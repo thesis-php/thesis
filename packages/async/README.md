@@ -495,7 +495,9 @@ reached it by then, the code leaving the scope calls it itself. So a `cancelQuer
 has ended and the connection has gone back to a pool to run someone else's query.
 It is never called after unsubscribing, even if the cancellation has already happened;
 if the scope already is cancelled, it is called soon. Inside `shield()` an outer cancellation does not reach it.
-When the scope ends without being cancelled, the callback is dropped, so unsubscribing is optional then.
+When the code of the scope ends without being cancelled, the callback is dropped, so unsubscribing is optional then.
+That holds for a group body that has returned or failed while its tasks still run, and for a task that has failed:
+the failure that cancels the group comes after their code.
 
 ### A value from elsewhere: `Deferred`
 
@@ -936,7 +938,8 @@ An operation that completes without a wait never yields either: a read that alwa
 finds a connection. A peer that sends without a pause then starves the other tasks and the timers, as a CPU-bound loop does.
 `Pacer::pace()`, called before every such operation, yields for one tick through `checkpoint()` after `$perTick` calls
 within one tick of the event loop. The count starts anew every tick, so code that waits now and then never pays for a yield.
-Keep one pacer per source of work, shared by its callers, as the watcher is:
+Keep one pacer per source of work, shared by its callers, as the watcher is: it counts the calls of all of them,
+so a tick runs at most `$perTick`, plus the one each caller makes right after its yield.
 
 ```php
 public function read(): string

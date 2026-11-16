@@ -221,12 +221,12 @@ final class LocalKeyedSemaphoreTest
      */
     private static function users(LocalKeyedSemaphore $semaphore): array
     {
-        return (fn(): array => $this->users)->call($semaphore);
+        return (fn() => $this->users)->call($semaphore);
     }
 
     private function assertNoKeysLeft(LocalKeyedSemaphore $semaphore): void
     {
         Assert::same(self::users($semaphore), []);
-        Assert::same((fn(): array => $this->semaphores)->call($semaphore), []);
+        Assert::same((fn() => $this->semaphores)->call($semaphore), []);
     }
 }

@@ -27,6 +27,8 @@ is not here: the tools fix the code anyway.
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
 - No return types on closures and arrow functions: `static fn() => new X()`, not `static fn(): X => new X()`.
+  The exception is a closure whose type PHPStan cannot infer through a generic parameter without it
+  (nested `callable(): T`, `ScopedValue::with()` in a `group()` in the tests of thesis/async).
 - A path to a parent directory is `dirname(__DIR__)` or `dirname(__DIR__, 2)`, never `__DIR__.'/..'`:
   a path without `..` reads well in errors and can be compared as a string with other paths.
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
@@ -98,6 +100,9 @@ is not here: the tools fix the code anyway.
 
 - Write the failing test first, then the fix.
 - No traits for test helpers: plain functions (in `tests/autoload.files.php`) or a base class.
+- A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
+  `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
+  the write is lost, and an assertion like `Assert::false($called)` passes on a broken library.
 
 ## Decisions
 

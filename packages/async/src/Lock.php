@@ -38,19 +38,6 @@ final class Lock
     }
 
     /**
-     * If the lock is destroyed unreleased, the permit is returned here, so that nobody waits for it forever.
-     * Do not rely on it: when an object is destroyed is up to the engine (a reference cycle, an exception trace
-     * holding the lock, ...). But a lock captured by a task that was cancelled before it started is dropped
-     * exactly like this, and that is not a bug. A release that has to wait must not be left to the destructor:
-     * when the engine destroys a suspended fiber, its `finally` blocks and destructors run where nothing can suspend,
-     * and the wait throws FiberError.
-     */
-    public function __destruct()
-    {
-        $this->release();
-    }
-
-    /**
      * Returns the permit. Works in a cancelled scope.
      *
      * @return bool whether this call released the lock, false if it was already released
@@ -66,5 +53,18 @@ final class Lock
         shield($this->release);
 
         return true;
+    }
+
+    /**
+     * If the lock is destroyed unreleased, the permit is returned here, so that nobody waits for it forever.
+     * Do not rely on it: when an object is destroyed is up to the engine (a reference cycle, an exception trace
+     * holding the lock, ...). But a lock captured by a task that was cancelled before it started is dropped
+     * exactly like this, and that is not a bug. A release that has to wait must not be left to the destructor:
+     * when the engine destroys a suspended fiber, its `finally` blocks and destructors run where nothing can suspend,
+     * and the wait throws FiberError.
+     */
+    public function __destruct()
+    {
+        $this->release();
     }
 }

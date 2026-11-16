@@ -23,6 +23,11 @@ final class Pacer
     private int $count = 0;
 
     /**
+     * Counts the resets of {@see $count}: a yield that has seen none, has lost its tick with the event loop driver.
+     */
+    private int $resets = 0;
+
+    /**
      * @param positive-int $perTick calls without a yield: enough to drain a burst without a wait for each,
      *                              few enough that one busy source cannot hold the event loop
      */
@@ -39,13 +44,22 @@ final class Pacer
     public function pace(): void
     {
         if ($this->count >= $this->perTick) {
+            $resets = $this->resets;
             checkpoint();
-            $this->count = 0;
+
+            // The defer of the tick has reset the count before the yield returns, and since then other callers
+            // of a shared pacer may have counted their calls in the new tick: a reset here would erase them.
+            // Unless the defer was dropped with its driver (the end of `VirtualTime\run()`, a new driver):
+            // then nothing would ever reset the count again.
+            if ($this->resets === $resets) {
+                $this->count = 0;
+            }
         }
 
         if ($this->count === 0) {
             EventLoop::defer(function () {
                 $this->count = 0;
+                ++$this->resets;
             });
         }
 

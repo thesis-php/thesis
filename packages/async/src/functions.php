@@ -110,11 +110,12 @@ function isCancelled(): bool
  *
  * It only observes the cancellation and cannot cause one. $callback runs from the event loop's microtask queue,
  * never inside the code that cancels, and in the root scope: it must not throw. If the scope is cancelled,
- * it is called exactly once and always before the scope ends: if the queue has not reached it by then,
+ * it is called exactly once and always before the code of the scope ends: if the queue has not reached it by then,
  * the code leaving the scope calls it itself. It is never called after the returned function is called,
  * even if the cancellation has already happened.
- * Inside {@see shield()} an outer cancellation does not reach it. Once the scope ends without being cancelled,
- * the callback is dropped and never called, so unsubscribing is optional then.
+ * Inside {@see shield()} an outer cancellation does not reach it. Once the code of the scope ends without being
+ * cancelled, the callback is dropped and never called, so unsubscribing is optional then: a group body that has
+ * returned or failed while its tasks run, and a task that has failed, are not cancelled by that failure.
  *
  * @api
  * @param callable(): void $callback

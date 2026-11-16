@@ -41,7 +41,7 @@ final class ScopedValueTest
         /** @var ScopedValue<?string> */
         $value = new ScopedValue('default');
 
-        $inTask = static fn(): ?string => group(static fn(Group $group) => $group->spawn($value->get(...))->await());
+        $inTask = static fn() => group(static fn(Group $group) => $group->spawn($value->get(...))->await());
 
         $observed = $value->with('outer', static fn() => [
             $value->with(null, $value->get(...)),

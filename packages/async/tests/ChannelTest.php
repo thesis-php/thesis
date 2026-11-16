@@ -393,7 +393,7 @@ final class ChannelTest
         /** @var Channel<int> */
         $events = new Channel(250);
         $batches = [];
-        $store = static function (array $batch) use (&$batches): void {
+        $store = static function (array $batch) use (&$batches) {
             $batches[] = \count($batch);
         };
 
@@ -977,7 +977,7 @@ final class ChannelTest
      */
     private static function waiters(Channel $channel): array
     {
-        return (fn(): array => [
+        return (fn() => [
             'receivers' => $this->receivers->items,
             'senders' => $this->senders->items,
         ])->call($channel);
@@ -989,6 +989,6 @@ final class ChannelTest
      */
     private function isBuffered(Channel $channel): bool
     {
-        return !(fn(): \SplQueue => $this->buffer)->call($channel)->isEmpty();
+        return !(fn() => $this->buffer)->call($channel)->isEmpty();
     }
 }

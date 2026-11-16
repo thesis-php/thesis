@@ -176,7 +176,7 @@ final class ScopeTest
     {
         $fiber = new \Fiber(static fn() => \Thesis\Async\Tests\never());
         $fiber->start();
-        $waits = (fn(): array => $this->waits)->call(ROOT_SCOPE);
+        $waits = (fn() => $this->waits)->call(ROOT_SCOPE);
 
         Assert::same($waits, []);
     }
@@ -190,7 +190,7 @@ final class ScopeTest
         $scope->onCancel(static function () use (&$called) {
             $called = true;
         });
-        $callbacks = (fn(): array => $this->callbacks)->call($scope);
+        $callbacks = (fn() => $this->callbacks)->call($scope);
         $scope->cancel();
         checkpoint();
 
@@ -269,7 +269,7 @@ final class ScopeTest
         $scope->cancel();
         checkpoint();
 
-        Assert::same((fn(): array => $this->callbacks)->call($scope), []);
+        Assert::same((fn() => $this->callbacks)->call($scope), []);
     }
 
     public function remainingFitsDurationWhenClockIsNearOrigin(): void

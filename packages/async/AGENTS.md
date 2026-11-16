@@ -29,9 +29,12 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `onCancel()` does not break this: it only observes the cancellation of the current scope.
 - `onCancel()` callbacks are queued through `EventLoop::queue()`, never called inside `Scope::notify()`: user code does not run
   in the middle of the walk. If the scope is cancelled while subscribed, the callback is called exactly once and always
-  before the scope ends: `close()` of a cancelled scope calls the ones the queue has not reached yet (in the root scope,
-  with no scoped values; a throw goes to the event loop), and the queued run is then a no-op. Never after unsubscribing
-  (even if already queued), never after `close()` (a closed scope stores none), and the root scope stores none.
+  before the code of the scope ends: `Scope::endCallbacks()` of a cancelled scope calls the ones the queue has not reached
+  yet (in the root scope, with no scoped values; a throw goes to the event loop), and the queued run is then a no-op.
+  Never after unsubscribing (even if already queued), never after `endCallbacks()` (an ended scope stores none),
+  and the root scope stores none. `close()` calls `endCallbacks()`; a group calls it earlier, as soon as the code
+  of a body or of a failed task ends and before the failure cancels the group: a scope still needed to cancel its
+  children (a body while its tasks run) or a task that failed on its own is not cancelled for its own callbacks.
   They live in their own list: the hot path of `suspend()` is untouched. The root scope stores no waits either.
 - `Internal\ScopeCancellation` keeps no cancellation state of its own (only the unsubscribe functions by id)
   and subscribes only through `Scope::onCancel()`: amphp unsubscribes
@@ -82,7 +85,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `Pacer` is separate from `StreamWatcher`: fairness of a fast path has nothing to do with streams
   (a hot channel needs it too). It counts calls per tick and is reset by an `EventLoop::defer()` registered
   by the first call of the tick; past the limit it calls `checkpoint()` *before* the operation,
-  so a `Cancelled` from it means the operation did not happen.
+  so a `Cancelled` from it means the operation did not happen. The count is not reset after that yield: the tick's defer
+  has done it, and other callers of a shared pacer may have counted since (a reset let N fibers pass N × `$perTick`).
+  Only if no reset has happened during the yield, the defer was dropped with its driver, and the yield resets the count:
+  otherwise a pacer that outlives a driver (`stdout()` of thesis/io across `VirtualTime\run()`) yields on every call.
   Calls under the limit do not check cancellation: a fast path stays a counter increment.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not `fn() => $continuation->resume()`.
 - A parent scope holds its children strongly and a child holds its parent: every created `Internal\Scope` must be closed
@@ -108,8 +114,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
   `VirtualTime\run()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is finished.
-- A rate limiter keeps absolute times and sleeps once per call, without comparing the clock again after the wake-up:
+- A rate limiter keeps absolute times and sleeps once per call, without sleeping again after the wake-up:
   a wake-up a hair early (Revolt's timers are float seconds) must not loop on a delay too small to move the clock.
+  It reads the clock after the wake-up only to account for a late one: a blocked loop must not let `$burst + 1` calls
+  through. The sliding window stores the later of the planned and the actual start; the token bucket restarts its
+  counting from the wake-up only if the bucket has been full for a whole token interval by then. A smaller lateness
+  keeps the schedule: a real timer is late on every call, and restarting from each wake-up ran a `burst: 1` limiter
+  a quarter below its rate.
 - A duration passed in is `Time\Duration` only (`delay()`, `timeout()`, `timeoutOr()`, `StreamWatcher::delay()`,
   the window of the rate limiter, `VirtualTime\advance()`), and `remaining()` returns one. A point in time is `Instant`, not a
   `Duration` (as `thesis/time` decided) and not a float: the difference of two is a `Duration`.
@@ -120,10 +131,12 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the deadlines, `Instant`, the rate limiters and the virtual timers. Exact like `Duration` (the same representation,
   `ns()`/`toNs()` convert without a loss) and as cheap as a float. Revolt is the only float boundary: `$ns / 1e9`
   into `EventLoop::delay()`, rounded back in `VirtualTimeDriver`. An int overflow turns into a float and a
-  `TypeError`, so every sum with a `Duration` from outside is guarded. A deadline and a virtual timer saturate at
-  `PHP_INT_MAX` (`Scope::after()`, `VirtualTimeDriver::enqueue()`): a timeout of centuries is still a deadline,
-  only one that never comes. `Scope::remaining()` is capped at the longest `Duration`, a little below `PHP_INT_MAX`,
-  so `ns()` of it never throws. `Instant` is a value, so it does not saturate: `add()` and `since()` throw
+  `TypeError`, so every sum with a `Duration` or a rate from outside is guarded. A deadline, a virtual timer,
+  the virtual clock and the times of the rate limiters saturate at `PHP_INT_MAX` (`Scope::after()`,
+  `VirtualTimeDriver::enqueue()`, `VirtualClock::advance()`, the window, `tokenAt()`): a timeout of centuries is still
+  a deadline, only one that never comes. `Scope::remaining()` and the sleep of a rate limiter are capped at
+  `Scope::LONGEST_DURATION`, a little below `PHP_INT_MAX`, so `ns()` of them never throws.
+  `Instant` is a value, so it does not saturate: `add()` and `since()` throw
   `Time\TimeException` beyond int, as `Duration` does beyond its range.
   Rejected: float seconds (they lose nanoseconds after about 100 days of uptime and do not convert to `Duration`
   exactly), `Duration` objects (about 500 ns an operation on the polyfill against 40, and an allocation each).
@@ -159,6 +172,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   exactly (`Assert::same(secondsSince($start), 20.0)`, `Assert::equals(remaining(), sec(990))`), and busy code is `VirtualTime\advance()`, not a loop on the real clock.
   Keep a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive.
   Real time is only for what virtual time cannot model.
+- A limiter, a pacer or a clock is tested beyond one caller on time: with several callers sharing it, with a blocked loop
+  (`VirtualTime\advance()` while a caller sleeps), with a wake-up late by less than its interval (what a real timer does
+  on every call, invisible on virtual time otherwise), with the longest `Duration` or an extreme rate, and, if it keeps
+  a callback in the loop across calls, after that callback is dropped with its driver (`VirtualTime\run()` drops
+  what is left). None of these was tested, and each hid a defect.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,

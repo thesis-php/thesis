@@ -690,7 +690,7 @@ final class GroupTest
 
     public function closesEveryScope(): void
     {
-        $onlyChild = static function (Scope $scope): Scope {
+        $onlyChild = static function (Scope $scope) {
             $scopes = self::children($scope);
             Assert::count($scopes, 1);
             $child = current($scopes);
@@ -730,8 +730,8 @@ final class GroupTest
 
         try {
             group(static function (Group $group) use (&$references) {
-                $parent = static function (): Scope {
-                    $parent = (fn(): ?Scope => $this->parent)->call(Scope::current());
+                $parent = static function () {
+                    $parent = (fn() => $this->parent)->call(Scope::current());
                     \assert($parent !== null);
 
                     return $parent;
@@ -763,6 +763,6 @@ final class GroupTest
      */
     private static function children(Scope $scope): array
     {
-        return (fn(): array => $this->children)->call($scope);
+        return (fn() => $this->children)->call($scope);
     }
 }

@@ -177,7 +177,7 @@ final class LocalSemaphoreTest
         $exception = thrown(static fn() => timeout(sec(1), $semaphore->acquire(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same((fn(): array => $this->waiters->items)->call($semaphore), []);
+        Assert::same((fn() => $this->waiters->items)->call($semaphore), []);
         assertNoCallbacksLeft();
 
         $lock->release();
@@ -211,6 +211,6 @@ final class LocalSemaphoreTest
 
     private function assertFree(LocalSemaphore $semaphore): void
     {
-        Assert::same((fn(): int => $this->permits)->call($semaphore), 1);
+        Assert::same((fn() => $this->permits)->call($semaphore), 1);
     }
 }

@@ -14,8 +14,10 @@ use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\VirtualTimeDriver;
 use Thesis\TestoPlugin\VirtualTime;
+use Time\Duration;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\secondsSince;
@@ -133,6 +135,33 @@ final class VirtualTimeTest
         Expect::exception(\ValueError::class);
 
         advance(sec(-1));
+    }
+
+    public function advanceSaturatesAtEndOfClock(): void
+    {
+        $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
+
+        $now = run(static function () use ($longest) {
+            advance($longest);
+            delay(sec(1));
+
+            return Scope::now();
+        });
+
+        Assert::same($now, PHP_INT_MAX);
+    }
+
+    public function nestedRunStartsAtEndOfClock(): void
+    {
+        $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
+
+        $now = run(static function () use ($longest) {
+            advance($longest);
+
+            return run(Scope::now(...));
+        });
+
+        Assert::same($now, PHP_INT_MAX);
     }
 
     public function advanceMovesClockOfInnermostRun(): void

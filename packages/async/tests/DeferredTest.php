@@ -207,7 +207,7 @@ final class DeferredTest
             thrown(static fn() => timeout(sec(1), $deferred->await(...)));
         }
 
-        Assert::same((fn(): array => $this->waiters)->call($deferred), []);
+        Assert::same((fn() => $this->waiters)->call($deferred), []);
     }
 
     public function awaitOfDoneDeferredReturnsValueWithoutWaiting(): void

@@ -235,7 +235,7 @@ final class SignalTest
 
     public function trapIsReleasedAfterward(): void
     {
-        $trap = trapSignals([SIGUSR1], static fn(SignalTrap $trap): SignalTrap => $trap);
+        $trap = trapSignals([SIGUSR1], static fn(SignalTrap $trap) => $trap);
 
         Assert::same(iterator_to_array($trap), []);
         Expect::exception(\LogicException::class);
@@ -288,7 +288,7 @@ final class SignalTest
             }
 
             \assert($trap instanceof SignalTrapImpl);
-            Assert::same((fn(): array => $this->receivers->items)->call($trap), []);
+            Assert::same((fn() => $this->receivers->items)->call($trap), []);
         });
     }
 

@@ -210,8 +210,8 @@ final class SuspendTest
 
         $exception = thrown(static function () use (&$continuation) {
             timeout(sec(1), static function () use (&$continuation) {
-                suspend(static function (Continuation $c) use (&$continuation) {
-                    $continuation = $c;
+                suspend(static function (Continuation $given) use (&$continuation) {
+                    $continuation = $given;
                 });
             });
         });
@@ -247,8 +247,8 @@ final class SuspendTest
         group(static function (Group $group) use (&$received) {
             $continuation = null;
             $consumer = $group->spawn(static function () use (&$continuation, &$received) {
-                $received[] = suspend(static function (Continuation $c) use (&$continuation) {
-                    $continuation = $c;
+                $received[] = suspend(static function (Continuation $given) use (&$continuation) {
+                    $continuation = $given;
                 });
                 $received[] = 'returned';
                 suspend(static function (Continuation $continuation) {});

@@ -129,7 +129,7 @@ final class VirtualTimeDriver implements Driver
         // A microtask given is work to do, even before it runs, as a callback of counted().
         ++$this->activity;
 
-        $this->inner->queue(function (mixed ...$args) use ($closure): void {
+        $this->inner->queue(function (mixed ...$args) use ($closure) {
             ++$this->activity;
             $closure(...$args);
         }, ...$args);
@@ -505,7 +505,7 @@ final class VirtualTimeDriver implements Driver
     {
         // Its entry is extracted: until the defer runs, the timer is neither due nor pending.
         $this->leave($timer);
-        $timer->firingCallbackId = $this->inner->defer(function () use ($timer): void {
+        $timer->firingCallbackId = $this->inner->defer(function () use ($timer) {
             \assert($timer->firingCallbackId !== null);
             unset($this->own[$timer->firingCallbackId]);
             $timer->firingCallbackId = null;
@@ -543,7 +543,7 @@ final class VirtualTimeDriver implements Driver
         // just started a pump may give one right after.
         ++$this->activity;
 
-        return function (string $callbackId, mixed ...$args) use ($callback): void {
+        return function (string $callbackId, mixed ...$args) use ($callback) {
             ++$this->activity;
 
             if ($callback($callbackId, ...$args) !== null) {

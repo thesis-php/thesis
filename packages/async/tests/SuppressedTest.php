@@ -138,55 +138,55 @@ final class SuppressedTest
     {
         /** @var Deferred<null> */
         $shared = new Deferred();
-        $a = new \RuntimeException('a');
-        /** @var ?\RuntimeException $b */
-        $b = null;
+        $outerError = new \RuntimeException('outer');
+        /** @var ?\RuntimeException $innerError */
+        $innerError = null;
 
-        $exception = thrown(static function () use ($shared, $a, &$b) {
-            group(static function (Group $group) use ($shared, $a, &$b) {
-                $group->spawn(static fn() => $shared->await()); // a fails the outer group first
-                $group->spawn(static function () use ($shared, &$b) {
-                    group(static function (Group $inner) use ($shared, &$b) {
-                        $inner->spawn(static function () use (&$b) {
+        $exception = thrown(static function () use ($shared, $outerError, &$innerError) {
+            group(static function (Group $group) use ($shared, $outerError, &$innerError) {
+                $group->spawn(static fn() => $shared->await()); // fails the outer group first
+                $group->spawn(static function () use ($shared, &$innerError) {
+                    group(static function (Group $innerGroup) use ($shared, &$innerError) {
+                        $innerGroup->spawn(static function () use (&$innerError) {
                             delay(sec(1));
 
-                            throw $b = new \RuntimeException('b');
+                            throw $innerError = new \RuntimeException('inner');
                         });
-                        $inner->spawn(static function () use ($shared) {
+                        $innerGroup->spawn(static function () use ($shared) {
                             try {
                                 never();
                             } finally {
-                                shield(static fn() => $shared->await()); // a is suppressed under b
+                                shield(static fn() => $shared->await()); // suppressed under the inner error
                             }
                         });
                     });
                 });
 
                 delay(sec(2));
-                $shared->fail($a);
+                $shared->fail($outerError);
             });
         });
 
-        Assert::same($exception, $a);
-        Assert::instanceOf($b, \RuntimeException::class);
-        Assert::same(suppressed($a), [$b]);
+        Assert::same($exception, $outerError);
+        Assert::instanceOf($innerError, \RuntimeException::class);
+        Assert::same(suppressed($outerError), [$innerError]);
         // the error rethrown keeps every other one in its tree, without a cycle back to itself
-        Assert::same(suppressed($b), []);
+        Assert::same(suppressed($innerError), []);
     }
 
     public function errorIsNeverSuppressedUnderItsOwnDescendant(): void
     {
-        $a = new \RuntimeException('a');
-        $b = new \RuntimeException('b');
-        $c = new \RuntimeException('c');
-        Suppressed::add($b, $c);
-        Suppressed::add($c, $a);
+        $first = new \RuntimeException('first');
+        $second = new \RuntimeException('second');
+        $third = new \RuntimeException('third');
+        Suppressed::add($second, $third);
+        Suppressed::add($third, $first);
 
-        Suppressed::add($a, $b);
+        Suppressed::add($first, $second);
 
-        Assert::same(suppressed($a), [$b]);
-        Assert::same(suppressed($b), [$c]);
-        Assert::same(suppressed($c), []);
+        Assert::same(suppressed($first), [$second]);
+        Assert::same(suppressed($second), [$third]);
+        Assert::same(suppressed($third), []);
     }
 
     public function nestedGroupsGiveTree(): void

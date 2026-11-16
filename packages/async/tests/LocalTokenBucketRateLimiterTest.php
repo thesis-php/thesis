@@ -177,6 +177,74 @@ final class LocalTokenBucketRateLimiterTest
         Assert::same([$afterBurst, $third], [0.0, 2.0]);
     }
 
+    public function lateWakeUpTakesTokenFromRefilledBucket(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+
+        $starts = group(static function (Group $group) use ($limiter, $start) {
+            // Blocks the loop while the body sleeps for the next token.
+            $group->spawn(static function () {
+                delay(sec(0));
+                VirtualTime\advance(sec(10));
+            });
+
+            $limiter->wait();
+            $late = secondsSince($start);
+            $limiter->wait();
+
+            return [$late, secondsSince($start)];
+        });
+
+        Assert::same($starts, [10.0, 11.0]);
+    }
+
+    /**
+     * A real timer wakes up a little late on every call: unless it is late by a whole token interval,
+     * the next token comes on schedule, or the limiter would run below its rate.
+     */
+    public function wakeUpLateByLessThanIntervalKeepsSchedule(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 0.5, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+
+        $starts = group(static function (Group $group) use ($limiter, $start) {
+            // Blocks the loop while the body sleeps for the next token, due in 2 seconds.
+            $group->spawn(static function () {
+                delay(sec(0));
+                VirtualTime\advance(sec(3));
+            });
+
+            $limiter->wait();
+            $late = secondsSince($start);
+            $limiter->wait();
+
+            return [$late, secondsSince($start)];
+        });
+
+        Assert::same($starts, [3.0, 4.0]);
+    }
+
+    public function tokenTooFarAwayDoesNotOverflowClock(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1e-10, burst: 1);
+        $limiter->wait();
+
+        $result = withoutWarnings(static fn() => timeoutOr(
+            duration: sec(1000),
+            body: static function () use ($limiter) {
+                $limiter->wait();
+
+                return 'started';
+            },
+            default: 'expired',
+        ));
+
+        Assert::same($result, 'expired');
+    }
+
     #[DataSet([0.0, '0'])]
     #[DataSet([-1.0, '-1'])]
     #[DataSet([-INF, '-INF'])]

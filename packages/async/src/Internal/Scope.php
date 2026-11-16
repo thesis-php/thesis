@@ -26,7 +26,7 @@ final class Scope
     /**
      * The longest `Time\Duration` in nanoseconds: a little less than PHP_INT_MAX, the saturated deadline.
      */
-    private const int LONGEST_DURATION = 9_223_372_035_999_999_999;
+    public const int LONGEST_DURATION = 9_223_372_035_999_999_999;
 
     /**
      * The clock of {@see self::now()} while `Thesis\Async\VirtualTime\run()` runs, bound by it.
@@ -48,14 +48,14 @@ final class Scope
 
     /**
      * @var array<int, \Closure(): void> the {@see onCancel()} callbacks not called yet, keyed by spl_object_id():
-     *                                  queued on cancellation, and called by {@see close()} if still pending then
+     *                                  queued on cancellation, and called by {@see endCallbacks()} if still pending
      */
     private array $callbacks = [];
 
     /**
-     * Set by {@see close()}: a closed scope stores no callbacks.
+     * Set by {@see endCallbacks()}: once the code of the scope has ended, it stores no callbacks.
      */
-    private bool $closed = false;
+    private bool $callbacksEnded = false;
 
     /**
      * @var array<int, self> held strongly to deliver cancellation; released by {@see close()}
@@ -204,28 +204,28 @@ final class Scope
     /**
      * Queues $callback through `EventLoop::queue()` once this scope is cancelled, by its owner or through an ancestor.
      * If it already is, $callback is queued right away. Never synchronously: user code does not run inside
-     * {@see cancel()}. If the queue has not reached it when the scope is closed, {@see close()} calls it itself:
+     * {@see cancel()}. If the queue has not reached it when the code of the scope ends, {@see endCallbacks()} calls it:
      * a callback of a cancelled scope is always called before the scope ends, and never after.
      *
      * Not a way to cancel anything: it only observes. The callback runs in the root scope, with no scoped values.
      * It is called at most once, and never after the returned unsubscribe function is called,
-     * even if it is already queued. Once the scope is closed, it is never called.
+     * even if it is already queued. Once the code of the scope has ended, it is never called.
      *
-     * The root scope is never cancelled and a closed scope never calls back, so nothing is stored for them.
+     * The root scope is never cancelled and an ended one never calls back, so nothing is stored for them.
      *
      * @param \Closure(): void $callback
      * @return \Closure(): void unsubscribe, idempotent
      */
     public function onCancel(\Closure $callback): \Closure
     {
-        if ($this === ROOT_SCOPE || $this->closed) {
+        if ($this === ROOT_SCOPE || $this->callbacksEnded) {
             return static function () {};
         }
 
         $pending = true;
         $id = 0;
         // Queued once at most, by notify() or right here, and maybe called
-        // earlier by close(): only the first call counts.
+        // earlier by endCallbacks(): only the first call counts.
         $fire = function () use (&$pending, &$id, $callback) {
             if ($pending) {
                 $pending = false;
@@ -251,39 +251,49 @@ final class Scope
     }
 
     /**
-     * Detaches the scope from its parent. Every created scope must be closed by its owner.
-     *
-     * If the scope is cancelled, the {@see onCancel()} callbacks the queue has not reached yet are called here,
-     * so that none runs after the scope has ended; otherwise they are dropped. Either way, none is called afterwards:
-     * a task handle may still cancel a finished task.
+     * Detaches the scope from its parent and {@see endCallbacks()}. Every created scope must be closed by its owner.
      */
     public function close(): void
     {
-        $this->closed = true;
-        $callbacks = $this->callbacks;
-        $this->callbacks = [];
-
         try {
-            if ($this->cancelled && $callbacks !== []) {
-                // As from the queue: in the root scope, with no scoped values.
-                ROOT_SCOPE->run(static fn() => Context::run([], static function () use ($callbacks) {
-                    foreach ($callbacks as $fire) {
-                        try {
-                            $fire();
-                        } catch (\Throwable $error) {
-                            // As if it had been thrown from the queue: to the event loop,
-                            // not to whoever closes the scope.
-                            EventLoop::queue(static function () use ($error) {
-                                throw $error;
-                            });
-                        }
-                    }
-                }));
-            }
+            $this->endCallbacks();
         } finally {
             if ($this->parent !== null) {
                 unset($this->parent->children[spl_object_id($this)]);
             }
+        }
+    }
+
+    /**
+     * The code of the scope has ended, the scope itself may still be needed to cancel its children: a group body
+     * that has failed or returned while its tasks run. A failure cancels the body scope then, and a callback
+     * of the body must not run after the body.
+     *
+     * If the scope is cancelled, the {@see onCancel()} callbacks the queue has not reached yet are called here,
+     * so that none runs after the code has ended; otherwise they are dropped. Either way, none is called afterwards:
+     * a task handle may still cancel a finished task.
+     */
+    public function endCallbacks(): void
+    {
+        $this->callbacksEnded = true;
+        $callbacks = $this->callbacks;
+        $this->callbacks = [];
+
+        if ($this->cancelled && $callbacks !== []) {
+            // As from the queue: in the root scope, with no scoped values.
+            ROOT_SCOPE->run(static fn() => Context::run([], static function () use ($callbacks) {
+                foreach ($callbacks as $fire) {
+                    try {
+                        $fire();
+                    } catch (\Throwable $error) {
+                        // As if it had been thrown from the queue: to the event loop,
+                        // not to whoever ends the scope.
+                        EventLoop::queue(static function () use ($error) {
+                            throw $error;
+                        });
+                    }
+                }
+            }));
         }
     }
 
@@ -319,7 +329,7 @@ final class Scope
             $wait->interrupt();
         }
 
-        // They stay stored until called: close() calls those the queue has not reached yet.
+        // They stay stored until called: endCallbacks() calls those the queue has not reached yet.
         foreach ($this->callbacks as $fire) {
             EventLoop::queue($fire);
         }

@@ -79,7 +79,7 @@ final class Suppressed
         $suppressed = SUPPRESSED;
         $errors = $suppressed[$error] ?? null;
 
-        return $errors === null ? [] : iterator_to_array($errors, false);
+        return $errors === null ? [] : iterator_to_array($errors, preserve_keys: false);
     }
 }
 

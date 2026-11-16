@@ -17,6 +17,8 @@ final class VirtualClock
     ) {}
 
     /**
+     * Saturates at PHP_INT_MAX, like the deadlines and the timers: an advance of centuries is the end of time.
+     *
      * @throws \ValueError if $nanoseconds is negative: the clock is monotonic
      */
     public function advance(int $nanoseconds): void
@@ -25,7 +27,9 @@ final class VirtualClock
             throw new \ValueError('The clock is monotonic: it cannot be moved back.');
         }
 
-        $this->now += $nanoseconds;
+        $now = $this->now + $nanoseconds;
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        $this->now = \is_int($now) ? $now : PHP_INT_MAX;
     }
 
     /**

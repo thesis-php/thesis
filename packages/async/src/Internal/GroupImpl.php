@@ -62,10 +62,18 @@ final class GroupImpl implements Group
         $daemonsScope = new Scope($tasksScope);
         $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
         $result = null;
+        $error = null;
 
         try {
             $result = $bodyScope->run(static fn() => $body($group));
         } catch (\Throwable $error) {
+        }
+
+        // Before the failure below and those of the tasks during join() cancel the body scope:
+        // a callback of the body is called only for a cancellation that came while the body ran.
+        $bodyScope->endCallbacks();
+
+        if ($error !== null) {
             if ($error instanceof Cancelled && $bodyScope->isCancelled()) {
                 // Either an outer cancellation or a consequence of a task failure. The tasks see it through the tree,
                 // so there is nothing to cancel here: it is rethrown after join(), unless a failure takes precedence.
@@ -240,6 +248,8 @@ final class GroupImpl implements Group
                     }
 
                     $handle->fail($error);
+                    // Before the failure cancels the task's own scope: the task has not been cancelled.
+                    $scope->endCallbacks();
                     $this->fail($error);
                 }
             } finally {

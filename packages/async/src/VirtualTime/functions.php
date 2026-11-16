@@ -54,7 +54,7 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     // to swap a running driver: let it finish the tick and stop. A callback left for a later tick stays there.
     // A callback that throws interrupts the tick, and Revolt throws out of run() with the driver still running:
     // finish the tick anyway, then rethrow the first error.
-    $stop = static function (EventLoop\Driver $driver): void {
+    $stop = static function (EventLoop\Driver $driver) {
         $error = null;
 
         while ($driver->isRunning()) {
@@ -76,8 +76,11 @@ function run(callable $fn, ?EventLoop\Driver $driver = null): mixed
     $stop($previousDriver);
     $previousClock = Scope::$virtualClock;
     // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Rounded up, so that
-    // the clock does not go back, to a whole second, so that the times of a dump read well.
-    $clock = new VirtualClock(intdiv(Scope::now() + 999_999_999, 1_000_000_000) * 1_000_000_000);
+    // the clock does not go back, to a whole second, so that the times of a dump read well. Not rounded
+    // at the end of time (an outer advance() of centuries): the rounding would overflow.
+    $now = Scope::now();
+    $start = $now <= PHP_INT_MAX - 999_999_999 ? intdiv($now + 999_999_999, 1_000_000_000) * 1_000_000_000 : $now;
+    $clock = new VirtualClock($start);
     EventLoop::setDriver(new VirtualTimeDriver($clock, $driver));
     Scope::$virtualClock = $clock;
 

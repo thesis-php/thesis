@@ -116,6 +116,34 @@ final class PacerTest
         assertNoCallbacksLeft();
     }
 
+    public function callsOfOtherCallersInTickCountAfterYield(): void
+    {
+        $pacer = new Pacer(perTick: 2);
+        $pacer->pace();
+        $pacer->pace();
+        // Another caller of the shared pacer, in the next tick before the yield below returns: it fills that tick.
+        EventLoop::defer(static function () use ($pacer) {
+            $pacer->pace();
+            $pacer->pace();
+        });
+        $pacer->pace();
+
+        Assert::true(self::yields($pacer->pace(...)));
+    }
+
+    public function countsAgainAfterItsTickIsDroppedWithDriver(): void
+    {
+        $pacer = new Pacer(perTick: 2);
+        // The defer that resets the count is left in the loop of the run, and the run drops it.
+        VirtualTime\run(static function () use ($pacer) {
+            $pacer->pace();
+        });
+        $pacer->pace();
+        $pacer->pace();
+
+        Assert::false(self::yields($pacer->pace(...)));
+    }
+
     /**
      * Whether $fn has let the event loop run a tick.
      *

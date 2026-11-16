@@ -283,6 +283,66 @@ final class OnCancelTest
         Assert::false($called);
     }
 
+    public function isNotCalledAfterTaskHasFailedOnItsOwn(): void
+    {
+        $called = false;
+
+        thrown(static function () use (&$called) {
+            group(static function (Group $group) use (&$called) {
+                $group->spawn(static function () use (&$called) {
+                    onCancel(static function () use (&$called) {
+                        $called = true;
+                    });
+
+                    throw new \RuntimeException('Failed.');
+                });
+            });
+        });
+        checkpoint();
+
+        Assert::false($called);
+    }
+
+    public function isNotCalledAfterBodyHasFailedOnItsOwn(): void
+    {
+        $called = false;
+
+        thrown(static function () use (&$called) {
+            group(static function () use (&$called) {
+                onCancel(static function () use (&$called) {
+                    $called = true;
+                });
+
+                throw new \RuntimeException('Failed.');
+            });
+        });
+        checkpoint();
+
+        Assert::false($called);
+    }
+
+    public function isNotCalledAfterBodyHasReturned(): void
+    {
+        $called = false;
+
+        thrown(static function () use (&$called) {
+            group(static function (Group $group) use (&$called) {
+                onCancel(static function () use (&$called) {
+                    $called = true;
+                });
+
+                $group->spawn(static function () {
+                    delay(sec(1));
+
+                    throw new \RuntimeException('Failed.');
+                });
+            });
+        });
+        checkpoint();
+
+        Assert::false($called);
+    }
+
     public function acceptsCallableThatIsNotClosure(): void
     {
         $recorder = new class {

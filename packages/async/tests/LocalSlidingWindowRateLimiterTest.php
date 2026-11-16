@@ -7,6 +7,7 @@ namespace Thesis\Async;
 use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
+use Time\Duration;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
@@ -184,6 +185,25 @@ final class LocalSlidingWindowRateLimiterTest
         });
 
         Assert::same($at, [20.0, 40.0]); // 60.0 last if the cancelled wait counted
+    }
+
+    public function longestWindowDoesNotOverflowClock(): void
+    {
+        $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: $longest);
+        $limiter->wait();
+
+        $result = timeoutOr(
+            duration: sec(1000),
+            body: static function () use ($limiter) {
+                $limiter->wait();
+
+                return 'started';
+            },
+            default: 'expired',
+        );
+
+        Assert::same($result, 'expired');
     }
 
     #[DataSet([0, '0s'])]
