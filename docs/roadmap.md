@@ -81,8 +81,8 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
    for room *before* it buffers, then buffers the whole write (a cancelled write delivers nothing, writes never
    interleave); `closeWrite($error)` gives the reader `ReadFailed`, so a body cut short does not look complete;
    `close()` by the reader stops the writer.
-6. **Processes.** `process`, then `parallel`, then `cluster`. On top of them: `hot-reload` (`process`,
-   `http-server`, `trapSignals()`) and `cron` (the parser without async and a scheduler on `async`).
+6. **Processes.** `process`, then `parallel` (ideas: [parallel-ideas.md](parallel-ideas.md)), then `cluster`.
+   On top of them: `hot-reload` (`process`, `http-server`, `trapSignals()`) and `cron` (the parser without async and a scheduler on `async`).
 7. **Storage and the rest.** `redis` with `cache`, `file`, `mysql`.
 8. **Cleanup.** After 2.0, the replaced repositories (`amp-bridge`, `byte-*`, `endian`, `varint`, `clock`,
    `time-span`, `sync-once`, `package-version`) are marked abandoned on Packagist with their replacement,
