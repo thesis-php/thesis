@@ -22,19 +22,23 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
 
 ### To do
 
-| Area | amphp | thesis |
-|---|---|---|
-| HTTP | `http`, `hpack`, `http-client`, `http-server`, `http-tunnel` | `http`, `http-client`, `http-server`; HPACK inside HTTP/2, CONNECT inside the client |
-| HTTP client extensions | `http-client-cookies`, `http-client-cache`, `http-client-psr7` | Cookies and cache as interceptors of the client, a PSR-18 bridge |
-| HTTP server extensions | `http-server-router`, `http-server-form-parser`, `http-server-static-content` | Router and form parser, static content later |
-| WebSocket | `websocket`, `websocket-client`, `websocket-server` | `websocket` |
-| SQL | `postgres`, `mysql`, `sql`, `sql-common` | `postgres`, later `mysql`; a common `sql` only with the second driver |
-| Redis | `redis` | `redis`: RESP3, pub/sub, distributed `Mutex`/`RateLimiter` behind the interfaces of `async` |
-| Cache | `cache` | A cache interface and a local cache with TTL; the Redis one in `redis` |
-| Processes | `process` | `process` |
-| Parallelism | `parallel`, `parallel-functions`, `serialization` | `parallel`: workers on `proc_open` (ext-parallel optional), an IPC channel, a pool |
-| Cluster | `cluster` | `cluster`: a multi-process server, passing sockets (ext-sockets) |
-| Files | `file` | `file`: PHP has no non-blocking file I/O, the driver is an open question |
+What amphp has, then what thesis makes of it.
+
+- HTTP (`http`, `hpack`, `http-client`, `http-server`, `http-tunnel`): `http`, `http-client`, `http-server`;
+  HPACK inside HTTP/2, CONNECT inside the client.
+- HTTP client extensions (`http-client-cookies`, `http-client-cache`, `http-client-psr7`): cookies and cache
+  as interceptors of the client, a PSR-18 bridge.
+- HTTP server extensions (`http-server-router`, `http-server-form-parser`, `http-server-static-content`):
+  router and form parser, static content later.
+- WebSocket (`websocket`, `websocket-client`, `websocket-server`): `websocket`.
+- SQL (`postgres`, `mysql`, `sql`, `sql-common`): `postgres`, later `mysql`; a common `sql` only with the second driver.
+- Redis (`redis`): `redis`: RESP3, pub/sub, distributed `Mutex`/`RateLimiter` behind the interfaces of `async`.
+- Cache (`cache`): a cache interface and a local cache with TTL; the Redis one in `redis`.
+- Processes (`process`): `process`.
+- Parallelism (`parallel`, `parallel-functions`, `serialization`): `parallel`: workers on `proc_open`
+  (ext-parallel optional), an IPC channel, a pool.
+- Cluster (`cluster`): `cluster`: a multi-process server, passing sockets (ext-sockets).
+- Files (`file`): `file`: PHP has no non-blocking file I/O, the driver is an open question.
 
 ### Not carried over
 
@@ -82,7 +86,8 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
    interleave); `closeWrite($error)` gives the reader `ReadFailed`, so a body cut short does not look complete;
    `close()` by the reader stops the writer.
 6. **Processes.** `process`, then `parallel` (ideas: [parallel-ideas.md](parallel-ideas.md)), then `cluster`.
-   On top of them: `hot-reload` (`process`, `http-server`, `trapSignals()`) and `cron` (the parser without async and a scheduler on `async`).
+   On top of them: `hot-reload` (`process`, `http-server`, `trapSignals()`) and `cron` (the parser without async
+   and a scheduler on `async`).
 7. **Storage and the rest.** `redis` with `cache`, `file`, `mysql`.
 8. **Cleanup.** After 2.0, the replaced repositories (`amp-bridge`, `byte-*`, `endian`, `varint`, `clock`,
    `time-span`, `sync-once`, `package-version`) are marked abandoned on Packagist with their replacement,
