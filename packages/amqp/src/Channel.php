@@ -10,6 +10,7 @@ use Thesis\Amqp\Internal\ConsumerState;
 use Thesis\Amqp\Internal\Content;
 use Thesis\Amqp\Internal\ContentHeader;
 use Thesis\Amqp\Internal\Frames;
+use Thesis\Amqp\Internal\PendingCall;
 use Thesis\Amqp\Internal\Protocol\BasicAck;
 use Thesis\Amqp\Internal\Protocol\BasicCancel;
 use Thesis\Amqp\Internal\Protocol\BasicCancelOk;
@@ -64,7 +65,6 @@ use Thesis\Amqp\Internal\Protocol\TxSelectOk;
 use Thesis\Async\Channel as AsyncChannel;
 use Thesis\Async\Deferred;
 use Thesis\Async\LocalMutex;
-use Thesis\Async\Lock;
 use Thesis\Io\Buffer;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\shield;
@@ -98,22 +98,7 @@ final class Channel
 
     private readonly LocalMutex $callMutex;
 
-    /**
-     * The reply that a synchronous method waits for, and the lock of the method: released when the reply comes,
-     * even if the caller was cancelled meanwhile, so that the reply never goes to the next method.
-     *
-     * @var ?Deferred<Method|Delivery|null>
-     */
-    private ?Deferred $reply = null;
-
-    /**
-     * @var list<class-string<Method>>
-     */
-    private array $replies = [];
-
-    private ?Lock $callLock = null;
-
-    private bool $getNoAck = false;
+    private ?PendingCall $pending = null;
 
     private readonly Content $content;
 
@@ -629,22 +614,18 @@ final class Channel
             throw $this->closed;
         }
 
-        /** @var Deferred<Method|Delivery|null> $reply */
-        $reply = new Deferred();
-        $this->reply = $reply;
-        $this->replies = array_values($replies);
-        $this->callLock = $lock;
-
-        if ($method instanceof BasicGet) {
-            $this->getNoAck = $method->noAck;
-        }
+        $pending = new PendingCall(
+            replies: array_values($replies),
+            lock: $lock,
+            getNoAck: $method instanceof BasicGet && $method->noAck,
+        );
+        $this->pending = $pending;
 
         try {
             $this->connection->send($this->id, $method);
         } catch (\Throwable $exception) {
-            if ($this->reply === $reply) {
-                $this->reply = null;
-                $this->callLock = null;
+            if ($this->pending === $pending) {
+                $this->pending = null;
             }
 
             $lock->release();
@@ -652,18 +633,14 @@ final class Channel
             throw $exception;
         }
 
-        return $reply->await();
+        return $pending->reply->await();
     }
 
     private function respond(null|Method|Delivery $value): void
     {
-        $reply = $this->reply;
-        $lock = $this->callLock;
-        $this->reply = null;
-        $this->replies = [];
-        $this->callLock = null;
-        $reply?->complete($value);
-        $lock?->release();
+        $pending = $this->pending;
+        $this->pending = null;
+        $pending?->complete($value);
     }
 
     /**
@@ -725,7 +702,7 @@ final class Channel
             return;
         }
 
-        if ($this->reply === null || !\in_array($frame::class, $this->replies, true)) {
+        if ($this->pending === null || !$this->pending->expects($frame)) {
             throw new ProtocolError(
                 replyCode: ReplyCode::UnexpectedFrame,
                 message: \sprintf('Unexpected %s on channel %d.', $frame::class, $this->id),
@@ -771,7 +748,7 @@ final class Channel
 
         $consumerTag = $method instanceof BasicDeliver ? $method->consumerTag : null;
         $consumer = $consumerTag === null ? null : $this->consumers[$consumerTag] ?? null;
-        $noAck = $consumerTag === null ? $this->getNoAck : $consumer->noAck ?? true;
+        $noAck = $consumerTag === null ? $this->pending->getNoAck ?? false : $consumer->noAck ?? true;
         $delivery = new Delivery(
             settle: $this->settle(...),
             reply: $this->publishReply(...),
@@ -927,12 +904,9 @@ final class Channel
         $this->isClosed = true;
         $this->connection->unregister($this->id);
 
-        $reply = $this->reply;
-        $lock = $this->callLock;
-        $this->reply = null;
-        $this->callLock = null;
-        $reply?->fail($reason);
-        $lock?->release();
+        $pending = $this->pending;
+        $this->pending = null;
+        $pending?->fail($reason);
 
         $graceful = ($reason instanceof ChannelClosed || $reason instanceof ConnectionClosed)
             && $reason->replyCode === ReplyCode::ReplySuccess;
