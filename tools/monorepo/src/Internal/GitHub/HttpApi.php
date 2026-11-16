@@ -6,6 +6,7 @@ namespace Thesis\Monorepo\Internal\GitHub;
 
 use Thesis\Monorepo\Internal\Json;
 use Thesis\Monorepo\Internal\MonorepoException;
+use function Thesis\exceptionally;
 
 /**
  * @internal
@@ -57,7 +58,16 @@ final readonly class HttpApi implements Api
                 'timeout' => 30,
             ],
         ]);
-        $content = @file_get_contents(self::URL . $path, context: $context);
+
+        try {
+            $content = exceptionally(static fn() => file_get_contents(self::URL . $path, context: $context));
+        } catch (\ErrorException $error) {
+            throw new MonorepoException(
+                message: \sprintf('GitHub: %s %s: %s.', $method, $path, $error->getMessage()),
+                previous: $error,
+            );
+        }
+
         $status = self::status(http_get_last_response_headers() ?? []);
 
         if ($content === false || $status === null) {

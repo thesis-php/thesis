@@ -8,6 +8,7 @@ use Thesis\Monorepo\Internal\Git\CatFile;
 use Thesis\Monorepo\Internal\Git\Git;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
+use function Thesis\exceptionally;
 
 /**
  * Splits the history of every packages/<name> of a commit in one pass: each commit of the monorepo that changes
@@ -260,21 +261,25 @@ final class Splitter
             return;
         }
 
-        if (!is_dir($dir) && !mkdir($dir) && !is_dir($dir)) {
-            throw new MonorepoException(\sprintf('Cannot create %s.', $dir));
-        }
-
         $temporary = $dir . '/tmp_obj_' . bin2hex(random_bytes(8));
-        $compressed = gzcompress($object);
 
-        if ($compressed === false
-            || file_put_contents($temporary, $compressed) === false
-            || !chmod($temporary, 0o444)
-            || !rename($temporary, $path)
-        ) {
+        try {
+            exceptionally(static function () use ($dir, $temporary, $path, $object): void {
+                if (!is_dir($dir)) {
+                    mkdir($dir);
+                }
+
+                file_put_contents($temporary, gzcompress($object));
+                chmod($temporary, 0o444);
+                rename($temporary, $path);
+            });
+        } catch (\ErrorException $error) {
             @unlink($temporary);
 
-            throw new MonorepoException(\sprintf('Cannot write the object %s.', $id));
+            throw new MonorepoException(
+                message: \sprintf('Cannot write the object %s: %s.', $id, $error->getMessage()),
+                previous: $error,
+            );
         }
     }
 }

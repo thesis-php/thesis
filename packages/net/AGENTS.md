@@ -78,6 +78,12 @@ skills ship with the package and reach its users through llm/skills.
   and plaintext-first protocols need the upgrade anyway.
 - Rejected: `ALPN` together with SNI certificates is not refused at construction: PHP loses ALPN only on connections
   that pick an SNI certificate, which degrades to the default protocol instead of failing (documented in README).
+- A failed call of PHP is `error_clear_last()`, `@call()`, then `Internal\lastError($default)` for the message.
+  Rejected: `exceptionally()` of thesis/exceptionally. Nothing suspends between the clear and the read, so the global
+  last error is this call's. `exceptionally()` would cost a closure and two handler calls per `fread()`/`fwrite()`
+  of the hot path, and it loses the message where `lastError()` keeps it: under `@` or `error_reporting` of the caller
+  it throws nothing, while `error_get_last()` records a suppressed error too. A default is needed anyway:
+  `fread()` and `fwrite()` may fail without an error.
 
 ## Tests
 

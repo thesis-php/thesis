@@ -293,6 +293,24 @@ final readonly class SplitterTest
         $repository->git->run(['fsck', '--strict', '--no-dangling']);
     }
 
+    public static function failsWithReasonWhenObjectCannotBeWritten(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', ['packages/a/A.php' => 'a1']);
+        $split = self::split($repository)['a'] ?? '';
+        $object = $repository->dir . '/.git/objects/' . substr($split, 0, 2) . '/' . substr($split, 2);
+        unlink($object);
+        mkdir($object);
+
+        Expect
+            ::exception(MonorepoException::class)
+            ->withMessageContaining("Cannot write the object {$split}: rename(")
+            ->withMessageContaining('Is a directory')
+        ;
+
+        self::split($repository);
+    }
+
     public static function failsOnShallowHistory(): void
     {
         $origin = new Repository();

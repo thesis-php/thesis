@@ -10,6 +10,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Thesis\Monorepo\Internal\Generator;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
+use function Thesis\exceptionally;
 
 /**
  * @internal
@@ -33,7 +34,14 @@ final readonly class SyncCommand
         }
 
         foreach (Generator::stale($monorepo, $files) as $path => $content) {
-            file_put_contents($this->root . '/' . $path, $content);
+            try {
+                exceptionally(fn() => file_put_contents($this->root . '/' . $path, $content));
+            } catch (\ErrorException $error) {
+                $io->error(\sprintf('Cannot write %s: %s.', $path, $error->getMessage()));
+
+                return Command::FAILURE;
+            }
+
             $io->writeln('Updated ' . $path);
         }
 
