@@ -104,6 +104,15 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
   work only in the monorepo: the split repository and Packagist have no `../async`. Replace them all at once
   with links to the repositories of the packages (`https://github.com/thesis-php/async`), and make `bin/monorepo`
   check that a README links no path outside its package.
+- A constant or a default value derived from simpler numbers is written as the computation, not its result:
+  `1024 * 1024`, not `1_048_576`; `24 * 60 * 60` seconds, not `86_400`; `60 * NANOSECONDS_PER_SECOND`,
+  not `60_000_000_000` (PHP folds it at compile time). A bare literal stays where the number itself is the meaning:
+  a count (`10_000` messages), a limit of a protocol (`65535`), a bound with no simpler form
+  (`Duration::MAX_SECONDS`). Candidates: the buffer sizes of `Buffer`, `Stream`, `SharedStream`, `Socket`,
+  `Channel`, `Frames::DEFAULT_MAX`, `DnsResolver::MAX_TTL`, `Connector::ATTEMPT_DELAY`,
+  `Scope::LONGEST_DURATION`, the chain of `NANOSECONDS_PER_*` in `thesis/time`. Open: the same for literals
+  in code (`4_294_967_295` in `amqp` `Config` as `0xFF_FF_FF_FF` or `2 ** 32 - 1`, the int32 bounds of AMQP,
+  the microsecond bounds of `time`). Then the rule goes to `agents/php.md`, next to the one on `_` in literals.
 
 ## Open questions
 
