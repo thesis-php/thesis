@@ -19,8 +19,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   The generated code passes the fixer as it is: a change of the generator is checked with `make fixer P=amqp`.
 - A synchronous method holds `callMutex` until its reply arrives, even if the caller is cancelled meanwhile:
   the reply still comes, and the next call must not take it for its own. The reader releases the lock.
-- Confirm tags are assigned and the frames written under `publishMutex`, in one order, after `ensureOpen()`
-  inside the mutex: the wait for it may outlive the channel. The `Deferred` of each confirm is taken when its tag
+- Confirm tags are assigned (`Internal\Confirms`) and the frames written under `publishMutex` of `Channel`,
+  in one order, after `ensureOpen()` inside the mutex: the wait for it may outlive the channel. The `Deferred` of each confirm is taken when its tag
   is assigned, never looked up after the write: the reader may settle and forget it while a large write waits.
   A write that throws with the connection intact (nothing went out) gives its tags back; once a byte went out,
   net closes the socket.

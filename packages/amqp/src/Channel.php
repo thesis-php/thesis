@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Amqp;
 
+use Thesis\Amqp\Internal\Confirms;
 use Thesis\Amqp\Internal\Connection;
 use Thesis\Amqp\Internal\ContentHeader;
 use Thesis\Amqp\Internal\Frames;
@@ -82,11 +83,6 @@ use function Thesis\Async\synchronized;
 final class Channel
 {
     /**
-     * Correlates a basic.return with its publish: the frame carries no delivery tag.
-     */
-    private const string RETURN_HEADER = 'x-thesis-return-id';
-
-    /**
      * How many bytes of a batch are written at once.
      */
     private const int BATCH_BYTES = 1_048_576;
@@ -154,27 +150,7 @@ final class Channel
 
     private readonly LocalMutex $publishMutex;
 
-    private int $publishTag = 0;
-
-    /**
-     * @var array<int, Deferred<null>> by delivery tag, in ascending order
-     */
-    private array $unconfirmed = [];
-
-    /**
-     * @var array<int, string> the return id of a mandatory publish by its delivery tag
-     */
-    private array $returnIds = [];
-
-    /**
-     * @var array<string, int>
-     */
-    private array $returnTags = [];
-
-    /**
-     * @var array<int, MessageReturned> returned messages whose ack has not come yet
-     */
-    private array $returned = [];
+    private readonly Confirms $confirms;
 
     /**
      * @internal
@@ -187,6 +163,7 @@ final class Channel
     ) {
         $this->callMutex = new LocalMutex();
         $this->publishMutex = new LocalMutex();
+        $this->confirms = new Confirms();
         $connection->register($id, $this->handle(...), $this->terminate(...), $this->drain(...));
 
         try {
@@ -505,13 +482,12 @@ final class Channel
             $returnId = null;
 
             if ($mandatory) {
-                $returnId = bin2hex(random_bytes(8));
-                $message = self::withReturnId($message, $returnId);
+                [$message, $returnId] = Confirms::returnable($message);
             }
 
             $buffer = new Buffer();
             $this->encodePublish($buffer, $message, $exchange, $routingKey, $mandatory);
-            [[, $confirm]] = $this->expectConfirms([[null, $returnId]]);
+            [[, $confirm]] = $this->confirms->expect([[null, $returnId]]);
             $this->writeConfirmed($buffer->drain(), count: 1);
 
             return $confirm;
@@ -569,8 +545,7 @@ final class Channel
                     throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
                 }
 
-                $returnId = bin2hex(random_bytes(8));
-                $message = self::withReturnId($message, $returnId);
+                [$message, $returnId] = Confirms::returnable($message);
             }
 
             $this->encodePublish($buffer, $message, $publish->exchange, $publish->routingKey, $publish->mandatory);
@@ -777,7 +752,7 @@ final class Channel
         }
 
         if ($frame instanceof BasicAck || $frame instanceof BasicNack) {
-            $this->confirm($frame->deliveryTag, $frame->multiple, nacked: $frame instanceof BasicNack);
+            $this->confirms->confirm($frame->deliveryTag, $frame->multiple, nacked: $frame instanceof BasicNack);
 
             return;
         }
@@ -876,7 +851,7 @@ final class Channel
         $this->contentBody = '';
 
         if ($method instanceof BasicReturn) {
-            $this->returnedMessage($method, $message);
+            $this->confirms->receiveReturn($method, $message);
 
             return;
         }
@@ -905,54 +880,6 @@ final class Channel
         ($this->consumers[$consumerTag] ?? null)?->trySend($delivery);
     }
 
-    private function returnedMessage(BasicReturn $return, Message $message): void
-    {
-        $returnId = $message->headers[self::RETURN_HEADER] ?? null;
-        $tag = \is_string($returnId) ? $this->returnTags[$returnId] ?? null : null;
-
-        if ($tag === null) {
-            return;
-        }
-
-        $headers = $message->headers;
-        unset($headers[self::RETURN_HEADER]);
-        $this->returned[$tag] = new MessageReturned(
-            replyCode: ReplyCode::tryFrom($return->replyCode) ?? ReplyCode::NoRoute,
-            replyText: $return->replyText,
-            exchange: $return->exchange,
-            routingKey: $return->routingKey,
-            returnedMessage: clone($message, ['headers' => $headers]),
-        );
-    }
-
-    /**
-     * The confirms are taken now, not looked up after the write: the reader may settle one while the write waits.
-     *
-     * @template T
-     * @param non-empty-list<array{T, ?string}> $publishes with the return id of a mandatory message,
-     *     in the order of publishing
-     * @return non-empty-list<array{T, Deferred<null>}>
-     */
-    private function expectConfirms(array $publishes): array
-    {
-        $confirms = [];
-
-        foreach ($publishes as [$publish, $returnId]) {
-            $tag = ++$this->publishTag;
-            /** @var Deferred<null> $confirm */
-            $confirm = new Deferred();
-            $this->unconfirmed[$tag] = $confirm;
-            $confirms[] = [$publish, $confirm];
-
-            if ($returnId !== null) {
-                $this->returnIds[$tag] = $returnId;
-                $this->returnTags[$returnId] = $tag;
-            }
-        }
-
-        return $confirms;
-    }
-
     /**
      * Gives the last $count tags back if nothing reached the server: the next publish takes them.
      *
@@ -965,13 +892,7 @@ final class Channel
             $this->connection->write($bytes);
         } catch (\Throwable $exception) {
             if ($this->connection->isIntact()) {
-                $first = $this->publishTag - $count + 1;
-
-                for ($tag = $first; $tag <= $this->publishTag; ++$tag) {
-                    $this->forgetConfirm($tag);
-                }
-
-                $this->publishTag = $first - 1;
+                $this->confirms->giveBack($count);
             }
 
             throw $exception;
@@ -994,62 +915,11 @@ final class Channel
 
         return synchronized($this->publishMutex, function () use ($bytes, $chunk) {
             $this->ensureOpen();
-            $confirms = $this->expectConfirms($chunk);
+            $confirms = $this->confirms->expect($chunk);
             $this->writeConfirmed($bytes, \count($confirms));
 
             return $confirms;
         });
-    }
-
-    /**
-     * The id goes first, so that a header of the same name does not replace it; `+` keeps numeric header names,
-     * which a spread would renumber.
-     */
-    private static function withReturnId(Message $message, string $returnId): Message
-    {
-        return clone($message, ['headers' => [self::RETURN_HEADER => $returnId] + $message->headers]);
-    }
-
-    private function confirm(int $tag, bool $multiple, bool $nacked): void
-    {
-        if (!$multiple) {
-            $this->settleConfirm($tag, $nacked);
-
-            return;
-        }
-
-        foreach ($this->unconfirmed as $unconfirmed => $_) {
-            if ($unconfirmed > $tag) {
-                break;
-            }
-
-            $this->settleConfirm($unconfirmed, $nacked);
-        }
-    }
-
-    private function settleConfirm(int $tag, bool $nacked): void
-    {
-        $confirm = $this->unconfirmed[$tag] ?? null;
-        $returned = $this->returned[$tag] ?? null;
-        $this->forgetConfirm($tag);
-
-        match (true) {
-            $confirm === null => null,
-            $nacked => $confirm->fail(new PublishNacked("The broker has nacked the message published as {$tag}.")),
-            $returned !== null => $confirm->fail($returned),
-            default => $confirm->complete(),
-        };
-    }
-
-    private function forgetConfirm(int $tag): void
-    {
-        $returnId = $this->returnIds[$tag] ?? null;
-
-        if ($returnId !== null) {
-            unset($this->returnTags[$returnId]);
-        }
-
-        unset($this->unconfirmed[$tag], $this->returnIds[$tag], $this->returned[$tag]);
     }
 
     /**
@@ -1164,15 +1034,7 @@ final class Channel
             $this->endConsumer((string) $tag, $graceful ? null : $reason);
         }
 
-        $unconfirmed = $this->unconfirmed;
-        $this->unconfirmed = [];
-        $this->returnIds = [];
-        $this->returnTags = [];
-        $this->returned = [];
-
-        foreach ($unconfirmed as $confirm) {
-            $confirm->fail($reason);
-        }
+        $this->confirms->failAll($reason);
     }
 
     /**
@@ -1184,13 +1046,7 @@ final class Channel
             $this->cancelConsumer((string) $tag);
         }
 
-        foreach ($this->unconfirmed as $confirm) {
-            try {
-                $confirm->await();
-            } catch (AmqpException) {
-                // Its publisher gets it.
-            }
-        }
+        $this->confirms->awaitAll();
     }
 
     /**
