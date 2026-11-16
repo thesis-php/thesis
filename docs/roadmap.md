@@ -114,6 +114,34 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
   in code (`4_294_967_295` in `amqp` `Config` as `0xFF_FF_FF_FF` or `2 ** 32 - 1`, the int32 bounds of AMQP,
   the microsecond bounds of `time`). Then the rule goes to `agents/php.md`, next to the one on `_` in literals.
 
+## After the roadmap
+
+Candidates beyond the phases and the out-of-scope list above, not ordered within a group. The first two groups
+grow from what `async` already has and amphp lacks, so they come first.
+
+- **Deterministic simulation testing** (as FoundationDB, TigerBeetle): the virtual time of `async` plus an in-memory
+  `net` with delays, drops, reordering and partitions, and a scheduler driven by a seed. A client (`amqp`,
+  `postgres`, `nats`) runs thousands of times, a failure is replayed by its seed.
+- **Observability of the task tree**: a dump of the live tasks with where each is suspended (as a goroutine dump),
+  a task suspended longer than a threshold, a deadlock on `Lock`/`Channel`. Trace context carried by `ScopedValue`
+  along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over `http-server`.
+- **Deadlines across services**: the time left of a cancellation passed on in HTTP and grpc headers
+  (`grpc-timeout`) and as `statement_timeout` of postgres.
+- **Resilience** on `async`: a circuit breaker, a bulkhead, hedged requests, a retry policy on `Async\Backoff`,
+  local and distributed (redis, postgres advisory locks) behind one interface, as `Mutex` and `RateLimiter`.
+  Leader election on postgres, redis or etcd.
+- **Protocols**: on `net`: SMTP, MQTT, StatsD and syslog (the first users of UDP), ClickHouse native, LDAP.
+  On `http-client`: S3 with streamed bodies, the Docker and Kubernetes APIs (a watch as an iterator), ACME
+  for the certificates of `http-server`. On `http-server`: Server-Sent Events, later HTTP/3.
+- **Formats** as decorators of `Reader`/`Writer`: streamed JSON, msgpack, CBOR, CSV; zstd and brotli beside zlib.
+- **Application level**: a job queue with retries, a dead letter queue and idempotency on `pgmq`, `amqp`
+  and `redis`; the outbox pattern (`postgres` with `amqp`), a bridge to message-bus. An application server
+  on `cluster`, `http-server`, `hot-reload` and `trapSignals()`, with PSR-15 and Symfony Runtime bridges.
+- **Tooling**: PHPStan rules in `phpstan-extension` for async code (a blocking call in a fiber: `sleep()`,
+  network `file_get_contents()`, PDO; a task nobody awaits; the reference cycles of
+  [memory-ideas.md](memory-ideas.md)). Rector rules to migrate from amphp. A documentation site and benchmarks
+  against amphp, ReactPHP and Swoole.
+
 ## Open questions
 
 1. Protobuf: wait for grpc, or rewrite it earlier as a standalone serializer?
