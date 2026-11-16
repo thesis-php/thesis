@@ -23,8 +23,9 @@ a change made there would be lost on the next split or would diverge from the mo
   repository says so.
 - **Settings come from the manifests.** `bin/monorepo github` brings every `thesis-php/<name>` to the state
   derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
-  the description, the homepage (`packages/<name>` in the monorepo), the disabled features and the rulesets,
-  and registers the package on Packagist. GitHub itself is the state, the command is idempotent and deletes nothing.
+  the description, the homepage (`packages/<name>` in the monorepo), the disabled features and the rulesets.
+  It does not register the package on Packagist yet: that is done by hand before the first release.
+  GitHub itself is the state, the command is idempotent and deletes nothing.
   CI runs it before the split, so a new package gets its repository with its first push.
 - **Older repositories of the same name.** `github` refuses a repository that exists without the rulesets
   of the split: the organization holds older packages under the same names, and taking one over is a decision,
