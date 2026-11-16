@@ -103,7 +103,8 @@ final class Tracer
             $this->listens = [];
         }
 
-        // The next observation numbers its scopes from 1 again.
+        // The next observation numbers its scopes from 1 again. Only the last detach of this tracer resets it:
+        // a new one is created only once the dispatchers are gone, so an older tracer never unbinds a newer one.
         if ($this->dispatchers === [] && Scope::$tracer === $this) {
             Scope::$tracer = null;
         }

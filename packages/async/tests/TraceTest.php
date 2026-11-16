@@ -387,6 +387,38 @@ final class TraceTest
         Assert::same(\count($outer->lines), 6);
     }
 
+    public function givesEventsToConcurrentObserversUntilEachCallReturns(): void
+    {
+        $first = new TraceLog();
+        $second = new TraceLog();
+
+        group(static function (Group $group) use ($first, $second) {
+            $group->spawn(static fn() => observe(new Dispatcher([$first]), static fn() => delay(sec(2))));
+            $group->spawn(static function () use ($second) {
+                delay(sec(1));
+                observe(new Dispatcher([$second]), static fn() => delay(sec(2)));
+            });
+        });
+        $after = self::record(static fn() => shield(static fn() => null));
+
+        Assert::same($first->lines, [
+            '0 #1 suspended in Thesis\Async\delay',
+            '0 #2 started',
+            '0 #2 suspended in Thesis\Async\delay',
+            '1 #2 resumed',
+            '1 #2 suspended in Thesis\Async\delay',
+            '2 #1 resumed',
+        ]);
+        // The numbers of the first observation: it was still running when the second began.
+        Assert::same($second->lines, [
+            '0 #2 suspended in Thesis\Async\delay',
+            '1 #1 resumed',
+            '1 #1 returned null',
+            '2 #2 resumed',
+        ]);
+        Assert::same($after->lines, ['0 #1 shield in root', '0 #1 returned null']);
+    }
+
     public function givesListenerOnlyEventsOfItsType(): void
     {
         $lines = [];
