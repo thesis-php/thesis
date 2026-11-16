@@ -6,6 +6,7 @@ namespace Thesis\Amqp;
 
 use Thesis\Amqp\Internal\Confirms;
 use Thesis\Amqp\Internal\Connection;
+use Thesis\Amqp\Internal\Content;
 use Thesis\Amqp\Internal\ContentHeader;
 use Thesis\Amqp\Internal\Frames;
 use Thesis\Amqp\Internal\Protocol\BasicAck;
@@ -18,7 +19,6 @@ use Thesis\Amqp\Internal\Protocol\BasicGet;
 use Thesis\Amqp\Internal\Protocol\BasicGetEmpty;
 use Thesis\Amqp\Internal\Protocol\BasicGetOk;
 use Thesis\Amqp\Internal\Protocol\BasicNack;
-use Thesis\Amqp\Internal\Protocol\BasicProperties;
 use Thesis\Amqp\Internal\Protocol\BasicPublish;
 use Thesis\Amqp\Internal\Protocol\BasicQos;
 use Thesis\Amqp\Internal\Protocol\BasicQosOk;
@@ -65,7 +65,6 @@ use Thesis\Async\Deferred;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Lock;
 use Thesis\Io\Buffer;
-use function Thesis\Amqp\Internal\message;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\shield;
 use function Thesis\Async\synchronized;
@@ -115,13 +114,7 @@ final class Channel
 
     private bool $getNoAck = false;
 
-    private null|BasicDeliver|BasicGetOk|BasicReturn $content = null;
-
-    private ?BasicProperties $contentProperties = null;
-
-    private int $contentRemaining = 0;
-
-    private string $contentBody = '';
+    private readonly Content $content;
 
     /**
      * Unbounded: the reader never waits for a consumer, a prefetch of {@see qos()} bounds what the server sends.
@@ -164,6 +157,7 @@ final class Channel
         $this->callMutex = new LocalMutex();
         $this->publishMutex = new LocalMutex();
         $this->confirms = new Confirms();
+        $this->content = new Content($id);
         $connection->register($id, $this->handle(...), $this->terminate(...), $this->drain(...));
 
         try {
@@ -688,18 +682,18 @@ final class Channel
         }
 
         if (\is_string($frame)) {
-            $this->receiveBody($frame);
+            $this->receiveContent($this->content->receiveBody($frame));
 
             return;
         }
 
         if ($frame instanceof ContentHeader) {
-            $this->receiveHeader($frame);
+            $this->receiveContent($this->content->receiveHeader($frame));
 
             return;
         }
 
-        if ($this->content !== null) {
+        if ($this->content->isStarted) {
             throw new ProtocolError(
                 replyCode: ReplyCode::UnexpectedFrame,
                 message: "A method in the middle of a content on channel {$this->id}.",
@@ -707,7 +701,7 @@ final class Channel
         }
 
         if ($frame instanceof BasicDeliver || $frame instanceof BasicReturn) {
-            $this->content = $frame;
+            $this->content->start($frame);
 
             return;
         }
@@ -745,7 +739,7 @@ final class Channel
         }
 
         if ($frame instanceof BasicGetOk) {
-            $this->content = $frame;
+            $this->content->start($frame);
 
             return;
         }
@@ -765,51 +759,15 @@ final class Channel
     }
 
     /**
-     * @throws ProtocolError
+     * @param ?array{BasicDeliver|BasicGetOk|BasicReturn, Message} $content null while the message is incomplete
      */
-    private function receiveHeader(ContentHeader $header): void
+    private function receiveContent(?array $content): void
     {
-        if ($this->content === null || $this->contentProperties !== null) {
-            throw new ProtocolError(ReplyCode::UnexpectedFrame, "An unexpected content header on channel {$this->id}.");
+        if ($content === null) {
+            return;
         }
 
-        $this->contentProperties = $header->properties;
-        $this->contentRemaining = $header->bodySize;
-
-        if ($header->bodySize === 0) {
-            $this->completeContent();
-        }
-    }
-
-    /**
-     * @throws ProtocolError
-     */
-    private function receiveBody(string $body): void
-    {
-        if ($this->contentProperties === null) {
-            throw new ProtocolError(ReplyCode::UnexpectedFrame, "An unexpected content body on channel {$this->id}.");
-        }
-
-        $this->contentBody .= $body;
-        $this->contentRemaining -= \strlen($body);
-
-        if ($this->contentRemaining < 0) {
-            throw new ProtocolError(ReplyCode::FrameError, "A content body on channel {$this->id} exceeds its size.");
-        }
-
-        if ($this->contentRemaining === 0) {
-            $this->completeContent();
-        }
-    }
-
-    private function completeContent(): void
-    {
-        $method = $this->content;
-        \assert($method !== null && $this->contentProperties !== null);
-        $message = message($this->contentBody, $this->contentProperties);
-        $this->content = null;
-        $this->contentProperties = null;
-        $this->contentBody = '';
+        [$method, $message] = $content;
 
         if ($method instanceof BasicReturn) {
             $this->confirms->receiveReturn($method, $message);
