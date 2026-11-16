@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Formatter\Internal;
 
+use Thesis\SourceLocation\Location;
 use function Thesis\Formatter\formatValue;
 
 /**
@@ -15,8 +16,11 @@ use function Thesis\Formatter\formatValue;
  */
 function className(string $class): string
 {
-    if (preg_match('/^(.+)@anonymous\x00([^\x00-\x1F\x7F]+):(\d+)\$[0-9a-f]+$/D', $class, $matches) === 1) {
-        return name($matches[1]) . '@' . location($matches[2], (int) $matches[3]);
+    if (preg_match('/^(.+)@anonymous\x00([^\x00-\x1F\x7F]+):([1-9]\d*)\$[0-9a-f]+$/D', $class, $matches) === 1) {
+        /** @var positive-int $line */
+        $line = (int) $matches[3];
+
+        return name($matches[1]) . '@' . Location::of($matches[2], $line);
     }
 
     return name($class);
@@ -86,11 +90,10 @@ function reflectedFunctionName(\ReflectionFunctionAbstract $function): string
 {
     // First: the parameter of a closure declared in a method gives a \ReflectionMethod named {closure:...}.
     if (str_starts_with($function->name, '{closure')) {
-        $file = $function->getFileName();
-        $line = $function->getStartLine();
-        \assert($file !== false && $line !== false, 'Only user code declares closures.');
+        $location = Location::ofFunction($function);
+        \assert($location !== null, 'Only user code declares closures.');
 
-        return 'function@' . location($file, $line);
+        return 'function@' . $location;
     }
 
     if ($function instanceof \ReflectionMethod) {
@@ -106,20 +109,4 @@ function reflectedFunctionName(\ReflectionFunctionAbstract $function): string
     }
 
     return className($class->name) . '::' . $function->name;
-}
-
-/**
- * Code of eval() is in a file like "/app/src/foo.php(12) : eval()'d code", nested eval() appends more:
- * its location is the line of the outermost eval().
- *
- * @internal
- * @return non-empty-string
- */
-function location(string $file, int $line): string
-{
-    if (preg_match("/^(.+?)\\((\\d+)\\) : eval\\(\\)'d code/", $file, $matches) === 1) {
-        return $matches[1] . ':' . $matches[2];
-    }
-
-    return $file . ':' . $line;
 }

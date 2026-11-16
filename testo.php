@@ -17,12 +17,14 @@ return new ApplicationConfig(
         __DIR__ . '/packages/io/src',
         __DIR__ . '/packages/net/src',
         __DIR__ . '/packages/phpstan-extension/src',
+        __DIR__ . '/packages/source-location/src',
         __DIR__ . '/packages/testo-plugin/src',
         __DIR__ . '/packages/time/src',
     ],
     suites: [
         new SuiteConfig(name: 'monorepo', location: [__DIR__ . '/tools/monorepo/tests']),
         new SuiteConfig(name: 'php-cs-fixer', location: [__DIR__ . '/tools/php-cs-fixer/tests']),
+        new SuiteConfig(name: 'trace-recorder', location: [__DIR__ . '/tools/trace-recorder/tests']),
         new SuiteConfig(name: 'amqp', location: [__DIR__ . '/packages/amqp/tests']),
         new SuiteConfig(
             name: 'async',
@@ -38,6 +40,7 @@ return new ApplicationConfig(
         new SuiteConfig(name: 'formatter', location: [__DIR__ . '/packages/formatter/tests']),
         new SuiteConfig(name: 'io', location: [__DIR__ . '/packages/io/tests']),
         new SuiteConfig(name: 'net', location: [__DIR__ . '/packages/net/tests']),
+        new SuiteConfig(name: 'source-location', location: [__DIR__ . '/packages/source-location/tests']),
         new SuiteConfig(name: 'testo-plugin', location: [__DIR__ . '/packages/testo-plugin/tests']),
         new SuiteConfig(name: 'time', location: [__DIR__ . '/packages/time/tests']),
     ],

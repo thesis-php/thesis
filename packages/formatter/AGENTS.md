@@ -26,6 +26,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   (reflecting it threw), and `formatFunction()` takes `mixed`, since the native `callable` autoloads the class
   of `'Foo::bar'`. A string that is not a name of PHP (`Internal\name()`) is a string literal, so a name from outside
   cannot inject a newline into a message.
+- A location (of a closure, of an anonymous class) is `Thesis\SourceLocation\Location`, written with its full path:
+  the code of `eval()` is resolved there. A name of an anonymous class with the line 0 is not one of PHP.
 - The parameter of a closure declared in a method reflects its function as a `\ReflectionMethod` named
   `{closure:...}`: `reflectedFunctionName()` checks for a closure before a method.
 

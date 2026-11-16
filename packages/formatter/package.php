@@ -10,6 +10,9 @@ return new Manifest(
     description: 'Formats PHP values, classes, functions and parameters into short strings for error messages.',
     licenseSince: 2026,
     version: '0.2',
+    require: [
+        'thesis/source-location' => '*',
+    ],
     requireDev: [
         'testo/assert' => '^0.1.17',
         'testo/data' => '^0.1.10',

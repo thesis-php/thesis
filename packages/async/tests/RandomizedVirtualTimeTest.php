@@ -10,6 +10,7 @@ use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
 use function Thesis\Async\Tests\secondsSince;
+use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\run;
 use function Thesis\Time\sec;
 
@@ -38,6 +39,19 @@ final class RandomizedVirtualTimeTest
     public function readerOfPipeWakesAtTimeOfWrite(): void
     {
         $this->seeds(count: 100, program: $this->pipes(...));
+    }
+
+    /**
+     * An observer only observes: the same programs, traced, behave the same, and every trace is whole.
+     */
+    public function traceChangesNothing(): void
+    {
+        $checker = new TraceChecker();
+        observe($checker, fn() => $this->seeds(count: 100, program: $this->pipes(...)));
+
+        Assert::true($checker->events > 0);
+        Assert::same($checker->violations, []);
+        Assert::same($checker->unfinished(), []);
     }
 
     /**

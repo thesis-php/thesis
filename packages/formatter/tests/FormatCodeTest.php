@@ -51,6 +51,7 @@ final class FormatCodeTest
     {
         Assert::same(formatClass("App\\Foo\nBar"), '"App\\\Foo\nBar"');
         Assert::same(formatClass("class@anonymous\0/app/\nfoo.php:12$0"), '"class@anonymous\x00/app/\nfoo.php:12\$0"');
+        Assert::same(formatClass("class@anonymous\0/app/foo.php:0$0"), '"class@anonymous\x00/app/foo.php:0\$0"');
         Assert::same(formatClass(''), "''");
         Assert::same(formatFunction('run me'), "'run me'()");
         Assert::same(formatProperty(Service::class, 'a b'), "Thesis\\Formatter\\Service::$'a b'");

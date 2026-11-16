@@ -8,6 +8,7 @@ use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Cancelled;
+use Thesis\Async\Trace\CancelCause;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
@@ -63,7 +64,7 @@ final class ScopeTest
         $shield = new Scope($scope, shield: true);
         $shielded = new Scope($shield);
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::same(
             actual: array_map(
@@ -77,7 +78,7 @@ final class ScopeTest
     public function scopeCreatedInCancelledScopeIsCancelledUnlessShield(): void
     {
         $scope = new Scope();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         $child = new Scope($scope);
         $grandchild = new Scope($child);
         $shield = new Scope($scope, shield: true);
@@ -97,12 +98,12 @@ final class ScopeTest
         $scope = new Scope();
         $child = new Scope($scope);
         $grandchild = new Scope($child);
-        $grandchild->cancel();
+        $grandchild->cancel(CancelCause::Handle, by: null);
         /** @var ContinuationImpl<null> */
         $wait = new ContinuationImpl();
         $child->subscribe($wait);
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::true($child->isCancelled());
         Assert::false($wait->resume());
@@ -116,7 +117,7 @@ final class ScopeTest
         $wait = new ContinuationImpl();
         $child->subscribe($wait);
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::false($wait->resume('too late'));
         Assert::instanceOf(thrown($wait->park(...)), Cancelled::class);
@@ -125,7 +126,7 @@ final class ScopeTest
     public function subscriptionToCancelledScopeIsInterruptedRightAway(): void
     {
         $scope = new Scope();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         /** @var ContinuationImpl<string> */
         $wait = new ContinuationImpl();
 
@@ -143,7 +144,7 @@ final class ScopeTest
         $scope->subscribe($wait);
         $scope->unsubscribe($wait);
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::true($wait->resume('value'));
         Assert::same($wait->park(), 'value');
@@ -154,7 +155,7 @@ final class ScopeTest
         $scope = new Scope();
         $scope->throwIfCancelled();
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::instanceOf(thrown($scope->throwIfCancelled(...)), Cancelled::class);
     }
@@ -191,7 +192,7 @@ final class ScopeTest
             $called = true;
         });
         $callbacks = (fn() => $this->callbacks)->call($scope);
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         checkpoint();
 
         Assert::same($callbacks, []);
@@ -202,7 +203,7 @@ final class ScopeTest
     {
         $called = false;
         $scope = new Scope();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         $scope->close();
 
         $scope->onCancel(static function () use (&$called) {
@@ -221,7 +222,7 @@ final class ScopeTest
             ++$calls;
         });
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         $before = $calls;
         $scope->close();
         $afterClose = $calls;
@@ -247,7 +248,7 @@ final class ScopeTest
         });
 
         try {
-            $scope->cancel();
+            $scope->cancel(CancelCause::Handle, by: null);
             $scope->close();
             checkpoint();
         } finally {
@@ -266,7 +267,7 @@ final class ScopeTest
             $scope->onCancel(static function () {})();
         }
         $scope->onCancel(static function () {});
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         checkpoint();
 
         Assert::same((fn() => $this->callbacks)->call($scope), []);

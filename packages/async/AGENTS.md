@@ -154,7 +154,24 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.
 
+- Tracing (`Trace\observe()`) only observes and costs nothing without an observer: every hook is
+  `Scope::$tracer?->...`, which evaluates no arguments while it is null, and `suspend()` reads `Scope::$tracer`
+  once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was.
+  A hook goes where the outcome is decided (the task callback of `GroupImpl::start()`, after `join()`, `Expired::run()`,
+  `shield()`), never into `Scope::run()` or `ContinuationImpl`. `ScopeCancelled` is emitted after `notify()`, so the
+  observer never runs in the middle of the walk, and the tracer finds the scopes it reached by `isCancelled()`
+  among its pending ones instead of walking the tree again. Every `Scope::cancel()` names its `CancelCause` and the
+  scope that cancels. The tasks and daemons scopes of a group get the number of its body: they are not in the model.
+  The events hold no `Scope`: there is no public scope object, only its number. A new way to create a scope,
+  to wait or to cancel adds its event, and `TraceChecker` (whole traces on the generated programs) checks it.
+
 ## Decisions
+
+- Tracing is one stream of event objects to one `Observer::handle()`, not a method per event: a new event is a new
+  class, which breaks no observer. Rejected: hooks on `Scope::__construct()` (the kind of a scope is known only
+  where it is created), events from inside `notify()` (user code in the middle of the walk), a null check per event
+  in `suspend()` (the traced wait is a separate method instead), a full backtrace per wait (`caller()` of
+  thesis/source-location takes the first frame outside this library and Revolt, and names the call that waits).
 
 - Rejected: `Once` (a lazy value computed once for concurrent callers, `Sync\Once` of the old thesis).
   Under structured concurrency it has no single meaning: the init runs either in the scope of the first caller,

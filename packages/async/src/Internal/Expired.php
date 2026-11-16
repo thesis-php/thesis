@@ -7,6 +7,7 @@ namespace Thesis\Async\Internal;
 use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
 use Thesis\Async\TimedOut;
+use Thesis\Async\Trace\CancelCause;
 use Time\Duration;
 use function Thesis\Time\toNs;
 
@@ -31,26 +32,36 @@ final readonly class Expired
         $timeout = toNs($duration);
         $parent = Scope::current();
         $scope = new Scope($parent, timeout: $timeout);
+        Scope::$tracer?->timeoutCreated($scope, $parent, $duration);
         $timer = null;
 
         if ($timeout > 0) {
             $timer = EventLoop::delay($timeout / 1e9, static function () use ($scope) {
-                $scope->cancel();
+                $scope->cancel(CancelCause::Deadline, by: $scope);
             });
         } else {
             // Revolt rejects a negative delay, and a zero one would let $body wait until the next tick.
-            $scope->cancel();
+            $scope->cancel(CancelCause::Deadline, by: $scope);
         }
 
         try {
-            return $scope->run($body);
+            $result = $scope->run($body);
+            Scope::$tracer?->ended($scope, $result, null);
+
+            return $result;
         } catch (Cancelled $cancelled) {
+            Scope::$tracer?->ended($scope, null, $cancelled);
+
             // Only the timer cancels this scope, so if the parent is not cancelled, the deadline is the reason.
             if ($scope->isCancelled() && !$parent->isCancelled()) {
                 return new self($cancelled);
             }
 
             throw $cancelled;
+        } catch (\Throwable $error) {
+            Scope::$tracer?->ended($scope, null, $error);
+
+            throw $error;
         } finally {
             if ($timer !== null) {
                 EventLoop::cancel($timer);

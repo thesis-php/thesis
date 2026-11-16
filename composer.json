@@ -23,6 +23,7 @@
         "ext-filter": "*",
         "ext-openssl": "*",
         "ext-uri": "*",
+        "composer-runtime-api": "^2.0",
         "internal/container": "^1.1",
         "phpstan/phpstan": "^2.3",
         "psr/clock": "^1.0",
@@ -57,6 +58,7 @@
         "thesis/io": "0.1.x-dev",
         "thesis/net": "0.1.x-dev",
         "thesis/phpstan-extension": "0.1.x-dev",
+        "thesis/source-location": "0.1.x-dev",
         "thesis/testo-plugin": "0.1.x-dev",
         "thesis/time": "0.1.x-dev"
     },
@@ -70,6 +72,7 @@
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
             "Thesis\\PhpstanExtension\\": "packages/phpstan-extension/src/",
+            "Thesis\\SourceLocation\\": "packages/source-location/src/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/src/",
             "Thesis\\Time\\": "packages/time/src/"
         },
@@ -78,6 +81,7 @@
             "packages/amqp/src/Internal/Protocol/internal.php",
             "packages/amqp/src/Internal/internal.php",
             "packages/async/src/Internal/internal.php",
+            "packages/async/src/Trace/api.php",
             "packages/async/src/VirtualTime/api.php",
             "packages/async/src/api.php",
             "packages/async/src/platform.php",
@@ -88,6 +92,7 @@
             "packages/io/src/api.php",
             "packages/net/src/Internal/internal.php",
             "packages/net/src/api.php",
+            "packages/source-location/src/api.php",
             "packages/time/src/Internal/internal.php",
             "packages/time/src/api.php",
             "packages/time/src/polyfill.php"
@@ -105,8 +110,11 @@
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
+            "Thesis\\SourceLocation\\": "packages/source-location/tests/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",
-            "Thesis\\Time\\": "packages/time/tests/"
+            "Thesis\\Time\\": "packages/time/tests/",
+            "Thesis\\TraceRecorder\\": "tools/trace-recorder/src/",
+            "Thesis\\TraceRecorder\\Tests\\": "tools/trace-recorder/tests/"
         },
         "files": [
             "packages/amqp/tests/helpers.php",

@@ -21,6 +21,7 @@
         "php": "^8.5",
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
+        "thesis/source-location": "^0.1",
         "thesis/time": "^0.1"
     },
     "require-dev": {
@@ -45,6 +46,7 @@
         },
         "files": [
             "src/Internal/internal.php",
+            "src/Trace/api.php",
             "src/VirtualTime/api.php",
             "src/api.php",
             "src/platform.php"

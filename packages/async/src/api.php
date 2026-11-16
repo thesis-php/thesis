@@ -49,6 +49,13 @@ function suspend(callable $register): mixed
     // After $register: if it has cancelled the scope (say, through a task handle), the wait is interrupted right away.
     $scope->subscribe($continuation);
 
+    // The only check of tracing on the hot path: the traced wait is the rest of this function with events.
+    $tracer = Scope::$tracer;
+
+    if ($tracer !== null) {
+        return $tracer->park($scope, $continuation, $unregister);
+    }
+
     try {
         return $continuation->park();
     } finally {
@@ -245,10 +252,19 @@ function group(callable $body): mixed
  */
 function shield(callable $body): mixed
 {
-    $scope = new Scope(Scope::current(), shield: true);
+    $parent = Scope::current();
+    $scope = new Scope($parent, shield: true);
+    Scope::$tracer?->shieldCreated($scope, $parent);
 
     try {
-        return $scope->run($body);
+        $result = $scope->run($body);
+        Scope::$tracer?->ended($scope, $result, null);
+
+        return $result;
+    } catch (\Throwable $error) {
+        Scope::$tracer?->ended($scope, null, $error);
+
+        throw $error;
     } finally {
         $scope->close();
     }

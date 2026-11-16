@@ -10,6 +10,7 @@ use Thesis\Async\Cancelled;
 use Thesis\Async\Group;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
+use Thesis\Async\Trace\CancelCause;
 
 /**
  * Scope tree of a group:
@@ -56,10 +57,12 @@ final class GroupImpl implements Group
      */
     public static function run(callable $body): mixed
     {
-        $bodyScope = new Scope(Scope::current());
+        $parent = Scope::current();
+        $bodyScope = new Scope($parent);
         $tasksScope = new Scope($bodyScope);
         $daemonsScope = new Scope($tasksScope);
         $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
+        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent);
         $result = null;
         $error = null;
 
@@ -86,12 +89,18 @@ final class GroupImpl implements Group
                     );
                 }
 
-                $group->fail($error);
+                $group->fail($error, by: $bodyScope);
             }
         }
 
+        Scope::$tracer?->joining($bodyScope);
+
         try {
             $group->join();
+        } catch (\Throwable $error) {
+            Scope::$tracer?->ended($bodyScope, null, $error);
+
+            throw $error;
         } finally {
             // Each child holds its parent and is held by it: closing all three breaks the cycle,
             // so a group is freed by refcounting, without waiting for the cycle collector.
@@ -100,12 +109,11 @@ final class GroupImpl implements Group
             $bodyScope->close();
         }
 
-        if ($group->error !== null) {
-            throw $group->error;
-        }
+        $error = $group->error ?? $group->cancelled;
+        Scope::$tracer?->ended($bodyScope, $error === null ? $result : null, $error);
 
-        if ($group->cancelled !== null) {
-            throw $group->cancelled;
+        if ($error !== null) {
+            throw $error;
         }
 
         /** @var T */
@@ -132,11 +140,14 @@ final class GroupImpl implements Group
     {
         if (!$this->tasksScope->isCancelled()) {
             $this->tasksCancelled = true;
-            $this->tasksScope->cancel();
+            $this->tasksScope->cancel(CancelCause::CancelTasks, by: Scope::current());
         }
     }
 
-    private function fail(\Throwable $error): void
+    /**
+     * @param ?Scope $by the scope whose code has failed, null for the event loop
+     */
+    private function fail(\Throwable $error, ?Scope $by): void
     {
         if ($this->error === null) {
             $this->error = $error;
@@ -144,7 +155,7 @@ final class GroupImpl implements Group
             Suppressed::add($this->error, $error);
         }
 
-        $this->bodyScope->cancel();
+        $this->bodyScope->cancel(CancelCause::Failure, $by);
     }
 
     /**
@@ -172,7 +183,7 @@ final class GroupImpl implements Group
         try {
             while ($this->tasks > 0 || $this->daemons > 0) {
                 if ($this->tasks === 0) {
-                    $this->daemonsScope->cancel();
+                    $this->daemonsScope->cancel(CancelCause::DaemonsAfterTasks, by: $this->bodyScope);
                 }
 
                 try {
@@ -183,7 +194,7 @@ final class GroupImpl implements Group
                     $this->joiner = null;
 
                     if ($error instanceof UncaughtThrowable) {
-                        $this->fail($error);
+                        $this->fail($error, by: null);
 
                         continue;
                     }
@@ -198,7 +209,7 @@ final class GroupImpl implements Group
                     }
 
                     $dry = $error;
-                    $this->fail($error);
+                    $this->fail($error, by: null);
                 }
             }
         } finally {
@@ -223,6 +234,7 @@ final class GroupImpl implements Group
         $values = Context::capture();
         /** @var TaskImpl<T> */
         $handle = new TaskImpl($scope);
+        Scope::$tracer?->taskCreated($scope, $this->bodyScope, $daemon, $task);
 
         if ($daemon) {
             ++$this->daemons;
@@ -234,15 +246,17 @@ final class GroupImpl implements Group
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();
+                Scope::$tracer?->taskStarted($scope);
                 // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
-                $handle->complete(
-                    value: $values === []
-                        ? $scope->run($task)
-                        : Context::run($values, static fn() => $scope->run($task)),
-                );
+                $value = $values === []
+                    ? $scope->run($task)
+                    : Context::run($values, static fn() => $scope->run($task));
+                Scope::$tracer?->ended($scope, $value, null);
+                $handle->complete($value);
             } catch (\Throwable $error) {
                 if ($error instanceof Cancelled && $scope->isCancelled()) {
                     // Cancellation is not a failure: it does not bring the group down.
+                    Scope::$tracer?->ended($scope, null, $error);
                     $handle->fail(new TaskCancelled($error));
 
                     // But if it came from outside, the group's work is incomplete, even if the body never awaits.
@@ -264,10 +278,11 @@ final class GroupImpl implements Group
                         );
                     }
 
+                    Scope::$tracer?->ended($scope, null, $error);
                     $handle->fail($error);
                     // Before the failure cancels the task's own scope: the task has not been cancelled.
                     $scope->endCallbacks();
-                    $this->fail($error);
+                    $this->fail($error, by: $scope);
                 }
             } finally {
                 $scope->close();

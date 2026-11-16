@@ -33,6 +33,8 @@ return new Config(
         'Thesis\Monorepo\\' => 'tools/monorepo/src/',
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',
         'Thesis\PhpCsFixer\Tests\\' => 'tools/php-cs-fixer/tests/',
+        'Thesis\TraceRecorder\\' => 'tools/trace-recorder/src/',
+        'Thesis\TraceRecorder\Tests\\' => 'tools/trace-recorder/tests/',
     ],
     allowPlugins: [
         'llm/skills' => true,

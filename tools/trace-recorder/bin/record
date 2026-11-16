@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Thesis\TraceRecorder\Recorder;
+
+require \dirname(__DIR__, 3) . '/vendor/autoload.php';
+
+if ($argc !== 2) {
+    fwrite(STDERR, "Usage: tools/trace-recorder/bin/record <demo.php>: the demo returns a callable, its trace goes to stdout\n");
+
+    exit(1);
+}
+
+/** @var callable(): mixed $program */
+$program = require $argv[1];
+
+echo json_encode(Recorder::record($program), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";

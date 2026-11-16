@@ -8,6 +8,7 @@ use Amp\CancelledException;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Async\Trace\CancelCause;
 use function Thesis\Async\checkpoint;
 
 #[Test]
@@ -20,7 +21,7 @@ final class ScopeCancellationTest
 
         $before = $cancellation->isRequested();
         $cancellation->throwIfRequested();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Assert::false($before);
         Assert::true($cancellation->isRequested());
@@ -29,7 +30,7 @@ final class ScopeCancellationTest
     public function throwIfRequestedThrowsCancelledException(): void
     {
         $scope = new Scope();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
 
         Expect::exception(CancelledException::class);
 
@@ -45,8 +46,8 @@ final class ScopeCancellationTest
             $received[] = $exception;
         });
 
-        $scope->cancel();
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
+        $scope->cancel(CancelCause::Handle, by: null);
         checkpoint();
 
         Assert::count($received, 1);
@@ -64,7 +65,7 @@ final class ScopeCancellationTest
             $calls[] = 'second';
         });
 
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         $cancellation->unsubscribe($first);
         $cancellation->unsubscribe($first);
         $cancellation->unsubscribe('unknown');
@@ -95,7 +96,7 @@ final class ScopeCancellationTest
         });
 
         $cancellation->unsubscribe($stale);
-        $scope->cancel();
+        $scope->cancel(CancelCause::Handle, by: null);
         checkpoint();
 
         Assert::same($calls, 1);

@@ -6,6 +6,7 @@ namespace Thesis\Async\Internal;
 
 use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
+use Thesis\Async\Trace\CancelCause;
 
 /**
  * Node of the cancellation tree. Every fiber always runs inside some scope.
@@ -34,6 +35,12 @@ final class Scope
      * and here, not on {@see VirtualClock}, so that the class is loaded only if `run()` is used.
      */
     public static ?VirtualClock $virtualClock = null;
+
+    /**
+     * Bound while `Thesis\Async\Trace\observe()` runs. Every hook is `Scope::$tracer?->...`: without an observer,
+     * one null check that does not evaluate the arguments. Here for the same reason as {@see $virtualClock}.
+     */
+    public static ?Tracer $tracer = null;
 
     /**
      * This scope or a visible ancestor is cancelled: set by {@see notify()} and inherited on creation.
@@ -166,11 +173,14 @@ final class Scope
 
     /**
      * A no-op if the scope is already cancelled, by its owner or through an ancestor: its subtree is notified then.
+     *
+     * @param ?self $by the scope that cancels it, for the trace: null for none
      */
-    public function cancel(): void
+    public function cancel(CancelCause $cause, ?self $by): void
     {
         if (!$this->cancelled) {
             $this->notify();
+            self::$tracer?->cancelled($this, $cause, $by);
         }
     }
 

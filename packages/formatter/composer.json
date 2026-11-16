@@ -19,7 +19,8 @@
     ],
     "require": {
         "php": "^8.5",
-        "php-64bit": "*"
+        "php-64bit": "*",
+        "thesis/source-location": "^0.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",

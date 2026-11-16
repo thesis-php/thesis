@@ -7,6 +7,7 @@ namespace Thesis\Async\Internal;
 use Thesis\Async\Deferred;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
+use Thesis\Async\Trace\CancelCause;
 
 /**
  * A task is its scope plus a {@see Deferred} result.
@@ -43,7 +44,7 @@ final class TaskImpl implements Task
     {
         if (!$this->scope->isCancelled()) {
             $this->cancelledByHandle = true;
-            $this->scope->cancel();
+            $this->scope->cancel(CancelCause::Handle, by: Scope::current());
         }
     }
 

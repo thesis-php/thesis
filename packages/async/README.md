@@ -887,6 +887,46 @@ For [Testo](https://github.com/php-testo/testo),
 [thesis/testo-plugin](https://github.com/thesis-php/testo-plugin) runs tests this way: its `VirtualTimePlugin` runs
 every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute does the same for a class or a test. The tests of this library run on it.
 
+### What the tree does: `Trace\observe()`
+
+`Trace\observe($observer, $fn)` gives an observer the events of the whole scope tree while `$fn` runs, of every fiber:
+a group, a task or a daemon, a `timeout()` or a `shield()` is created (with its parent and where it is called from),
+a task starts, a scope waits and wakes up, an owner cancels (why, who, and every scope it reached), a group joins,
+a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `VirtualTime\run()`
+the trace is the same on every run: the scopes are numbered from 1 in the order the observation sees them.
+
+```php
+use Thesis\Async\Trace;
+use Thesis\Async\VirtualTime;
+
+final class PrintTrace implements Trace\Observer
+{
+    public function handle(Trace\Event $event): void
+    {
+        match (true) {
+            $event instanceof Trace\TaskCreated => print "#{$event->scope} spawned at {$event->location}\n",
+            $event instanceof Trace\Suspended => print "#{$event->scope} waits in {$event->caller}\n",
+            $event instanceof Trace\ScopeCancelled => print "#{$event->scope} cancelled: {$event->cause->name}\n",
+            default => null,
+        };
+    }
+}
+
+VirtualTime\run(static fn() => Trace\observe(new PrintTrace(), $program));
+// #2 spawned at /app/src/Worker.php:21
+// #2 waits in Thesis\Async\delay() at /app/src/Worker.php:34
+// #1 cancelled: Failure
+```
+
+It answers what a stack trace cannot: who cancelled a task and why (`Cancelled` carries nothing), what is still
+running and where each task waits, which task never ended. On virtual time a trace is also a test of the order
+and the timing of a concurrent scenario, compared with an expected one.
+
+An observer only observes: it must not throw, wait or cancel, and must not keep the values and the errors
+of the events, or it holds them alive past their scope. Without an observer a wait costs one check of a static
+property more; with one, a wait costs about 4 µs (two events and a short backtrace to find where it is written).
+Observations nest: each observer gets the events until its own call returns.
+
 ### Streams: `StreamWatcher`
 
 A `StreamWatcher` owns the waits on one stream: `readable()` and `writable()` suspend until a read or a write
@@ -1114,6 +1154,7 @@ all([user, orders])              orders fails after 50 ms
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
 | `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(Duration)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
+| `Trace\observe(Trace\Observer, callable(): T): T`; `Observer::handle(Trace\Event)` | the events of the scope tree while a callable runs |
 
 ## Limitations
 
