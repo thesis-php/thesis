@@ -56,7 +56,6 @@ final class InstantTest
         $later = $now->add(ms(1));
 
         Assert::true($now < $later);
-        Assert::true($later > $now);
         Assert::equals($now, $now->add(sec(0)));
     }
 

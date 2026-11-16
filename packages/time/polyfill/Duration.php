@@ -284,7 +284,6 @@ final readonly class Duration
         $nanoseconds = $this->nanoseconds * ($factor % self::NANOSECONDS_PER_SECOND);
         $extraSeconds += intdiv($nanoseconds, self::NANOSECONDS_PER_SECOND);
         $nanoseconds %= self::NANOSECONDS_PER_SECOND;
-        \assert($extraSeconds >= 0);
 
         if (self::exceedsUint64($this->seconds, $factor, $extraSeconds)) {
             throw new TimeException('Failed to create a Time\Duration: Integer Overflow');

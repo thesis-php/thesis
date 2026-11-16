@@ -554,7 +554,6 @@ final class VirtualTimeTest
         ];
 
         foreach ($register as $fn) {
-            // @phpstan-ignore argument.type (the value returned is what is tested)
             $callbackId = $fn(static fn() => 'value');
 
             $exception = thrown(never(...));
