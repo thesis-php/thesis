@@ -190,7 +190,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A behaviour that depends on combinations is also checked on generated programs: `RandomizedVirtualTimeTest`
   (random pipes, relays, raw timers and daemons: when the clock may jump) and `CancelledFirstTest` (every
   combination against a model of who cancelled first). A new way to wait on virtual time or to cancel a task
-  is added to them. Rejected: a random stress of groups, channels and semaphores with general checks.
+  is added to them. A combination that cannot behave differently from another one is left out (a cleanup
+  of a task that ends before anything cancels it): `CancelledFirstTest` once took a third of the suite.
+  Rejected: running the cases concurrently in one `run()`, it was five times slower (thousands of live fibers).
+  Rejected: a random stress of groups, channels and semaphores with general checks.
   It never found a defect, not even the ones a review found by reading, and its seed reproduces only on one driver.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a `ValueError`.
   Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).

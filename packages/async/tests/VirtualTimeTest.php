@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Composer\Autoload\ClassLoader;
 use Revolt\EventLoop;
 use Revolt\EventLoop\CallbackType;
 use Revolt\EventLoop\Driver\StreamSelectDriver;
@@ -179,20 +178,17 @@ final class VirtualTimeTest
 
     public function advanceThrowsOutsideRun(): void
     {
-        // Every test runs inside run(): only another process is outside it.
-        // vendor/ is not next to the package in the monorepo, so Composer tells where it is.
-        $classLoader = new \ReflectionClass(ClassLoader::class)->getFileName();
-        \assert(\is_string($classLoader));
-        $code = \sprintf(
-            'require %s; try { Thesis\Async\VirtualTime\advance(Thesis\Time\sec(1)); } catch (LogicException $e) { echo $e::class; }',
-            var_export(\dirname($classLoader, 2) . '/autoload.php', true),
-        );
-        $process = proc_open(command: [PHP_BINARY, '-r', $code], descriptor_spec: [1 => ['pipe', 'w']], pipes: $pipes);
-        \assert(\is_resource($process) && isset($pipes[1]));
-        $output = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
+        // Every test runs inside run(): outside it is where no clock is bound.
+        $clock = Scope::$virtualClock;
+        Scope::$virtualClock = null;
 
-        Assert::same([$output, proc_close($process)], [\LogicException::class, 0]);
+        try {
+            $error = thrown(static fn() => advance(sec(1)));
+        } finally {
+            Scope::$virtualClock = $clock;
+        }
+
+        Assert::same($error::class, \LogicException::class);
     }
 
     public function clockIsClockOfLibrary(): void

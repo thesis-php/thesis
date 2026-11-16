@@ -27,16 +27,6 @@ final class DeferredTest
         Assert::same($deferred->await(), 'value');
     }
 
-    public function awaitOfDoneDeferredReturnsValueEveryTime(): void
-    {
-        /** @var Deferred<string> */
-        $deferred = new Deferred();
-        $deferred->complete('value');
-
-        Assert::same($deferred->await(), 'value');
-        Assert::same($deferred->await(), 'value');
-    }
-
     public function completeWithoutValueResolvesToNull(): void
     {
         /** @var Deferred<null> */
@@ -210,19 +200,19 @@ final class DeferredTest
         Assert::same((fn() => $this->waiters)->call($deferred), []);
     }
 
-    public function awaitOfDoneDeferredReturnsValueWithoutWaiting(): void
+    public function awaitOfDoneDeferredReturnsValueEveryTimeWithoutWaiting(): void
     {
         /** @var Deferred<string> */
         $deferred = new Deferred();
         $deferred->complete('value');
 
-        $result = timeout(sec(1), static function () use ($deferred) {
+        $results = timeout(sec(1), static function () use ($deferred) {
             untilCancelled();
 
-            return $deferred->await();
+            return [$deferred->await(), $deferred->await()];
         });
 
-        Assert::same($result, 'value');
+        Assert::same($results, ['value', 'value']);
     }
 
     public function awaitInCancelledScopeOfPendingDeferredThrowsCancelled(): void

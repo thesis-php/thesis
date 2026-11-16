@@ -42,26 +42,6 @@ final class LocalSemaphoreTest
         Assert::same($peak, $permits);
     }
 
-    public function criticalSectionsWithOnePermitDoNotInterleave(): void
-    {
-        $mutex = new LocalSemaphore(1);
-        $log = [];
-
-        group(static function (Group $group) use ($mutex, &$log) {
-            foreach (['a', 'b'] as $name) {
-                $group->spawn(static function () use ($mutex, $name, &$log) {
-                    synchronized($mutex, static function () use ($name, &$log) {
-                        $log[] = $name . ' in';
-                        delay(sec(1));
-                        $log[] = $name . ' out';
-                    });
-                });
-            }
-        });
-
-        Assert::same($log, ['a in', 'a out', 'b in', 'b out']);
-    }
-
     public function acquireOfFreePermitReturnsWithoutWaiting(): void
     {
         $semaphore = new LocalSemaphore(1);

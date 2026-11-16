@@ -15,6 +15,9 @@ use function Thesis\Time\sec;
  * and a deadline at 5 s, against a model of who cancelled first: `group()` throws `TimedOut` only if
  * the deadline came to a task that the group had not cancelled before. Found the loss of the result of a group
  * whose own cancellations were unwinding when the deadline came.
+ *
+ * A combination that cannot behave differently from another one is left out: an action at 4 s after `cancelTasks()`
+ * or after cancelling the same task at 2 s, and a cleanup of a task that ends before anything cancels it.
  */
 #[Test]
 final class CancelledFirstTest
@@ -60,11 +63,26 @@ final class CancelledFirstTest
                     foreach (self::CLEANUPS as $secondCleanup) {
                         foreach (self::ACTIONS as $atTwo) {
                             foreach (self::ACTIONS as $atFour) {
+                                if ($atTwo === 'all' && $atFour !== null || $atTwo !== null && $atTwo === $atFour) {
+                                    continue;
+                                }
+
+                                $actions = [2 => $atTwo, 4 => $atFour];
+                                $firstEndsUncancelled = $firstWork < self::cancelledAt(0, $actions);
+                                $secondEndsUncancelled = $secondWork < self::cancelledAt(1, $actions);
+
+                                if (
+                                    $firstEndsUncancelled && $firstCleanup !== 0
+                                    || $secondEndsUncancelled && $secondCleanup !== 0
+                                ) {
+                                    continue;
+                                }
+
                                 foreach ([false, true] as $fromDaemon) {
                                     yield [
                                         'works' => [$firstWork, $secondWork],
                                         'cleanups' => [$firstCleanup, $secondCleanup],
-                                        'actions' => [2 => $atTwo, 4 => $atFour],
+                                        'actions' => $actions,
                                         'fromDaemon' => $fromDaemon,
                                     ];
                                 }
@@ -83,22 +101,28 @@ final class CancelledFirstTest
     private static function expected(array $works, array $actions): string
     {
         foreach ($works as $task => $work) {
-            $cancelledAt = INF;
-
-            foreach ($actions as $time => $action) {
-                if ($action === $task || $action === 'all') {
-                    $cancelledAt = $time;
-
-                    break;
-                }
-            }
-
-            if ($work > self::DEADLINE && $cancelledAt > self::DEADLINE) {
+            if ($work > self::DEADLINE && self::cancelledAt($task, $actions) === self::DEADLINE) {
                 return 'TimedOut';
             }
         }
 
         return 'result';
+    }
+
+    /**
+     * @param 0|1 $task
+     * @param array<int, null|0|1|'all'> $actions in the order of their times
+     * @return int when the task is cancelled first: by the group, or by the deadline
+     */
+    private static function cancelledAt(int $task, array $actions): int
+    {
+        foreach ($actions as $time => $action) {
+            if ($action === $task || $action === 'all') {
+                return $time;
+            }
+        }
+
+        return self::DEADLINE;
     }
 
     /**
