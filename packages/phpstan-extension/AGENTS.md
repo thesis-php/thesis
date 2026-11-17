@@ -1,7 +1,7 @@
 # thesis/phpstan-extension
 
-The PHPStan extension of all thesis packages: the types that their PHPDoc cannot express. How to use it
-is in `README.md`.
+The PHPStan extension of all thesis packages: the types that their PHPDoc cannot express, and rules for what
+PHP cannot check (an attribute on a wrong method). How to use it is in `README.md`.
 
 This file is for agents changing this package. It is not loaded while an agent works in another package,
 so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
@@ -20,6 +20,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `allSettled()`: every key is optional in both arrays, which of them a key goes to is known only at runtime.
   For the same reason it says nothing of an input that is not a shape: a failure leaves a hole in a list.
 - `map()` of a generator keeps the PHPDoc type: a generator may repeat a key.
+- A rule reports an error at the line of what is wrong (the attribute, not the method), with an identifier
+  `thesis.<camelCase>`, so a user ignores exactly it. A rule checks only what the package cannot check itself
+  or checks only at runtime: `ListenerRule` repeats the runtime check of a method that is not public to report it
+  without running, and adds the one `listenersOf()` cannot do (an abstract method, the mark is not inherited).
 
 ## Decisions
 
@@ -32,6 +36,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   PHPStan, a tool of the users, and a user would include a config per package); a package of extensions
   per package (`thesis/async-phpstan`, an install per package for the same result); stubs (a stub is a PHPDoc
   too, it cannot express more than the package itself).
+- Rejected: requiring `nikic/php-parser`. It is a part of the API of PHPStan, bundled unprefixed in its phar
+  for extensions, so `phpstan/phpstan` is the dependency. A copy in `vendor/` may be loaded instead of the bundled
+  one, and its constraint could not follow the version inside each release of PHPStan.
 - Classes of the extension are `@internal` (`Internal\`, flat until there are many): users include `extension.neon`,
   never reference them.
 - The monorepo analyses itself with the extension: `tools/phpstan.neon` includes `extension.neon`,
@@ -41,7 +48,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Nothing for the functions whose generics are already precise: `race()` (the union of the template),
   `timeout()`, `timeoutOr()`, `group()`, `shield()`, `synchronized()`, `Group::spawn()`.
   Nothing for `some()`: the best honest type is its PHPDoc, a shape or a list would lie about the order.
-  The other packages need nothing yet.
+  Of the other packages only `dispatcher` needs a rule (`ListenerRule`).
 
 ## Tests
 
@@ -51,5 +58,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   that runs PHPStan on the fixtures (a second run of what `make phpstan` checks).
 - A fixture function is named after what it checks, not after the function of the package: a namespaced `all()`
   would clash with the imported `Thesis\Async\all`.
+- `types/*Errors.php` are fixtures of a rule, next to those of the types: every error the rule must report
+  is ignored by `@phpstan-ignore` on the line before it. PHPStan fails on an error that is not ignored
+  and on an ignore that matches no error, so both a missed and an extra error fail `make phpstan`.
 - `PhpParser\` lives inside `phpstan.phar`: `tools/composer-dependency-analyser.php` ignores it as unknown.
-  The analyser does not read `types/`, it is outside the autoload.
+  The analyser does not read `types/`, it is outside the autoload. It also loads every class it meets
+  to find its file, so `src/` uses no class of PHPStan that extends one of PhpParser (`InClassMethodNode`):
+  the analyser fails on it. A rule takes the node of PhpParser (`ClassMethod`) and the class from `Scope`.

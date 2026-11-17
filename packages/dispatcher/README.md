@@ -7,11 +7,13 @@ Synchronous event dispatcher: a listener gets the events of the type of its para
 
 ```php
 use Thesis\Dispatcher;
+use function Thesis\Dispatcher\listenersOf;
 
 $dispatcher = new Dispatcher([
     static function (UserRegistered $event) { /* ... */ },
     static function (OrderPlaced|OrderCancelled $event) { /* ... */ },
     new AuditLog(), // __invoke(DomainEvent $event)
+    ...listenersOf(new Mailer()), // methods marked #[Listener]
 ]);
 
 $dispatcher->dispatch(new UserRegistered('user@example.com'));
@@ -43,6 +45,32 @@ It gets the event as its first parameter, and the type of that parameter says wh
 `\InvalidArgumentException` if it cannot take an event: no parameter, a nullable type (the dispatcher never passes
 `null`), a scalar, a class or an interface that does not exist, a variadic or a reference parameter, a second
 parameter that is not optional, a generator (its body would not run).
+
+### Subscribers
+
+An object with several listeners marks its methods with `#[Listener]`, and `listenersOf()` gives them
+to the dispatcher, among any other listeners:
+
+```php
+use Thesis\Dispatcher\Listener;
+use function Thesis\Dispatcher\listenersOf;
+
+final class Mailer
+{
+    #[Listener]
+    public function onRegistered(UserRegistered $event): void { /* ... */ }
+
+    #[Listener]
+    public function onPlaced(OrderPlaced|OrderCancelled $event): void { /* ... */ }
+}
+
+$dispatcher = new Dispatcher([...listenersOf(new Mailer()), $otherListener]);
+```
+
+The methods come in the order of `ReflectionClass::getMethods()`: those declared in the class, then the inherited
+ones. A marked method may be static, it must be public. The mark is not inherited: an override is a listener only if
+it is marked too. `listenersOf()` throws `\InvalidArgumentException` for a marked method that is not public
+and for an object without marked methods, the dispatcher checks every method as any listener.
 
 ## Dispatching
 

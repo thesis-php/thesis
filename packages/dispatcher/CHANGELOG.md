@@ -12,6 +12,7 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 ### Added
 
 - `Dispatcher::listens()` tells whether any listener gets the events of a class.
+- `Dispatcher\listenersOf()` gives the methods of an object marked `#[Dispatcher\Listener]` as listeners.
 
 ### Changed
 

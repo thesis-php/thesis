@@ -89,6 +89,7 @@
             "packages/async/src/VirtualTime/api.php",
             "packages/async/src/api.php",
             "packages/async/src/platform.php",
+            "packages/dispatcher/src/Dispatcher/api.php",
             "packages/exceptionally/src/api.php",
             "packages/formatter/src/Internal/internal.php",
             "packages/formatter/src/api.php",

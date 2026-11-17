@@ -49,6 +49,23 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   so the failure points at the listener that failed.
 - Rejected: stripping `null` from `?A`: the dispatcher never passes `null`, a nullable type is a mistake
   of the listener. Rejected: rejecting intersections and DNF: in the normal form they cost nothing more.
+- Several listeners of one object are its methods marked `#[Listener]`, given by `listenersOf()`: an invokable object
+  with a `match` over the events hides what it listens to, a list of `$object->onX(...)` where the dispatcher
+  is built is far from the methods. Rejected: the constructor expanding a marked object by itself (an object
+  that is also invokable is ambiguous, and `iterable<callable>` stops being the truth), an interface that returns
+  `[$this->onX(...), ...]` (the list is again apart from the methods).
+- A marked method is public. Rejected: calling one that is not through `getClosure()`: the dispatcher calls it
+  from outside the class, so it is a part of the public contract, and reflection around the visibility hides that.
+- A marked method that is not public or no marked method is an error, not a skip: a forgotten mark otherwise
+  shows only as a listener that never runs. `ListenerRule` of `phpstan-extension` reports a mark on a method
+  that is not public or is abstract before it runs: `listenersOf()` never sees an abstract one,
+  the mark is not inherited by its implementations.
+- Rejected: caching the marked methods of a class in `listenersOf()`. It is called once per object where
+  a dispatcher is built, and the dispatcher reflects every closure again in `Listener::of()` without a cache:
+  a cache would save about 2 of 10 µs per object of 5 listeners, at the cost of a table of every class
+  kept forever. If building dispatchers per request becomes hot, the cache belongs to the whole of it.
+- The attribute `Listener` and `Internal\Listener` share the short name: they are the same notion,
+  the mark of a method and a listener with its parsed type, and the namespaces tell them apart.
 - Rejected: `subscribe()` and unsubscribing of the older 0.2 (a mutable table, listeners added during a dispatch
   called in the same dispatch, only final classes). A listener that must stop is a check in the listener,
   a set that changes is a new dispatcher.

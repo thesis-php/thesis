@@ -17,6 +17,10 @@ return [
         'packages/time/polyfill/TimeException.php',
     ],
     'rector' => [
+        \Rector\Php55\Rector\String_\StringClassNameToClassConstantRector::class => [
+            // A class of a package is recognized by its name: the extension does not require the packages it knows.
+            'packages/phpstan-extension/src',
+        ],
         \Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector::class => [
             // The property is non-negative-int, the parameter is positive-int: promotion would lose the property's
             // type.

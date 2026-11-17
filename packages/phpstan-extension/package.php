@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use Rector\Php55\Rector\String_\StringClassNameToClassConstantRector;
 use Thesis\Monorepo\Manifest;
+use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
-    description: 'PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.',
+    description: 'PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot.',
     licenseSince: 2026,
     version: '0.1',
     require: [
@@ -13,6 +15,14 @@ return new Manifest(
     ],
     requireDev: [
         'thesis/async' => '*',
+        'thesis/dispatcher' => '*',
+    ],
+    skip: [
+        new RectorSkip(
+            rule: StringClassNameToClassConstantRector::class,
+            paths: ['src'],
+            reason: 'A class of a package is recognized by its name: the extension does not require the packages it knows.',
+        ),
     ],
     dist: ['extension.neon'],
     type: 'phpstan-extension',

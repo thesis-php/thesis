@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/phpstan-extension)](https://github.com/thesis-php/phpstan-extension/releases)
 
 A [PHPStan](https://phpstan.org) extension for the thesis packages: precise types where the generics of PHPDoc
-cannot express them. One extension for all packages: it does nothing for a package you do not use.
+cannot express them, and checks of what PHP itself cannot check. One extension for all packages: it does nothing for a package you do not use.
 
 ## Installation
 
@@ -59,3 +59,20 @@ assertType('array{sales: Report, costs: Report}', map(['sales' => $sales, 'costs
 
 Without such a key or for a generator, the type of the PHPDoc stays. `race()`, `timeout()`, `group()` and the others
 need no extension: their generics are precise.
+
+## thesis/dispatcher
+
+A method marked `#[Listener]` must be public and have a body:
+
+```php
+abstract class Mailer
+{
+    #[Listener] // thesis.listenerNotPublic: listenersOf() rejects it
+    protected function onRegistered(UserRegistered $event): void { /* ... */ }
+
+    #[Listener] // thesis.listenerAbstract: the mark is not inherited, so its implementations are not listeners
+    abstract public function onPlaced(OrderPlaced $event): void;
+}
+```
+
+`listenersOf()` finds the first error only when it runs, and the second never.
