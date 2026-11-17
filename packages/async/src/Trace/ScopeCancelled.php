@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async\Trace;
 
 use Thesis\Async\Instant;
+use Thesis\SourceLocation\Caller;
 
 /**
  * An owner has cancelled: a task by its handle, the tasks or everything of a group, a timeout by its deadline.
@@ -22,6 +23,9 @@ final readonly class ScopeCancelled implements Event
      *     null for none (a group failed by the event loop)
      * @param list<positive-int> $reached the scopes that are cancelled now and were not before,
      *     in the order of creation
+     * @param ?Caller $caller the call that has cancelled, outside the library: `Thesis\Async\Task::cancel`
+     *     or `Thesis\Async\Group::cancelTasks` and where it is written; null for the other causes,
+     *     where the library cancels and `$by` says why
      */
     public function __construct(
         public int $scope,
@@ -29,5 +33,6 @@ final readonly class ScopeCancelled implements Event
         public CancelCause $cause,
         public ?int $by,
         public array $reached,
+        public ?Caller $caller,
     ) {}
 }

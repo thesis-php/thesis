@@ -892,7 +892,7 @@ every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute doe
 `Trace\observe($dispatcher, $fn)` dispatches the events of the whole scope tree while `$fn` runs, of every fiber,
 to the listeners of a [`Thesis\Dispatcher`](https://github.com/thesis-php/dispatcher) by the type of their parameter:
 a group, a task or a daemon, a `timeout()` or a `shield()` is created (with its parent and where it is called from),
-a task starts, a scope waits and wakes up, an owner cancels (why, who, and every scope it reached), a group joins,
+a task starts, a scope waits and wakes up, an owner cancels (why, who, where it is called, and every scope it reached), a group joins,
 a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `VirtualTime\run()`
 the trace is the same on every run: the scopes are numbered from 1 in the order the observation sees them.
 

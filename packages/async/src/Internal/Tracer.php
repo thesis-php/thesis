@@ -215,7 +215,7 @@ final class Tracer
         $id = $this->idOrNull($scope);
 
         if ($id !== null && $this->listens(Suspended::class)) {
-            $this->emit(new Suspended($id, Instant::now(), self::waitingCaller()));
+            $this->emit(new Suspended($id, Instant::now(), self::publicCaller()));
         }
 
         $value = null;
@@ -273,6 +273,10 @@ final class Tracer
                 cause: $cause,
                 by: $byId,
                 reached: $reached,
+                caller: match ($cause) {
+                    CancelCause::Handle, CancelCause::CancelTasks => self::publicCaller(),
+                    CancelCause::Failure, CancelCause::Deadline, CancelCause::DaemonsAfterTasks => null,
+                },
             ));
         }
     }
@@ -369,9 +373,10 @@ final class Tracer
     }
 
     /**
-     * The call that waits, named by the public API: a task handle is `Thesis\Async\Task`, not its implementation.
+     * The call of the library from outside, named by the public API: a task handle is `Thesis\Async\Task`,
+     * not its implementation.
      */
-    private static function waitingCaller(): ?Caller
+    private static function publicCaller(): ?Caller
     {
         $caller = caller(self::libraries());
         $implementation = '/^Thesis\\\Async\\\Internal\\\(\w+)Impl::(.+)$/D';

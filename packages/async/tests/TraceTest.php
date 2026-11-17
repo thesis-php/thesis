@@ -6,6 +6,7 @@ namespace Thesis\Async;
 
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Trace\CancelCause;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
@@ -59,7 +60,7 @@ final class TraceTest
             '0 #2 started',
             '0 #2 suspended in Thesis\Async\suspend',
             '1 #1 resumed',
-            '1 #2 cancelled: Handle by #1, reached #2',
+            '1 #2 cancelled: Handle by #1 in Thesis\Async\Task::cancel, reached #2',
             '1 #1 joining',
             '1 #2 resumed by Cancelled',
             '1 #2 threw Cancelled',
@@ -77,7 +78,7 @@ final class TraceTest
         Assert::same($log->lines, [
             '0 #1 group in root',
             '0 #2 task in #1',
-            '0 #1 cancelled: CancelTasks by #1, reached #2',
+            '0 #1 cancelled: CancelTasks by #1 in Thesis\Async\Group::cancelTasks, reached #2',
             '0 #1 joining',
             '0 #2 threw Cancelled',
             '0 #1 returned null',
@@ -143,7 +144,7 @@ final class TraceTest
         Assert::same($log->lines, [
             '0 #1 group in root',
             '0 #2 task in #1',
-            '0 #2 cancelled: Handle by #1, reached #2',
+            '0 #2 cancelled: Handle by #1 in Thesis\Async\Task::cancel, reached #2',
             '0 #1 joining',
             '0 #2 threw Cancelled',
             '0 #1 returned null',
@@ -243,6 +244,63 @@ final class TraceTest
         Assert::instanceOf($wait, Suspended::class);
         Assert::equals($wait->caller?->location, new Location(__FILE__, $awaitLine));
         Assert::same($wait->caller?->callee, 'Thesis\Async\Task::await');
+    }
+
+    public function locatesCancellationByCallInCallingCode(): void
+    {
+        $cancelLine = $cancelTasksLine = 1;
+        $log = self::record(static function () use (&$cancelLine, &$cancelTasksLine) {
+            group(static function (Group $group) use (&$cancelLine, &$cancelTasksLine) {
+                $cancelLine = __LINE__ + 1;
+                $group->spawn(static fn() => never())->cancel();
+                $cancelTasksLine = __LINE__ + 1;
+                $group->cancelTasks();
+            });
+        });
+
+        $cancellations = array_values(array_filter(
+            $log->events,
+            static fn(Event $event) => $event instanceof ScopeCancelled,
+        ));
+        $calls = array_map(
+            static fn(ScopeCancelled $event) => [$event->caller?->callee, $event->caller?->location],
+            $cancellations,
+        );
+
+        Assert::equals($calls, [
+            ['Thesis\Async\Task::cancel', new Location(__FILE__, $cancelLine)],
+            ['Thesis\Async\Group::cancelTasks', new Location(__FILE__, $cancelTasksLine)],
+        ]);
+    }
+
+    public function locatesNoCallForCancellationByLibrary(): void
+    {
+        $log = self::record(static function () {
+            timeoutOr(sec(1), static fn() => never());
+
+            try {
+                group(static function (Group $group) {
+                    $group->daemon(static fn() => never());
+                    $group->spawn(static fn() => never());
+                    $group->spawn(static fn() => throw new \RuntimeException());
+                });
+            } catch (\RuntimeException) {
+            }
+
+            group(static fn(Group $group) => $group->daemon(static fn() => never()));
+        });
+
+        $cancellations = array_values(array_filter(
+            $log->events,
+            static fn(Event $event) => $event instanceof ScopeCancelled,
+        ));
+        $causes = array_map(static fn(ScopeCancelled $event) => [$event->cause, $event->caller], $cancellations);
+
+        Assert::same($causes, [
+            [CancelCause::Deadline, null],
+            [CancelCause::Failure, null],
+            [CancelCause::DaemonsAfterTasks, null],
+        ]);
     }
 
     public function givesTaskToObserver(): void

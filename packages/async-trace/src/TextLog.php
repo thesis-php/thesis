@@ -115,9 +115,10 @@ final class TextLog
     public function onScopeCancelled(ScopeCancelled $event): void
     {
         $this->add($event, \sprintf(
-            'cancelled: %s by %s, reached %s',
+            'cancelled: %s by %s%s, reached %s',
             $event->cause->name,
             self::scope($event->by),
+            $event->caller === null ? '' : ' in ' . $event->caller->callee,
             implode(' ', array_map(static fn(int $scope) => '#' . $scope, $event->reached)),
         ));
     }

@@ -134,6 +134,27 @@ final class TextLogTest
         ]);
     }
 
+    public function writesCallThatHasCancelled(): void
+    {
+        $log = self::record(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => delay(sec(5)))->cancel();
+            $group->spawn(static fn() => delay(sec(5)));
+            $group->cancelTasks();
+        }));
+
+        Assert::same($log->lines, [
+            '0 #1 group in root',
+            '0 #2 task in #1',
+            '0 #2 cancelled: Handle by #1 in Thesis\Async\Task::cancel, reached #2',
+            '0 #3 task in #1',
+            '0 #1 cancelled: CancelTasks by #1 in Thesis\Async\Group::cancelTasks, reached #3',
+            '0 #1 joining',
+            '0 #2 threw Cancelled',
+            '0 #3 threw Cancelled',
+            '0 #1 returned null',
+        ]);
+    }
+
     public function writesShieldAndScopeCreatedCancelled(): void
     {
         $log = self::record(static fn() => timeoutOr(sec(0), static function () {

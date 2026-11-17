@@ -136,6 +136,7 @@ final class NdjsonWriter
             'cause' => $event->cause->name,
             'by' => $event->by,
             'reached' => $event->reached,
+            'caller' => self::caller($event->caller),
         ]);
     }
 

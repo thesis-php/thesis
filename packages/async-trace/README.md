@@ -70,7 +70,7 @@ of [thesis/formatter](https://github.com/thesis-php/formatter), an error is the 
 | `TaskStarted` | `started` |
 | `Suspended` | `suspended in Thesis\Async\delay`, `suspended` if the caller is unknown |
 | `Resumed` | `resumed`, `resumed by Cancelled` |
-| `ScopeCancelled` | `cancelled: Failure by #3, reached #1 #2` |
+| `ScopeCancelled` | `cancelled: Failure by #3, reached #1 #2`, `cancelled: Handle by #1 in Thesis\Async\Task::cancel, reached #2` |
 | `Joining` | `joining` |
 | `Ended` | `returned 42`, `threw RuntimeException` |
 
@@ -97,7 +97,7 @@ of its class:
 | `TaskStarted` | |
 | `Suspended` | `caller` |
 | `Resumed` | `error` |
-| `ScopeCancelled` | `cause` (a case of `CancelCause`: `Deadline`, `Failure`, ...), `by`, `reached` |
+| `ScopeCancelled` | `cause` (a case of `CancelCause`: `Deadline`, `Failure`, ...), `by`, `reached`, `caller` (of `Task::cancel()` and `Group::cancelTasks()`, `null` for the other causes) |
 | `Joining` | |
 | `Ended` | `value`, `error` |
 

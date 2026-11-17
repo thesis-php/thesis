@@ -103,6 +103,7 @@ final class NdjsonWriterTest
                 'cause' => 'Deadline',
                 'by' => 1,
                 'reached' => [1],
+                'caller' => null,
             ],
             [
                 'event' => 'Resumed',
@@ -139,6 +140,7 @@ final class NdjsonWriterTest
             'cause' => 'Failure',
             'by' => 3,
             'reached' => [1, 2],
+            'caller' => null,
         ]]);
         Assert::same(self::ofEvent($records, 'Ended')[0] ?? null, [
             'event' => 'Ended',
@@ -152,6 +154,24 @@ final class NdjsonWriterTest
                 'line' => $line + 5,
             ],
         ]);
+    }
+
+    public function writesCallThatHasCancelled(): void
+    {
+        $line = __LINE__ + 2;
+        $records = self::write(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => delay(sec(5)))->cancel();
+        }));
+
+        Assert::same(self::ofEvent($records, 'ScopeCancelled'), [[
+            'event' => 'ScopeCancelled',
+            'scope' => 2,
+            'at' => 0,
+            'cause' => 'Handle',
+            'by' => 1,
+            'reached' => [2],
+            'caller' => ['callee' => 'Thesis\Async\Task::cancel', 'file' => __FILE__, 'line' => $line],
+        ]]);
     }
 
     public function writesShield(): void
