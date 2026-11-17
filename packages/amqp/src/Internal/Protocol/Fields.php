@@ -63,6 +63,8 @@ final class Fields
             $table[$key] = self::readFieldValue($buffer);
         }
 
+        self::checkEnd($buffer, $end, $length, 'A table');
+
         /** @var array<string, mixed> */
         return $table;
     }
@@ -164,6 +166,8 @@ final class Fields
             $values[] = self::readFieldValue($buffer);
         }
 
+        self::checkEnd($buffer, $end, $length, 'An array');
+
         return $values;
     }
 
@@ -180,6 +184,23 @@ final class Fields
         }
 
         $buffer->patchUint32($mark, $buffer->sizeSince($mark) - 4);
+    }
+
+    /**
+     * The last value must end exactly at the declared length: one that runs past it has read the bytes
+     * of what holds the table or the array.
+     *
+     * @throws ProtocolError
+     */
+    private static function checkEnd(Buffer $buffer, int $end, int $length, string $what): void
+    {
+        $overrun = $end - $buffer->count();
+
+        if ($overrun !== 0) {
+            $held = $length + $overrun;
+
+            throw new ProtocolError(ReplyCode::FrameError, "{$what} of {$length} bytes holds {$held}.");
+        }
     }
 
     /**

@@ -117,8 +117,24 @@ final class Frames
         }
 
         $in->fill($socket, $size + 1);
-        $payload = $in->slice($size);
+        $frame = self::decode($type, $in->slice($size));
 
+        if ($in->readUint8() !== self::END) {
+            throw new ProtocolError(ReplyCode::FrameError, 'A frame does not end with the frame end octet.');
+        }
+
+        return [$channel, $frame];
+    }
+
+    /**
+     * The payload of a frame of $type, whatever bytes the server has sent: nothing but a frame
+     * or a ProtocolError leaves it.
+     *
+     * @return Method|ContentHeader|string|null a method, a content header, a piece of a body, or null for a heartbeat
+     * @throws ProtocolError
+     */
+    public static function decode(int $type, Buffer $payload): null|Method|ContentHeader|string
+    {
         try {
             $frame = match ($type) {
                 self::METHOD => Methods::decode($payload),
@@ -138,11 +154,7 @@ final class Frames
             throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is longer than its fields.");
         }
 
-        if ($in->readUint8() !== self::END) {
-            throw new ProtocolError(ReplyCode::FrameError, 'A frame does not end with the frame end octet.');
-        }
-
-        return [$channel, $frame];
+        return $frame;
     }
 
     public static function describe(null|Method|ContentHeader|string $frame): string

@@ -91,6 +91,28 @@ final class FieldsTest
         Fields::readTable($buffer);
     }
 
+    public function failsOnATableWhoseLastEntryRunsPastItsLength(): void
+    {
+        $buffer = new Buffer();
+        // A table of 3 bytes, the entry k = true takes 4, the byte after it belongs to what holds the table.
+        $buffer->write("\0\0\0\x03\x01kt\x01next");
+
+        Expect::exception(ProtocolError::class)->withMessage('A table of 3 bytes holds 4.');
+
+        Fields::readTable($buffer);
+    }
+
+    public function failsOnAnArrayWhoseLastValueRunsPastItsLength(): void
+    {
+        $buffer = new Buffer();
+        // A table of 9 bytes with the entry a = an array of 1 byte, which holds true of 2.
+        $buffer->write("\0\0\0\x09\x01aA\0\0\0\x01t\x01");
+
+        Expect::exception(ProtocolError::class)->withMessage('An array of 1 bytes holds 2.');
+
+        Fields::readTable($buffer);
+    }
+
     public function failsOnAValueItCannotWrite(): void
     {
         Expect::exception(\ValueError::class)->withMessage('A field table cannot hold a value of type stdClass.');

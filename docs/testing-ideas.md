@@ -9,23 +9,6 @@ TLS by tests of the failures (another name, an untrusted certificate, client cer
 
 ## amqp
 
-### Fuzzing the frame decoder
-
-The invariant: any bytes give a frame or `ProtocolError`/`UnexpectedEof`, never another `\Throwable`.
-The corpus is `encode()` of every method with random fields, mutated: bit flips, truncation, changed lengths.
-Built like `BufferFuzzTest`: seeds in a `DataProvider`, a failure is reproduced by its seed.
-
-### Round trip of every method
-
-`decode(encode($method)) == $method` for every method of `Internal\Protocol` on random values of the whole range,
-the bounds included: `0`, `2³¹`, `PHP_INT_MAX`, an empty and a 255-byte short string, nested tables and arrays.
-
-### `readTable()` and `readArray()` do not check their end
-
-They read while the buffer is longer than the declared end, but do not check that the last value ends exactly
-at it. A declared length shorter than the content makes the reading run into the bytes of the parent table
-silently. A table with a wrong length must give `ProtocolError`.
-
 ### Publisher confirms against a model
 
 A random sequence of publishes and server `ack`/`nack` (with and without `multiple`, tags out of range, repeats,
@@ -79,6 +62,5 @@ where the tests run the code but check nothing.
 
 ## Order
 
-1. Fuzzing the frame decoder, the round trip, the end of `readTable()`.
-2. Publisher confirms against a model.
-3. The rest as time permits.
+1. Publisher confirms against a model.
+2. The rest as time permits.
