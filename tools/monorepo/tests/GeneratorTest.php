@@ -592,6 +592,105 @@ final readonly class GeneratorTest
         Generator::generate($fixture->load());
     }
 
+    public static function writesInfectionConfigWithSkippedMutants(): void
+    {
+        $fixture = self
+            ::fixture()
+            ->file('packages/async/src/Semaphore.php', "<?php\n\nfinal class Semaphore { function acquire() {} }\n")
+            ->file('packages/bytes/src/Internal/Reader.php', "<?php\n\nfinal class Reader { static function read() {} }\n")
+            ->package('async', <<<'PHP'
+                skip: [
+                    new Thesis\Monorepo\InfectionSkip(
+                        mutator: 'Coalesce',
+                        class: 'Thesis\Async\Semaphore',
+                        method: 'acquire',
+                        reason: 'Only slower.',
+                    ),
+                ],
+                PHP)
+            ->package('bytes', <<<'PHP'
+                skip: [
+                    new Thesis\Monorepo\InfectionSkip(
+                        mutator: 'IncrementInteger',
+                        class: 'Thesis\Bytes\Internal\Reader',
+                        method: 'read',
+                        reason: 'Never seen.',
+                    ),
+                    new Thesis\Monorepo\InfectionSkip(
+                        mutator: 'Coalesce',
+                        class: 'Thesis\Bytes\Internal\Reader',
+                        method: 'read',
+                        reason: 'The same.',
+                    ),
+                ],
+                PHP)
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        Assert
+            ::string($files[Generator::INFECTION] ?? '')
+            ->contains(<<<'JSON5'
+                    "mutators": {
+                        "@default": true,
+                        "Coalesce": {
+                            "ignore": [
+                                // Only slower.
+                                "Thesis\\Async\\Semaphore::acquire",
+                                // The same.
+                                "Thesis\\Bytes\\Internal\\Reader::read",
+                            ],
+                        },
+                        "IncrementInteger": {
+                            "ignore": [
+                                // Never seen.
+                                "Thesis\\Bytes\\Internal\\Reader::read",
+                            ],
+                        },
+                    },
+                }
+
+                JSON5)
+        ;
+    }
+
+    public static function writesDefaultMutatorsWithoutSkippedMutants(): void
+    {
+        $fixture = self::fixture();
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files[Generator::INFECTION] ?? '')->contains("        \"@default\": true,\n    },\n}\n");
+    }
+
+    #[DataSet([
+        "class: 'Thesis\\Bytes\\Gone', method: 'read'",
+        'packages/bytes/package.php: the class Thesis\Bytes\Gone of a skipped mutant is not in src/Gone.php, fix or remove the skip.',
+    ])]
+    #[DataSet([
+        "class: 'Thesis\\Async\\Semaphore', method: 'read'",
+        'packages/bytes/package.php: the class Thesis\Async\Semaphore of a skipped mutant is not in the namespace Thesis\Bytes\, fix or remove the skip.',
+    ])]
+    #[DataSet([
+        "class: 'Thesis\\Bytes\\Reader', method: 'write'",
+        'packages/bytes/package.php: the class Thesis\Bytes\Reader of a skipped mutant has no method write() in src/Reader.php, fix or remove the skip.',
+    ])]
+    public static function failsOnSkippedMutantThatDoesNotExist(string $symbol, string $error): void
+    {
+        $fixture = self
+            ::fixture()
+            ->file('packages/async/src/Semaphore.php', "<?php\n\nfinal class Semaphore { function read() {} }\n")
+            ->file('packages/bytes/src/Reader.php', "<?php\n\nfinal class Reader { function read() {} }\n")
+            ->package('bytes', <<<PHP
+                skip: [new Thesis\\Monorepo\\InfectionSkip(mutator: 'Coalesce', {$symbol}, reason: 'Gone.')],
+                PHP)
+        ;
+
+        Expect::exception(MonorepoException::class)->withMessage($error);
+
+        Generator::generate($fixture->load());
+    }
+
     public static function reportsOnlyChangedFilesAsStale(): void
     {
         $fixture = self::fixture();

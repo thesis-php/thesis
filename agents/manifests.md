@@ -19,6 +19,7 @@ or changing the public API of a package that others use. How the generator works
   - `testo.php`: one suite per `packages/<name>/tests` and `tools/<name>/tests`, named after the directory.
     A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
   - `tools/manifests.php`: what the configs of fixer, rector and dependency-analyser take from the manifests,
+  - `tools/infection.json5`, with the mutants that no test can kill (`InfectionSkip`),
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,
     from the descriptions.
 - `keywords` of a manifest and of `monorepo.php` go to `composer.json` and are the topics of the repository
@@ -27,7 +28,7 @@ or changing the public API of a package that others use. How the generator works
   (a protocol, a transport, a kind of API) updates the `description` and `keywords` of its manifest
   in the same change, and those of `monorepo.php` when it changes what the ecosystem offers (a new package).
   They are how the package is found on Packagist and GitHub: a stale one hides a feature or promises a removed one.
-- An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in `tools/*.php`.
+- An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in `tools/*`.
   PHPStan errors are ignored in the code instead, by `@phpstan-ignore identifier (reason)`.
 - CI runs `make sync` and fails on any change in git, so the generated files are committed.
 

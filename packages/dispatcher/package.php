@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Thesis\Dispatcher;
+use Thesis\Monorepo\InfectionSkip;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
@@ -19,4 +21,12 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
     ],
     rootEntry: true,
+    skip: [
+        new InfectionSkip(
+            mutator: 'Coalesce',
+            class: Dispatcher::class,
+            method: 'dispatch',
+            reason: 'Without the table every event resolves its listeners again and gets the same ones: only slower, which no test sees.',
+        ),
+    ],
 );
