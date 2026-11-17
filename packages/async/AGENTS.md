@@ -209,12 +209,12 @@ The model, the API and the guarantees are described in `README.md` — read it f
 
 ## Conventions
 
-- Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo-plugin in `testo.plugins.php`; no attribute is
-  needed): delays are whole seconds (`delay(sec(1))`), a wait that only a cancellation ends is `never()` from
-  `tests/helpers.php`, durations are asserted exactly (`Assert::same(secondsSince($start), 20.0)`,
-  `Assert::equals(remaining(), sec(990))`), and busy code is `burnCpu()`, not a loop on the real clock. Keep
-  a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive. Real time
-  is only for what virtual time cannot model.
+- Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo-plugin in `testoPlugins` of the manifest; no
+  attribute is needed): delays are whole seconds (`delay(sec(1))`), a wait that only a cancellation ends is `never()`
+  from `tests/helpers.php`, durations are asserted exactly (`Assert::same(secondsSince($start), 20.0)`,
+  `Assert::equals(remaining(), sec(990))`), and busy code is `burnCpu()`, not a loop on the real clock. Keep a real
+  `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive. Real time is only
+  for what virtual time cannot model.
 - A limiter, a pacer or a clock is tested beyond one caller on time: with several callers sharing it, with a blocked
   loop (`burnCpu()` while a caller sleeps), with a wake-up late by less than its interval (what a real timer
   does on every call, invisible on virtual time otherwise), with the longest `Duration` or an extreme rate, and, if it

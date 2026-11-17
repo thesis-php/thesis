@@ -6,10 +6,10 @@ use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
 use Thesis\Monorepo\Internal\Monorepo;
-use Thesis\Monorepo\Internal\ToolSkips;
+use Thesis\Monorepo\Internal\Tools;
 use Thesis\PhpCsFixer\StaticCallChainFixer;
 
-$skipped = ToolSkips::of(Monorepo::load(__DIR__))->fixer;
+$skipped = Tools::of(Monorepo::load(__DIR__))->fixerSkips;
 
 return new Config()
     ->setFinder(
@@ -17,14 +17,8 @@ return new Config()
             ::create()
             ->in([__DIR__ . '/tools', __DIR__ . '/packages'])
             ->filter(static fn(SplFileInfo $file) => !in_array($file->getPathname(), $skipped, true))
-            ->append([
-                __DIR__ . '/bin/monorepo',
-                __DIR__ . '/.php-cs-fixer.php',
-                __DIR__ . '/composer-dependency-analyser.php',
-                __DIR__ . '/monorepo.php',
-                __DIR__ . '/rector.php',
-                __DIR__ . '/tally.php',
-            ]),
+            ->append(Finder::create()->in(__DIR__)->depth(0)->ignoreDotFiles(false))
+            ->append([__DIR__ . '/bin/monorepo']),
     )
     ->setParallelConfig(ParallelConfigFactory::detect())
     ->setCacheFile(__DIR__ . '/var/php-cs-fixer.cache')

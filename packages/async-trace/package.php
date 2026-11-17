@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Thesis\Monorepo\Manifest;
+use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
     description: 'Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long.',
@@ -23,4 +24,5 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
     ],
+    testoPlugins: [new VirtualTimePlugin()],
 );

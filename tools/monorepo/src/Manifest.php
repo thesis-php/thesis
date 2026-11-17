@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Monorepo;
 
+use Testo\Common\PluginConfigurator;
+
 /**
  * packages/<dir>/package.php returns an instance of this class. The package's composer.json is generated from it.
  *
@@ -37,6 +39,8 @@ final readonly class Manifest
      *     Tell the users about them in $suggest
      * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan and Infection
      *     are not here: they are told in the code, by a phpstan-ignore or an infection-ignore comment with a reason
+     * @param list<PluginConfigurator> $testoPlugins the plugins of the Testo suite of the package, testo.php adds
+     *     those of every suite
      * @param list<non-empty-string> $dist top-level entries of the package that src/ needs at runtime (a polyfill,
      *     resources). The split repository has only them, src/, composer.json, LICENSE, README.md,
      *     CHANGELOG.md and skills/
@@ -59,6 +63,7 @@ final readonly class Manifest
         public array $conflict = [],
         public array $optional = [],
         public array $skip = [],
+        public array $testoPlugins = [],
         public array $dist = [],
         public string $type = 'library',
         public array $extra = [],

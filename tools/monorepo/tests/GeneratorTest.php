@@ -466,58 +466,12 @@ final readonly class GeneratorTest
         ]);
     }
 
-    public static function writesTestoSuitesWithPlugins(): void
-    {
-        $fixture = self::fixture()->file('packages/async/testo.plugins.php', "<?php\n\nreturn [];\n");
-
-        $files = Generator::generate($fixture->load());
-
-        Assert
-            ::string($files['testo.php'] ?? '')
-            ->contains(<<<'PHP'
-                        new SuiteConfig(
-                            name: 'async',
-                            location: [__DIR__ . '/packages/async/tests'],
-                            plugins: require __DIR__ . '/packages/async/testo.plugins.php', // @phpstan-ignore argument.type
-                        ),
-                        new SuiteConfig(name: 'bytes', location: [__DIR__ . '/packages/bytes/tests']),
-
-                PHP)
-        ;
-    }
-
-    public static function writesPluginsOfEverySuiteFromTheRoot(): void
-    {
-        $fixture = self::fixture()->file('testo.plugins.php', "<?php\n\nreturn [];\n");
-
-        $files = Generator::generate($fixture->load());
-
-        Assert
-            ::string($files['testo.php'] ?? '')
-            ->contains("    plugins: require __DIR__ . '/testo.plugins.php', // @phpstan-ignore argument.type\n);\n")
-        ;
-    }
-
-    public static function writesNoPluginsOfEverySuiteWithoutTheRootFile(): void
-    {
-        $fixture = self::fixture();
-
-        $files = Generator::generate($fixture->load());
-
-        Assert::string($files['testo.php'] ?? '')->notContains('    plugins:');
-    }
-
-    public static function writesNoTestsOfPackageWithoutTests(): void
+    public static function writesNoAutoloadDevOfPackageWithoutTests(): void
     {
         $fixture = self::fixture()->package('stan');
 
         $files = Generator::generate($fixture->load());
 
-        Assert
-            ::string($files['testo.php'] ?? '')
-            ->contains("        __DIR__ . '/packages/stan/src',\n")
-            ->notContains("name: 'stan'")
-        ;
         $package = Json::decode($files['packages/stan/composer.json'] ?? '', 'stan');
         Assert::false(isset($package['autoload-dev']));
         $root = Json::decode($files['composer.json'] ?? '', 'root');
@@ -527,29 +481,6 @@ final readonly class GeneratorTest
                 'psr-4' => ['Thesis\Async\\' => 'packages/async/tests/', 'Thesis\Bytes\\' => 'packages/bytes/tests/'],
             ],
         );
-    }
-
-    public static function writesTestoSuiteOfEveryToolWithTests(): void
-    {
-        $fixture = self
-            ::fixture()
-            ->file('tools/lint/tests/LintTest.php', "<?php\n")
-            ->file('tools/build/tests/BuildTest.php', "<?php\n")
-            ->file('tools/docs/src/Docs.php', "<?php\n")
-        ;
-
-        $files = Generator::generate($fixture->load());
-
-        Assert
-            ::string($files['testo.php'] ?? '')
-            ->contains(<<<'PHP'
-                    suites: [
-                        new SuiteConfig(name: 'build', location: [__DIR__ . '/tools/build/tests']),
-                        new SuiteConfig(name: 'lint', location: [__DIR__ . '/tools/lint/tests']),
-                        new SuiteConfig(name: 'async', location: [__DIR__ . '/packages/async/tests']),
-                PHP)
-            ->notContains('docs')
-        ;
     }
 
     public static function failsOnSkippedPathThatDoesNotExist(): void

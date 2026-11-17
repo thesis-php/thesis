@@ -11,7 +11,7 @@ Plugins for Testo that the tests of thesis packages and of their users need. The
 - `PhpErrorsPlugin` throws from its own handler, set around the run of the test, not through `exceptionally()`:
   the levels of `exceptionally()` do not reach a fiber started inside it, and the tasks of a test are such fibers.
   It respects `error_reporting()` (`@`), which PHP keeps per fiber. The monorepo applies it to every suite
-  through the root `testo.plugins.php`, so `PhpErrorsTest` relies on it being there.
+  through `plugins` of the root `testo.php`, so `PhpErrorsTest` relies on it being there.
 - The package only wires Testo to `Thesis\Async\virtualTime()`: how the virtual clock behaves belongs to
   thesis/async and is not repeated or patched here.
 

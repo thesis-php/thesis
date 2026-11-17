@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Thesis\Monorepo\Manifest;
 use Thesis\Monorepo\RectorSkip;
+use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
@@ -43,4 +44,5 @@ return new Manifest(
             reason: "The property is non-negative-int, the parameter is positive-int: promotion would lose the property's type.",
         ),
     ],
+    testoPlugins: [new VirtualTimePlugin()],
 );

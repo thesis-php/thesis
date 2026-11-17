@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Thesis\Monorepo\Manifest;
+use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
     description: 'Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex.',
@@ -20,4 +21,5 @@ return new Manifest(
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
     ],
+    testoPlugins: [new VirtualTimePlugin()],
 );
