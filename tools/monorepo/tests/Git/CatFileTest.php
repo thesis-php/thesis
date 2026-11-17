@@ -55,6 +55,39 @@ final readonly class CatFileTest
         Assert::same($repository->git->catFile()->subtrees($tree), ['a' => $subtree]);
     }
 
+    public static function readsEntriesOfTreeAsTheyAreWritten(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', ['a/src/A.php' => 'a', 'a/with space.md' => 'readme']);
+        $src = $repository->id('HEAD:a/src');
+        $readme = $repository->id('HEAD:a/with space.md');
+
+        $entries = $repository->git->catFile()->entries('HEAD:a');
+
+        Assert::same(
+            actual: array_map(get_object_vars(...), $entries),
+            expected: [
+                ['name' => 'src', 'id' => $src, 'isTree' => true, 'bytes' => "40000 src\0" . hex2bin($src)],
+                [
+                    'name' => 'with space.md',
+                    'id' => $readme,
+                    'isTree' => false,
+                    'bytes' => "100644 with space.md\0" . hex2bin($readme),
+                ],
+            ],
+        );
+    }
+
+    public static function readsNoEntriesOfObjectThatIsNotTree(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', ['a/A.php' => 'a']);
+        $catFile = $repository->git->catFile();
+
+        Assert::same($catFile->entries('HEAD:a/A.php'), []);
+        Assert::same($catFile->entries('HEAD:missing'), []);
+    }
+
     public static function readsObjectsOfAnySize(): void
     {
         $repository = new Repository();

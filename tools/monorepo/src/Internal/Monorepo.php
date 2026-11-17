@@ -18,6 +18,12 @@ final readonly class Monorepo
     public const string CONFIG = 'monorepo.php';
     public const string MANIFEST = 'package.php';
 
+    /**
+     * The list of a package: the entries of its directory that its split repository has, one name per line.
+     * Read by the split from every commit of history, so its format never changes (tools/monorepo/AGENTS.md).
+     */
+    public const string SPLIT = '.split';
+
     public static function load(string $root): self
     {
         $config = self::require(

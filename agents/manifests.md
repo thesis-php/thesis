@@ -13,8 +13,9 @@ or changing the public API of a package that others use. How the generator works
 - Generated from the manifests and `monorepo.php` by `make sync`, never edited by hand:
   - `packages/<name>/composer.json` and the root `composer.json`,
   - `LICENSE` of the root and of every package, from the year in the manifest,
-  - `packages/<name>/.gitattributes`: the archive that composer installs has only `src/`, `composer.json`, `LICENSE`,
-    `README.md`, `skills/` and the paths in `dist` of the manifest (a polyfill, resources that `src/` loads),
+  - `packages/<name>/.split`: the split repository, and so every install, has only `src/`, `composer.json`,
+    `LICENSE`, `README.md`, `CHANGELOG.md`, `skills/` and the top-level entries in `dist` of the manifest
+    (a polyfill, resources that `src/` loads), see `repositories.md`,
   - `skills.json` (`sources`),
   - `testo.php`: one suite per `packages/<name>/tests` and `tools/<name>/tests`, named after the directory.
     A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,

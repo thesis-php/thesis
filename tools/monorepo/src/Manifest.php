@@ -37,8 +37,9 @@ final readonly class Manifest
      *     Tell the users about them in $suggest
      * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan and Infection
      *     are not here: they are told in the code, by a phpstan-ignore or an infection-ignore comment with a reason
-     * @param list<non-empty-string> $dist top-level paths of the package that src/ needs at runtime (a polyfill,
-     *     resources). Composer installs only them, src/, composer.json, LICENSE, README.md and skills/
+     * @param list<non-empty-string> $dist top-level entries of the package that src/ needs at runtime (a polyfill,
+     *     resources). The split repository has only them, src/, composer.json, LICENSE, README.md,
+     *     CHANGELOG.md and skills/
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
      *     installs by its type
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names

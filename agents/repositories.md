@@ -5,7 +5,7 @@ The implementation (`bin/monorepo github`, `bin/monorepo split`) is in `tools/mo
 the versions are in `versions.md`, the tags and the releases in `releases.md`.
 
 The monorepo `thesis-php/thesis` holds every package in `packages/<name>/`, while composer installs `thesis/<name>`
-from a repository of its own. Those repositories are exact copies of their directories with the history of them:
+from a repository of its own. Those repositories are copies of what their directories ship, with the history of it:
 a change made there would be lost on the next split or would diverge from the monorepo.
 
 ## Rules
@@ -14,6 +14,11 @@ a change made there would be lost on the next split or would diverge from the mo
   of `thesis-php/<name>` (`versions.md`), the tags are pushed by the release (`releases.md`). The split keeps
   the history of the directory and is deterministic, so the pushes are never forced. How a split commit is written
   is ours to keep stable: a change to it rewrites every split repository.
+- **Only what is shipped.** A split has the entries of the package that `packages/<name>/.split` of the commit
+  lists (`manifests.md`): `src/`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `skills/` and `dist`
+  of the manifest. The tests, the manifest and `AGENTS.md` stay in the monorepo, so the repository is exactly
+  what composer installs, from the archive and from source alike, and a commit that changes only the rest
+  is not a commit of the split. A package without the list is split whole: that is the history before the lists.
 - **Push by an app.** A GitHub App of the organization pushes the splits and manages the repositories:
   its id and key are `vars.BOT_CLIENT_ID` and `secrets.BOT_PRIVATE_KEY` of the monorepo.
 - **Read-only.** A split repository has pull requests, issues, wiki, projects and discussions disabled.
@@ -50,6 +55,8 @@ a change made there would be lost on the next split or would diverge from the mo
 
 ## Decisions
 
+- Rejected: the split as an exact copy of the directory, with `.gitattributes` leaving the rest out of the archive
+  only (`tools/monorepo/AGENTS.md`).
 - Rejected: `git subtree split`: walks the whole history on every run. Actions that copy files into a new commit:
   no history, no deterministic commits, so every split is a new commit.
 - Rejected: splitsh-lite. It links libgit2 through git2go v34, which needs libgit2 1.5 exactly: neither the runners

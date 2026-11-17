@@ -12,7 +12,7 @@ use function Thesis\exceptionally;
 
 /**
  * Splits the history of every packages/<name> of a commit in one pass: each commit of the monorepo that changes
- * a package becomes a commit of its split with the same author, committer and message.
+ * what a package has in its split becomes a commit of the split with the same author, committer and message.
  *
  * @internal
  */
@@ -41,6 +41,14 @@ final class Splitter
      * @var array<string, true> monorepo commits split so far
      */
     private array $split = [];
+
+    /**
+     * Most commits leave most packages as they are: the tree of a split is made once per change of the package.
+     * Only the last one of a package is kept, so the memory does not grow with the history.
+     *
+     * @var array<string, array{package: non-empty-string, split: non-empty-string}> package => its last trees
+     */
+    private array $trees = [];
 
     /**
      * @param non-empty-string $commit the id of a commit, resolved once by the caller: a ref may move meanwhile
@@ -124,7 +132,7 @@ final class Splitter
 
         foreach ($packages as $package) {
             $heads = $this->parentHeads($package, $parents);
-            $tree = $trees[$package] ?? null;
+            $tree = isset($trees[$package]) ? $this->splitTree($package, $trees[$package]) : null;
             $unchanged = \count($heads) === 1 && $heads[0]->tree === $tree;
 
             if ($tree !== null && !$unchanged) {
@@ -147,6 +155,43 @@ final class Splitter
                 unset($this->heads[$parent], $this->children[$parent]);
             }
         }
+    }
+
+    /**
+     * The entries of the package that its list names (Monorepo::SPLIT). A package without a list is split whole,
+     * as every package was before the lists: the commits of that time keep their ids.
+     *
+     * @param non-empty-string $tree the tree of the package
+     * @return non-empty-string the tree of its split
+     */
+    private function splitTree(string $package, string $tree): string
+    {
+        $last = $this->trees[$package] ?? null;
+
+        if ($last !== null && $last['package'] === $tree) {
+            return $last['split'];
+        }
+
+        $list = $this->catFile->read($tree . ':' . Monorepo::SPLIT, type: 'blob');
+        $split = $tree;
+
+        if ($list !== null) {
+            // A line that names no entry keeps nothing: the list needs no syntax for its header.
+            $listed = array_flip(explode("\n", $list));
+            $entries = '';
+
+            foreach ($this->catFile->entries($tree) as $entry) {
+                if (isset($listed[$entry->name])) {
+                    $entries .= $entry->bytes;
+                }
+            }
+
+            $split = $this->store('tree', $entries);
+        }
+
+        $this->trees[$package] = ['package' => $tree, 'split' => $split];
+
+        return $split;
     }
 
     /**
@@ -231,34 +276,35 @@ final class Splitter
         }
 
         $body .= "\n" . $message;
-        $object = 'commit ' . \strlen($body) . "\0" . $body;
-        $id = sha1($object);
+        $id = $this->store('commit', $body);
 
-        if (!isset($this->commits[$id])) {
-            $this->store($id, $object);
-            $this->commits[$id] = new SplitCommit(
-                id: $id,
-                tree: $tree,
-                parents: array_map(static fn(SplitCommit $parent) => $parent->id, $parents),
-                generation: 1 + max([0, ...array_map(static fn(SplitCommit $parent) => $parent->generation, $parents)]),
-            );
-        }
+        $this->commits[$id] ??= new SplitCommit(
+            id: $id,
+            tree: $tree,
+            parents: array_map(static fn(SplitCommit $parent) => $parent->id, $parents),
+            generation: 1 + max([0, ...array_map(static fn(SplitCommit $parent) => $parent->generation, $parents)]),
+        );
 
         return $this->commits[$id];
     }
 
     /**
-     * Writes a loose object the way git does, without a process per commit. A file left by an earlier run
+     * Writes a loose object the way git does, without a process per object. A file left by an earlier run
      * is kept only if it holds this very object: a broken one would be pushed as it is.
+     *
+     * @param 'commit'|'tree' $type
+     * @return non-empty-string the id of the object
      */
-    private function store(string $id, string $object): void
+    private function store(string $type, string $body): string
     {
+        $object = $type . ' ' . \strlen($body) . "\0" . $body;
+        $id = sha1($object);
         $dir = $this->objects . '/' . substr($id, 0, 2);
         $path = $dir . '/' . substr($id, 2);
         $existing = is_file($path) ? @file_get_contents($path) : false;
 
         if ($existing !== false && @gzuncompress($existing) === $object) {
-            return;
+            return $id;
         }
 
         $temporary = $dir . '/tmp_obj_' . bin2hex(random_bytes(8));
@@ -281,5 +327,7 @@ final class Splitter
                 previous: $error,
             );
         }
+
+        return $id;
     }
 }

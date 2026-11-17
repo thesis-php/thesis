@@ -89,6 +89,83 @@ final readonly class SplitterTest
         $repository->git->run(['fsck', '--strict', '--no-dangling']);
     }
 
+    /**
+     * The tree of a split is written by us: it must be the very object git writes for the same entries.
+     */
+    public static function keepsOnlyEntriesThatListOfPackageNames(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', [
+            'packages/a/.split' => "# Generated, do not edit.\nLICENSE\ncomposer.json\nskills\nsrc\n",
+            'packages/a/AGENTS.md' => 'agents',
+            'packages/a/LICENSE' => 'license',
+            'packages/a/composer.json' => '{}',
+            'packages/a/src/A.php' => 'a1',
+            'packages/a/src/Internal/B.php' => 'b1',
+            'packages/a/tests/ATest.php' => 'test1',
+            'expected/LICENSE' => 'license',
+            'expected/composer.json' => '{}',
+            'expected/src/A.php' => 'a1',
+            'expected/src/Internal/B.php' => 'b1',
+        ]);
+
+        $split = self::split($repository)['a'] ?? '';
+
+        Assert::same($repository->id($split . '^{tree}'), $repository->id('main:expected'));
+        $repository->git->run(['fsck', '--strict', '--no-dangling']);
+    }
+
+    public static function dropsCommitThatChangesOnlyWhatListLeavesOut(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', [
+            'packages/a/.split' => "src\n",
+            'packages/a/src/A.php' => 'a1',
+            'packages/a/tests/ATest.php' => 'test1',
+        ]);
+        $repository->commit('Change the test of a', ['packages/a/tests/ATest.php' => 'test2']);
+        $repository->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $repository->commit('Change the test of a again', ['packages/a/tests/ATest.php' => 'test3']);
+
+        Assert::same($repository->log(self::split($repository)['a'] ?? ''), ['Change a', 'Add a']);
+    }
+
+    /**
+     * A list read from the commit itself leaves the commits before it as they are: the split of a package
+     * that gets a list, or another list, goes on from the history that is pushed already.
+     */
+    public static function continuesHistoryWhenListIsAddedAndChanged(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', [
+            'packages/a/README.md' => 'readme',
+            'packages/a/src/A.php' => 'a1',
+            'packages/a/tests/ATest.php' => 'test1',
+        ]);
+        $whole = self::split($repository)['a'] ?? '';
+        $repository->commit('List src of a', ['packages/a/.split' => "src\n"]);
+        $listed = self::split($repository)['a'] ?? '';
+        $repository->commit('List README.md of a', ['packages/a/.split' => "README.md\nsrc\n"]);
+
+        $split = self::split($repository)['a'] ?? '';
+
+        Assert::same($repository->id($whole . '^{tree}'), $repository->id('main~2:packages/a'));
+        Assert::same($repository->id($split . '~2'), $whole);
+        Assert::same($repository->id($split . '~1'), $listed);
+        Assert::same(self::names($repository, $listed), ['src']);
+        Assert::same(self::names($repository, $split), ['README.md', 'src']);
+    }
+
+    public static function copiesWholePackageWhoseListIsNotFile(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', ['packages/a/.split/src' => 'not a list', 'packages/a/src/A.php' => 'a1']);
+
+        $split = self::split($repository)['a'] ?? '';
+
+        Assert::same($repository->id($split . '^{tree}'), $repository->id('main:packages/a'));
+    }
+
     public static function continuesHistoryOfPackageAddedAgain(): void
     {
         $repository = new Repository();
@@ -342,6 +419,14 @@ final readonly class SplitterTest
     private static function split(Repository $repository, string $revision = 'HEAD'): array
     {
         return Splitter::split($repository->git, $repository->id($revision . '^{commit}'));
+    }
+
+    /**
+     * @return list<string> the names of the entries of the tree of the commit
+     */
+    private static function names(Repository $repository, string $commit): array
+    {
+        return explode("\n", trim($repository->git->run(['ls-tree', '--name-only', $commit])));
     }
 
     /**

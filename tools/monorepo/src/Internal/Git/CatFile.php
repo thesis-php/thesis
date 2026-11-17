@@ -98,12 +98,12 @@ final class CatFile
 
     /**
      * @param non-empty-string $object
-     * @return array<string, non-empty-string> name => id of every subtree, empty if the object is not a tree
+     * @return list<TreeEntry> in the order of the tree, empty if the object is not a tree
      */
-    public function subtrees(string $object): array
+    public function entries(string $object): array
     {
         $tree = $this->read($object, type: 'tree') ?? '';
-        $subtrees = [];
+        $entries = [];
         $offset = 0;
 
         // Every entry is "<octal mode> <name>\0<20 bytes of id>".
@@ -115,13 +115,33 @@ final class CatFile
                 throw new MonorepoException(\sprintf('git cat-file: %s is a malformed tree.', $object));
             }
 
-            if (\intval(substr($tree, $offset, $space - $offset), 8) === self::TREE_MODE) {
-                $id = bin2hex(substr($tree, $nul + 1, 20));
-                \assert($id !== '');
-                $subtrees[substr($tree, $space + 1, $nul - $space - 1)] = $id;
-            }
-
+            $id = bin2hex(substr($tree, $nul + 1, 20));
+            $bytes = substr($tree, $offset, $nul + 21 - $offset);
+            \assert($id !== '' && $bytes !== '');
+            $entries[] = new TreeEntry(
+                name: substr($tree, $space + 1, $nul - $space - 1),
+                id: $id,
+                isTree: \intval(substr($tree, $offset, $space - $offset), 8) === self::TREE_MODE,
+                bytes: $bytes,
+            );
             $offset = $nul + 21;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param non-empty-string $object
+     * @return array<string, non-empty-string> name => id of every subtree, empty if the object is not a tree
+     */
+    public function subtrees(string $object): array
+    {
+        $subtrees = [];
+
+        foreach ($this->entries($object) as $entry) {
+            if ($entry->isTree) {
+                $subtrees[$entry->name] = $entry->id;
+            }
         }
 
         return $subtrees;

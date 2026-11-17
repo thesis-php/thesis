@@ -5,12 +5,16 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
   Keep them plain readonly DTOs with named arguments: humans and agents write them by hand. The rest is in `Internal\`.
-- `.gitattributes` of a package is an allowlist (`/* export-ignore`, then `-export-ignore` for what is kept):
-  the split repository stays an exact copy of the package (`agents/repositories.md`), only the archive is trimmed,
-  and a new file of the monorepo stays out of it without anyone remembering to exclude it. `sync` throws
-  on a `dist` path that does not exist. Rejected: excluding files from the split itself (every split commit
-  would differ from its directory and nobody gains from it: users install the archive); a list of excluded files
-  (a forgotten one leaks into every install).
+- `packages/<name>/.split` (`Monorepo::SPLIT`) lists the entries of the package that its split repository has
+  (`agents/repositories.md`): `src`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `skills`
+  and `dist` of the manifest.
+  An allowlist: a new file of the monorepo stays out of the split, and so out of every install, without anyone
+  remembering to exclude it. `sync` throws on a `dist` path that does not exist or is not a top-level entry:
+  the split keeps whole entries, a path inside one would name nothing. Rejected: a list of excluded files
+  (a forgotten one leaks into every install); `.gitattributes` with `export-ignore` over an exact copy
+  of the package (only the archive was trimmed: the repository, an install from source and `dev-main`
+  of Packagist had the tests and the files of the monorepo, and a commit that changed only them was a commit
+  of the split).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
   a property does not exist, so nothing is read back from the current file. `type` (default `library`)
   and `extra` are written as given: `extra` is free-form by the design of composer, a config of a plugin
@@ -84,11 +88,18 @@ CI (`.github/workflows/split.yaml`) runs it after `github` on every push of `mai
 Invariants:
 
 - A split is deterministic: the same commit of the monorepo gives the same commit of a package on any machine,
-  and the pushes are never forced. How a commit is written (the headers copied, the parents kept, their order)
-  is part of the ids of every published history: a change to it rewrites all split repositories.
+  and the pushes are never forced. How a commit is written (the headers copied, the parents kept, their order,
+  the entries of its tree) is part of the ids of every published history: a change to it rewrites all
+  split repositories.
   `givesTheSameIdsForEveryKindOfCommit` pins the ids, checked once against a model built with `git commit-tree`,
   and `givesTheSameIdsForLinearHistory` a history that splitsh-lite gave the same ids for: the switch from it
   needed no force push.
+- The tree of a split has the entries of `packages/<name>` that `.split` of the same commit names: one name
+  per line, and a line that names no entry (the header of the file) keeps nothing, so the format has no syntax
+  to change. A package without the file is split whole, as every commit before the lists was: their ids are
+  published. The list is read from the commit it filters and from nowhere else: the same list for the whole
+  history (the manifest of the head) would change the trees of the older commits, and with them every id,
+  each time it changes. A changed list is an ordinary commit of the split that adds or removes an entry.
 - Only the commit `main` points to is split, resolved once (`show-ref --verify`, then `rev-parse`), never
   the working tree or the checked-out branch.
 - Nothing outside the objects decides a split: git runs without the caller's `GIT_*` variables, without replace
@@ -119,6 +130,17 @@ Decisions:
   is kept only where both sides changed the package. A commit is reused when its only parent has the same tree.
 - Author, committer, encoding and message are copied byte for byte, every other header is dropped: a signature
   (`gpgsig`, `mergetag`) signs the commit of the monorepo, not the split.
+- The tree of a split is written like its commits, as a loose object made of the entries of the package
+  byte for byte (a mode is `40000` or `040000` as it was). `keepsOnlyEntriesThatListOfPackageNames` checks
+  that it is the object git writes for the same files. The tree is made once per change of the package,
+  and only the last one of a package is remembered: the memory does not grow with the history.
+- Rejected for the list: `package.php` of the commit (code, not data: it cannot be run with the classes
+  of the head, the same as for the release below, and the list is also the rules of `Generator` of that commit);
+  an incremental split that adds a commit on top of the split repository (a state to fetch, and the release
+  could not compute the commit of a tag from the monorepo alone); moving what is shipped into a subdirectory
+  (a level more in the path to every class) or making `src/` the root of the split (`composer.json`,
+  `README.md` and the polyfill of `time` inside the psr-4 root); josh or git-filter-repo (a tool to install
+  for what is a filter of one tree).
 - A loose object left by an earlier run is kept only if it inflates to this very object: a run killed while
   writing leaves a broken one.
 - The credentials of `SPLIT_REMOTE` go to the environment of `git push` as `url.<with>.insteadOf <without>`
@@ -128,7 +150,7 @@ Decisions:
 - Rejected: `git subtree split` (a process per commit, slow as the history grows); a fork of splitsh with
   a prebuilt image (still cgo pinned to libgit2 1.5, plus an image and a registry to maintain); a tool in Go
   (a toolchain to distribute for what is git plumbing); an action that copies files into a new commit
-  (no history, no deterministic commits); filtering files out of the split (see `.gitattributes` above).
+  (no history, no deterministic commits).
 
 ## release
 
