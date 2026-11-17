@@ -129,14 +129,15 @@ observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $print]), $main
 // at /app/src/main.php:9 to Thesis\Async\Channel::receive() at /app/src/main.php:14
 ```
 
-A run begins when a task starts or a wait is over, and ends at the next wait of any scope, at the join of a group
-or at the end of a task: `from` and `to` of the report say which. The report has `scope`, `what`, `at`
+A run begins when a task starts, a wait or the join of a group is over, or a group, a `timeout()` or a `shield()`
+is created in the root scope. It ends at the next wait of any scope, at the join of a group, at the end of a task
+or of a scope created in the root: `from` and `to` of the report say which. The report has `scope`, `what`, `at`
 (the beginning of the run) and `duration` too. The time is that of the events: under `VirtualTime\run()`
 code takes no time, and a test makes a run long by `VirtualTime\advance()`.
 
-Not seen: a run that never ends (an endless loop), code after the join of a group up to its next wait,
-code outside the scope tree. The root scope is not in the trace, its waits have no events: code that runs
-in the callable of `observe()` itself, outside any group, is never reported. Run it in a task:
+Not seen: a run that never ends (an endless loop), code outside the scope tree. The root scope is not in the trace,
+its waits have no events: code that runs in the callable of `observe()` itself, outside a group, a `timeout()`
+and a `shield()`, is never reported. Run the program in a task:
 
 ```php
 use Thesis\Async\Group;

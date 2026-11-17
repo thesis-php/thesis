@@ -87,10 +87,14 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   through `suspend()`. The price was a break of the type of `$scope`, a new `VERSION` of the NDJSON and a `from`
   that cannot tell the fibers of the root apart. Rejected: a group around the callable of `observe()`, it adds
   a scope, a join and a cancellation to every trace.
-- A run of `BlockingDetector` ends at `Joining` too: the join of a group waits for its tasks without `suspend()`,
-  so no `Suspended` comes, and the run of the body would last until another fiber starts. Trap: a run that begins
-  while another is open has lost its end to a wait outside the tree (in the root scope): it is dropped,
-  not reported with a wrong end.
+- A run of `BlockingDetector` follows the fiber, not the events of waits: code goes on without a `TaskStarted`
+  or `Resumed` in two places, and a run begins there too. A group, a `timeout()` and a `shield()` created
+  in the root run in the root fiber, whose waits have no events: a run begins at their creation and ends
+  at their end (one created in another scope goes on with the run of its fiber). The join of a group waits
+  for its tasks without `suspend()`, so no `Suspended` or `Resumed` comes: a run ends at `Joining`, else the run
+  of the body would last until another fiber starts, and a run of the parent begins at `Ended` of the group.
+  Trap: a run that begins while another is open has lost its end to a wait outside the tree (in the root scope):
+  it is dropped, not reported with a wrong end.
 - Not yet: following a chain of causes, such as a task failed by the `TaskCancelled` of a task it awaited,
   cancelled in its turn. The first cause covers the deadlines, the calls and the failures.
 - An error is its class, message, file and line, without the previous ones and the trace:

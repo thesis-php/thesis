@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace;
 
+use Thesis\Async\Instant;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
@@ -27,13 +28,15 @@ use function Thesis\Time\toNs;
  * a wait, while no other task can run. Such a run gets a {@see Blocked} in the dispatcher of the trace when it ends,
  * with the waits around it. Give it to the dispatcher of the trace: `new Dispatcher([$detector, $listener])`.
  *
- * A run is of the event loop, not of a scope: one fiber runs at a time. It begins when a task starts or a wait
- * is over and ends at the next wait of any scope (a `timeout()` or a `shield()` waits in the fiber of its task),
- * at the join of a group or at the end of a task. The time is that of the events: the monotonic clock,
+ * A run is of the event loop, not of a scope: one fiber runs at a time. It begins when a task starts, a wait
+ * is over, the join of a group is over, or a group, a `timeout()` or a `shield()` is created in the root scope,
+ * and ends at the next wait of any scope (a `timeout()` or a `shield()` waits in the fiber that creates it),
+ * at the join of a group, at the end of a task or of a scope created in the root.
+ * The time is that of the events: the monotonic clock,
  * or the virtual one under `VirtualTime\run()`, where CPU work takes no time but `VirtualTime\advance()`.
- * Not seen: a run that never ends (an endless loop), code after the join of a group up to its next wait,
- * code outside the scope tree (the callable of `observe()` outside a group, raw callbacks of the event loop):
- * the waits of the root scope have no events.
+ * Not seen: a run that never ends (an endless loop), code outside the scope tree (the callable of `observe()`
+ * outside a group, a `timeout()` and a `shield()`, raw callbacks of the event loop): the waits of the root scope
+ * have no events.
  *
  * It listens to the waits, so each costs a backtrace: a tool of debugging, not of every request in production.
  *
@@ -56,6 +59,21 @@ final class BlockingDetector implements Subscriber
      * @var array<positive-int, true>
      */
     private array $tasks = [];
+
+    /**
+     * The parents of the live groups with one: when the join of a group is over, a run of the parent begins.
+     *
+     * @var array<positive-int, positive-int>
+     */
+    private array $groups = [];
+
+    /**
+     * The live scopes created in the root, with what ends their run: their code is the first of the tree
+     * in the fiber of the root, and the code after them is outside it.
+     *
+     * @var array<positive-int, non-empty-string>
+     */
+    private array $roots = [];
 
     /**
      * The waits of the suspended scopes, a run that wakes up begins there.
@@ -91,6 +109,12 @@ final class BlockingDetector implements Subscriber
     private function onGroupCreated(GroupCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
+
+        if ($event->parent === null) {
+            $this->beginInRoot($event, 'group');
+        } else {
+            $this->groups[$event->scope] = $event->parent;
+        }
     }
 
     private function onTaskCreated(TaskCreated $event): void
@@ -102,16 +126,24 @@ final class BlockingDetector implements Subscriber
     private function onTimeoutCreated(TimeoutCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
+
+        if ($event->parent === null) {
+            $this->beginInRoot($event, 'timeout');
+        }
     }
 
     private function onShieldCreated(ShieldCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
+
+        if ($event->parent === null) {
+            $this->beginInRoot($event, 'shield');
+        }
     }
 
     private function onTaskStarted(TaskStarted $event): void
     {
-        $this->begin($event, 'the start of the task');
+        $this->begin($event->scope, $event->at, 'the start of the task');
     }
 
     private function onSuspended(Suspended $event, Dispatcher $dispatcher): void
@@ -123,7 +155,7 @@ final class BlockingDetector implements Subscriber
 
     private function onResumed(Resumed $event): void
     {
-        $this->begin($event, $this->waits[$event->scope] ?? 'a wait of unknown code');
+        $this->begin($event->scope, $event->at, $this->waits[$event->scope] ?? 'a wait of unknown code');
         unset($this->waits[$event->scope]);
     }
 
@@ -134,24 +166,50 @@ final class BlockingDetector implements Subscriber
 
     private function onEnded(Ended $event, Dispatcher $dispatcher): void
     {
-        if (isset($this->tasks[$event->scope])) {
+        $scope = $event->scope;
+
+        if (isset($this->tasks[$scope])) {
             $this->end($event, 'the end of the task', $dispatcher);
+        } elseif (isset($this->roots[$scope])) {
+            $this->end($event, $this->roots[$scope], $dispatcher);
+        } elseif (isset($this->groups[$scope])) {
+            // The join waits without `suspend()`, so no `Resumed` comes when the fiber of the parent goes on.
+            $this->begin($this->groups[$scope], $event->at, 'the join of the group');
         }
 
-        unset($this->scopes[$event->scope], $this->tasks[$event->scope], $this->waits[$event->scope]);
+        unset(
+            $this->scopes[$scope],
+            $this->tasks[$scope],
+            $this->groups[$scope],
+            $this->roots[$scope],
+            $this->waits[$scope],
+        );
+    }
+
+    /**
+     * A scope created in the root runs in the fiber of the root, where no wait has an event: no `TaskStarted`
+     * or `Resumed` begins its run. A scope created in another one goes on with the run of the fiber that creates it.
+     *
+     * @param non-empty-string $kind
+     */
+    private function beginInRoot(GroupCreated|TimeoutCreated|ShieldCreated $event, string $kind): void
+    {
+        $this->roots[$event->scope] = 'the end of the ' . $kind;
+        $this->begin($event->scope, $event->at, 'the start of the ' . $kind);
     }
 
     /**
      * A run left open by a wait outside the scope tree has no known end: it is dropped, not reported.
      *
+     * @param positive-int $scope
      * @param non-empty-string $from
      */
-    private function begin(TaskStarted|Resumed $event, string $from): void
+    private function begin(int $scope, Instant $at, string $from): void
     {
         $this->run = new Run(
-            scope: $event->scope,
-            what: $this->scopes[$event->scope] ?? '#' . $event->scope,
-            at: $event->at,
+            scope: $scope,
+            what: $this->scopes[$scope] ?? '#' . $scope,
+            at: $at,
             from: $from,
         );
     }

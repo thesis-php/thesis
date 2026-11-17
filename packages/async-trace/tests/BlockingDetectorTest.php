@@ -12,6 +12,7 @@ use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Dispatcher;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\shield;
 use function Thesis\Async\timeout;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\advance;
@@ -77,6 +78,97 @@ final class BlockingDetectorTest
         Assert::same($reports, [
             '#1 ' . self::at('group', $line - 1) . ' has run 0.1s without a wait: from Thesis\Async\delay() at '
             . self::file($line + 1) . ' to the join of the group',
+        ]);
+    }
+
+    public function reportsRunOfBodyFromStartOfGroupInRoot(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => group(static function () {
+            advance(ms(100));
+            delay(sec(1));
+        }));
+
+        Assert::same($reports, [
+            '#1 ' . self::at('group', $line - 1) . ' has run 0.1s without a wait: from the start of the group'
+            . ' to Thesis\Async\delay() at ' . self::file($line + 1),
+        ]);
+    }
+
+    public function reportsRunOfBodyFromStartOfTimeoutInRoot(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => timeout(sec(5), static function () {
+            advance(ms(100));
+            delay(sec(1));
+        }));
+
+        Assert::same($reports, [
+            '#1 ' . self::at('timeout 5s', $line - 1) . ' has run 0.1s without a wait: from the start of the timeout'
+            . ' to Thesis\Async\delay() at ' . self::file($line + 1),
+        ]);
+    }
+
+    public function reportsRunOfBodyFromStartToEndOfShieldInRoot(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => shield(static fn() => advance(ms(100))));
+
+        Assert::same($reports, [
+            '#1 ' . self::at('shield', $line - 1) . ' has run 0.1s without a wait: from the start of the shield'
+            . ' to the end of the shield',
+        ]);
+    }
+
+    public function keepsRunOfTimeoutInRootThroughNestedGroup(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => timeout(sec(5), static function () {
+            advance(ms(60));
+            group(static function () {
+                advance(ms(60));
+                delay(sec(1));
+            });
+        }));
+
+        Assert::same($reports, [
+            '#1 ' . self::at('timeout 5s', $line - 1) . ' has run 0.12s without a wait: from the start of the timeout'
+            . ' to Thesis\Async\delay() at ' . self::file($line + 3),
+        ]);
+    }
+
+    public function reportsRunOfTaskFromJoinOfNestedGroup(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => group(static function (Group $group) {
+            $group->spawn(static function () {
+                group(static fn(Group $nested) => $nested->spawn(static fn() => delay(sec(1))));
+                advance(ms(100));
+            });
+        }));
+
+        Assert::same($reports, [
+            '#2 ' . self::at('task', $line) . ' has run 0.1s without a wait: from the join of the group'
+            . ' to the end of the task',
+        ]);
+    }
+
+    public function keepsRunOfTaskThroughNestedGroup(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => group(static function (Group $group) {
+            $group->spawn(static function () {
+                advance(ms(60));
+                group(static function () {
+                    advance(ms(60));
+                    delay(sec(1));
+                });
+            });
+        }));
+
+        Assert::same($reports, [
+            '#2 ' . self::at('task', $line) . ' has run 0.12s without a wait: from the start of the task'
+            . ' to Thesis\Async\delay() at ' . self::file($line + 4),
         ]);
     }
 
