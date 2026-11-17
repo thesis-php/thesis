@@ -26,8 +26,16 @@ final class PhpErrorsTest
     public function throwsDeprecation(): void
     {
         Expect::exception(\ErrorException::class)->withMessage('deprecated');
+        // A variable: error_suppression of the fixer puts @ before trigger_error() of E_USER_DEPRECATED.
+        $deprecation = E_USER_DEPRECATED;
+        // Infection runs the tests without deprecations in error_reporting.
+        $reporting = error_reporting(E_ALL);
 
-        @trigger_error('deprecated', E_USER_DEPRECATED);
+        try {
+            trigger_error('deprecated', $deprecation);
+        } finally {
+            error_reporting($reporting);
+        }
     }
 
     public function throwsWarningOfTaskStartedByTest(): void
