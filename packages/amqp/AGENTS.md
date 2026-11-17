@@ -45,6 +45,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `close()` during a handshake terminates the connection it produces (`run()` and `reconnect()` check `closing`
   after `connect()`). One `Backoff` serves all reconnects and is reset only by a connection that has lived 30 s.
   Hosts are validated by `Config`, not when a reconnect in a daemon tries them.
+- Whatever the server sends, a decoding failure leaves `Frames::read()` only as `ProtocolError`: it turns
+  `UnexpectedEof` and `\OverflowException` (a long-long of 2^63 and above, as `Buffer::readUint64()` throws)
+  into `FrameError`. Any other exception would escape `run()` instead of closing the connection.
 - The handshake reads frames of at most `Frames::DEFAULT_MAX` bytes: the peer is not yet known to be a broker.
 - Field tables: an int is written as `I` if it fits 32 bits, else `l`; an empty array is a table, a list an array.
   A decimal is read as a numeric string. Types are those of RabbitMQ, not of the spec (`s` is a short int).

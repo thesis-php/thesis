@@ -9,17 +9,6 @@ TLS by tests of the failures (another name, an untrusted certificate, client cer
 
 ## amqp
 
-### A suspected bug: `\OverflowException` escapes the reader
-
-`Buffer::readUint64()` throws `\OverflowException` for a value of 2⁶³ and above. amqp reads with it what
-the server sends: `bodySize` in `ContentHeader::decode()`, the delivery tag of `BasicDeliver`, `BasicAck`,
-`BasicNack`, `BasicReject`, `BasicGetOk`, the field type `'T'` and the timestamp of `BasicProperties`.
-`Connection::readFrame()` catches only `UnexpectedEof`, `Connection::run()` only `ProtocolError`,
-`ConnectionClosed` and `IoException`. So a single header frame with `bodySize = 0xFFFFFFFFFFFFFFFF` throws
-a bare `\OverflowException` out of `run()` instead of closing the connection with `FrameError`.
-
-First a failing test with `FakePeer`, then the fix.
-
 ### Fuzzing the frame decoder
 
 The invariant: any bytes give a frame or `ProtocolError`/`UnexpectedEof`, never another `\Throwable`.
@@ -90,7 +79,6 @@ where the tests run the code but check nothing.
 
 ## Order
 
-1. The test for `\OverflowException`, then the fix.
-2. Fuzzing the frame decoder, the round trip, the end of `readTable()`.
-3. Publisher confirms against a model.
-4. The rest as time permits.
+1. Fuzzing the frame decoder, the round trip, the end of `readTable()`.
+2. Publisher confirms against a model.
+3. The rest as time permits.

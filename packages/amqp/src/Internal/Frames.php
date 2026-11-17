@@ -129,6 +129,9 @@ final class Frames
             };
         } catch (UnexpectedEof) {
             throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} is shorter than its fields.");
+        } catch (\OverflowException) {
+            // A long-long field (a body size, a delivery tag, a timestamp) of 2^63 and above does not fit an int.
+            throw new ProtocolError(ReplyCode::FrameError, "A frame of type {$type} has a number over PHP_INT_MAX.");
         }
 
         if ($payload->count() !== 0) {
