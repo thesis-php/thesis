@@ -135,7 +135,7 @@ final class Repositories
                 '%s exists, but is not a split of %s: it has no rulesets of the split. '
                     . 'Rename or delete it, or add the rulesets by hand to take it over.',
                 $repository,
-                $package->path(),
+                $package->path,
             ));
         }
 
@@ -230,10 +230,10 @@ final class Repositories
             );
         }
 
-        if ($hasMain && !$this->packagist->exists($package->name())) {
+        if ($hasMain && !$this->packagist->exists($package->name)) {
             $this->change(
                 repository: $repository,
-                what: \sprintf('%s registered on Packagist', $package->name()),
+                what: \sprintf('%s registered on Packagist', $package->name),
                 apply: fn() => $this->packagist->create('https://github.com/' . $repository),
             );
         }
@@ -358,7 +358,7 @@ final class Repositories
                 self::ORGANIZATION,
                 self::MONOREPO,
                 self::DEFAULT_BRANCH,
-                $package->path(),
+                $package->path,
             ),
             'has_issues' => false,
             'has_wiki' => false,

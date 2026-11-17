@@ -60,8 +60,8 @@ final class Requirements
             $external = static fn(string $name) => $monorepo->package($name) === null;
             $require = array_filter($package->manifest->require, $external, ARRAY_FILTER_USE_KEY);
             $requireDev = array_filter($package->manifest->requireDev, $external, ARRAY_FILTER_USE_KEY);
-            $requirements->add($package->path(), $require, runtime: true);
-            $requirements->add($package->path(), $requireDev, runtime: false);
+            $requirements->add($package->path, $require, runtime: true);
+            $requirements->add($package->path, $requireDev, runtime: false);
         }
 
         foreach ($requirements->usages as $name => $usages) {

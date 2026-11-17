@@ -950,7 +950,7 @@ final class Channel
 
         $method = new BasicPublish($publish->exchange, $publish->routingKey, $publish->mandatory, immediate: false);
         Frames::method($buffer, $this->id, $method);
-        Frames::content($buffer, $this->id, properties($message), $message->body, $this->connection->bodyFrameMax());
+        Frames::content($buffer, $this->id, properties($message), $message->body, $this->connection->bodyFrameMax);
 
         return $returnId;
     }

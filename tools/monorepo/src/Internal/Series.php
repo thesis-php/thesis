@@ -13,15 +13,29 @@ use Thesis\Monorepo\Internal\GitHub\Repositories;
  *
  * @internal
  */
-final readonly class Series
+final class Series
 {
     private const string PATTERN = '/^(0|[1-9]\d*)\.(0|[1-9]\d*)$/D';
+
+    /**
+     * @var non-empty-string the versions compatible with the series: below 1.0 a minor is a break, above it a major
+     */
+    public string $range {
+        get => $this->major === 0 ? '^0.' . $this->minor : '^' . $this->major . '.0';
+    }
+
+    /**
+     * @var non-empty-string
+     */
+    public string $alias {
+        get => $this->major . '.' . $this->minor . '.x-dev';
+    }
 
     public static function of(Package $package): self
     {
         return self::parse($package->manifest->version) ?? throw new MonorepoException(\sprintf(
             "%s/%s: the version %s is not a series X.Y, e.g. version: '0.1'.",
-            $package->path(),
+            $package->path,
             Monorepo::MANIFEST,
             $package->manifest->version,
         ));
@@ -61,27 +75,9 @@ final readonly class Series
     }
 
     private function __construct(
-        public int $major,
-        public int $minor,
+        public readonly int $major,
+        public readonly int $minor,
     ) {}
-
-    /**
-     * The versions compatible with the series: below 1.0 a minor is a break, above it a major.
-     *
-     * @return non-empty-string
-     */
-    public function range(): string
-    {
-        return $this->major === 0 ? '^0.' . $this->minor : '^' . $this->major . '.0';
-    }
-
-    /**
-     * @return non-empty-string
-     */
-    public function alias(): string
-    {
-        return $this->major . '.' . $this->minor . '.x-dev';
-    }
 
     /**
      * Whether every version the constraint allows is in the range of the series. The ranges of two series
@@ -94,7 +90,7 @@ final readonly class Series
         try {
             $allowed = $parser->parseConstraints($constraint);
 
-            return Intervals::isSubsetOf($allowed, $parser->parseConstraints($this->range()));
+            return Intervals::isSubsetOf($allowed, $parser->parseConstraints($this->range));
         } catch (\UnexpectedValueException) {
             return false;
         }

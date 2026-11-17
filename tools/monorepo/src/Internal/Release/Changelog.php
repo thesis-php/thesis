@@ -12,7 +12,7 @@ use Thesis\Monorepo\Internal\MonorepoException;
  *
  * @internal
  */
-final readonly class Changelog
+final class Changelog
 {
     private const string UNRELEASED = 'Unreleased';
     private const string HEADING = '/^## \[([^\]]+)\](.*)$/D';
@@ -27,6 +27,13 @@ final readonly class Changelog
      * A line that opens or closes a fenced code block: a heading inside one is an example, not a section.
      */
     private const string FENCE = '/^ {0,3}(```|~~~)/';
+
+    /**
+     * The version right under [Unreleased], null if there is none yet.
+     */
+    public ?string $topVersion {
+        get => $this->top['version'] ?? null;
+    }
 
     /**
      * @param non-empty-string $path for errors
@@ -88,18 +95,10 @@ final readonly class Changelog
      * @param ?array{version: string, dated: bool, notes: string} $top the section right under [Unreleased]
      */
     private function __construct(
-        public string $path,
-        public string $unreleased,
-        private ?array $top,
+        public readonly string $path,
+        public readonly string $unreleased,
+        private readonly ?array $top,
     ) {}
-
-    /**
-     * The version right under [Unreleased], null if there is none yet.
-     */
-    public function topVersion(): ?string
-    {
-        return $this->top['version'] ?? null;
-    }
 
     /**
      * The version right under [Unreleased] with the notes of its release.

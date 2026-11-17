@@ -110,7 +110,7 @@ function checkpoint(): void
  */
 function isCancelled(): bool
 {
-    return Scope::current()->isCancelled();
+    return Scope::current()->isCancelled;
 }
 
 /**
@@ -634,7 +634,7 @@ function ampCancellable(callable $fn): mixed
     try {
         return $fn(new ScopeCancellation($scope));
     } catch (CancelledException $exception) {
-        if ($scope->isCancelled()) {
+        if ($scope->isCancelled) {
             throw Cancelled::create();
         }
 

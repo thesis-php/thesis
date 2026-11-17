@@ -9,8 +9,41 @@ use Thesis\Monorepo\Manifest;
 /**
  * @internal
  */
-final readonly class Package
+final class Package
 {
+    /**
+     * @var non-empty-string
+     */
+    public string $name {
+        get => Monorepo::VENDOR . '/' . $this->dir;
+    }
+
+    /**
+     * @var non-empty-string
+     */
+    public string $path {
+        get => Monorepo::PACKAGES_DIR . '/' . $this->dir;
+    }
+
+    /**
+     * @var non-empty-string the psr-4 prefix of src/ and tests/
+     */
+    public string $namespace {
+        get {
+            if ($this->manifest->rootEntry) {
+                return Monorepo::ROOT_NAMESPACE;
+            }
+
+            $pascalCase = str_replace(
+                search: '-',
+                replace: '',
+                subject: ucwords($this->dir, '-'),
+            );
+
+            return Monorepo::ROOT_NAMESPACE . $pascalCase . '\\';
+        }
+    }
+
     /**
      * @param non-empty-string $dir
      * @param list<non-empty-string> $files autoload files, relative to the package: those of src/ without classes
@@ -18,45 +51,11 @@ final readonly class Package
      * @param list<non-empty-string> $devFiles the same, of tests/ and devFiles of the manifest
      */
     public function __construct(
-        public string $dir,
-        public Manifest $manifest,
-        public array $files,
-        public array $devFiles,
-        public bool $hasSkills,
-        public bool $hasTests,
+        public readonly string $dir,
+        public readonly Manifest $manifest,
+        public readonly array $files,
+        public readonly array $devFiles,
+        public readonly bool $hasSkills,
+        public readonly bool $hasTests,
     ) {}
-
-    /**
-     * @return non-empty-string
-     */
-    public function name(): string
-    {
-        return Monorepo::VENDOR . '/' . $this->dir;
-    }
-
-    /**
-     * @return non-empty-string
-     */
-    public function path(): string
-    {
-        return Monorepo::PACKAGES_DIR . '/' . $this->dir;
-    }
-
-    /**
-     * @return non-empty-string the psr-4 prefix of src/ and tests/
-     */
-    public function namespace(): string
-    {
-        if ($this->manifest->rootEntry) {
-            return Monorepo::ROOT_NAMESPACE;
-        }
-
-        $pascalCase = str_replace(
-            search: '-',
-            replace: '',
-            subject: ucwords($this->dir, '-'),
-        );
-
-        return Monorepo::ROOT_NAMESPACE . $pascalCase . '\\';
-    }
 }

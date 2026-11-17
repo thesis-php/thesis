@@ -46,7 +46,7 @@ final class Scope
      * This scope or a visible ancestor is cancelled: set by {@see notify()} and inherited on creation.
      * One flag is enough, because it never goes back: whoever cancelled the scope, its subtree has been notified.
      */
-    private bool $cancelled = false;
+    public private(set) bool $isCancelled = false;
 
     /**
      * @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id()
@@ -92,7 +92,7 @@ final class Scope
             // the code under it would otherwise think it has no time, although nothing will stop it.
             if (!$shield) {
                 // The parent's subtree has been notified before this scope existed.
-                $this->cancelled = $parent->cancelled;
+                $this->isCancelled = $parent->isCancelled;
 
                 if ($parent->deadline !== null) {
                     $deadline = $deadline === null ? $parent->deadline : min($deadline, $parent->deadline);
@@ -137,14 +137,6 @@ final class Scope
     }
 
     /**
-     * Whether this scope or a visible ancestor is cancelled. A shield hides its ancestors.
-     */
-    public function isCancelled(): bool
-    {
-        return $this->cancelled;
-    }
-
-    /**
      * Nanoseconds left until the nearest deadline of this scope or a visible ancestor, null if there is none.
      * Zero once the deadline has passed, even if its timer has not fired yet.
      *
@@ -167,7 +159,7 @@ final class Scope
      */
     public function throwIfCancelled(): void
     {
-        if ($this->cancelled) {
+        if ($this->isCancelled) {
             throw Cancelled::create();
         }
     }
@@ -180,7 +172,7 @@ final class Scope
      */
     public function cancel(CancelCause $cause, ?self $by, ?\Throwable $error = null): void
     {
-        if (!$this->cancelled) {
+        if (!$this->isCancelled) {
             $this->notify();
             self::$tracer?->cancelled($this, $cause, $by, $error);
         }
@@ -196,7 +188,7 @@ final class Scope
      */
     public function subscribe(ContinuationImpl $wait): void
     {
-        if ($this->cancelled) {
+        if ($this->isCancelled) {
             $wait->interrupt();
         } elseif ($this !== ROOT_SCOPE) {
             // The root scope is never cancelled: holding its waits would only keep abandoned fibers alive.
@@ -250,7 +242,7 @@ final class Scope
         $id = spl_object_id($fire);
         $this->callbacks[$id] = $fire;
 
-        if ($this->cancelled) {
+        if ($this->isCancelled) {
             EventLoop::queue($fire);
         }
 
@@ -292,7 +284,7 @@ final class Scope
         $callbacks = $this->callbacks;
         $this->callbacks = [];
 
-        if ($this->cancelled && $callbacks !== []) {
+        if ($this->isCancelled && $callbacks !== []) {
             // As from the queue: in the root scope, with no scoped values.
             ROOT_SCOPE->run(static fn() => Context::run([], static function () use ($callbacks) {
                 foreach ($callbacks as $fire) {
@@ -334,7 +326,7 @@ final class Scope
 
     private function notify(): void
     {
-        $this->cancelled = true;
+        $this->isCancelled = true;
         $waits = $this->waits;
         $this->waits = [];
 
@@ -350,7 +342,7 @@ final class Scope
         foreach ($this->children as $child) {
             // A cancelled child has already been visited, together with its subtree, and everything
             // created below it since has inherited the flag; a subscription to it is interrupted right away.
-            if (!$child->shield && !$child->cancelled) {
+            if (!$child->shield && !$child->isCancelled) {
                 $child->notify();
             }
         }

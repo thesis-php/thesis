@@ -56,13 +56,13 @@ final class ScopeCancellation implements Cancellation
     #[\Override]
     public function isRequested(): bool
     {
-        return $this->scope->isCancelled();
+        return $this->scope->isCancelled;
     }
 
     #[\Override]
     public function throwIfRequested(): void
     {
-        if ($this->scope->isCancelled()) {
+        if ($this->scope->isCancelled) {
             throw new CancelledException();
         }
     }

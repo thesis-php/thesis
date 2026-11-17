@@ -79,7 +79,7 @@ The API and the guarantees are in `README.md` — read it first.
   and plaintext-first protocols need the upgrade anyway.
 - TLS context options that are the defaults of PHP are not set: compression is off (`disable_compression`),
   a server picks the cipher in its own order (`honor_cipher_order`).
-- `Certificate::contextOptions()` always has `local_pk`, the certificate file if the key is in it:
+- `Certificate::$contextOptions` always has `local_pk`, the certificate file if the key is in it:
   a certificate of `SNI_server_certs` without one fails every handshake that picks it.
 - Rejected: `ALPN` together with SNI certificates is not refused at construction: PHP loses ALPN only on connections
   that pick an SNI certificate, which degrades to the default protocol instead of failing (documented in README).

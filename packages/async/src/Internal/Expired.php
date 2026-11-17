@@ -53,7 +53,7 @@ final readonly class Expired
             Scope::$tracer?->ended($scope, null, $cancelled);
 
             // Only the timer cancels this scope, so if the parent is not cancelled, the deadline is the reason.
-            if ($scope->isCancelled() && !$parent->isCancelled()) {
+            if ($scope->isCancelled && !$parent->isCancelled) {
                 return new self($cancelled);
             }
 

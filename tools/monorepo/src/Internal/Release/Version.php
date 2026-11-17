@@ -12,7 +12,7 @@ use Thesis\Monorepo\Internal\Series;
  *
  * @internal
  */
-final readonly class Version
+final class Version
 {
     private const string PATTERN = '/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|RC)([1-9]\d*))?$/D';
 
@@ -21,7 +21,29 @@ final readonly class Version
      */
     private const array STAGES = ['alpha', 'beta', 'RC'];
 
-    public bool $preRelease;
+    public readonly bool $preRelease;
+
+    /**
+     * @var non-empty-string
+     */
+    public string $tag {
+        get => 'v' . $this->toString();
+    }
+
+    /**
+     * @var non-empty-list<self> this stable version and its first pre-release of every stage
+     */
+    private array $withFirstPreReleases {
+        get {
+            $first = [$this];
+
+            foreach (self::STAGES as $stage) {
+                $first[] = $this->preRelease($stage, number: 1);
+            }
+
+            return $first;
+        }
+    }
 
     public static function parse(string $version): ?self
     {
@@ -47,11 +69,11 @@ final readonly class Version
     public static function next(Series $series, ?self $last): array
     {
         if ($last === null) {
-            return self::stable($series->major, $series->minor, patch: 0)->withFirstPreReleases();
+            return self::stable($series->major, $series->minor, patch: 0)->withFirstPreReleases;
         }
 
         if (!$last->preRelease) {
-            return self::stable($last->major, $last->minor, $last->patch + 1)->withFirstPreReleases();
+            return self::stable($last->major, $last->minor, $last->patch + 1)->withFirstPreReleases;
         }
 
         $stable = self::stable($last->major, $last->minor, $last->patch);
@@ -71,11 +93,11 @@ final readonly class Version
     }
 
     private function __construct(
-        public int $major,
-        public int $minor,
-        public int $patch,
-        public ?string $stage,
-        public int $number,
+        public readonly int $major,
+        public readonly int $minor,
+        public readonly int $patch,
+        public readonly ?string $stage,
+        public readonly int $number,
     ) {
         $this->preRelease = $stage !== null;
     }
@@ -100,30 +122,8 @@ final readonly class Version
         return $this->stage === null ? $version : $version . '-' . $this->stage . $this->number;
     }
 
-    /**
-     * @return non-empty-string
-     */
-    public function tag(): string
-    {
-        return 'v' . $this->toString();
-    }
-
     private function preRelease(?string $stage, int $number): self
     {
         return new self($this->major, $this->minor, $this->patch, $stage, $number);
-    }
-
-    /**
-     * @return non-empty-list<self> this stable version and its first pre-release of every stage
-     */
-    private function withFirstPreReleases(): array
-    {
-        $first = [$this];
-
-        foreach (self::STAGES as $stage) {
-            $first[] = $this->preRelease($stage, number: 1);
-        }
-
-        return $first;
     }
 }

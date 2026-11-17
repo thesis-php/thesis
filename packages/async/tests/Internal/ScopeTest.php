@@ -68,7 +68,7 @@ final class ScopeTest
 
         Assert::same(
             actual: array_map(
-                callback: static fn(Scope $scope) => $scope->isCancelled(),
+                callback: static fn(Scope $scope) => $scope->isCancelled,
                 array: [$scope, $child, $grandchild, $shield, $shielded],
             ),
             expected: [true, true, true, false, false],
@@ -86,7 +86,7 @@ final class ScopeTest
 
         Assert::same(
             actual: array_map(
-                callback: static fn(Scope $scope) => $scope->isCancelled(),
+                callback: static fn(Scope $scope) => $scope->isCancelled,
                 array: [$child, $grandchild, $shield, $shielded],
             ),
             expected: [true, true, false, false],
@@ -105,7 +105,7 @@ final class ScopeTest
 
         $scope->cancel(CancelCause::Handle, by: null);
 
-        Assert::true($child->isCancelled());
+        Assert::true($child->isCancelled);
         Assert::false($wait->resume());
     }
 

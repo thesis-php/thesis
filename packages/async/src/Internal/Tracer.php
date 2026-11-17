@@ -133,7 +133,7 @@ final class Tracer
                 parent: $this->idOrNull($parent),
                 function: $function,
                 name: $name,
-                cancelled: $body->isCancelled(),
+                cancelled: $body->isCancelled,
                 location: self::location(),
             ));
         }
@@ -155,7 +155,7 @@ final class Tracer
                 daemon: $daemon,
                 name: $name,
                 task: $task,
-                cancelled: $scope->isCancelled(),
+                cancelled: $scope->isCancelled,
                 location: self::location(),
             ));
         }
@@ -171,7 +171,7 @@ final class Tracer
                 at: Instant::now(),
                 parent: $this->idOrNull($parent),
                 duration: $duration,
-                cancelled: $scope->isCancelled(),
+                cancelled: $scope->isCancelled,
                 location: self::location(),
             ));
         }
@@ -186,7 +186,7 @@ final class Tracer
                 scope: $id,
                 at: Instant::now(),
                 parent: $this->idOrNull($parent),
-                cancelled: $scope->isCancelled(),
+                cancelled: $scope->isCancelled,
                 location: self::location(),
             ));
         }
@@ -252,7 +252,7 @@ final class Tracer
         $cancelled = [];
 
         foreach ($this->pending as $pending => $id) {
-            if ($pending->isCancelled()) {
+            if ($pending->isCancelled) {
                 $reached[] = $id;
                 $cancelled[] = $pending;
             }
@@ -327,7 +327,7 @@ final class Tracer
         $this->idOrNull($parent);
         $id = $this->id($scope);
 
-        if (!$scope->isCancelled()) {
+        if (!$scope->isCancelled) {
             $this->pending[$scope] = $id;
         }
 

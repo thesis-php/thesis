@@ -61,7 +61,7 @@ final readonly class ChangelogTest
         $changelog = Changelog::parse("## [Unreleased]\n\n- A change.\n", 'packages/a/CHANGELOG.md');
 
         Assert::same($changelog->unreleased, '- A change.');
-        Assert::null($changelog->topVersion());
+        Assert::null($changelog->topVersion);
     }
 
     public static function failsWithoutUnreleasedFirst(): void

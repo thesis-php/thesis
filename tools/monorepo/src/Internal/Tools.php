@@ -57,7 +57,7 @@ final class Tools
      */
     public array $testoSrc {
         get => array_map(
-            fn(Package $package) => $this->monorepo->root . '/' . $package->path() . '/src',
+            fn(Package $package) => $this->monorepo->root . '/' . $package->path . '/src',
             array_values($this->monorepo->packages),
         );
     }
@@ -68,13 +68,9 @@ final class Tools
      */
     public array $testoSuites {
         get {
-            // The tools have no manifests: a tool has a suite when it has tests.
-            /** @var list<non-empty-string>|false $tools */
-            $tools = glob($this->monorepo->root . '/tools/*/tests', GLOB_ONLYDIR);
-            \assert($tools !== false);
             $suites = [];
 
-            foreach ($tools as $tests) {
+            foreach ($this->toolTests as $tests) {
                 $name = basename(\dirname($tests));
                 \assert($name !== '');
                 $suites[] = new SuiteConfig(name: $name, location: [$tests]);
@@ -85,7 +81,7 @@ final class Tools
                 if ($package->hasTests) {
                     $suites[] = new SuiteConfig(
                         name: $package->dir,
-                        location: [$this->monorepo->root . '/' . $package->path() . '/tests'],
+                        location: [$this->monorepo->root . '/' . $package->path . '/tests'],
                         plugins: $package->manifest->testoPlugins,
                     );
                 }
@@ -102,14 +98,18 @@ final class Tools
      */
     public static function of(Monorepo $monorepo): self
     {
-        $tools = new self($monorepo);
+        // The tools have no manifests: a tool has a suite when it has tests.
+        /** @var list<non-empty-string>|false $toolTests */
+        $toolTests = glob($monorepo->root . '/tools/*/tests', GLOB_ONLYDIR);
+        \assert($toolTests !== false);
+        $tools = new self($monorepo, $toolTests);
         $errors = [];
 
         foreach ($tools->skips() as [, $path, $package, $file]) {
             if (!file_exists($path)) {
                 $errors[] = \sprintf(
                     '%s/%s: the skipped path %s does not exist, fix or remove the skip.',
-                    $package->path(),
+                    $package->path,
                     Monorepo::MANIFEST,
                     $file,
                 );
@@ -123,8 +123,12 @@ final class Tools
         return $tools;
     }
 
+    /**
+     * @param list<non-empty-string> $toolTests tests/ of every tool
+     */
     private function __construct(
         private readonly Monorepo $monorepo,
+        private readonly array $toolTests,
     ) {}
 
     /**
@@ -133,7 +137,7 @@ final class Tools
     public function ignoreOptionalDependencies(Configuration $config): Configuration
     {
         foreach ($this->monorepo->packages as $package) {
-            $src = $this->monorepo->root . '/' . $package->path() . '/src';
+            $src = $this->monorepo->root . '/' . $package->path . '/src';
 
             foreach ($package->manifest->optional as $dependency) {
                 if (str_starts_with($dependency, 'ext-')) {
@@ -156,7 +160,7 @@ final class Tools
         foreach ($this->monorepo->packages as $package) {
             foreach ($package->manifest->skip as $skip) {
                 foreach ($skip->paths as $file) {
-                    yield [$skip, $this->monorepo->root . '/' . $package->path() . '/' . $file, $package, $file];
+                    yield [$skip, $this->monorepo->root . '/' . $package->path . '/' . $file, $package, $file];
                 }
             }
         }

@@ -121,7 +121,7 @@ final class Plan
                 $changelog = Changelog::parse($content, $path);
                 $this->unreleased[$package] = $changelog->unreleased;
 
-                if ($changelog->topVersion() !== null) {
+                if ($changelog->topVersion !== null) {
                     $headings[$package] = $changelog->top();
                 }
             } catch (MonorepoException $exception) {
@@ -159,7 +159,7 @@ final class Plan
             return $reasons !== [] ? null : new Release(
                 package: $package,
                 version: $version,
-                tag: $version->tag(),
+                tag: $version->tag,
                 commit: $split,
                 notes: $notes,
                 tagged: false,
@@ -168,9 +168,9 @@ final class Plan
         }
 
         // The release writes vX.Y.Z: a tag of the version without v is of an older package of the same name.
-        $tag = array_find($tagged, static fn(array $tag) => $tag['name'] === $version->tag());
+        $tag = array_find($tagged, static fn(array $tag) => $tag['name'] === $version->tag);
         $repository = Repositories::ORGANIZATION . '/' . $package;
-        $existing = \sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($version->tag()));
+        $existing = \sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($version->tag));
 
         if ($tag === null || $this->api->get($existing) !== null) {
             return null;

@@ -10,13 +10,17 @@ namespace Thesis\Amqp;
  * @api
  * @implements \IteratorAggregate<int, Delivery>
  */
-final readonly class Batch implements \IteratorAggregate, \Countable
+final class Batch implements \IteratorAggregate, \Countable
 {
+    private Delivery $last {
+        get => array_last($this->deliveries);
+    }
+
     /**
      * @param non-empty-list<Delivery> $deliveries in the order of delivery
      */
     public function __construct(
-        public array $deliveries,
+        public readonly array $deliveries,
     ) {}
 
     /**
@@ -24,7 +28,7 @@ final readonly class Batch implements \IteratorAggregate, \Countable
      */
     public function ack(): void
     {
-        $this->last()->ack(multiple: true);
+        $this->last->ack(multiple: true);
     }
 
     /**
@@ -32,7 +36,7 @@ final readonly class Batch implements \IteratorAggregate, \Countable
      */
     public function nack(bool $requeue = true): void
     {
-        $this->last()->nack(multiple: true, requeue: $requeue);
+        $this->last->nack(multiple: true, requeue: $requeue);
     }
 
     /**
@@ -49,10 +53,5 @@ final readonly class Batch implements \IteratorAggregate, \Countable
     public function count(): int
     {
         return \count($this->deliveries);
-    }
-
-    private function last(): Delivery
-    {
-        return array_last($this->deliveries);
     }
 }

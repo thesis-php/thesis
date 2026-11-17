@@ -40,6 +40,13 @@ final class Connection
     public private(set) ?ConnectionClosed $closed = null;
 
     /**
+     * @var positive-int the size of the body frames: the negotiated maximum, or that of RabbitMQ when there is none
+     */
+    public int $bodyFrameMax {
+        get => $this->frameMax === 0 ? Frames::DEFAULT_MAX : max(Frames::OVERHEAD + 1, $this->frameMax);
+    }
+
+    /**
      * @var array<int, ChannelHandler>
      */
     private array $channels = [];
@@ -115,16 +122,6 @@ final class Connection
             frameMax: $tune->frameMax,
             heartbeat: $tune->heartbeat,
         );
-    }
-
-    /**
-     * The size of the body frames: the negotiated maximum, or that of RabbitMQ when there is none.
-     *
-     * @return positive-int
-     */
-    public function bodyFrameMax(): int
-    {
-        return $this->frameMax === 0 ? Frames::DEFAULT_MAX : max(Frames::OVERHEAD + 1, $this->frameMax);
     }
 
     /**

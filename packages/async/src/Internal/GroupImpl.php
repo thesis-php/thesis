@@ -78,7 +78,7 @@ final class GroupImpl implements Group
         $bodyScope->endCallbacks();
 
         if ($error !== null) {
-            if ($error instanceof Cancelled && $bodyScope->isCancelled()) {
+            if ($error instanceof Cancelled && $bodyScope->isCancelled) {
                 // Either an outer cancellation or a consequence of a task failure. The tasks see it through the tree,
                 // so there is nothing to cancel here: it is rethrown after join(), unless a failure takes precedence.
                 $group->cancelled = $error;
@@ -155,7 +155,7 @@ final class GroupImpl implements Group
 
     public function cancelTasks(): void
     {
-        if (!$this->tasksScope->isCancelled()) {
+        if (!$this->tasksScope->isCancelled) {
             $this->tasksCancelled = true;
             $this->tasksScope->cancel(CancelCause::CancelTasks, by: Scope::current());
         }
@@ -216,7 +216,7 @@ final class GroupImpl implements Group
                         continue;
                     }
 
-                    if ($this->bodyScope->isCancelled()) {
+                    if ($this->bodyScope->isCancelled) {
                         // Revolt's error replaces the group's failure: it is not lost, unless it is the same deadlock.
                         if ($this->error !== null && $this->error !== $dry) {
                             Suppressed::add($error, $this->error);
@@ -273,7 +273,7 @@ final class GroupImpl implements Group
                 Scope::$tracer?->ended($scope, $value, null);
                 $handle->complete($value);
             } catch (\Throwable $error) {
-                if ($error instanceof Cancelled && $scope->isCancelled()) {
+                if ($error instanceof Cancelled && $scope->isCancelled) {
                     // Cancellation is not a failure: it does not bring the group down.
                     Scope::$tracer?->ended($scope, null, $error);
                     $handle->fail(new TaskCancelled($error));
@@ -285,7 +285,7 @@ final class GroupImpl implements Group
                         !$daemon
                         && !$this->tasksCancelled
                         && !$handle->cancelledByHandle
-                        && $this->bodyScope->isCancelled()
+                        && $this->bodyScope->isCancelled
                     ) {
                         $this->cancelled ??= $error;
                     }

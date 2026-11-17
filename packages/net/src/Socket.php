@@ -246,7 +246,7 @@ final class Socket implements Reader, Writer, Closer
             $method = $tls->minVersion->clientMethod();
             $captured = true;
         } else {
-            $options = $tls->contextOptions();
+            $options = $tls->contextOptions;
             $method = $tls->minVersion->serverMethod();
             $captured = $tls->clientCaFile !== null;
         }

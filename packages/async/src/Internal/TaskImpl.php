@@ -42,7 +42,7 @@ final class TaskImpl implements Task
 
     public function cancel(): void
     {
-        if (!$this->scope->isCancelled()) {
+        if (!$this->scope->isCancelled) {
             $this->cancelledByHandle = true;
             $this->scope->cancel(CancelCause::Handle, by: Scope::current());
         }

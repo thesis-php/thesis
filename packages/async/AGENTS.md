@@ -100,7 +100,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
   `CURRENT_SCOPE`). Per-fiber state (`CURRENT_SCOPE`, `CONTEXT`, the locks of `synchronized()`) is a plain
   `WeakMap` keyed by `Internal\fiberKey()`, by the rules of `agents/fibers.md` (`valueGoesAwayWithFiber`).
 - Cancellation is propagated eagerly: `Scope::notify()` marks every scope of the non-shielded subtree, and a new scope
-  inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the
+  inherits the mark from its parent unless it is a shield. `Scope::$isCancelled` stays a flag read; do not walk the
   tree. One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
   A wait subscribes its `ContinuationImpl` itself (`Scope::subscribe()`/`unsubscribe()`), without allocating closures.
 - The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`Scope::now()`, null if
@@ -160,7 +160,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
   once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was.
   A hook goes where the outcome is decided (the task callback of `GroupImpl::start()`, after `join()`, `Expired::run()`,
   `shield()`), never into `Scope::run()` or `ContinuationImpl`. `ScopeCancelled` is emitted after `notify()`, so the
-  listener never runs in the middle of the walk, and the tracer finds the scopes it reached by `isCancelled()`
+  listener never runs in the middle of the walk, and the tracer finds the scopes it reached by `$isCancelled`
   among its pending ones instead of walking the tree again. An event that no listener of the attached dispatchers
   gets is not built (`Tracer::listens()`, cached until the dispatchers change), but its scope is numbered anyway:
   the numbers never depend on what is listened to. Every `Scope::cancel()` names its `CancelCause` and the

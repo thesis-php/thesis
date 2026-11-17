@@ -61,7 +61,7 @@ final readonly class ClientTls
                 'ciphers' => $this->ciphers,
                 // The context of a connected socket is its own, so the captured certificate is this peer's.
                 'capture_peer_cert' => true,
-                ...$this->certificate?->contextOptions() ?? [],
+                ...$this->certificate->contextOptions ?? [],
             ],
             callback: static fn(mixed $value) => $value !== null,
         );

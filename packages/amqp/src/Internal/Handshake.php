@@ -29,7 +29,7 @@ use function Thesis\Time\toSec;
  *
  * @internal
  */
-final readonly class Handshake
+final class Handshake
 {
     private const array CAPABILITIES = [
         'publisher_confirms' => true,
@@ -41,11 +41,43 @@ final readonly class Handshake
         'per_consumer_qos' => true,
     ];
 
-    private Buffer $in;
+    private readonly Buffer $in;
+
+    /**
+     * A field table without its length.
+     */
+    private string $amqPlain {
+        get {
+            $buffer = new Buffer();
+            Fields::writeTable($buffer, ['LOGIN' => $this->config->user, 'PASSWORD' => $this->config->password]);
+            $buffer->skip(4);
+
+            return $buffer->drain();
+        }
+    }
+
+    /**
+     * @var array<string, mixed>
+     */
+    private array $clientProperties {
+        get {
+            $properties = [
+                'product' => 'thesis/amqp',
+                'platform' => 'PHP ' . PHP_VERSION,
+                'capabilities' => self::CAPABILITIES,
+            ];
+
+            if ($this->config->connectionName !== null) {
+                $properties['connection_name'] = $this->config->connectionName;
+            }
+
+            return $properties;
+        }
+    }
 
     private function __construct(
-        private Socket $socket,
-        private Config $config,
+        private readonly Socket $socket,
+        private readonly Config $config,
     ) {
         $this->in = new Buffer();
     }
@@ -74,7 +106,7 @@ final readonly class Handshake
         $start = $this->expect(ConnectionStart::class);
         [$mechanism, $response] = $this->authenticate($start);
         $this->send(new ConnectionStartOk(
-            clientProperties: $this->clientProperties(),
+            clientProperties: $this->clientProperties,
             mechanism: $mechanism->value,
             response: $response,
             locale: 'en_US',
@@ -161,7 +193,7 @@ final readonly class Handshake
 
             $response = match ($mechanism) {
                 AuthMechanism::Plain => "\0{$this->config->user}\0{$this->config->password}",
-                AuthMechanism::AmqPlain => $this->amqPlain(),
+                AuthMechanism::AmqPlain => $this->amqPlain,
                 AuthMechanism::External => '',
             };
 
@@ -176,36 +208,6 @@ final readonly class Handshake
             ),
             $start->mechanisms,
         ));
-    }
-
-    /**
-     * A field table without its length.
-     */
-    private function amqPlain(): string
-    {
-        $buffer = new Buffer();
-        Fields::writeTable($buffer, ['LOGIN' => $this->config->user, 'PASSWORD' => $this->config->password]);
-        $buffer->skip(4);
-
-        return $buffer->drain();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function clientProperties(): array
-    {
-        $properties = [
-            'product' => 'thesis/amqp',
-            'platform' => 'PHP ' . PHP_VERSION,
-            'capabilities' => self::CAPABILITIES,
-        ];
-
-        if ($this->config->connectionName !== null) {
-            $properties['connection_name'] = $this->config->connectionName;
-        }
-
-        return $properties;
     }
 
     /**
