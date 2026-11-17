@@ -7,9 +7,13 @@ use ShipMonk\ComposerDependencyAnalyser\Config\ErrorType;
 
 $root = dirname(__DIR__);
 $config = new Configuration();
-// phpstan/phpstan is a phar, the analyser autoloads only its own classes, not nikic/php-parser bundled in it,
-// which an extension of PHPStan uses.
-$config->ignoreUnknownClassesRegex('~^PhpParser\\\~');
+// An extension of PHPStan uses nikic/php-parser bundled in the phar of phpstan/phpstan. The analyser finds
+// its classes in the copy that infection/infection installs and takes them for a dependency that is not listed.
+$config->ignoreErrorsOnPackageAndPath(
+    packageName: 'nikic/php-parser',
+    path: $root . '/packages/phpstan-extension/src',
+    errorTypes: [ErrorType::SHADOW_DEPENDENCY],
+);
 /** @var array{optional: array<string, list<string>>, fixer: list<string>, rector: array<string, list<string>>} */
 $manifests = require __DIR__ . '/manifests.php';
 

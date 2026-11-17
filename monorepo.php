@@ -39,10 +39,12 @@ return new Config(
         'ext-tokenizer' => '*',
         'ext-zlib' => '*',
         'composer/semver' => '^3.4',
+        'infection/infection' => '^0.33',
         'llm/skills' => '^1.17',
         'symfony/console' => '^8.0',
         'symfony/var-dumper' => '^8.0',
         'testo/assert' => '^0.1.17',
+        'testo/bridge-infection' => '^0.1.9',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
@@ -54,6 +56,7 @@ return new Config(
         'Thesis\TraceRecorder\Tests\\' => 'tools/trace-recorder/tests/',
     ],
     allowPlugins: [
+        'infection/extension-installer' => true,
         'llm/skills' => true,
     ],
 );

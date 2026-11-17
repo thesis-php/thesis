@@ -15,6 +15,11 @@
         },
     },
     "tmpDir": "../var",
+    "testFramework": "testo",
+    // Infection looks for the config of any test framework (testo.php) in phpUnit.configDir.
+    "phpUnit": {
+        "configDir": "..",
+    },
     "minCoveredMsi": 99,
     "mutators": {
         "@default": true,

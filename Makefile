@@ -100,7 +100,7 @@ test: var vendor up ## Run tests [P=] [DRIVER=]
 .PHONY: test
 
 infect: var vendor ## Run mutation testing [P=]
-	$(RUN) infection --configuration=tools/infection.json5 --show-mutations $(if $(P),--filter=packages/$(P)/src --test-framework-options=--suite=$(P)) $(ARGS)
+	$(RUN) vendor/bin/infection --configuration=tools/infection.json5 --show-mutations --threads=max $(if $(P),--filter=packages/$(P)/src --test-framework-options=--suite=$(P)) $(ARGS)
 .PHONY: infect
 
 # CI

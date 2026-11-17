@@ -56,10 +56,12 @@
         "ext-zlib": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
+        "infection/infection": "^0.33",
         "llm/skills": "^1.17",
         "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
+        "testo/bridge-infection": "^0.1.9",
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
         "testo/lifecycle": "^0.1.9",
@@ -156,6 +158,7 @@
     },
     "config": {
         "allow-plugins": {
+            "infection/extension-installer": true,
             "llm/skills": true
         }
     }
