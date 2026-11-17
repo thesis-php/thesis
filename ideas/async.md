@@ -78,8 +78,12 @@ own their background work.
 
 `Io\Poll` gives epoll and kqueue without an extension, instead of `stream_select()` (O(n) a tick,
 `FD_SETSIZE` = 1024). The default way is a driver of Revolt on it, so everything gets it. A loop of our own pays
-only with effects, where the scheduler must see every suspension. Not run: written from the RFC.
+only with effects, where the scheduler must see every suspension. Checked on 8.6.0RC7: `Io\Poll\Context::wait()`
+takes a `?Time\Duration`, so the float boundary of Revolt goes away; `Epoll` and `Poll` in the Linux image.
+Not run as a loop yet.
 
+- The other way round: our loop is the bottom, and a Revolt `Driver` on it (`EventLoop::setDriver()`) is the adapter
+  for amphp and raw Revolt callbacks. It owns the `Suspension` of Revolt, so the scheduler sees their waits too.
 - `Io\Poll` has no timers or signals: a timer queue of our own, the wait until the nearest timer;
   signals by `pcntl_async_signals()` and a self-pipe.
 - Almost every timer of `timeout()` is cancelled before it fires, so cancelling is what to make cheap:
