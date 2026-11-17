@@ -86,6 +86,29 @@ final class ExceptionallyTest
         Assert::same($this->passedOn, ['suppressed']);
     }
 
+    public function skipsTheStandardHandlerWhenThePreviousOneHandlesTheError(): void
+    {
+        error_clear_last();
+
+        exceptionally(static fn() => @trigger_error('suppressed', E_USER_WARNING));
+
+        Assert::null(error_get_last());
+    }
+
+    public function passesToTheStandardHandlerWhenThePreviousOneReturnsFalse(): void
+    {
+        set_error_handler(static fn() => false);
+        error_clear_last();
+
+        try {
+            exceptionally(static fn() => @trigger_error('suppressed', E_USER_WARNING));
+        } finally {
+            restore_error_handler();
+        }
+
+        Assert::same(error_get_last()['message'] ?? null, 'suppressed');
+    }
+
     public function passesDeprecationsOnByDefault(): void
     {
         exceptionally(static fn() => deprecate('deprecated'));
