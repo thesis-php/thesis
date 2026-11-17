@@ -8,8 +8,8 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Instant;
+use function Thesis\Async\burnCpu;
 use function Thesis\Async\delay;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\hours;
 use function Thesis\Time\sec;
 
@@ -26,7 +26,7 @@ final class VirtualTimeTest
         $realStart = hrtime(true);
 
         delay(hours(1));
-        advance(sec(1));
+        burnCpu(sec(1));
 
         Assert::equals(Instant::now()->since($start), sec(3601));
         Assert::int(hrtime(true) - $realStart)->lessThan(1_000_000_000);
@@ -36,6 +36,6 @@ final class VirtualTimeTest
     {
         Expect::exception(\LogicException::class);
 
-        advance(sec(1));
+        burnCpu(sec(1));
     }
 }

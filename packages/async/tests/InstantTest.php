@@ -9,7 +9,6 @@ use Testo\Test;
 use Time\Duration;
 use Time\TimeException;
 use function Thesis\Async\Tests\thrown;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -20,7 +19,7 @@ final class InstantTest
     {
         $elapsed = Instant::elapsed(static function () {
             delay(sec(2));
-            advance(ms(500));
+            burnCpu(ms(500));
         });
 
         Assert::equals($elapsed, ms(2500));

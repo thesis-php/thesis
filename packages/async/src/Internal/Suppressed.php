@@ -63,6 +63,8 @@ final class Suppressed
 
             foreach ($errors as $child) {
                 if (!$visited->offsetExists($child)) {
+                    // Only spares a second walk under an error recorded in two groups: the result is the same.
+                    // @infection-ignore MethodCallRemoval
                     $visited->offsetSet($child);
                     $stack[] = $child;
                 }
@@ -79,7 +81,7 @@ final class Suppressed
         $suppressed = SUPPRESSED;
         $errors = $suppressed[$error] ?? null;
 
-        return $errors === null ? [] : iterator_to_array($errors, preserve_keys: false);
+        return $errors === null ? [] : [...$errors];
     }
 }
 

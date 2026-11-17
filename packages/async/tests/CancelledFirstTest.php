@@ -8,7 +8,6 @@ use Testo\Assert;
 use Testo\Test;
 use Thesis\Dispatcher;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Async\VirtualTime\run;
 use function Thesis\Time\sec;
 
 /**
@@ -60,7 +59,7 @@ final class CancelledFirstTest
 
         foreach (self::cases() as $case) {
             $expected = self::expected(works: $case['works'], actions: $case['actions']);
-            $actual = run(static fn() => self::actual(...$case));
+            $actual = virtualTime(static fn() => self::actual(...$case));
 
             if ($actual !== $expected) {
                 $mismatches[] = \sprintf('%s: %s, expected %s', json_encode($case), $actual, $expected);

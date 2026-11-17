@@ -94,7 +94,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   so a `Cancelled` from it means the operation did not happen. The count is not reset after that yield: the tick's defer
   has done it, and other callers of a shared pacer may have counted since (a reset let N fibers pass N × `$perTick`).
   Only if no reset has happened during the yield, the defer was dropped with its driver, and the yield resets the count:
-  otherwise a pacer that outlives a driver (`stdout()` of thesis/io across `VirtualTime\run()`) yields on every call.
+  otherwise a pacer that outlives a driver (`stdout()` of thesis/io across `virtualTime()`) yields on every call.
   Calls under the limit do not check cancellation: a fast path stays a counter increment.
 - Revolt callbacks must return `null`: use a closure with a body (`function () { $continuation->resume(); }`), not
   `fn() => $continuation->resume()`.
@@ -112,17 +112,17 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   none), the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the
   clock; `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
 - `Internal\Scope::now()` is the only clock of the library (`Instant`, deadlines, the rate limiters): never call
-  `hrtime()` or `microtime()` elsewhere. Within `VirtualTime\run()`, it reads `Internal\Scope::$virtualClock`, bound by
-  `run()`: never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on
-  `Scope`, not on `Internal\VirtualClock`, so that an application that never calls `run()` never loads the class. The
+  `hrtime()` or `microtime()` elsewhere. Within `virtualTime()`, it reads `Internal\Scope::$virtualClock`, bound by
+  `virtualTime()`: never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on
+  `Scope`, not on `Internal\VirtualClock`, so that an application that never calls `virtualTime()` never loads the class. The
   clock is not read in `suspend()`. The virtual clock starts at `Scope::now()` rounded up to a whole second, not at
-  zero: a time captured before `run()` stays in the past.
+  zero: a time captured before `virtualTime()` stays in the past.
 - `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run during two pumps in a
   row: the pump is a defer, and the defers of a tick run before the stream and signal callbacks found ready in it,
   so after one idle pump a stream written to inside the process may still be ready behind it.
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
-  `VirtualTime\run()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is
+  `virtualTime()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is
   finished.
 - A rate limiter keeps absolute times and sleeps once per call, without sleeping again after the wake-up:
   a wake-up a hair early (Revolt's timers are float seconds) must not loop on a delay too small to move the clock.
@@ -132,10 +132,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   keeps the schedule: a real timer is late on every call, and restarting from each wake-up ran a `burst: 1` limiter
   a quarter below its rate.
 - A duration passed in is `Time\Duration` only (`delay()`, `timeout()`, `timeoutOr()`, `StreamWatcher::delay()`,
-  the window of the rate limiter, `VirtualTime\advance()`), and `remaining()` returns one. A point in time is `Instant`,
+  the window of the rate limiter, `burnCpu()`), and `remaining()` returns one. A point in time is `Instant`,
   not a `Duration` (as `thesis/time` decided) and not a float: the difference of two is a `Duration`.
   Its shape follows the `Instant` sketched in the future scope of the Duration RFC: `add(Duration)`, the difference
-  is a signed `Duration`, no adding of two instants. A native one would not follow `VirtualTime\run()`, so ours stays
+  is a signed `Duration`, no adding of two instants. A native one would not follow `virtualTime()`, so ours stays
   even then; it may wrap the native one. A rate (`$perSecond`) is not a duration and stays a float.
 - Inside, time is `int` nanoseconds: `Internal\Scope::now()` is `hrtime(true)` or the virtual clock, and so are
   the deadlines, `Instant`, the rate limiters and the virtual timers. Exact like `Duration` (the same representation,
@@ -218,16 +218,23 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo-plugin in `testo.plugins.php`; no attribute is
   needed): delays are whole seconds (`delay(sec(1))`), a wait that only a cancellation ends is `never()` from
   `tests/helpers.php`, durations are asserted exactly (`Assert::same(secondsSince($start), 20.0)`,
-  `Assert::equals(remaining(), sec(990))`), and busy code is `VirtualTime\advance()`, not a loop on the real clock. Keep
+  `Assert::equals(remaining(), sec(990))`), and busy code is `burnCpu()`, not a loop on the real clock. Keep
   a real `delay()` where its timer matters: a test of `delay()` itself, or a timer that keeps the loop alive. Real time
   is only for what virtual time cannot model.
 - A limiter, a pacer or a clock is tested beyond one caller on time: with several callers sharing it, with a blocked
-  loop (`VirtualTime\advance()` while a caller sleeps), with a wake-up late by less than its interval (what a real timer
+  loop (`burnCpu()` while a caller sleeps), with a wake-up late by less than its interval (what a real timer
   does on every call, invisible on virtual time otherwise), with the longest `Duration` or an extreme rate, and, if it
-  keeps a callback in the loop across calls, after that callback is dropped with its driver (`VirtualTime\run()` drops
+  keeps a callback in the loop across calls, after that callback is dropped with its driver (`virtualTime()` drops
   what is left). None of these was tested, and each hid a defect.
 - A stream or a signal on virtual time is tested with another timer pending (a `timeout()` around it):
   without one, the pump stops while the inner driver waits, and the jump past a ready stream is never seen.
+- Whether `Internal\VirtualTimeDriver` keeps the loop alive is seen by what runs before it ends: a pump left
+  referenced for one tick runs an unreferenced defer (`unreferencedDeferRuns()` of `VirtualTimeTest`), one left
+  for two jumps the clock to an unreferenced timer (`secondsSince()` after the loop has ended). The callback
+  of that timer is no witness: its firing defer is unreferenced, so it never runs after the loop has ended.
+- A lock held for one method is `synchronized($mutex, $this->method(...))`, not `acquire()` with a release
+  in `finally`: `Lock` releases itself in its destructor too, so mutation testing shows the `finally`
+  as code no test tells apart (the rate limiters).
 - An outer cancellation is tested against everything the group may have cancelled itself before it:
   daemons, `Task::cancel()`, `cancelTasks()`, the losers of `race()` and `some()`.
 - A behaviour that depends on combinations is also checked on generated programs: `RandomizedVirtualTimeTest`
@@ -235,7 +242,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   combination against a model of who cancelled first). A new way to wait on virtual time or to cancel a task
   is added to them. A combination that cannot behave differently from another one is left out (a cleanup
   of a task that ends before anything cancels it): `CancelledFirstTest` once took a third of the suite.
-  Rejected: running the cases concurrently in one `run()`, it was five times slower (thousands of live fibers).
+  Rejected: running the cases concurrently in one `virtualTime()`, it was five times slower (thousands of live fibers).
   Rejected: a random stress of groups, channels and semaphores with general checks.
   It never found a defect, not even the ones a review found by reading, and its seed reproduces only on one driver.
 - Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a

@@ -8,7 +8,6 @@ use Testo\Assert;
 use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -35,7 +34,7 @@ final class RemainingTest
     {
         [$before, $after] = timeout(sec(1000), static function () {
             $before = remaining();
-            advance(sec(2));
+            burnCpu(sec(2));
 
             return [$before, remaining()];
         });
@@ -89,7 +88,7 @@ final class RemainingTest
 
         thrown(static function () use (&$observed) {
             timeout(sec(1), static function () use (&$observed) {
-                advance(sec(2));
+                burnCpu(sec(2));
                 $observed = [remaining(), isCancelled()];
                 never();
             });

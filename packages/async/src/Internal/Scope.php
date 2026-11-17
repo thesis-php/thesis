@@ -30,9 +30,9 @@ final class Scope
     public const int LONGEST_DURATION = 9_223_372_035_999_999_999;
 
     /**
-     * The clock of {@see self::now()} while `Thesis\Async\VirtualTime\run()` runs, bound by it.
+     * The clock of {@see self::now()} while `Thesis\Async\virtualTime()` runs, bound by it.
      * Here, not found through the event loop driver, which may be decorated;
-     * and here, not on {@see VirtualClock}, so that the class is loaded only if `run()` is used.
+     * and here, not on {@see VirtualClock}, so that the class is loaded only if `virtualTime()` is used.
      */
     public static ?VirtualClock $virtualClock = null;
 
@@ -93,9 +93,10 @@ final class Scope
             if (!$shield) {
                 // The parent's subtree has been notified before this scope existed.
                 $this->cancelled = $parent->cancelled;
-                $deadline = $deadline === null || $parent->deadline === null
-                    ? $deadline ?? $parent->deadline
-                    : min($deadline, $parent->deadline);
+
+                if ($parent->deadline !== null) {
+                    $deadline = $deadline === null ? $parent->deadline : min($deadline, $parent->deadline);
+                }
             }
         }
 
@@ -234,6 +235,8 @@ final class Scope
         }
 
         $pending = true;
+        // Never read: $fire runs only after $id is its own id. Only a capture by reference needs it defined.
+        // @infection-ignore DecrementInteger, IncrementInteger
         $id = 0;
         // Queued once at most, by notify() or right here, and maybe called
         // earlier by endCallbacks(): only the first call counts.
@@ -266,12 +269,11 @@ final class Scope
      */
     public function close(): void
     {
-        try {
-            $this->endCallbacks();
-        } finally {
-            if ($this->parent !== null) {
-                unset($this->parent->children[spl_object_id($this)]);
-            }
+        // Never throws: a callback that throws goes to the event loop.
+        $this->endCallbacks();
+
+        if ($this->parent !== null) {
+            unset($this->parent->children[spl_object_id($this)]);
         }
     }
 
@@ -310,7 +312,7 @@ final class Scope
 
     /**
      * Monotonic, in nanoseconds: the clock Revolt's timers run on. The only clock of the library:
-     * `Thesis\Async\Instant` too. Within `Thesis\Async\VirtualTime\run()`, {@see $virtualClock} instead.
+     * `Thesis\Async\Instant` too. Within `Thesis\Async\virtualTime()`, {@see $virtualClock} instead.
      * Not on the hot path of a wait: only a deadline, {@see remaining()} and the rate limiters read the clock.
      */
     public static function now(): int

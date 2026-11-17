@@ -105,7 +105,6 @@
             "packages/amqp/src/Internal/internal.php",
             "packages/async/src/Internal/internal.php",
             "packages/async/src/Trace/api.php",
-            "packages/async/src/VirtualTime/api.php",
             "packages/async/src/api.php",
             "packages/async/src/platform.php",
             "packages/exceptionally/src/api.php",

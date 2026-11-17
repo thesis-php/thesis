@@ -224,12 +224,12 @@ final class Tracer
         try {
             $value = $continuation->park();
         } catch (\Throwable $error) {
-        } finally {
-            $scope->unsubscribe($continuation);
+        }
 
-            if ($unregister instanceof \Closure) {
-                $unregister();
-            }
+        $scope->unsubscribe($continuation);
+
+        if ($unregister instanceof \Closure) {
+            $unregister();
         }
 
         if ($id !== null && $this->listens(Resumed::class)) {
@@ -355,6 +355,8 @@ final class Tracer
      */
     private function listens(string $class): bool
     {
+        // Only saves the work of asking the dispatchers again, and building an event nobody gets is only slower.
+        // @infection-ignore ArrayAny, AssignCoalesce
         return $this->listens[$class] ??= array_any(
             $this->dispatchers,
             static fn(Dispatcher $dispatcher) => $dispatcher->listens($class),

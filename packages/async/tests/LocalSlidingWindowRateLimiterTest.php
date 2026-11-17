@@ -77,11 +77,11 @@ final class LocalSlidingWindowRateLimiterTest
 
     public function limiterUsedOutsideRunWorksInside(): void
     {
-        delay(sec(100)); // the clock of the inner run() must not start behind the time the limiter has seen
+        delay(sec(100)); // the clock of the inner virtualTime() must not start behind the time the limiter has seen
         $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: sec(1));
         $limiter->wait();
 
-        $elapsed = VirtualTime\run(static function () use ($limiter) {
+        $elapsed = virtualTime(static function () use ($limiter) {
             $start = Instant::now();
             $limiter->wait();
 
@@ -130,6 +130,27 @@ final class LocalSlidingWindowRateLimiterTest
     {
         $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: sec(1000));
 
+        $thrown = timeout(sec(1), static function () use ($limiter) {
+            untilCancelled();
+
+            try {
+                $limiter->wait();
+            } catch (Cancelled $cancelled) {
+                return $cancelled;
+            }
+
+            return null;
+        });
+
+        Assert::null($thrown);
+    }
+
+    public function waitAsOldestStartLeavesWindowDoesNotSuspend(): void
+    {
+        $limiter = new LocalSlidingWindowRateLimiter(limit: 1, window: sec(1));
+        $limiter->wait();
+
+        // Cancelled exactly as the first call leaves the window.
         $thrown = timeout(sec(1), static function () use ($limiter) {
             untilCancelled();
 

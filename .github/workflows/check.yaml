@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [async-trace, cache, dispatcher, exceptionally, formatter, io, net, source-location, testo-plugin, time]
+        package: [async, async-trace, cache, dispatcher, exceptionally, formatter, io, net, source-location, testo-plugin, time]
     steps:
       - uses: actions/checkout@v6
       - run: make infect P=${{ matrix.package }}

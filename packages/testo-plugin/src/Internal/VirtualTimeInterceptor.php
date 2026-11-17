@@ -9,7 +9,7 @@ use Testo\Core\Context\TestResult;
 use Testo\Pipeline\Attribute\InterceptorOptions;
 use Testo\Pipeline\Middleware\TestRunInterceptor;
 use Testo\Pipeline\Policy\ConflictPolicy;
-use function Thesis\Async\VirtualTime\run;
+use function Thesis\Async\virtualTime;
 
 /**
  * Outer to the lifecycle hooks, which run right before the test, and inner to data providers:
@@ -26,6 +26,6 @@ final readonly class VirtualTimeInterceptor implements TestRunInterceptor
     public function runTest(TestInfo $info, callable $next): TestResult
     {
         /** @var TestResult */
-        return run(static fn(): mixed => $next($info));
+        return virtualTime(static fn(): mixed => $next($info));
     }
 }

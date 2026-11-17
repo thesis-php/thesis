@@ -14,7 +14,6 @@ use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -123,7 +122,7 @@ final class TimeoutTest
             timeout(sec(1), static function () use (&$inner) {
                 $inner = thrown(static function () {
                     timeout(sec(2), static function () {
-                        advance(sec(5)); // both deadlines expire before anyone looks
+                        burnCpu(sec(5)); // both deadlines expire before anyone looks
                         never();
                     });
                 });

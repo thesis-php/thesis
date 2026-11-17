@@ -68,25 +68,26 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
 
     public function wait(): void
     {
-        $lock = $this->mutex->acquire();
+        synchronized($this->mutex, $this->start(...));
+    }
 
-        try {
-            $oldestStart = $this->starts[$this->oldest] ?? null;
-            $leavesAt = $oldestStart === null ? PHP_INT_MIN : $oldestStart + $this->window;
-            // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
-            $leavesAt = \is_int($leavesAt) ? $leavesAt : PHP_INT_MAX;
-            $now = Scope::now();
+    private function start(): void
+    {
+        $oldestStart = $this->starts[$this->oldest] ?? null;
+        $leavesAt = $oldestStart === null ? PHP_INT_MIN : $oldestStart + $this->window;
+        // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
+        $leavesAt = \is_int($leavesAt) ? $leavesAt : PHP_INT_MAX;
+        $now = Scope::now();
 
-            // Sleeps once and does not sleep again: Revolt's timers are float seconds, and a wake-up a hair early
-            // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
-            if ($leavesAt > $now) {
-                delay(ns(min($leavesAt - $now, Scope::LONGEST_DURATION)));
-            }
-
-            $this->starts[$this->oldest] = max($leavesAt, Scope::now());
-            $this->oldest = ($this->oldest + 1) % $this->limit;
-        } finally {
-            $lock->release();
+        // Sleeps once and does not sleep again: Revolt's timers are float seconds, and a wake-up a hair early
+        // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
+        if ($leavesAt > $now) {
+            delay(ns(min($leavesAt - $now, Scope::LONGEST_DURATION)));
         }
+
+        $this->starts[$this->oldest] = max($leavesAt, Scope::now());
+        // Every slot in turn: the other direction around the ring is the same ring.
+        // @infection-ignore Plus
+        $this->oldest = ($this->oldest + 1) % $this->limit;
     }
 }

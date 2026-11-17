@@ -275,6 +275,7 @@ final class SuspendTest
         Assert::instanceOf($cancelled, Cancelled::class);
         Assert::same($cancelled->getTrace()[2]['function'] ?? null, 'Thesis\Async\suspend');
         Assert::same(basename($cancelled->getFile()), 'ContinuationImpl.php');
+        Assert::same($cancelled->getLine(), $cancelled->getTrace()[0]['line'] ?? null);
         Assert::same($cancelled->getMessage(), 'The scope is cancelled.');
     }
 

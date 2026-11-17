@@ -62,39 +62,38 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
 
     public function wait(): void
     {
-        $lock = $this->mutex->acquire();
+        synchronized($this->mutex, $this->take(...));
+    }
 
-        try {
+    private function take(): void
+    {
+        $now = Scope::now();
+
+        if ($this->tokenAt($this->taken) <= $now) {
+            $this->fullAt = $now;
+            $this->taken = 0;
+        }
+
+        // The caller sleeps once and does not wait again: Revolt's timers are float seconds,
+        // and a wake-up a hair early would loop on a delay too small to move the clock.
+        // A cancelled delay() throws before the token is taken.
+        $tokenAt = $this->tokenAt($this->taken - $this->burst + 1);
+
+        if ($tokenAt > $now) {
+            delay(ns(min($tokenAt - $now, Scope::LONGEST_DURATION)));
             $now = Scope::now();
 
-            if ($this->tokenAt($this->taken) <= $now) {
+            // The bucket has been full for a whole token interval (the loop was blocked): counted from the old
+            // start, it would be full again right after this token, and $burst + 1 calls would start at once.
+            // A wake-up late by less keeps the schedule: a timer is late on every call,
+            // and the delays would add up.
+            if ($this->tokenAt($this->taken + 1) <= $now) {
                 $this->fullAt = $now;
                 $this->taken = 0;
             }
-
-            // The caller sleeps once and does not wait again: Revolt's timers are float seconds,
-            // and a wake-up a hair early would loop on a delay too small to move the clock.
-            // A cancelled delay() throws before the token is taken.
-            $tokenAt = $this->tokenAt($this->taken - $this->burst + 1);
-
-            if ($tokenAt > $now) {
-                delay(ns(min($tokenAt - $now, Scope::LONGEST_DURATION)));
-                $now = Scope::now();
-
-                // The bucket has been full for a whole token interval (the loop was blocked): counted from the old
-                // start, it would be full again right after this token, and $burst + 1 calls would start at once.
-                // A wake-up late by less keeps the schedule: a timer is late on every call,
-                // and the delays would add up.
-                if ($this->tokenAt($this->taken + 1) <= $now) {
-                    $this->fullAt = $now;
-                    $this->taken = 0;
-                }
-            }
-
-            ++$this->taken;
-        } finally {
-            $lock->release();
         }
+
+        ++$this->taken;
     }
 
     /**
@@ -110,7 +109,8 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
             return PHP_INT_MAX;
         }
 
-        if ($offset <= PHP_INT_MIN) {
+        // Exactly PHP_INT_MIN is an int, and $fullAt plus it is as long ago as PHP_INT_MIN for the clock.
+        if (/* @infection-ignore LessThanOrEqualTo */ $offset <= PHP_INT_MIN) {
             return PHP_INT_MIN;
         }
 

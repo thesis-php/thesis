@@ -9,7 +9,7 @@ use Thesis\Dispatcher;
 
 /**
  * Dispatches the events of the whole scope tree to $dispatcher while $fn runs, of every fiber: run it in {main}
- * around the program, `VirtualTime\run()` inside for a trace that is the same on every run.
+ * around the program, `virtualTime()` inside for a trace that is the same on every run.
  * Observations nest and may overlap in different fibers: each dispatcher gets the events until its own call
  * returns, and a dispatcher passed to two of them gets each event twice. Overlapping observations share
  * the numbers of the scopes, which start from 1 only when none is running: one that begins while another

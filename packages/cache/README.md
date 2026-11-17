@@ -46,7 +46,7 @@ if ($value === $missing) {
 ## `LocalCache`
 
 An in-process cache: values are kept as they are, without serialization. With a `capacity`, the least recently used
-entry is evicted. Expiry follows the clock of `thesis/async`, so tests on `VirtualTime\run()` see entries expire.
+entry is evicted. Expiry follows the clock of `thesis/async`, so tests on `virtualTime()` see entries expire.
 There is no timer: an expired entry is dropped when it is read or by the next `set()`. An entry that leaves the cache
 otherwise (deleted, replaced, evicted) is freed at once. A TTL beyond the range of the clock (about 292 years)
 is no expiry. Every operation is O(1), or O(log n) for an entry with a TTL. `count($cache)` is the number

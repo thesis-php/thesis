@@ -12,6 +12,8 @@ use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Async\Tests\withoutWarnings;
+use function Thesis\Time\ms;
+use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -67,11 +69,11 @@ final class LocalTokenBucketRateLimiterTest
 
     public function limiterCreatedOutsideRunWorksInside(): void
     {
-        delay(sec(100)); // the clock of the inner run() must not start behind the time the limiter has seen
+        delay(sec(100)); // the clock of the inner virtualTime() must not start behind the time the limiter has seen
         $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
         $limiter->wait();
 
-        $elapsed = VirtualTime\run(static function () use ($limiter) {
+        $elapsed = virtualTime(static function () use ($limiter) {
             $start = Instant::now();
             $limiter->wait();
 
@@ -116,6 +118,33 @@ final class LocalTokenBucketRateLimiterTest
         });
 
         Assert::null($thrown);
+    }
+
+    public function tokensComeAtIntervalRoundedToNanoseconds(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 3, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+
+        $limiter->wait();
+        $second = Instant::now()->since($start);
+        $limiter->wait();
+
+        Assert::equals([$second, Instant::now()->since($start)], [ns(333_333_333), ns(666_666_667)]);
+    }
+
+    public function bucketFullExactlyAtCallStartsCountingAnew(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 3, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+        delay(ns(333_333_333));
+
+        $limiter->wait();
+        $limiter->wait();
+
+        // Counted on from the first token, it would be 666 666 667: the second interval rounded up.
+        Assert::equals(Instant::now()->since($start), ns(666_666_666));
     }
 
     public function cancelledSleeperTakesNoToken(): void
@@ -187,7 +216,7 @@ final class LocalTokenBucketRateLimiterTest
             // Blocks the loop while the body sleeps for the next token.
             $group->spawn(static function () {
                 delay(sec(0));
-                VirtualTime\advance(sec(10));
+                burnCpu(sec(10));
             });
 
             $limiter->wait();
@@ -198,6 +227,51 @@ final class LocalTokenBucketRateLimiterTest
         });
 
         Assert::same($starts, [10.0, 11.0]);
+    }
+
+    public function wakeUpLateByOneIntervalAndAHalfTakesTokenFromRefilledBucket(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+
+        $starts = group(static function (Group $group) use ($limiter, $start) {
+            $group->spawn(static function () {
+                delay(sec(0));
+                burnCpu(ms(2500));
+            });
+
+            $limiter->wait();
+            $late = secondsSince($start);
+            $limiter->wait();
+
+            return [$late, secondsSince($start)];
+        });
+
+        Assert::same($starts, [2.5, 3.5]);
+    }
+
+    public function wakeUpLateByExactlyOneIntervalTakesTokenFromRefilledBucket(): void
+    {
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: 3, burst: 1);
+        $limiter->wait();
+        $start = Instant::now();
+
+        $starts = group(static function (Group $group) use ($limiter, $start) {
+            // The second token comes at 666 666 667 ns.
+            $group->spawn(static function () {
+                delay(sec(0));
+                burnCpu(ns(666_666_667));
+            });
+
+            $limiter->wait();
+            $late = Instant::now()->since($start);
+            $limiter->wait();
+
+            return [$late, Instant::now()->since($start)];
+        });
+
+        Assert::equals($starts, [ns(666_666_667), ns(1_000_000_000)]);
     }
 
     /**
@@ -214,7 +288,7 @@ final class LocalTokenBucketRateLimiterTest
             // Blocks the loop while the body sleeps for the next token, due in 2 seconds.
             $group->spawn(static function () {
                 delay(sec(0));
-                VirtualTime\advance(sec(3));
+                burnCpu(sec(3));
             });
 
             $limiter->wait();
@@ -227,9 +301,14 @@ final class LocalTokenBucketRateLimiterTest
         Assert::same($starts, [3.0, 4.0]);
     }
 
-    public function tokenTooFarAwayDoesNotOverflowClock(): void
+    /**
+     * A token 2^63 nanoseconds away is just beyond int: as a float, PHP_INT_MAX is 2^63.
+     */
+    #[DataSet([1e-10])]
+    #[DataSet([1e9 / 9.223372036854775808e18])]
+    public function tokenTooFarAwayDoesNotOverflowClock(float $perSecond): void
     {
-        $limiter = new LocalTokenBucketRateLimiter(perSecond: 1e-10, burst: 1);
+        $limiter = new LocalTokenBucketRateLimiter(perSecond: $perSecond, burst: 1);
         $limiter->wait();
 
         $result = withoutWarnings(static fn() => timeoutOr(

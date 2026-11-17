@@ -64,11 +64,11 @@ final class WaitQueue
     }
 
     /**
-     * @return list<T> every item in the order of arrival; the queue is empty afterwards
+     * @return array<int, T> every item in the order of arrival; the queue is empty afterwards
      */
     public function drain(): array
     {
-        $items = array_values($this->items);
+        $items = $this->items;
         $this->items = [];
         $this->head = $this->tail;
 

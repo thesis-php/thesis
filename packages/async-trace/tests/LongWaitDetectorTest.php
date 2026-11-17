@@ -14,11 +14,11 @@ use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Dispatcher;
+use function Thesis\Async\burnCpu;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -121,7 +121,7 @@ final class LongWaitDetectorTest
         };
         // A listener before the detector takes 2s of the virtual clock.
         $slow = static function (Suspended $event) {
-            advance(sec(2));
+            burnCpu(sec(2));
         };
         $dispatcher = new Dispatcher([$slow, new LongWaitDetector(threshold: sec(1)), $listener]);
         observe($dispatcher, static fn() => group(static function (Group $group) {

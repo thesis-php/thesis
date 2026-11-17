@@ -189,6 +189,22 @@ final class SuppressedTest
         Assert::same(suppressed($third), []);
     }
 
+    public function errorIsNeverSuppressedUnderDescendantBehindLeaf(): void
+    {
+        $first = new \RuntimeException('first');
+        $second = new \RuntimeException('second');
+        $deep = new \RuntimeException('deep');
+        $leaf = new \RuntimeException('leaf');
+        Suppressed::add($second, $deep);
+        Suppressed::add($second, $leaf);
+        Suppressed::add($deep, $first);
+
+        Suppressed::add($first, $second);
+
+        Assert::same(suppressed($first), [$second]);
+        Assert::same(suppressed($deep), []);
+    }
+
     public function nestedGroupsGiveTree(): void
     {
         $innerSecond = null;

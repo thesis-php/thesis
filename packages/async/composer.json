@@ -57,7 +57,6 @@
         "files": [
             "src/Internal/internal.php",
             "src/Trace/api.php",
-            "src/VirtualTime/api.php",
             "src/api.php",
             "src/platform.php"
         ]

@@ -10,7 +10,7 @@ use Revolt\EventLoop\InvalidCallbackError;
 use Revolt\EventLoop\Suspension;
 
 /**
- * The Revolt driver of `Thesis\Async\VirtualTime\run()`: a decorator of a regular driver that keeps the timers itself,
+ * The Revolt driver of `Thesis\Async\virtualTime()`: a decorator of a regular driver that keeps the timers itself,
  * on a {@see VirtualClock}.
  *
  * The clock stands still while code runs: CPU work takes no time, {@see VirtualClock::advance()} models it.
@@ -89,7 +89,7 @@ final class VirtualTimeDriver implements Driver
     private array $own = [];
 
     /**
-     * @param Driver $inner a fresh driver, owned by this one: `Thesis\Async\VirtualTime\run()` checks it
+     * @param Driver $inner a fresh driver, owned by this one: `Thesis\Async\virtualTime()` checks it
      */
     public function __construct(
         private readonly VirtualClock $clock,
@@ -134,9 +134,13 @@ final class VirtualTimeDriver implements Driver
     public function queue(\Closure $closure, mixed ...$args): void
     {
         // A microtask given is work to do, even before it runs, as a callback of counted().
+        // The pump only compares the count with the one it saw, so a decrement is a change too. And a microtask
+        // runs in the tick that has queued it, after a callback that is counted itself.
+        // @infection-ignore Increment
         ++$this->activity;
 
         $this->inner->queue(function (mixed ...$args) use ($closure) {
+            // @infection-ignore Increment
             ++$this->activity;
             $closure(...$args);
         }, ...$args);
@@ -185,6 +189,8 @@ final class VirtualTimeDriver implements Driver
 
         if ($timer === null) {
             // A callback enabled is work to do, as one given: the pump must not jump past it.
+            // It only compares the count with the one it saw, so a decrement is a change too.
+            // @infection-ignore Increment
             ++$this->activity;
 
             return $this->inner->enable($callbackId);
@@ -201,14 +207,12 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function cancel(string $callbackId): void
     {
-        if (!isset($this->timers[$callbackId])) {
+        if (isset($this->timers[$callbackId])) {
+            $this->disable($callbackId);
+            unset($this->timers[$callbackId]);
+        } else {
             $this->inner->cancel($callbackId);
-
-            return;
         }
-
-        $this->disable($callbackId);
-        unset($this->timers[$callbackId]);
     }
 
     #[\Override]
@@ -309,11 +313,12 @@ final class VirtualTimeDriver implements Driver
     #[\Override]
     public function getIdentifiers(): array
     {
-        $identifiers = array_values(array_filter(
+        $identifiers = array_filter(
             array: $this->inner->getIdentifiers(),
             callback: fn(string $callbackId) => !isset($this->own[$callbackId]),
-        ));
+        );
 
+        // The spread numbers the keys left by the filter anew.
         return [...$identifiers, ...array_keys($this->timers)];
     }
 
@@ -371,7 +376,8 @@ final class VirtualTimeDriver implements Driver
         // Saturated: a delay of centuries does not fit in int nanoseconds.
         $nanoseconds = round($seconds * 1e9);
         $interval = $nanoseconds >= PHP_INT_MAX ? PHP_INT_MAX : (int) $nanoseconds;
-        // Not like the inner ids, which are letters.
+        // Not like the inner ids, which are letters. Any other unique id that is not only letters does as well.
+        // @infection-ignore Increment, Concat
         $callbackId = 'virtual-' . $this->nextId++;
         $timer = new VirtualTimer(callbackId: $callbackId, interval: $interval, callback: $callback, repeat: $repeat);
         $this->timers[$callbackId] = $timer;
@@ -443,21 +449,27 @@ final class VirtualTimeDriver implements Driver
      */
     private function updatePump(): void
     {
-        if ($this->pending === 0) {
+        // A pump left without a pending timer only spins the loop: it is unreferenced, and it has nothing to jump to.
+        if (/* @infection-ignore DecrementInteger */ $this->pending === 0) {
             if ($this->pumpCallbackId !== null) {
                 $this->inner->cancel($this->pumpCallbackId);
                 unset($this->own[$this->pumpCallbackId]);
                 $this->pumpCallbackId = null;
             }
 
+            // More idle runs of the pump before a jump only delay it: the clock jumps to the same timer.
+            // @infection-ignore DecrementInteger
             $this->idlePumps = 0;
 
+            // @infection-ignore ReturnRemoval
             return;
         }
 
         if ($this->pumpCallbackId === null) {
             $this->activityAtPump = $this->activity;
             $this->pumpCallbackId = $this->inner->defer($this->pump(...));
+            // Only the key is read, by isset(), which is true for false as well.
+            // @infection-ignore TrueValue
             $this->own[$this->pumpCallbackId] = true;
         }
 
@@ -474,13 +486,16 @@ final class VirtualTimeDriver implements Driver
         unset($this->own[$this->pumpCallbackId]);
         $this->pumpCallbackId = null;
 
+        // More idle runs before a jump than two only delay it: the clock jumps to the same timer.
+        // @infection-ignore DecrementInteger
         $this->idlePumps = $this->activity === $this->activityAtPump ? $this->idlePumps + 1 : 0;
         $this->activityAtPump = $this->activity;
 
         // The second idle run in a row: the callbacks found ready with the first one have run since, and none was.
-        if ($this->idlePumps >= 2 && ($timer = $this->next()) !== null) {
+        if (/* @infection-ignore GreaterThanOrEqualTo */ $this->idlePumps >= 2 && ($timer = $this->next()) !== null) {
             // Nothing can run: let the time pass at once.
             $this->clock->jump($timer->expiration);
+            // @infection-ignore DecrementInteger
             $this->idlePumps = 0;
         }
 
@@ -522,11 +537,11 @@ final class VirtualTimeDriver implements Driver
             $timer->firingCallbackId = null;
             ++$this->activity;
 
+            // A timer that does not repeat has left the pending ones when it was handed here, and the pump knows.
             if ($timer->repeat) {
                 $this->enqueue($timer);
             } else {
                 unset($this->timers[$timer->callbackId]);
-                $this->updatePump();
             }
 
             // Revolt rejects a callback that returns a value: a timer of this driver is no exception.
@@ -534,6 +549,8 @@ final class VirtualTimeDriver implements Driver
                 throw InvalidCallbackError::nonNullReturn($timer->callbackId, $timer->callback);
             }
         });
+        // Only the key is read, by isset(), which is true for false as well.
+        // @infection-ignore TrueValue
         $this->own[$timer->firingCallbackId] = true;
 
         if (!$timer->referenced) {

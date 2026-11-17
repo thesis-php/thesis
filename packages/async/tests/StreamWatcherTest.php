@@ -72,6 +72,8 @@ final class StreamWatcherTest
 
             delay(sec(1));
             $watcher->close();
+            // Before the waits have woken up: the stream is closed right away.
+            assertNoCallbacksLeft();
             fclose($pair[0]);
 
             return array_map(static fn(Task $handle) => $handle->await(), $handles);

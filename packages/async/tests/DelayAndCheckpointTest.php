@@ -11,7 +11,6 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -127,7 +126,7 @@ final class DelayAndCheckpointTest
             timeout(sec(5), static function () use (&$iterations) {
                 while ($iterations < 1000) {
                     ++$iterations;
-                    advance(sec(1));
+                    burnCpu(sec(1));
                     checkpoint();
                 }
             });

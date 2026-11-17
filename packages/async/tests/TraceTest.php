@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Internal\Scope;
 use Thesis\Async\Trace\CancelCause;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
@@ -16,6 +18,7 @@ use Thesis\Async\Trace\TaskCreated;
 use Thesis\Dispatcher;
 use Thesis\SourceLocation\Location;
 use function Thesis\Async\Tests\never;
+use function Thesis\Async\Tests\reaches;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Time\sec;
@@ -43,6 +46,133 @@ final class TraceTest
             '1 #2 returned 42',
             '1 #1 returned null',
         ]);
+    }
+
+    public function tracesResultOfGroup(): void
+    {
+        $log = self::record(static fn() => group(static fn() => 42));
+
+        Assert::same($log->lines, [
+            '0 #1 group in root',
+            '0 #1 joining',
+            '0 #1 returned 42',
+        ]);
+    }
+
+    public function tracesFailureOfTimeoutBody(): void
+    {
+        $log = self::record(static fn() => thrown(static fn() => timeout(sec(1), static function () {
+            throw new \RuntimeException('boom');
+        })));
+
+        Assert::same($log->lines, [
+            '0 #1 timeout 1s in root',
+            '0 #1 threw RuntimeException',
+        ]);
+    }
+
+    public function tracesDeadlockInMain(): void
+    {
+        $log = self::record(static fn() => thrown(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => new Deferred()->await());
+        })));
+
+        Assert::same(\array_slice($log->lines, -2), [
+            '0 #2 threw Cancelled',
+            '0 #1 threw Error',
+        ]);
+    }
+
+    public function tracesJoinGivingUpOnDeadlockInMain(): void
+    {
+        /** @var Deferred<null> */
+        $never = new Deferred();
+
+        $log = self::record(static fn() => thrown(static fn() => group(static function (Group $group) use ($never) {
+            $group->spawn(static fn() => shield($never->await(...)));
+        })));
+
+        Assert::same(\array_slice($log->lines, -1), ['0 #1 threw Error']);
+
+        // lets the orphaned task finish
+        $never->complete();
+        delay(sec(0));
+    }
+
+    public function tracesNoWaitOfRootScope(): void
+    {
+        $log = self::record(static fn() => delay(sec(1)));
+
+        Assert::same($log->lines, []);
+    }
+
+    public function releasesWaitOnceResumed(): void
+    {
+        $value = new \stdClass();
+        $held = null;
+
+        self::record(static function () use ($value, &$held) {
+            timeout(sec(1), static function () use ($value, &$held) {
+                suspend(static function (Continuation $continuation) use ($value) {
+                    $continuation->resume($value);
+                });
+                $held = reaches(Scope::current(), $value);
+            });
+        });
+
+        Assert::false($held);
+    }
+
+    public function reachesNoScopeCancelledBefore(): void
+    {
+        $log = self::record(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => never())->cancel();
+            $group->cancelTasks();
+        }));
+
+        Assert::same(\array_slice($log->lines, 2, 2), [
+            '0 #2 cancelled: Handle by #1 in Thesis\Async\Task::cancel, reached #2',
+            '0 #1 cancelled: CancelTasks by #1 in Thesis\Async\Group::cancelTasks, reached ',
+        ]);
+    }
+
+    public function numbersParentNotSeenBeforeFirst(): void
+    {
+        $log = new TraceLog();
+
+        group(static function (Group $group) use ($log) {
+            observe(new Dispatcher([$log]), static fn() => $group->spawn(static fn() => null));
+        });
+
+        Assert::same($log->lines, ['0 #2 task in #1']);
+    }
+
+    public function locatesWaitOfTaskOfLibraryPastEventLoop(): void
+    {
+        $log = self::record(static fn() => group(static function (Group $group) {
+            $group->spawn(checkpoint(...));
+        }));
+
+        Assert::same($log->lines[4] ?? null, '0 #2 suspended in Thesis\Async\group');
+    }
+
+    public function listenerThrowingAtEndOfTaskDoesNotLeaveGroupWaitingForIt(): void
+    {
+        $listener = static function (Ended $event) {
+            if ($event->scope === 2) {
+                throw new \RuntimeException('listener');
+            }
+        };
+
+        $exception = thrown(static fn() => observe(
+            dispatcher: new Dispatcher([$listener]),
+            fn: static fn() => group(static function (Group $group) {
+                $group->spawn(static fn() => null);
+            }),
+        ));
+
+        Assert::instanceOf($exception, UncaughtThrowable::class);
+        Assert::same($exception->getPrevious()?->getMessage(), 'listener');
     }
 
     public function tracesCancellationByHandle(): void

@@ -12,12 +12,12 @@ use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Dispatcher;
+use function Thesis\Async\burnCpu;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeout;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -31,7 +31,7 @@ final class BlockingDetectorTest
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
                 delay(sec(1));
-                advance(ms(120));
+                burnCpu(ms(120));
                 delay(sec(1));
             }, name: 'work');
         }));
@@ -46,9 +46,9 @@ final class BlockingDetectorTest
     {
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
-                advance(ms(50));
+                burnCpu(ms(50));
                 delay(sec(1));
-                advance(ms(50));
+                burnCpu(ms(50));
             });
         }));
 
@@ -59,7 +59,7 @@ final class BlockingDetectorTest
     {
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => group(static function (Group $group) {
-            $group->spawn(static fn() => advance(sec(2)));
+            $group->spawn(static fn() => burnCpu(sec(2)));
         }));
 
         Assert::same($reports, [
@@ -74,7 +74,7 @@ final class BlockingDetectorTest
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(1)));
             delay(sec(1));
-            advance(ms(100));
+            burnCpu(ms(100));
         }));
 
         Assert::same($reports, [
@@ -87,7 +87,7 @@ final class BlockingDetectorTest
     {
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => group(static function () {
-            advance(ms(100));
+            burnCpu(ms(100));
             delay(sec(1));
         }));
 
@@ -101,7 +101,7 @@ final class BlockingDetectorTest
     {
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => timeout(sec(5), static function () {
-            advance(ms(100));
+            burnCpu(ms(100));
             delay(sec(1));
         }));
 
@@ -114,7 +114,7 @@ final class BlockingDetectorTest
     public function reportsRunOfBodyFromStartToEndOfShieldInRoot(): void
     {
         $line = __LINE__ + 2;
-        $reports = self::reports(static fn() => shield(static fn() => advance(ms(100))));
+        $reports = self::reports(static fn() => shield(static fn() => burnCpu(ms(100))));
 
         Assert::same($reports, [
             '#1 ' . self::at('shield', $line - 1) . ' has run 0.1s without a wait: from the start of the shield'
@@ -126,9 +126,9 @@ final class BlockingDetectorTest
     {
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => timeout(sec(5), static function () {
-            advance(ms(60));
+            burnCpu(ms(60));
             group(static function () {
-                advance(ms(60));
+                burnCpu(ms(60));
                 delay(sec(1));
             });
         }));
@@ -145,7 +145,7 @@ final class BlockingDetectorTest
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
                 group(static fn(Group $nested) => $nested->spawn(static fn() => delay(sec(1))));
-                advance(ms(100));
+                burnCpu(ms(100));
             });
         }));
 
@@ -160,9 +160,9 @@ final class BlockingDetectorTest
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
-                advance(ms(60));
+                burnCpu(ms(60));
                 group(static function () {
-                    advance(ms(60));
+                    burnCpu(ms(60));
                     delay(sec(1));
                 });
             });
@@ -179,7 +179,7 @@ final class BlockingDetectorTest
         $line = __LINE__ + 2;
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
-                advance(ms(100));
+                burnCpu(ms(100));
                 timeout(sec(5), static fn() => delay(sec(1)));
             });
         }));
@@ -200,7 +200,7 @@ final class BlockingDetectorTest
         $dispatcher = new Dispatcher([new BlockingDetector(threshold: ms(50)), $listener]);
 
         $dispatcher->dispatch(new TaskStarted(scope: 9, at: Instant::now()));
-        advance(ms(100));
+        burnCpu(ms(100));
         $dispatcher->dispatch(new Suspended(scope: 9, at: Instant::now(), caller: null));
 
         Assert::same($reports, ['#9 #9 has run 0.1s without a wait: from the start of the task to a wait of unknown code']);
@@ -218,7 +218,7 @@ final class BlockingDetectorTest
         observe($dispatcher, static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
                 delay(sec(1));
-                advance(ms(250));
+                burnCpu(ms(250));
             });
         }));
 

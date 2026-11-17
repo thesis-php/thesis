@@ -237,11 +237,12 @@ final class OnCancelTest
                     });
                     $observed[] = 'subscribed';
                     shield(checkpoint(...));
+                    $observed[] = 'yielded';
                 }
             });
         });
 
-        Assert::same($observed, ['subscribed', 'called']);
+        Assert::same($observed, ['subscribed', 'called', 'yielded']);
     }
 
     public function isNotCalledIfScopeIsAlreadyCancelledAndUnsubscribedAtOnce(): void

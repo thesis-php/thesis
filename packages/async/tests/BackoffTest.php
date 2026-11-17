@@ -10,6 +10,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Time\ms;
+use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
@@ -21,6 +22,13 @@ final class BackoffTest
         $backoff = new Backoff(initial: ms(100), max: ms(500), jitter: false);
 
         Assert::same(self::delays($backoff, 5), [100, 200, 400, 500, 500]);
+    }
+
+    public function doublesUpToAnOddMaximum(): void
+    {
+        $backoff = new Backoff(initial: ns(1), max: ns(3), jitter: false);
+
+        Assert::equals([$backoff->next(), $backoff->next(), $backoff->next()], [ns(1), ns(2), ns(3)]);
     }
 
     public function startsAgainAfterReset(): void
@@ -51,6 +59,14 @@ final class BackoffTest
         $backoff = new Backoff(initial: sec(1), max: sec(1), randomizer: new Randomizer(new Mt19937(42)));
 
         Assert::true(\count(array_unique(self::delays($backoff, 10))) > 1);
+    }
+
+    public function jitterTakesItsRandomnessFromTheRandomizer(): void
+    {
+        $first = new Backoff(initial: sec(1), max: sec(1), randomizer: new Randomizer(new Mt19937(42)));
+        $second = new Backoff(initial: sec(1), max: sec(1), randomizer: new Randomizer(new Mt19937(42)));
+
+        Assert::same(self::delays($first, 10), self::delays($second, 10));
     }
 
     public function doesNotOverflowWithAHugeMaximum(): void

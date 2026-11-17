@@ -14,6 +14,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Internal\Scope;
+use Thesis\Async\Internal\VirtualClock;
 use Thesis\Async\Internal\VirtualTimeDriver;
 use Thesis\TestoPlugin\VirtualTime;
 use Time\Duration;
@@ -21,30 +22,29 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
-use function Thesis\Async\VirtualTime\advance;
-use function Thesis\Async\VirtualTime\run;
 use function Thesis\Time\ms;
+use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 
 /**
- * Every test already runs on virtual time: the ones of run() itself nest a run() in it.
+ * Every test already runs on virtual time: the ones of virtualTime() itself nest a virtualTime() in it.
  */
 #[Test]
 final class VirtualTimeTest
 {
     public function clockStartsAtCurrentTimeRoundedUpToWholeSecond(): void
     {
-        advance(ms(250));
+        burnCpu(ms(250));
         $outer = Instant::now();
 
-        Assert::same(run(static fn() => secondsSince($outer)), 0.75);
+        Assert::same(virtualTime(static fn() => secondsSince($outer)), 0.75);
     }
 
     public function timeCapturedBeforeRunStaysValidInIt(): void
     {
         $deadline = Instant::now()->add(sec(5));
 
-        Assert::equals(run(static fn() => $deadline->since(Instant::now())), sec(5));
+        Assert::equals(virtualTime(static fn() => $deadline->since(Instant::now())), sec(5));
     }
 
     public function longDelayIsOverAtOnce(): void
@@ -100,7 +100,7 @@ final class VirtualTimeTest
         Assert::same($fired, [2.0, 4.0, 6.0]);
     }
 
-    public function advanceMovesClockButTimerFiresAtNextSuspension(): void
+    public function burnCpuMovesClockButTimerFiresAtNextSuspension(): void
     {
         $start = Instant::now();
         $fired = null;
@@ -108,7 +108,7 @@ final class VirtualTimeTest
             $fired = secondsSince($start);
         });
 
-        advance(sec(2));
+        burnCpu(sec(2));
 
         Assert::same([secondsSince($start), $fired], [2.0, null]);
 
@@ -117,11 +117,11 @@ final class VirtualTimeTest
         Assert::same($fired, 2.0);
     }
 
-    public function advanceExpiresDeadline(): void
+    public function burnCpuExpiresDeadline(): void
     {
         $start = Instant::now();
         $exception = thrown(static fn() => timeout(sec(1), static function () {
-            advance(sec(1));
+            burnCpu(sec(1));
             delay(sec(0));
         }));
 
@@ -129,19 +129,19 @@ final class VirtualTimeTest
         Assert::same(secondsSince($start), 1.0);
     }
 
-    public function advanceRejectsNegativeSeconds(): void
+    public function burnCpuRejectsNegativeDuration(): void
     {
         Expect::exception(\ValueError::class);
 
-        advance(sec(-1));
+        burnCpu(sec(-1));
     }
 
-    public function advanceSaturatesAtEndOfClock(): void
+    public function burnCpuSaturatesAtEndOfClock(): void
     {
         $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
 
-        $now = run(static function () use ($longest) {
-            advance($longest);
+        $now = virtualTime(static function () use ($longest) {
+            burnCpu($longest);
             delay(sec(1));
 
             return Scope::now();
@@ -154,21 +154,21 @@ final class VirtualTimeTest
     {
         $longest = Duration::fromSeconds(9_223_372_035, 999_999_999);
 
-        $now = run(static function () use ($longest) {
-            advance($longest);
+        $now = virtualTime(static function () use ($longest) {
+            burnCpu($longest);
 
-            return run(Scope::now(...));
+            return virtualTime(Scope::now(...));
         });
 
         Assert::same($now, PHP_INT_MAX);
     }
 
-    public function advanceMovesClockOfInnermostRun(): void
+    public function burnCpuMovesClockOfInnermostRun(): void
     {
         $start = Instant::now();
-        $inner = run(static function () {
+        $inner = virtualTime(static function () {
             $start = Instant::now();
-            advance(sec(3));
+            burnCpu(sec(3));
 
             return secondsSince($start);
         });
@@ -176,19 +176,29 @@ final class VirtualTimeTest
         Assert::same([$inner, secondsSince($start)], [3.0, 0.0]);
     }
 
-    public function advanceThrowsOutsideRun(): void
+    public function burnCpuSpinsOnRealClockOutsideVirtualTime(): void
     {
-        // Every test runs inside run(): outside it is where no clock is bound.
-        $clock = Scope::$virtualClock;
-        Scope::$virtualClock = null;
+        $deferred = false;
+        EventLoop::defer(static function () use (&$deferred) {
+            $deferred = true;
+        });
 
-        try {
-            $error = thrown(static fn() => advance(sec(1)));
-        } finally {
-            Scope::$virtualClock = $clock;
-        }
+        $spent = self::outsideVirtualTime(static function () {
+            $start = hrtime(true);
+            burnCpu(ms(20));
 
-        Assert::same($error::class, \LogicException::class);
+            return hrtime(true) - $start;
+        });
+
+        Assert::true($spent >= 20_000_000);
+        Assert::false($deferred);
+    }
+
+    public function burnCpuRejectsNegativeDurationOutsideVirtualTime(): void
+    {
+        $error = self::outsideVirtualTime(static fn() => thrown(static fn() => burnCpu(sec(-1))));
+
+        Assert::same($error::class, \ValueError::class);
     }
 
     public function clockIsClockOfLibrary(): void
@@ -314,12 +324,12 @@ final class VirtualTimeTest
     {
         $driver = EventLoop::getDriver();
 
-        $virtual = run(static function () {
+        $virtual = virtualTime(static function () {
             delay(sec(1));
 
             return EventLoop::getDriver();
         });
-        thrown(static fn() => run(static fn() => throw new \RuntimeException()));
+        thrown(static fn() => virtualTime(static fn() => throw new \RuntimeException()));
 
         Assert::notSame($virtual, $driver);
         Assert::same(EventLoop::getDriver(), $driver);
@@ -329,7 +339,7 @@ final class VirtualTimeTest
     {
         $driver = new StreamSelectDriver();
 
-        [$callbackId, $identifiers] = run(fn: static function () use ($driver) {
+        [$callbackId, $identifiers] = virtualTime(fn: static function () use ($driver) {
             $callbackId = EventLoop::defer(static function () {});
 
             return [$callbackId, $driver->getIdentifiers()];
@@ -340,7 +350,7 @@ final class VirtualTimeTest
 
     public function runRejectsCurrentDriver(): void
     {
-        $exception = thrown(static fn() => run(static fn() => null, EventLoop::getDriver()));
+        $exception = thrown(static fn() => virtualTime(static fn() => null, EventLoop::getDriver()));
 
         Assert::instanceOf($exception, \LogicException::class);
     }
@@ -350,7 +360,7 @@ final class VirtualTimeTest
         $driver = new StreamSelectDriver();
         $driver->defer(static function () {});
 
-        $exception = thrown(static fn() => run(static fn() => null, $driver));
+        $exception = thrown(static fn() => virtualTime(static fn() => null, $driver));
 
         Assert::instanceOf($exception, \LogicException::class);
     }
@@ -359,7 +369,7 @@ final class VirtualTimeTest
     {
         $start = Instant::now();
         delay(sec(10));
-        $inner = run(static function () {
+        $inner = virtualTime(static function () {
             $start = Instant::now();
             delay(sec(1));
 
@@ -377,8 +387,9 @@ final class VirtualTimeTest
         $returned = false;
 
         $exception = thrown(static function () use (&$returned) {
-            run(static function () use (&$returned) {
-                // Both in one tick: the first resumes {main}, the second is left to the tick that run() finishes.
+            virtualTime(static function () use (&$returned) {
+                // Both in one tick: the first resumes {main},
+                // the second is left to the tick that virtualTime() finishes.
                 suspend(static function (Continuation $continuation) {
                     EventLoop::defer(static function () use ($continuation) {
                         $continuation->resume();
@@ -405,7 +416,7 @@ final class VirtualTimeTest
     {
         $fired = false;
 
-        run(static function () use (&$fired) {
+        virtualTime(static function () use (&$fired) {
             EventLoop::delay(1, static function () use (&$fired) {
                 $fired = true;
             });
@@ -421,7 +432,7 @@ final class VirtualTimeTest
         $driver = EventLoop::getDriver();
 
         $exception = thrown(static fn() => group(static function (Group $group) {
-            $group->spawn(static fn() => run(static fn() => null));
+            $group->spawn(static fn() => virtualTime(static fn() => null));
         }));
 
         Assert::instanceOf($exception, \LogicException::class);
@@ -433,7 +444,7 @@ final class VirtualTimeTest
         $driver = new StreamSelectDriver();
         $exception = null;
         $driver->defer(static function () use ($driver, &$exception) {
-            $exception = thrown(static fn() => run(static fn() => null, $driver));
+            $exception = thrown(static fn() => virtualTime(static fn() => null, $driver));
         });
 
         $driver->run();
@@ -461,11 +472,11 @@ final class VirtualTimeTest
     {
         $seen = null;
 
-        $inner = run(static function () use (&$seen) {
+        $inner = virtualTime(static function () use (&$seen) {
             $start = Instant::now();
-            advance(sec(100));
+            burnCpu(sec(100));
 
-            // Both in one tick: the first resumes {main}, the second is left to the tick that run() finishes.
+            // Both in one tick: the first resumes {main}, the second is left to the tick that virtualTime() finishes.
             suspend(static function (Continuation $continuation) use ($start, &$seen) {
                 EventLoop::defer(static function () use ($continuation) {
                     $continuation->resume();
@@ -487,7 +498,7 @@ final class VirtualTimeTest
             $timer = EventLoop::unreference(EventLoop::delay(1, static function () use ($continuation) {
                 $continuation->resume(true);
             }));
-            advance(sec(1));
+            burnCpu(sec(1));
             // Runs in the tick in which the due timer is handed to its firing defer, after it is.
             EventLoop::defer(static function () use ($timer) {
                 EventLoop::reference($timer);
@@ -507,7 +518,7 @@ final class VirtualTimeTest
             $timer = EventLoop::delay(1, static function () use ($continuation) {
                 $continuation->resume();
             });
-            advance(sec(1));
+            burnCpu(sec(1));
             EventLoop::defer(static function () use ($timer) {
                 EventLoop::unreference($timer);
             });
@@ -546,7 +557,7 @@ final class VirtualTimeTest
         $timer = EventLoop::delay(1, static function () use (&$fired) {
             $fired = true;
         });
-        advance(sec(1));
+        burnCpu(sec(1));
         EventLoop::defer(static function () use ($timer) {
             EventLoop::disable($timer);
         });
@@ -559,6 +570,7 @@ final class VirtualTimeTest
 
     public function unreferencedTimerDoesNotKeepLoopAlive(): void
     {
+        $start = Instant::now();
         $fired = 0;
         $timer = EventLoop::delay(1, static function () use (&$fired) {
             ++$fired;
@@ -569,13 +581,138 @@ final class VirtualTimeTest
         $exception = thrown(never(...));
 
         Assert::string($exception->getMessage())->contains('Event loop terminated without resuming');
-        Assert::same($fired, 0);
+        Assert::same([$fired, secondsSince($start)], [0, 0.0]);
 
         Assert::same(EventLoop::reference($timer), $timer);
         Assert::true(EventLoop::isReferenced($timer));
         delay(sec(1));
 
         Assert::same($fired, 1);
+    }
+
+    public function clockDoesNotJumpToUnreferencedTimerOnceReferencedOneIsGone(): void
+    {
+        $start = Instant::now();
+        EventLoop::unreference(EventLoop::delay(1, static function () {}));
+        EventLoop::cancel(EventLoop::delay(1, static function () {}));
+        EventLoop::disable(EventLoop::delay(1, static function () {}));
+
+        thrown(never(...));
+
+        Assert::same(secondsSince($start), 0.0);
+    }
+
+    public function unreferencingPendingTimerLetsLoopEndAtOnce(): void
+    {
+        EventLoop::unreference(EventLoop::delay(1, static function () {}));
+
+        Assert::false(self::unreferencedDeferRuns());
+    }
+
+    public function disablingPendingTimerLetsLoopEndAtOnce(): void
+    {
+        $timer = EventLoop::delay(1, static function () {});
+        EventLoop::disable($timer);
+
+        Assert::false(self::unreferencedDeferRuns());
+        EventLoop::cancel($timer);
+    }
+
+    public function timerReferencedAgainKeepsLoopAlive(): void
+    {
+        $fired = suspend(static function (Continuation $continuation) {
+            $timer = EventLoop::unreference(EventLoop::delay(1, static function () use ($continuation) {
+                $continuation->resume(true);
+            }));
+            EventLoop::reference($timer);
+
+            return static function () use ($timer) {
+                EventLoop::cancel($timer);
+            };
+        });
+
+        Assert::true($fired);
+    }
+
+    public function dueUnreferencedTimerDoesNotKeepLoopAlive(): void
+    {
+        $fired = false;
+        EventLoop::unreference(EventLoop::delay(1, static function () use (&$fired) {
+            $fired = true;
+        }));
+        burnCpu(sec(1));
+        // Referenced: the loop runs a tick, in which the due timer is handed to its firing defer.
+        EventLoop::defer(static function () {});
+
+        thrown(never(...));
+
+        Assert::false($fired);
+    }
+
+    public function timerDisabledTwiceDoesNotFire(): void
+    {
+        $fired = false;
+        $timer = EventLoop::delay(2, static function () use (&$fired) {
+            $fired = true;
+        });
+        EventLoop::disable($timer);
+        EventLoop::enable($timer);
+        EventLoop::disable($timer);
+
+        delay(sec(3));
+
+        Assert::false($fired);
+        EventLoop::cancel($timer);
+    }
+
+    public function delayOfWholeNanosecondsIsExact(): void
+    {
+        $start = Instant::now();
+
+        // As float seconds, 15 ns comes back a hair less and 61 ns a hair more.
+        delay(ns(15));
+        delay(ns(61));
+
+        Assert::equals(Instant::now()->since($start), ns(76));
+    }
+
+    public function longestDelayNeverFires(): void
+    {
+        $fired = false;
+        $timer = EventLoop::delay(PHP_INT_MAX / 1e9, static function () use (&$fired) {
+            $fired = true;
+        });
+
+        delay(sec(1));
+
+        Assert::false($fired);
+        EventLoop::cancel($timer);
+    }
+
+    public function identifiersAreThoseOfCallbacksOfUser(): void
+    {
+        $timer = EventLoop::delay(1, static function () {});
+        $defer = EventLoop::defer(static function () {});
+
+        Assert::same(EventLoop::getIdentifiers(), [$defer, $timer]);
+
+        EventLoop::cancel($timer);
+        EventLoop::cancel($defer);
+    }
+
+    public function stopStopsInnerDriver(): void
+    {
+        $driver = new VirtualTimeDriver(new VirtualClock(0), new StreamSelectDriver());
+        $ticks = 0;
+        $driver->repeat(1, static function () use ($driver, &$ticks) {
+            if (++$ticks === 3) {
+                $driver->stop();
+            }
+        });
+
+        $driver->run();
+
+        Assert::same($ticks, 3);
     }
 
     public function timersHaveTypesOfRevolt(): void
@@ -637,19 +774,20 @@ final class VirtualTimeTest
         $driver = new StreamSelectDriver();
         $handler = static function () {};
 
-        [$handle, $errorHandler, $debugInfo] = run(fn: static function () use ($handler) {
+        [$handle, $errorHandler, $debugInfo] = virtualTime(fn: static function () use ($handler) {
             EventLoop::setErrorHandler($handler);
             EventLoop::delay(1, static function () {});
 
             return [
                 EventLoop::getDriver()->getHandle(),
                 EventLoop::getErrorHandler(),
-                EventLoop::getDriver()->__debugInfo(),
+                EventLoop::getDriver()->__debugInfo() + ['clock' => Scope::now() / 1e9],
             ];
         }, driver: $driver);
 
         Assert::same([$handle, $errorHandler], [$driver->getHandle(), $handler]);
         Assert::same([$debugInfo['timers'] ?? null, $debugInfo['inner'] ?? null], [1, $driver->__debugInfo()]);
+        Assert::same($debugInfo['now'] ?? null, $debugInfo['clock']);
     }
 
     public function cancelledTimersDoNotPileUpInQueue(): void
@@ -680,6 +818,47 @@ final class VirtualTimeTest
         Assert::same($fired, [3600.0]);
     }
 
+    public function queueIsRebuiltOnceOutdatedEntriesAreManyAndMost(): void
+    {
+        $timers = self::timers(100);
+        array_map(EventLoop::cancel(...), \array_slice($timers, 0, 64));
+
+        Assert::same(self::queued(), 36);
+
+        $timers = [...\array_slice($timers, 64), ...self::timers(28)];
+        array_map(EventLoop::cancel(...), $timers);
+
+        Assert::same(self::queued(), 0);
+    }
+
+    public function queueIsKeptWhileOutdatedEntriesAreFew(): void
+    {
+        array_map(EventLoop::cancel(...), self::timers(63));
+
+        Assert::same(self::queued(), 63);
+    }
+
+    public function queueIsKeptWhileOutdatedEntriesAreNoMoreThanPendingTimers(): void
+    {
+        $timers = self::timers(128);
+        array_map(EventLoop::cancel(...), \array_slice($timers, 0, 64));
+
+        Assert::same(self::queued(), 128);
+
+        array_map(EventLoop::cancel(...), \array_slice($timers, 64));
+    }
+
+    public function outdatedEntriesDroppedAtTopAreNoLongerCounted(): void
+    {
+        array_map(EventLoop::cancel(...), self::timers(10, seconds: 1));
+        $timers = self::timers(60, seconds: 10);
+
+        delay(sec(0)); // the pump drops the outdated entries before the first timer pending
+        array_map(EventLoop::cancel(...), $timers);
+
+        Assert::same(self::queued(), 60);
+    }
+
     #[VirtualTime]
     public function attributeAndPluginDoNotWrapTwice(): void
     {
@@ -687,5 +866,65 @@ final class VirtualTimeTest
         \assert($driver instanceof VirtualTimeDriver);
 
         Assert::false((fn() => $this->inner)->call($driver) instanceof VirtualTimeDriver);
+    }
+
+    /**
+     * Whether an unreferenced defer runs before the loop ends: only if something else keeps the loop alive for a tick.
+     */
+    private static function unreferencedDeferRuns(): bool
+    {
+        $ran = false;
+        EventLoop::unreference(EventLoop::defer(static function () use (&$ran) {
+            $ran = true;
+        }));
+
+        thrown(never(...));
+
+        return $ran;
+    }
+
+    /**
+     * @param positive-int $count
+     * @return list<string>
+     */
+    private static function timers(int $count, int $seconds = 3600): array
+    {
+        $timers = [];
+
+        for ($i = 0; $i < $count; ++$i) {
+            $timers[] = EventLoop::delay($seconds, static function () {});
+        }
+
+        return $timers;
+    }
+
+    /**
+     * How many entries the queue of the timers of the current driver holds, outdated ones included.
+     */
+    private static function queued(): int
+    {
+        $driver = EventLoop::getDriver();
+        \assert($driver instanceof VirtualTimeDriver);
+
+        return (fn() => $this->queue->count())->call($driver);
+    }
+
+    /**
+     * Every test runs inside virtualTime(): outside it is where no clock is bound.
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    private static function outsideVirtualTime(callable $fn): mixed
+    {
+        $clock = Scope::$virtualClock;
+        Scope::$virtualClock = null;
+
+        try {
+            return $fn();
+        } finally {
+            Scope::$virtualClock = $clock;
+        }
     }
 }

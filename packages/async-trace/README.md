@@ -32,7 +32,7 @@ per event, and keeps nothing of them: a value, an error and a task are formatted
 
 It writes synchronously, as a listener must: pass a blocking stream (a file, `php://stderr`).
 It never throws: a line it could not write is counted in `$writer->lost`. Wrap `observe()` in
-`VirtualTime\run()` for a trace that is the same on every run, `start` of the header aside
+`virtualTime()` for a trace that is the same on every run, `start` of the header aside
 (pass a `Thesis\Time\FrozenClock` as the second argument to fix it too).
 
 ## `TextLog`
@@ -133,8 +133,8 @@ observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $print]), $main
 A run begins when a task starts, a wait or the join of a group is over, or a group, a `timeout()` or a `shield()`
 is created in the root scope. It ends at the next wait of any scope, at the join of a group, at the end of a task
 or of a scope created in the root: `from` and `to` of the report say which. The report has `scope`, `what`, `at`
-(the beginning of the run) and `duration` too. The time is that of the events: under `VirtualTime\run()`
-code takes no time, and a test makes a run long by `VirtualTime\advance()`.
+(the beginning of the run) and `duration` too. The time is that of the events: under `virtualTime()`
+code takes no time, and a test makes a run long by `burnCpu()`.
 
 Not seen: a run that never ends (an endless loop), code outside the scope tree. The root scope is not in the trace,
 its waits have no events: code that runs in the callable of `observe()` itself, outside a group, a `timeout()`
@@ -171,7 +171,7 @@ observe(new Dispatcher([new LongWaitDetector(threshold: sec(5)), $print]), $main
 The report has `scope`, `what`, `at` (the beginning of the wait), `duration` (how long it has waited, the threshold
 or a hair more) and `wait` (the call that waits). A hang brings no event, so the report comes from a timer
 of the event loop, outside the scope tree. The timer is unreferenced, so it never keeps the program alive,
-and it is there only while a wait is not reported yet. Under `VirtualTime\run()` it is virtual like every timer:
+and it is there only while a wait is not reported yet. Under `virtualTime()` it is virtual like every timer:
 `delay(hours(1))` with a threshold of 5 seconds is reported at once, at the fifth virtual second.
 A wait that ends exactly at the threshold may be reported or not, as the order of the callbacks of one tick decides.
 

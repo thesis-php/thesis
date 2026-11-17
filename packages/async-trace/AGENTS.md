@@ -93,7 +93,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   and mutation testing shows it as a mutant no test kills. What is guarded is a scope the tool has not seen
   (events given by hand): it is named `#<id>` and never makes a tool fail.
 - `BlockingDetector` takes the time of the events, not a clock of its own: `Instant::now()` is `hrtime()`
-  outside virtual time, and under it `VirtualTime\advance()` is CPU work without a wait, which a test needs.
+  outside virtual time, and under it `burnCpu()` is CPU work without a wait, which a test needs.
   Rejected: an injected monotonic clock, a second time that a test would have to move along with the virtual one.
 - `BlockingDetector` does not see the root scope, and `README.md` tells to run the code in a task. Rejected:
   `Suspended`/`Resumed` with `scope: null` for the root. It would catch only waits of thesis/async called outside

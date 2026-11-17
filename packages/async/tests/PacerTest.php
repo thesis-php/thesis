@@ -61,6 +61,16 @@ final class PacerTest
         }));
     }
 
+    public function countsEachTickAnewAfterOneCall(): void
+    {
+        $pacer = new Pacer(perTick: 1);
+        $pacer->pace();
+
+        delay(sec(0));
+
+        Assert::false(self::yields($pacer->pace(...)));
+    }
+
     public function letsOtherTasksRun(): void
     {
         $pacer = new Pacer(perTick: 16);
@@ -135,7 +145,7 @@ final class PacerTest
     {
         $pacer = new Pacer(perTick: 2);
         // The defer that resets the count is left in the loop of the run, and the run drops it.
-        VirtualTime\run(static function () use ($pacer) {
+        virtualTime(static function () use ($pacer) {
             $pacer->pace();
         });
         $pacer->pace();

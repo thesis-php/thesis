@@ -10,7 +10,6 @@ use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
-use function Thesis\Async\VirtualTime\advance;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -154,7 +153,7 @@ final class TaskTest
             timeout(sec(1), static function () use (&$awaited) {
                 group(static function (Group $group) use (&$awaited) {
                     $handle = $group->spawn(never(...));
-                    advance(sec(5));
+                    burnCpu(sec(5));
 
                     untilCancelled(); // the deadline cancels both the task and the body
 

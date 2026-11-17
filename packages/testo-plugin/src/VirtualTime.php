@@ -9,7 +9,7 @@ use Testo\Pipeline\Attribute\Interceptable;
 use Thesis\TestoPlugin\Internal\VirtualTimeInterceptor;
 
 /**
- * Runs the test, its hooks included, on a fresh virtual time: see `Thesis\Async\VirtualTime\run()`.
+ * Runs the test, its hooks included, on a fresh virtual time: see `Thesis\Async\virtualTime()`.
  * On a class, every test of it; every data set gets a clock of its own.
  * For a whole suite, see {@see VirtualTimePlugin}.
  *

@@ -15,7 +15,7 @@ Requires 64-bit PHP 8.5+.
 
 ## Virtual time
 
-`VirtualTimePlugin` and the `#[VirtualTime]` attribute run a test in its own `Thesis\Async\VirtualTime\run()`
+`VirtualTimePlugin` and the `#[VirtualTime]` attribute run a test in its own `Thesis\Async\virtualTime()`
 of [thesis/async](https://github.com/thesis-php/async): the clock jumps to the next timer whenever nothing can run,
 so `delay(hours(1))` is over at once and durations can be asserted exactly. How the virtual clock behaves is described
 in the README of thesis/async.

@@ -16,7 +16,7 @@ use function Thesis\Time\toNs;
  * In-process {@see Cache}: values are kept as they are, not serialized, so an object is shared with whoever
  * gets it and a change to it is seen by every reader.
  *
- * Expiry is measured on {@see Instant}, so `VirtualTime\run()` moves it. An expired entry is dropped when it is read
+ * Expiry is measured on {@see Instant}, so `virtualTime()` moves it. An expired entry is dropped when it is read
  * or by the next set(), which first drops every entry that has expired by then. There is no timer: the cache needs
  * no owner of background work, and an expired entry that is never read waits for a set() to be freed.
  * An entry that leaves the cache otherwise (deleted, replaced, evicted) is freed at once.

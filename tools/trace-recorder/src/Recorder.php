@@ -20,7 +20,7 @@ use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
 use Thesis\Dispatcher;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Async\VirtualTime\run;
+use function Thesis\Async\virtualTime;
 use function Thesis\Formatter\formatValue;
 use function Thesis\Time\toNs;
 
@@ -61,7 +61,7 @@ final class Recorder
     public static function record(callable $program): array
     {
         $recorder = new self();
-        run(static fn() => observe(new Dispatcher([$recorder]), $program));
+        virtualTime(static fn() => observe(new Dispatcher([$recorder]), $program));
 
         return ['rows' => array_values($recorder->rows), 'events' => $recorder->events];
     }

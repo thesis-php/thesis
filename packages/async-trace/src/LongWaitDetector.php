@@ -27,7 +27,7 @@ use function Thesis\Time\toNs;
  * while it still waits, once per wait. Give it to the dispatcher of the trace: `new Dispatcher([$detector, $listener])`.
  *
  * A hang brings no event, so it reports from a timer of the event loop, outside the scope tree: unreferenced,
- * it never keeps the program alive, and it is virtual under `VirtualTime\run()`, like every timer of the loop.
+ * it never keeps the program alive, and it is virtual under `virtualTime()`, like every timer of the loop.
  * The timer is there only while a wait is not reported yet. Not seen: the waits of the root scope,
  * which have no events, and a hang of the whole loop (blocking code, see {@see BlockingDetector}).
  *

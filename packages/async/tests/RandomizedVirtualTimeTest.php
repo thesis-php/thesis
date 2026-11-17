@@ -12,11 +12,10 @@ use Testo\Test;
 use Thesis\Dispatcher;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Async\VirtualTime\run;
 use function Thesis\Time\sec;
 
 /**
- * Random programs of pipes on virtual time, each seed in a run() of its own: whether the clock may jump
+ * Random programs of pipes on virtual time, each seed in a virtualTime() of its own: whether the clock may jump
  * depends on what else is pending and ready, and hand-written tests cover one shape at a time.
  * A seed draws everything up front, so it is the same program on every driver; a broken one is listed with it.
  */
@@ -63,7 +62,7 @@ final class RandomizedVirtualTimeTest
     {
         for ($this->seed = 1; $this->seed <= $count; ++$this->seed) {
             $this->random = new Randomizer(new Mt19937($this->seed));
-            run(function () use ($program) {
+            virtualTime(function () use ($program) {
                 $program();
 
                 if (EventLoop::getIdentifiers() !== []) {

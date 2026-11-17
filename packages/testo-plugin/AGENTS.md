@@ -8,14 +8,14 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 ## Invariants that must not be broken
 
 - `VirtualTimePlugin` and `#[VirtualTime]` register the same `Internal\VirtualTimeInterceptor`, which conflicts
-  with itself (`ConflictPolicy::First`): a test gets one `VirtualTime\run()`, whichever way it was asked for.
+  with itself (`ConflictPolicy::First`): a test gets one `virtualTime()`, whichever way it was asked for.
 - The interceptor is outer to the lifecycle hooks and inner to data providers: the hooks share the test's clock,
   and every data set starts on a fresh one.
 - `PhpErrorsPlugin` throws from its own handler, set around the run of the test, not through `exceptionally()`:
   the levels of `exceptionally()` do not reach a fiber started inside it, and the tasks of a test are such fibers.
   It respects `error_reporting()` (`@`), which PHP keeps per fiber. The monorepo applies it to every suite
   through the root `testo.plugins.php`, so `PhpErrorsTest` relies on it being there.
-- The package only wires Testo to `Thesis\Async\VirtualTime\run()`: how the virtual clock behaves belongs to
+- The package only wires Testo to `Thesis\Async\virtualTime()`: how the virtual clock behaves belongs to
   thesis/async and is not repeated or patched here.
 
 ## Decisions

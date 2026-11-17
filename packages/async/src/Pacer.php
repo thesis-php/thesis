@@ -49,7 +49,7 @@ final class Pacer
 
             // The defer of the tick has reset the count before the yield returns, and since then other callers
             // of a shared pacer may have counted their calls in the new tick: a reset here would erase them.
-            // Unless the defer was dropped with its driver (the end of `VirtualTime\run()`, a new driver):
+            // Unless the defer was dropped with its driver (the end of `virtualTime()`, a new driver):
             // then nothing would ever reset the count again.
             if ($this->resets === $resets) {
                 $this->count = 0;
@@ -59,6 +59,8 @@ final class Pacer
         if ($this->count === 0) {
             EventLoop::defer(function () {
                 $this->count = 0;
+                // Only compared with the count seen before a yield: a decrement is a change too.
+                // @infection-ignore Increment
                 ++$this->resets;
             });
         }

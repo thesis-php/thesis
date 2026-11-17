@@ -12,10 +12,10 @@ use function Thesis\Time\toNs;
 
 /**
  * A point on the monotonic clock of the library: the clock of deadlines and Revolt's timers,
- * which `VirtualTime\run()` replaces. For measuring and for a time kept ahead, such as the expiry of a cached entry:
+ * which `virtualTime()` replaces. For measuring and for a time kept ahead, such as the expiry of a cached entry:
  * code that keeps times takes them from here, not from `hrtime()`, or virtual time does not move them.
  *
- * Not wall-clock time: only instants of one process and of one `VirtualTime\run()` make sense together.
+ * Not wall-clock time: only instants of one process and of one `virtualTime()` make sense together.
  * Instants compare with the operators: `$expiresAt <= Instant::now()`.
  * A point in time, not a `Time\Duration`: the difference of two instants is one.
  *

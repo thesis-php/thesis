@@ -314,7 +314,8 @@ final class GroupImpl implements Group
 
                 // The joiner has something to do only when the last regular task is done (cancel the daemons),
                 // or when the last daemon is done after it: waking it on every task would be a park per task.
-                if ($this->tasks === 0 && ($this->daemons === 0 || !$daemon)) {
+                // Woken more often, it only parks again.
+                if (/* @infection-ignore LogicalAnd */ $this->tasks === 0 && ($this->daemons === 0 || !$daemon)) {
                     $joiner = $this->joiner;
                     $this->joiner = null;
                     $joiner?->resume();

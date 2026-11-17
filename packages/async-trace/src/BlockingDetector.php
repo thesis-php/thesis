@@ -34,7 +34,7 @@ use function Thesis\Time\toNs;
  * and ends at the next wait of any scope (a `timeout()` or a `shield()` waits in the fiber that creates it),
  * at the join of a group, at the end of a task or of a scope created in the root.
  * The time is that of the events: the monotonic clock,
- * or the virtual one under `VirtualTime\run()`, where CPU work takes no time but `VirtualTime\advance()`.
+ * or the virtual one under `virtualTime()`, where CPU work takes no time but `burnCpu()`.
  * Not seen: a run that never ends (an endless loop), code outside the scope tree (the callable of `observe()`
  * outside a group, a `timeout()` and a `shield()`, raw callbacks of the event loop): the waits of the root scope
  * have no events.

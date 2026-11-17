@@ -250,7 +250,7 @@ if ($user === $expired) {
 }
 ```
 
-`Instant` is a point on the monotonic clock of deadlines, the one `VirtualTime\run()` replaces. Code that keeps times
+`Instant` is a point on the monotonic clock of deadlines, the one `virtualTime()` replaces. Code that keeps times
 (a cache entry that expires, a breaker that reopens) takes them from it, not from `hrtime()`, so that virtual time moves them.
 The difference of two instants is a `Duration`, and instants compare with the operators:
 
@@ -841,20 +841,20 @@ The cancellation is bound to the current scope: do not keep it beyond the callab
 The cancellation costs nothing until amphp subscribes to it. A subscription removed by amphp is never called,
 even if the cancellation has already happened, so it cannot wake a fiber that has moved on to another wait.
 
-### Tests on virtual time: `VirtualTime\run()`
+### Tests on virtual time: `virtualTime()`
 
 Code with long deadlines is hard to test on real time: a heartbeat every 30 seconds, a backoff up to a minute.
-`VirtualTime\run()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `Instant::now()`
-rounded up to a whole second, so a time captured before `run()` (a deadline, a rate limiter) stays valid in it, and stands still
+`virtualTime()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `Instant::now()`
+rounded up to a whole second, so a time captured before `virtualTime()` (a deadline, a rate limiter) stays valid in it, and stands still
 while code runs; when nothing can run, it jumps to the nearest timer. So an hour of waiting is over at once,
 timers fire exactly in the order of their deadlines, and durations can be asserted exactly:
 
 ```php
 use Thesis\Async\Instant;
-use Thesis\Async\VirtualTime;
+use function Thesis\Async\virtualTime;
 use function Thesis\Time\sec;
 
-VirtualTime\run(static function () {
+virtualTime(static function () {
     $start = Instant::now();
     $client = new Client(new AlwaysFailingSocket());
 
@@ -867,25 +867,26 @@ VirtualTime\run(static function () {
 });
 ```
 
-CPU work takes no time on this clock: `VirtualTime\advance($duration)` moves it forward without yielding,
-as busy code would (a negative `$duration` throws `\ValueError`).
+CPU work takes no time on this clock: `burnCpu($duration)` moves it forward without yielding,
+as busy code would (a negative `$duration` throws `\ValueError`). Outside `virtualTime()` it spins on the real clock,
+so the same code blocks the loop for real.
 A deadline passes then, but its timer fires only at the next suspension, as after a loop that blocked the event loop.
 A deadlock fails at once instead of hanging: there is no timer to jump to, and Revolt ends the loop.
-`run()` swaps the driver of the event loop, so it must be called in `{main}`: in a fiber it throws `LogicException`.
+`virtualTime()` swaps the driver of the event loop, so it must be called in `{main}`: in a fiber it throws `LogicException`.
 The callbacks left for the tick it finishes on return still see its clock.
 
 Streams and signals stay real, on the driver that `EventLoop\DriverFactory` creates (`REVOLT_DRIVER` chooses it),
-or on one passed as `run($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,
+or on one passed as `virtualTime($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,
 so nothing from outside runs on virtual time, and it is dropped with whatever `$fn` leaves in it. They are polled on every tick, and only timers are waited for virtually,
 so a stream that becomes ready from outside the process may be jumped past.
-While `run()` runs, its clock is the clock of the library, bound by `run()` itself rather than found through the driver:
+While `virtualTime()` runs, its clock is the clock of the library, bound by `virtualTime()` itself rather than found through the driver:
 `Instant`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
-Each `run()` has a clock of its own, so an object that keeps times must not outlive the `run()` it was used in:
-a rate limiter shared by two `run()`s one after another, or used again outside, may see a time from the future of its clock.
+Each `virtualTime()` has a clock of its own, so an object that keeps times must not outlive the `virtualTime()` it was used in:
+a rate limiter shared by two `virtualTime()` calls one after another, or used again outside, may see a time from the future of its clock.
 
 For [Testo](https://github.com/php-testo/testo),
 [thesis/testo-plugin](https://github.com/thesis-php/testo-plugin) runs tests this way: its `VirtualTimePlugin` runs
-every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute does the same for a class or a test. The tests of this library run on it.
+every test of a suite in its own `virtualTime()`, and the `#[VirtualTime]` attribute does the same for a class or a test. The tests of this library run on it.
 
 ### What the tree does: `Trace\observe()`
 
@@ -893,7 +894,7 @@ every test of a suite in its own `run()`, and the `#[VirtualTime]` attribute doe
 to the listeners of a [`Thesis\Dispatcher`](https://github.com/thesis-php/dispatcher) by the type of their parameter:
 a group, a task or a daemon, a `timeout()` or a `shield()` is created (with its parent and where it is called from),
 a task starts, a scope waits and wakes up, an owner cancels (why, who, where it is called, and every scope it reached), a group joins,
-a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `VirtualTime\run()`
+a scope ends with its value or its error. Each event has the scope and the `Instant`. Under `virtualTime()`
 the trace is the same on every run: the scopes are numbered from 1 in the order the observation sees them.
 
 A task is named in the trace by `$group->spawn($task, name: 'fetch user')` (`daemon()` too) or by its key
@@ -905,8 +906,8 @@ which function has created the group: `Thesis\Async\group`, `Thesis\Async\race`,
 
 ```php
 use Thesis\Async\Trace;
-use Thesis\Async\VirtualTime;
 use Thesis\Dispatcher;
+use function Thesis\Async\virtualTime;
 
 $printTrace = new Dispatcher([
     static function (Trace\TaskCreated $event) { print "#{$event->scope} {$event->name} spawned at {$event->location}\n"; },
@@ -914,7 +915,7 @@ $printTrace = new Dispatcher([
     static function (Trace\ScopeCancelled $event) { print "#{$event->scope} cancelled: {$event->cause->name}\n"; },
 ]);
 
-VirtualTime\run(static fn() => Trace\observe($printTrace, $program));
+virtualTime(static fn() => Trace\observe($printTrace, $program));
 // #2 fetch user spawned at /app/src/Worker.php:21
 // #2 waits in Thesis\Async\delay() at /app/src/Worker.php:34
 // #1 cancelled: Failure
@@ -1156,7 +1157,7 @@ all([user, orders])              orders fails after 50 ms
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
 | `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
-| `VirtualTime\run(callable(): T, ?Driver): T`, `VirtualTime\advance(Duration)` | run on a virtual clock that jumps to the next timer; move it as busy code would |
+| `virtualTime(callable(): T, ?Driver): T`, `burnCpu(Duration)` | run on a virtual clock that jumps to the next timer; take a duration without yielding, as busy code would |
 | `Trace\observe(Dispatcher, callable(): T): T`, listeners of `Trace\Event` and its classes | the events of the scope tree while a callable runs |
 
 ## Limitations
