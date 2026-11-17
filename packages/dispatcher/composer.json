@@ -1,6 +1,11 @@
 {
     "name": "thesis/dispatcher",
     "description": "Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class.",
+    "keywords": [
+        "php",
+        "event-dispatcher",
+        "events"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

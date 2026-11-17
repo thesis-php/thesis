@@ -1,6 +1,12 @@
 {
     "name": "thesis/source-location",
     "description": "Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.",
+    "keywords": [
+        "php",
+        "source-location",
+        "backtrace",
+        "debugging"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

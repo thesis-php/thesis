@@ -18,6 +18,12 @@ final readonly class Generator
     public const string TOOLS = 'tools/manifests.php';
 
     /**
+     * The rules of GitHub for a topic: every keyword is one.
+     */
+    private const string TOPIC = '/^[a-z0-9][a-z0-9-]{0,49}$/';
+    private const int MAX_TOPICS = 20;
+
+    /**
      * @return array<non-empty-string, string> path => content
      */
     public static function generate(Monorepo $monorepo): array
@@ -28,7 +34,8 @@ final readonly class Generator
             'skills.json' => $generator->skills(),
             'testo.php' => $generator->testo(),
             self::TOOLS => $generator->tools(),
-            'AGENTS.md' => $generator->agents(),
+            'AGENTS.md' => $generator->withCatalog('AGENTS.md', $generator->agentsCatalog()),
+            'README.md' => $generator->withCatalog('README.md', $generator->readmeCatalog()),
             'LICENSE' => $generator->license($monorepo->config->licenseSince),
         ];
 
@@ -99,6 +106,7 @@ final readonly class Generator
         $composer = [
             'name' => $package->name(),
             'description' => $manifest->description,
+            'keywords' => self::keywords($manifest->keywords, $package->path() . '/' . Monorepo::MANIFEST),
             'license' => 'MIT',
             'type' => $manifest->type,
             'authors' => $config->authors,
@@ -197,6 +205,7 @@ final readonly class Generator
         $composer = [
             'name' => Monorepo::VENDOR . '/monorepo',
             'description' => $config->description,
+            'keywords' => self::keywords($config->keywords, Monorepo::CONFIG),
             'license' => 'MIT',
             'type' => 'project',
             'authors' => $config->authors,
@@ -552,30 +561,68 @@ final readonly class Generator
         return implode('', array_map(static fn(string $line) => $prefix . $line . "\n", $lines));
     }
 
-    private function agents(): string
+    /**
+     * The keywords are the topics of the repository on GitHub too, so they follow its rules.
+     *
+     * @param list<non-empty-string> $keywords
+     * @param non-empty-string $file
+     * @return list<non-empty-string>
+     */
+    private static function keywords(array $keywords, string $file): array
     {
-        $agents = $this->monorepo->read('AGENTS.md') ?? '';
-        $start = strpos($agents, self::CATALOG_START);
-        $end = strpos($agents, self::CATALOG_END);
+        $errors = [];
 
-        if ($start === false || $end === false || $end < $start) {
-            throw new MonorepoException(
-                \sprintf('AGENTS.md must contain the markers %s and %s.', self::CATALOG_START, self::CATALOG_END),
+        foreach ($keywords as $keyword) {
+            if (preg_match(self::TOPIC, $keyword) !== 1) {
+                $errors[] = \sprintf(
+                    '%s: the keyword "%s" is not a topic of GitHub: '
+                    . 'lowercase letters, digits and hyphens, at most 50 characters.',
+                    $file,
+                    $keyword,
+                );
+            }
+        }
+
+        if (\count(array_unique($keywords)) !== \count($keywords)) {
+            $errors[] = $file . ': a keyword is repeated.';
+        }
+
+        if (\count($keywords) > self::MAX_TOPICS) {
+            $errors[] = \sprintf(
+                '%s: more than %d keywords, GitHub takes at most %2$d topics.',
+                $file,
+                self::MAX_TOPICS,
             );
         }
 
-        $before = substr(
-            $agents,
-            0,
-            $start,
-        );
+        if ($errors !== []) {
+            throw new MonorepoException(implode("\n", $errors));
+        }
 
-        return $before
-            . self::CATALOG_START . "\n\n" . $this->catalog() . "\n" . self::CATALOG_END
-            . substr($agents, $end + \strlen(self::CATALOG_END));
+        return $keywords;
     }
 
-    private function catalog(): string
+    /**
+     * @param non-empty-string $path
+     */
+    private function withCatalog(string $path, string $catalog): string
+    {
+        $content = $this->monorepo->read($path) ?? '';
+        $start = strpos($content, self::CATALOG_START);
+        $end = strpos($content, self::CATALOG_END);
+
+        if ($start === false || $end === false || $end < $start) {
+            throw new MonorepoException(
+                \sprintf('%s must contain the markers %s and %s.', $path, self::CATALOG_START, self::CATALOG_END),
+            );
+        }
+
+        return substr($content, 0, $start)
+            . self::CATALOG_START . "\n\n" . $catalog . "\n" . self::CATALOG_END
+            . substr($content, $end + \strlen(self::CATALOG_END));
+    }
+
+    private function agentsCatalog(): string
     {
         $lines = [];
 
@@ -592,6 +639,26 @@ final readonly class Generator
         }
 
         return $lines === [] ? "No packages yet.\n" : implode("\n", $lines) . "\n";
+    }
+
+    private function readmeCatalog(): string
+    {
+        if ($this->monorepo->packages === []) {
+            return "No packages yet.\n";
+        }
+
+        $rows = "| Package | Description |\n|---|---|\n";
+
+        foreach ($this->monorepo->packages as $package) {
+            $rows .= \sprintf(
+                "| [%s](%s) | %s |\n",
+                $package->name(),
+                $package->path(),
+                str_replace('|', '\|', $package->manifest->description),
+            );
+        }
+
+        return $rows;
     }
 
     /**

@@ -8,6 +8,7 @@ return new Manifest(
     description: 'Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'async', 'cache', 'lru-cache', 'cache-stampede'],
     require: [
         'thesis/async' => '*',
         'thesis/time' => '*',

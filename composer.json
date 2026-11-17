@@ -1,8 +1,24 @@
 {
     "name": "thesis/monorepo",
-    "description": "Thesis: an asynchronous PHP ecosystem",
+    "description": "Asynchronous PHP on Revolt: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, AMQP. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
+    "keywords": [
+        "php",
+        "async",
+        "asynchronous",
+        "fibers",
+        "event-loop",
+        "revolt",
+        "structured-concurrency",
+        "concurrency",
+        "non-blocking-io",
+        "monorepo",
+        "amqp",
+        "rabbitmq",
+        "sockets",
+        "dns"
+    ],
     "authors": [
         {
             "name": "Vadim Zanfir",

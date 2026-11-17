@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Monorepo\Internal\GitHub;
 
+use Thesis\Monorepo\Config;
 use Thesis\Monorepo\Internal\Json;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
@@ -13,6 +14,7 @@ use Thesis\Monorepo\Internal\Packagist\Packagist;
 /**
  * Brings thesis-php/<dir> of every package to the state derived from its manifest: a public read-only copy
  * of packages/<dir> that only the app of the split may push to, registered on Packagist. Deletes nothing.
+ * Of the monorepo itself only the description and the topics come from monorepo.php.
  * A repository that fails does not stop the others: the split still pushes every package whose repository is fine.
  *
  * @internal
@@ -41,6 +43,12 @@ final class Repositories
     public static function sync(Monorepo $monorepo, Api $api, Packagist $packagist, bool $dryRun): self
     {
         $repositories = new self($api, $packagist, $dryRun);
+
+        try {
+            $repositories->monorepo($monorepo->config);
+        } catch (MonorepoException $exception) {
+            $repositories->errors[] = $exception->getMessage();
+        }
 
         foreach ($monorepo->packages as $package) {
             try {
@@ -72,6 +80,28 @@ final class Repositories
         private readonly Packagist $packagist,
         private readonly bool $dryRun,
     ) {}
+
+    private function monorepo(Config $config): void
+    {
+        $repository = self::ORGANIZATION . '/' . self::MONOREPO;
+        $actual = $this->api->get('repos/' . $repository);
+
+        if ($actual === null || !self::isNamed($actual, $repository)) {
+            throw new MonorepoException(\sprintf('%s does not exist or the token has no access to it.', $repository));
+        }
+
+        if (($actual['description'] ?? null) !== $config->description) {
+            $this->change(
+                repository: $repository,
+                what: 'description updated',
+                apply: fn() => $this->api->send('PATCH', 'repos/' . $repository, [
+                    'description' => $config->description,
+                ]),
+            );
+        }
+
+        $this->topics($repository, $actual, $config->keywords);
+    }
 
     private function repository(Package $package): void
     {
@@ -138,8 +168,34 @@ final class Repositories
             );
         }
 
+        $this->topics($repository, $current, $package->manifest->keywords);
         $this->rulesets($repository, existing: $rulesets);
         $this->packagist($package, $repository, $hasMain);
+    }
+
+    /**
+     * Compared as a set: GitHub keeps the topics in its own order.
+     *
+     * @param non-empty-string $repository
+     * @param array<array-key, mixed> $actual what GET repos/<name> returns
+     * @param list<non-empty-string> $keywords
+     */
+    private function topics(string $repository, array $actual, array $keywords): void
+    {
+        $current = \is_array($actual['topics'] ?? null) ? $actual['topics'] : [];
+        sort($current);
+        $desired = $keywords;
+        sort($desired);
+
+        if ($current !== $desired) {
+            $this->change(
+                repository: $repository,
+                what: 'topics updated',
+                apply: fn() => $this->api->send('PUT', \sprintf('repos/%s/topics', $repository), [
+                    'names' => $keywords,
+                ]),
+            );
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ return new Manifest(
     description: 'Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'source-location', 'backtrace', 'debugging'],
     require: [
         'composer-runtime-api' => '^2.1',
     ],

@@ -9,6 +9,7 @@ return new Manifest(
     description: 'Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.',
     licenseSince: 2026,
     version: '0.3',
+    keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
     require: [
         'psr/clock' => '^1.0',
     ],

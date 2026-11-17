@@ -8,6 +8,7 @@ return new Manifest(
     description: 'Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'async', 'fibers', 'networking', 'sockets', 'tcp', 'unix-socket', 'tls', 'dns'],
     require: [
         'ext-filter' => '*',
         'ext-openssl' => '*',

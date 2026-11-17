@@ -8,6 +8,7 @@ return new Manifest(
     description: 'AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects.',
     licenseSince: 2026,
     version: '2.0',
+    keywords: ['php', 'async', 'fibers', 'amqp', 'amqp-client', 'rabbitmq', 'message-queue'],
     require: [
         'ext-filter' => '*',
         'ext-uri' => '*',

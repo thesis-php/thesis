@@ -15,7 +15,7 @@ final readonly class RepositoriesTest
 {
     public static function createsMissingRepositoryWithSettingsAndRulesets(): void
     {
-        $api = new FakeApi();
+        $api = new FakeApi(self::monorepoInSync());
 
         $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
@@ -104,6 +104,7 @@ final readonly class RepositoriesTest
     public static function refusesRepositoryThatIsNotSplitAndSyncsTheOthers(): void
     {
         $api = new FakeApi([
+            ...self::monorepoInSync(),
             'repos/thesis-php/io' => ['full_name' => 'thesis-php/io', 'default_branch' => '0.2.x'],
             'repos/thesis-php/io/rulesets' => [],
         ]);
@@ -130,6 +131,7 @@ final readonly class RepositoriesTest
     public static function createsRepositoryWhoseNameRedirectsToRenamedOne(): void
     {
         $api = new FakeApi([
+            ...self::monorepoInSync(),
             'repos/thesis-php/io' => ['full_name' => 'thesis-php/io-legacy', 'default_branch' => '0.2.x'],
         ]);
 
@@ -222,12 +224,79 @@ final readonly class RepositoriesTest
 
     public static function writesNothingInDryRun(): void
     {
-        $api = new FakeApi();
+        $api = new FakeApi(self::monorepoInSync());
 
         $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: true)->changes;
 
         Assert::same($api->writes, []);
         Assert::same(\count($changes), 5);
+    }
+
+    public static function setsTopicsFromKeywords(): void
+    {
+        $monorepo = new Fixture()->package('io', "keywords: ['php', 'io']")->load();
+        $api = new FakeApi(self::inSync());
+
+        $changes = Repositories::sync($monorepo, $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
+
+        Assert::same($api->writes, ['PUT repos/thesis-php/io/topics']);
+        Assert::same($api->bodies['PUT repos/thesis-php/io/topics'] ?? null, ['names' => ['php', 'io']]);
+        Assert::same($changes, ['thesis-php/io: topics updated']);
+    }
+
+    public static function leavesTopicsInAnotherOrder(): void
+    {
+        $monorepo = new Fixture()->package('io', "keywords: ['php', 'io']")->load();
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io'] = [...self::repository(), 'topics' => ['io', 'php']];
+        $api = new FakeApi($resources);
+
+        Repositories::sync($monorepo, $api, new FakePackagist(['thesis/io']), dryRun: false);
+
+        Assert::same($api->writes, []);
+    }
+
+    public static function setsDescriptionAndTopicsOfMonorepo(): void
+    {
+        $monorepo = new Fixture()
+            ->file('monorepo.php', <<<'PHP'
+                <?php
+
+                return new Thesis\Monorepo\Config(
+                    php: '^8.5',
+                    description: 'New.',
+                    copyrightHolder: 'Fixture',
+                    licenseSince: 2026,
+                    keywords: ['php', 'monorepo'],
+                );
+                PHP)
+            ->load()
+        ;
+        $api = new FakeApi([
+            'repos/thesis-php/thesis' => [
+                'full_name' => 'thesis-php/thesis',
+                'description' => 'Old.',
+                'topics' => ['php'],
+            ],
+        ]);
+
+        $changes = Repositories::sync($monorepo, $api, new FakePackagist(), dryRun: false)->changes;
+
+        Assert::same($api->bodies, [
+            'PATCH repos/thesis-php/thesis' => ['description' => 'New.'],
+            'PUT repos/thesis-php/thesis/topics' => ['names' => ['php', 'monorepo']],
+        ]);
+        Assert::same($changes, ['thesis-php/thesis: description updated', 'thesis-php/thesis: topics updated']);
+    }
+
+    public static function failsOnMonorepoItCannotSeeAndSyncsThePackages(): void
+    {
+        $api = new FakeApi(array_diff_key(self::inSync(), self::monorepoInSync()));
+
+        $synced = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false);
+
+        Assert::same($synced->errors, ['thesis-php/thesis does not exist or the token has no access to it.']);
+        Assert::same($api->writes, []);
     }
 
     private static function monorepo(): Monorepo
@@ -241,6 +310,7 @@ final readonly class RepositoriesTest
     private static function inSync(): array
     {
         return [
+            ...self::monorepoInSync(),
             'repos/thesis-php/io' => self::repository(),
             'repos/thesis-php/io/rulesets' => [
                 ['id' => 1, 'name' => 'read-only branches'],
@@ -252,6 +322,14 @@ final readonly class RepositoriesTest
                 ['id' => 3, 'config' => ['url' => 'https://packagist.org/api/github?username=thesis']],
             ],
         ];
+    }
+
+    /**
+     * @return array<string, array<array-key, mixed>>
+     */
+    private static function monorepoInSync(): array
+    {
+        return ['repos/thesis-php/thesis' => ['full_name' => 'thesis-php/thesis', 'description' => 'Fixture.']];
     }
 
     /**

@@ -1,6 +1,13 @@
 {
     "name": "thesis/testo-plugin",
     "description": "Testo plugins for thesis packages: tests on the virtual time of thesis/async.",
+    "keywords": [
+        "php",
+        "async",
+        "testing",
+        "testo",
+        "virtual-time"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

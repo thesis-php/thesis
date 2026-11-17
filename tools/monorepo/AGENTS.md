@@ -46,7 +46,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
 - `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
   creates it, sets the settings that differ, creates or replaces the two rulesets, adds the webhook of Packagist
-  and registers the package there (`Internal\Packagist`). It compares only the keys it sends
+  and registers the package there (`Internal\Packagist`). Of the monorepo itself it syncs only the description
+  and the topics. Topics are compared as a set: GitHub keeps its own order. It compares only the keys it sends
   (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
   locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`: a dry run reads Packagist without
   `PACKAGIST_USERNAME` and `PACKAGIST_TOKEN`, only a write needs them. Whether a package is registered

@@ -8,6 +8,7 @@ return new Manifest(
     description: 'Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'async', 'fibers', 'io', 'non-blocking-io', 'streams', 'buffer', 'binary'],
     require: [
         'revolt/event-loop' => '^1.0.9',
         'thesis/async' => '*',

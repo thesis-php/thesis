@@ -1,6 +1,14 @@
 {
     "name": "thesis/async-trace",
     "description": "Tools around the trace of thesis/async: its events written as NDJSON, one line per event, and as lines of text for tests.",
+    "keywords": [
+        "php",
+        "async",
+        "fibers",
+        "tracing",
+        "ndjson",
+        "debugging"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

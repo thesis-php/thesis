@@ -1,6 +1,12 @@
 {
     "name": "thesis/phpstan-extension",
     "description": "PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot.",
+    "keywords": [
+        "php",
+        "phpstan",
+        "phpstan-extension",
+        "static-analysis"
+    ],
     "license": "MIT",
     "type": "phpstan-extension",
     "authors": [

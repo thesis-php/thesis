@@ -10,6 +10,7 @@ return new Manifest(
     description: 'Formats PHP values, classes, functions and parameters into short strings for error messages.',
     licenseSince: 2026,
     version: '0.2',
+    keywords: ['php', 'formatter', 'error-messages'],
     require: [
         'thesis/source-location' => '*',
     ],

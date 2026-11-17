@@ -16,6 +16,8 @@ final readonly class Manifest
      * @param positive-int $licenseSince the first year of the copyright in LICENSE
      * @param non-empty-string $version the current series of the package, X.Y: '0.1', '2.0'. Changed by hand
      *     in the commit that starts a series: a break below 1.0, a new minor above (agents/versions.md)
+     * @param list<non-empty-string> $keywords composer keywords, also the topics of the split repository on GitHub,
+     *     so each is a topic: lowercase letters, digits and hyphens, at most 50 characters, at most 20 of them
      * @param array<non-empty-string, non-empty-string> $require packages and platform requirements.
      *     A monorepo package is required as 'thesis/<dir>' => '*', the range of its series is written instead
      *     (^0.Y below 1.0, ^X.0 above). A constraint within that range raises the lower bound: '^0.1.5'.
@@ -46,6 +48,7 @@ final readonly class Manifest
         public string $description,
         public int $licenseSince,
         public string $version,
+        public array $keywords = [],
         public array $require = [],
         public array $requireDev = [],
         public bool $rootEntry = false,

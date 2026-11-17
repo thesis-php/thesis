@@ -1,6 +1,11 @@
 {
     "name": "thesis/formatter",
     "description": "Formats PHP values, classes, functions and parameters into short strings for error messages.",
+    "keywords": [
+        "php",
+        "formatter",
+        "error-messages"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

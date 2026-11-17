@@ -10,6 +10,7 @@ return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop', 'revolt'],
     require: [
         'revolt/event-loop' => '^1.0.9',
         'thesis/dispatcher' => '*',

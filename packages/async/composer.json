@@ -1,6 +1,15 @@
 {
     "name": "thesis/async",
     "description": "Structured concurrency for PHP fibers: cancellation is a property of the task tree.",
+    "keywords": [
+        "php",
+        "async",
+        "fibers",
+        "structured-concurrency",
+        "cancellation",
+        "event-loop",
+        "revolt"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

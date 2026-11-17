@@ -1,6 +1,13 @@
 {
     "name": "thesis/exceptionally",
     "description": "Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.",
+    "keywords": [
+        "php",
+        "error-handling",
+        "exceptions",
+        "warnings",
+        "fibers"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

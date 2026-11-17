@@ -1,6 +1,16 @@
 {
     "name": "thesis/io",
     "description": "Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.",
+    "keywords": [
+        "php",
+        "async",
+        "fibers",
+        "io",
+        "non-blocking-io",
+        "streams",
+        "buffer",
+        "binary"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

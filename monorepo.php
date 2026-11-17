@@ -7,9 +7,26 @@ use Thesis\Monorepo\Config;
 /** Source of truth for the root composer.json together with packages/*\/package.php. Run `make sync` after a change. */
 return new Config(
     php: '^8.5',
-    description: 'Thesis: an asynchronous PHP ecosystem',
+    description: 'Asynchronous PHP on Revolt: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, AMQP. '
+        . 'Monorepo of the thesis/* packages.',
     copyrightHolder: 'The Thesis Authors',
     licenseSince: 2026,
+    keywords: [
+        'php',
+        'async',
+        'asynchronous',
+        'fibers',
+        'event-loop',
+        'revolt',
+        'structured-concurrency',
+        'concurrency',
+        'non-blocking-io',
+        'monorepo',
+        'amqp',
+        'rabbitmq',
+        'sockets',
+        'dns',
+    ],
     authors: [
         ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],
         ['name' => 'Valentin Udaltsov', 'email' => 'udaltsov.valentin@gmail.com'],

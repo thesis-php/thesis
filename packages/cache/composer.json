@@ -1,6 +1,13 @@
 {
     "name": "thesis/cache",
     "description": "Cache interface with Time\\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex.",
+    "keywords": [
+        "php",
+        "async",
+        "cache",
+        "lru-cache",
+        "cache-stampede"
+    ],
     "license": "MIT",
     "type": "library",
     "authors": [

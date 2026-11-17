@@ -8,6 +8,7 @@ return new Manifest(
     description: 'Testo plugins for thesis packages: tests on the virtual time of thesis/async.',
     licenseSince: 2026,
     version: '0.1',
+    keywords: ['php', 'async', 'testing', 'testo', 'virtual-time'],
     require: [
         'internal/container' => '^1.1',
         'testo/testo' => '^0.10.29',
