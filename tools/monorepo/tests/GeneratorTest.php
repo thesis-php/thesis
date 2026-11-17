@@ -459,7 +459,7 @@ final readonly class GeneratorTest
                         new SuiteConfig(
                             name: 'async',
                             location: [__DIR__ . '/packages/async/tests'],
-                            plugins: require __DIR__ . '/packages/async/testo.plugins.php',
+                            plugins: require __DIR__ . '/packages/async/testo.plugins.php', // @phpstan-ignore argument.type
                         ),
                         new SuiteConfig(name: 'bytes', location: [__DIR__ . '/packages/bytes/tests']),
 
@@ -475,7 +475,7 @@ final readonly class GeneratorTest
 
         Assert
             ::string($files['testo.php'] ?? '')
-            ->contains("    plugins: require __DIR__ . '/testo.plugins.php',\n);\n")
+            ->contains("    plugins: require __DIR__ . '/testo.plugins.php', // @phpstan-ignore argument.type\n);\n")
         ;
     }
 
