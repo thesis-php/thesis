@@ -12,7 +12,6 @@ use Thesis\Dispatcher\Fixtures\Base;
 use Thesis\Dispatcher\Fixtures\Child;
 use Thesis\Dispatcher\Fixtures\Event;
 use Thesis\Dispatcher\Fixtures\Named;
-use Thesis\Dispatcher\Fixtures\NotDeclared;
 use Thesis\Dispatcher\Fixtures\Other;
 use Thesis\Dispatcher\Fixtures\Unrelated;
 use function Thesis\Formatter\formatFunction;
@@ -257,8 +256,9 @@ final class DispatcherTest
     public function resolvesTheListenersOfAClassOnce(): void
     {
         $dispatcher = new Dispatcher([static function (Event $event) {}]);
-        // @phpstan-ignore class.notFound (a class that is not declared: is_a() asks the autoloaders for it every time)
-        $class = NotDeclared::class;
+        /** @var class-string $class a class that is not declared: is_a() asks the autoloaders for it every time */
+        // @phpstan-ignore varTag.nativeType
+        $class = 'Thesis\Dispatcher\Fixtures\NotDeclared';
         $loads = 0;
         $autoload = static function (string $loaded) use ($class, &$loads) {
             if ($loaded === $class) {
