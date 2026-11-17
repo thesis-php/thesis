@@ -70,7 +70,6 @@ final class TraceLog
             $event instanceof Ended => $event->error === null
                 ? 'returned ' . json_encode($event->value)
                 : 'threw ' . self::error($event->error),
-            default => $event::class,
         };
     }
 

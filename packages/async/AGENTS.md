@@ -175,13 +175,17 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   The function is passed as `__FUNCTION__`, never as a literal: `'Thesis\Async\group'` is the interface `Group`
   to Rector (it rewrites it to `group::class`) and to PHPStan, class names being case-insensitive. A new way to create a scope,
   to wait or to cancel adds its event, and `TraceChecker` (whole traces on the generated programs) checks it.
+  A new event goes into `@phpstan-sealed` of `Trace\Event`: PHPStan rejects a class of it missing there, and then
+  points at every `match` over the events that does not handle it (they have no `default`, `php.md`).
 
 ## Decisions
 
 - Tracing is one stream of event objects to a `Thesis\Dispatcher`, not a method per event: a new event is a new
-  class, which breaks no listener, and the dispatcher tells which events nobody gets, so the tracer skips the
-  backtraces of a wait for a listener of cancellations alone. Rejected: an `Observer` interface of our own,
+  class, which breaks no listener at runtime, and the dispatcher tells which events nobody gets, so the tracer
+  skips the backtraces of a wait for a listener of cancellations alone. Rejected: an `Observer` interface of our own,
   it routed by `instanceof` in every observer and could not tell the tracer what to skip.
+  The events are a closed set (`@phpstan-sealed`): only the library creates them, and a tool that handles each one
+  learns of a new one from PHPStan. Rejected: a list of the classes in a constant, a second list next to the sealed.
   Rejected: hooks on `Scope::__construct()` (the kind of a scope is known only
   where it is created), events from inside `notify()` (user code in the middle of the walk), a null check per event
   in `suspend()` (the traced wait is a separate method instead), a full backtrace per wait (`caller()` of

@@ -115,7 +115,6 @@ final class Recorder
             $event instanceof ScopeCancelled => $this->cancelled($event, $t),
             $event instanceof Joining => ['join', $this->name($scope) . ' waits for its tasks'],
             $event instanceof Ended => $this->ended($scope, $event->value, $event->error, $t),
-            default => ['other', $event::class],
         };
 
         $this->events[] = ['t' => $t, 'text' => $text, 'kind' => $kind, 'scope' => 's' . $scope];
