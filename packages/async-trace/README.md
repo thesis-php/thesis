@@ -79,8 +79,8 @@ A line is for reading and comparing, not parsing: a tool reads the NDJSON.
 ## `WhoCancelled`
 
 `Cancelled` carries nothing: a task that ends cancelled does not tell by whom. `WhoCancelled` does: each scope
-that ends as cancelled gets a `CancelledBy` report in the dispatcher of reports given to it, with what has cancelled
-the scope and where it is written:
+that ends as cancelled gets a `CancelledBy` report, with what has cancelled the scope and where it is written.
+The report goes to the same dispatcher as the events of the trace:
 
 ```php
 use Thesis\AsyncTrace\CancelledBy;
@@ -89,7 +89,7 @@ use Thesis\AsyncTrace\WhoCancelled;
 $print = static function (CancelledBy $report) {
     fwrite(STDERR, $report . "\n");
 };
-observe(new Dispatcher(listenersOf(new WhoCancelled(new Dispatcher([$print])))), $main);
+observe(new Dispatcher([...listenersOf(new WhoCancelled()), $print]), $main);
 // #3 task 'fetch' at /app/src/main.php:12 is cancelled by the deadline of timeout 2s at /app/src/main.php:10
 ```
 
@@ -107,7 +107,9 @@ the reason of the cancellation it was created under. The report has the fields t
 
 It listens only to the scopes being created, cancelled and ended, not to the waits, which cost a backtrace each.
 It forgets a scope when the scope ends, fit for a process that lives long. A listener of the reports is called
-inside a listener of `observe()`, with the same rules: it must not throw or suspend the fiber.
+inside a listener of `observe()`, with the same rules: it must not throw or suspend the fiber. A report is dispatched
+at once, before the listeners that stand after `WhoCancelled` get the `Ended` that has caused it: put a writer
+of the events (`NdjsonWriter`, `TextLog`) before it to keep the end before the report.
 
 ## The format, version 1
 

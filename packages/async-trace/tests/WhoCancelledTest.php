@@ -9,6 +9,7 @@ use Testo\Test;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\Trace\CancelCause;
+use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Joining;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\Suspended;
@@ -146,10 +147,10 @@ final class WhoCancelledTest
         $listener = static function (CancelledBy $report) use (&$reports) {
             $reports[] = $report;
         };
-        $who = new WhoCancelled(new Dispatcher([$listener]));
         $start = Instant::now();
-        $line = __LINE__ + 3;
-        observe(new Dispatcher(listenersOf($who)), static fn() => group(static function (Group $group) {
+        $line = __LINE__ + 4;
+        $dispatcher = new Dispatcher([...listenersOf(new WhoCancelled()), $listener]);
+        observe($dispatcher, static fn() => group(static function (Group $group) {
             delay(sec(1));
             $group->spawn(static fn() => delay(sec(5)))->cancel();
         }));
@@ -163,9 +164,27 @@ final class WhoCancelledTest
         Assert::same(toNs($report->at->since($start)), 1_000_000_000);
     }
 
+    public function reportsAfterListenersBeforeItGetTheEnd(): void
+    {
+        /** @var list<string> $order */
+        $order = [];
+        $ended = static function (Ended $event) use (&$order) {
+            $order[] = 'Ended #' . $event->scope;
+        };
+        $report = static function (CancelledBy $report) use (&$order) {
+            $order[] = 'CancelledBy #' . $report->scope;
+        };
+        observe(
+            dispatcher: new Dispatcher([$ended, ...listenersOf(new WhoCancelled()), $report]),
+            fn: static fn() => timeoutOr(sec(1), static fn() => delay(sec(5))),
+        );
+
+        Assert::same($order, ['Ended #1', 'CancelledBy #1']);
+    }
+
     public function listensToNoWaitsAndRuns(): void
     {
-        $dispatcher = new Dispatcher(listenersOf(new WhoCancelled(new Dispatcher())));
+        $dispatcher = new Dispatcher(listenersOf(new WhoCancelled()));
 
         foreach ([TaskStarted::class, Suspended::class, Resumed::class, Joining::class] as $class) {
             Assert::false($dispatcher->listens($class));
@@ -202,8 +221,7 @@ final class WhoCancelledTest
         $listener = static function (CancelledBy $report) use (&$reports) {
             $reports[] = (string) $report;
         };
-        $who = new WhoCancelled(new Dispatcher([$listener]));
-        observe(new Dispatcher(listenersOf($who)), $program);
+        observe(new Dispatcher([...listenersOf(new WhoCancelled()), $listener]), $program);
 
         return $reports;
     }

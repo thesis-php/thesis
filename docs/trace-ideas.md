@@ -121,8 +121,8 @@ of the losses: the program never slows down for its observer.
 ## Where it lives
 
 thesis/async keeps only the events, the tools go to thesis/async-trace, with a `bin/` for the reports and `top` later.
-A tool reports to a `Thesis\Dispatcher` of its reports (`Report`, `CancelledBy`): a listener takes the reports
-of its type, under the rules of a listener of `observe()`.
+A tool reports to the dispatcher of the trace that holds it, the second argument of a listener (`Report`,
+`CancelledBy`): a listener takes the reports of its type, under the rules of a listener of `observe()`.
 
 ## To discuss next
 

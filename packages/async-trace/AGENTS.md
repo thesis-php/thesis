@@ -29,7 +29,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   the dispatcher does not route to it.
 - A tool listens only to the events it needs: `observe()` does not build an event nobody gets, and `Suspended`
   and `Resumed` cost a backtrace per wait. `WhoCancelled` never listens to the waits (`listensToNoWaitsAndRuns`).
-- A tool reports to a `Thesis\Dispatcher` given to its constructor, a class per finding under the sealed `Report`.
+- A tool reports to the dispatcher of the trace that holds it, the second argument of its listener
+  (`onEnded(Ended $event, Dispatcher $dispatcher)`), a class per finding under the sealed `Report`.
   A report holds only formatted values, so its listener may keep it. It is dispatched inside a listener
   of `observe()`, so the rules of that listener are the rules of the listener of the report.
   Rejected: finding the events by the files of `src/Trace/` of async, it guessed classes by the case of a file name,
@@ -62,8 +63,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of async on async-trace would be a cycle in the split repositories.
 - A location is `{file, line}` of the full path, not `"file:line"` (a reader would split it, and a path may hold
   `:`) and not `Location::$shortFile` (it depends on the root of the project that writes the trace).
-- Reports go to a `Dispatcher`, not to a `callable(Report): void`: a listener takes the reports of its type
-  (`CancelledBy` alone), and the same dispatcher, `#[Listener]` and `listenersOf()` as the trace itself.
+- Reports go to the dispatcher of the trace, among the events: one dispatcher is built for a program, a listener
+  takes the reports of its type (`CancelledBy` alone), and a tool may listen to the reports of another one.
+  The price: a report is dispatched before the listeners after the tool get the event that has caused it.
+  Rejected: a dispatcher of reports given to the constructor of a tool, two dispatchers to build and one more
+  argument per tool. Rejected: a `callable(Report): void`, no routing by type and no `listens()`.
 - `WhoCancelled` reports when a scope ends as cancelled, not when it is cancelled: the question is asked when
   `Cancelled` comes out, and then the scope is known whole. A scope under a shield that never ends gets nothing.
   The reason is formatted at `ScopeCancelled`, while the scope that has cancelled is alive, and shared by every

@@ -22,8 +22,10 @@ use function Thesis\Formatter\formatValue;
 
 /**
  * Tells what has cancelled a scope, which `Cancelled` itself does not: a scope that ends as cancelled
- * gets a {@see CancelledBy} in $reports, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()`
- * and where it is written, or the failure that has cancelled it. A method per event: `listenersOf($whoCancelled)`.
+ * gets a {@see CancelledBy}, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()` and where
+ * it is written, or the failure that has cancelled it. A method per event: `listenersOf($whoCancelled)`.
+ * The report goes to the dispatcher of the trace, among its events: a listener of the reports stands next to it,
+ * after the listeners of the events that should see an `Ended` before its report.
  *
  * It listens only to the scopes being created, cancelled and ended, not to the waits: those cost a backtrace each.
  * It keeps a short description of each live scope and forgets it when the scope ends. A failed task is kept
@@ -44,10 +46,6 @@ final class WhoCancelled
      * @var array<positive-int, non-empty-string>
      */
     private array $failed = [];
-
-    public function __construct(
-        private readonly Dispatcher $reports,
-    ) {}
 
     #[Listener]
     public function onGroupCreated(GroupCreated $event): void
@@ -131,7 +129,7 @@ final class WhoCancelled
     }
 
     #[Listener]
-    public function onEnded(Ended $event): void
+    public function onEnded(Ended $event, Dispatcher $dispatcher): void
     {
         $scope = $this->scopes[$event->scope] ?? null;
 
@@ -149,7 +147,7 @@ final class WhoCancelled
         $cancellation = $scope->cancellation;
 
         if ($error instanceof Cancelled && $cancellation !== null) {
-            $this->reports->dispatch(new CancelledBy(
+            $dispatcher->dispatch(new CancelledBy(
                 scope: $event->scope,
                 what: $scope->what,
                 at: $cancellation->at,
