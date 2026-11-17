@@ -31,6 +31,13 @@ final class Repositories
     public const int BOT_APP_ID = 5766114;
 
     /**
+     * Packages whose repositories neither github nor split touch: thesis-php/amqp is an older package
+     * without the rulesets of the split, and taking it over waits until amqp is ready to be published.
+     * TODO: delete once amqp is ready.
+     */
+    public const array HELD_BACK = ['amqp'];
+
+    /**
      * @var list<non-empty-string> what was changed, or would be with
      */
     public private(set) array $changes = [];
@@ -51,6 +58,10 @@ final class Repositories
         }
 
         foreach ($monorepo->packages as $package) {
+            if (\in_array($package->dir, self::HELD_BACK, strict: true)) {
+                continue;
+            }
+
             try {
                 $repositories->repository($package);
             } catch (MonorepoException $exception) {
