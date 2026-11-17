@@ -38,5 +38,11 @@
                 "Thesis\\Exceptionally\\Internal\\ErrorHandler::__invoke",
             ],
         },
+        "PregMatchRemoveCaret": {
+            "ignore": [
+                // The lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway.
+                "Thesis\\SourceLocation\\Location::of",
+            ],
+        },
     },
 }

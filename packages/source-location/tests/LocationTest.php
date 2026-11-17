@@ -64,6 +64,18 @@ final class LocationTest
         Assert::null(Location::ofFunction(new \ReflectionFunction('strlen')));
     }
 
+    public function doesNotLocateFunctionWithoutFile(): void
+    {
+        $function = new class (static fn() => null) extends \ReflectionFunction {
+            public function getFileName(): string
+            {
+                return '';
+            }
+        };
+
+        Assert::null(Location::ofFunction($function));
+    }
+
     public function shortensFileUnderProjectRoot(): void
     {
         $file = 'packages/source-location/tests/LocationTest.php';

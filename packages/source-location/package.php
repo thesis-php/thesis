@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Thesis\Monorepo\InfectionSkip;
 use Thesis\Monorepo\Manifest;
+use Thesis\SourceLocation\Location;
 
 return new Manifest(
     description: 'Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.',
@@ -16,5 +18,13 @@ return new Manifest(
         'testo/assert' => '^0.1.17',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
+    ],
+    skip: [
+        new InfectionSkip(
+            mutator: 'PregMatchRemoveCaret',
+            class: Location::class,
+            method: 'of',
+            reason: 'The lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway.',
+        ),
     ],
 );
