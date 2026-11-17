@@ -12,6 +12,7 @@ use Thesis\Dispatcher\Fixtures\Base;
 use Thesis\Dispatcher\Fixtures\Child;
 use Thesis\Dispatcher\Fixtures\Event;
 use Thesis\Dispatcher\Fixtures\Named;
+use Thesis\Dispatcher\Fixtures\NotDeclared;
 use Thesis\Dispatcher\Fixtures\Other;
 use Thesis\Dispatcher\Fixtures\Unrelated;
 use function Thesis\Formatter\formatFunction;
@@ -36,6 +37,8 @@ final class DispatcherTest
         yield 'no type' => [static function ($event) {}, self::ALL];
         yield 'self' => [new Child()->onSelf(...), [Base::class, Child::class]];
         yield 'parent' => [new Child()->onParent(...), [Base::class, Child::class]];
+        yield 'self in a closure' => [Base::selfListener(), [Base::class, Child::class]];
+        yield 'parent in a closure' => [Child::parentListener(), [Base::class, Child::class]];
     }
     private const array ALL = [Base::class, Child::class, Other::class, Unrelated::class];
 
@@ -91,6 +94,24 @@ final class DispatcherTest
         $dispatcher->dispatch(new Other());
 
         Assert::same($calls, ['b', 'a']);
+    }
+
+    public function ignoresTheKeysOfTheIterable(): void
+    {
+        $calls = [];
+        $listeners = (static function () use (&$calls) {
+            yield 'same' => static function (Other $event) use (&$calls) {
+                $calls[] = 'first';
+            };
+            yield 'same' => static function (Other $event) use (&$calls) {
+                $calls[] = 'second';
+            };
+        })();
+        $dispatcher = new Dispatcher($listeners);
+
+        $dispatcher->dispatch(new Other());
+
+        Assert::same($calls, ['first', 'second']);
     }
 
     public function callsAListenerOnceForAnEventOfSeveralTypesOfItsUnion(): void
@@ -231,6 +252,48 @@ final class DispatcherTest
         $event = new class implements Event {};
 
         Assert::true($dispatcher->listens($event::class));
+    }
+
+    public function resolvesTheListenersOfAClassOnce(): void
+    {
+        $dispatcher = new Dispatcher([static function (Event $event) {}]);
+        // @phpstan-ignore class.notFound (a class that is not declared: is_a() asks the autoloaders for it every time)
+        $class = NotDeclared::class;
+        $loads = 0;
+        $autoload = static function (string $loaded) use ($class, &$loads) {
+            if ($loaded === $class) {
+                ++$loads;
+            }
+        };
+        spl_autoload_register($autoload);
+
+        try {
+            $dispatcher->listens($class);
+            $dispatcher->listens($class);
+        } finally {
+            spl_autoload_unregister($autoload);
+        }
+
+        Assert::same($loads, 1);
+    }
+
+    public function takesAClosureOutsideOfAClassWithoutAWarning(): void
+    {
+        $listener = \Closure::bind(static function (Other $event) {}, null, null);
+        $warnings = [];
+        set_error_handler(static function (int $level, string $message) use (&$warnings) {
+            $warnings[] = $message;
+
+            return true;
+        });
+
+        try {
+            new Dispatcher([$listener]);
+        } finally {
+            restore_error_handler();
+        }
+
+        Assert::same($warnings, []);
     }
 
     /**

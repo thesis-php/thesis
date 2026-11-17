@@ -23,5 +23,12 @@
     "minCoveredMsi": 99,
     "mutators": {
         "@default": true,
+        "Coalesce": {
+            "ignore": [
+                // Without the table every event resolves its listeners again and gets the same ones:
+                // only slower, which no test sees.
+                "Thesis\\Dispatcher::dispatch",
+            ],
+        },
     },
 }
