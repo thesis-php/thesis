@@ -689,6 +689,21 @@ final class VirtualTimeTest
         EventLoop::cancel($timer);
     }
 
+    /**
+     * A driver that has run holds suspended fibers of closures bound to it: since php/php-src#24134 the cycle
+     * collector keeps it, with its file descriptors, unless virtualTime() releases its fibers.
+     */
+    public function driverThatHasRunGoesAwayAfterCall(): void
+    {
+        $driver = new StreamSelectDriver();
+        virtualTime(static fn() => delay(sec(1)), driver: $driver);
+        $reference = \WeakReference::create($driver);
+        unset($driver);
+        gc_collect_cycles();
+
+        Assert::null($reference->get());
+    }
+
     public function microtaskQueuedOutsideCallbackOfDriverIsActivity(): void
     {
         /** @var array{resource, resource} $pair */

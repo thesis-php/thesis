@@ -19,6 +19,7 @@ use Thesis\Async\Internal\VirtualTimeDriver;
 use Thesis\Async\Internal\Workers;
 use Time\Duration;
 use function Thesis\Async\Internal\fiberKey;
+use function Thesis\Async\Internal\releaseFibers;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -726,6 +727,7 @@ function virtualTime(callable $fn, ?EventLoop\Driver $driver = null): mixed
         } finally {
             Scope::$virtualClock = $previousClock;
             EventLoop::setDriver($previousDriver);
+            releaseFibers($driver);
         }
     }
 }
