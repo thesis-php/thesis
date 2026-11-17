@@ -29,13 +29,13 @@ final readonly class Certificate
      */
     public function contextOptions(): array
     {
-        return array_filter(
-            array: [
-                'local_cert' => $this->certFile,
-                'local_pk' => $this->keyFile,
-                'passphrase' => $this->passphrase,
-            ],
-            callback: static fn(?string $value) => $value !== null,
-        );
+        // A certificate of SNI_server_certs needs a key file, even if it is the certificate file.
+        $options = ['local_cert' => $this->certFile, 'local_pk' => $this->keyFile ?? $this->certFile];
+
+        if ($this->passphrase !== null) {
+            $options['passphrase'] = $this->passphrase;
+        }
+
+        return $options;
     }
 }

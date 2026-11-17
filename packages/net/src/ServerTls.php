@@ -47,8 +47,6 @@ final readonly class ServerTls
                 ),
                 'alpn_protocols' => $this->alpnProtocols === [] ? null : implode(',', $this->alpnProtocols),
                 'ciphers' => $this->ciphers,
-                'honor_cipher_order' => true,
-                'disable_compression' => true,
                 'verify_peer' => $verifyClient,
                 'verify_peer_name' => false,
                 'cafile' => $this->clientCaFile,

@@ -14,6 +14,7 @@ use function Thesis\Async\all;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
+use function Thesis\Async\timeoutOr;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -28,6 +29,7 @@ final class TlsTest
         [$clientSocket, $serverSocket] = self::handshake($server, $client);
 
         Assert::same($clientSocket->tls?->protocol, 'TLSv1.3');
+        Assert::same($clientSocket->tls->cipher, 'TLS_AES_256_GCM_SHA384');
         Assert::same($clientSocket->tls->alpnProtocol, 'h2');
         Assert::same($serverSocket->tls?->alpnProtocol, 'h2');
         Assert::same(self::commonName($clientSocket->tls->peerCertificate), 'server.test');
@@ -171,6 +173,57 @@ final class TlsTest
         Assert::false($server->isClosed);
     }
 
+    public function cannotBeEnabledWhileAnotherFiberReads(): void
+    {
+        // the server end is kept: closed, it would end the read and the write
+        [$client, $server] = tcpPair();
+        Expect
+            ::exception(\LogicException::class)
+            ->withMessage('TLS cannot be enabled while another fiber reads or writes.')
+        ;
+
+        group(static function (Group $group) use ($client) {
+            $group->spawn(static fn() => $client->read(1));
+            delay(ms(1));
+            $client->enableTls(self::trusting('server.test', peerName: 'server.test'));
+        });
+    }
+
+    public function cannotBeEnabledWhileAnotherFiberWrites(): void
+    {
+        // the server end is kept: closed, it would end the read and the write
+        [$client, $server] = tcpPair();
+        Expect
+            ::exception(\LogicException::class)
+            ->withMessage('TLS cannot be enabled while another fiber reads or writes.')
+        ;
+
+        group(static function (Group $group) use ($client) {
+            $group->spawn(static fn() => $client->write(str_repeat('x', 10_000_000)));
+            delay(ms(10));
+            $client->enableTls(self::trusting('server.test', peerName: 'server.test'));
+        });
+    }
+
+    public function isEnabledOnceTheWritesThatWaitedAreDone(): void
+    {
+        [$client, $server] = tcpPair();
+
+        group(static function (Group $group) use ($client, $server) {
+            $group->spawn(static fn() => $client->write(str_repeat('a', 10_000_000)));
+            delay(ms(10));
+            // cancelled while it waits for the write above
+            timeoutOr(ms(10), static fn() => $client->write('b'));
+            readExactly($server, 10_000_000);
+        });
+        all([
+            static fn() => $client->enableTls(self::trusting('server.test', peerName: 'server.test')),
+            static fn() => $server->enableTls(self::server('server.test')),
+        ]);
+
+        Assert::same($client->tls?->protocol, 'TLSv1.3');
+    }
+
     public function failsIfThePeerClosesDuringTheHandshake(): void
     {
         [$client, $server] = tcpPair();
@@ -183,6 +236,17 @@ final class TlsTest
             });
             $client->enableTls(new ClientTls(peerName: 'server.test'));
         });
+    }
+
+    public function failsWithoutAnUnrelatedErrorIfThePeerHasClosedBefore(): void
+    {
+        [$client, $server] = tcpPair();
+        $server->close();
+        delay(ms(10));
+        Expect::exception(TlsFailed::class)->withMessage('TLS handshake failed: the peer has closed the connection.');
+        @trigger_error('unrelated', E_USER_WARNING);
+
+        $client->enableTls(new ClientTls(peerName: 'server.test'));
     }
 
     public function cannotBeEnabledTwice(): void
@@ -199,6 +263,123 @@ final class TlsTest
         Expect::exception(\LogicException::class)->withMessage('A TLS socket cannot be half-closed.');
 
         $client->closeWrite();
+    }
+
+    public function connectsWithoutVerifyingThePeer(): void
+    {
+        [$client] = self::handshake(self::server('server.test'), new ClientTls(verifyPeer: false));
+
+        Assert::same(self::commonName($client->tls?->peerCertificate), 'server.test');
+    }
+
+    public function connectsWithoutVerifyingThePeerName(): void
+    {
+        $client = new ClientTls(
+            peerName: 'other.test',
+            verifyPeerName: false,
+            caFile: certificate('server.test')->certFile,
+        );
+
+        [$clientSocket] = self::handshake(self::server('server.test'), $client);
+
+        Assert::same(self::commonName($clientSocket->tls?->peerCertificate), 'server.test');
+    }
+
+    public function trustsTheCasOfADirectory(): void
+    {
+        $certFile = certificate('server.test')->certFile;
+        $hash = openssl_x509_parse((string) file_get_contents($certFile))['hash'] ?? null;
+        \assert(\is_string($hash));
+        // OpenSSL looks up the hashed names only, so the other files of the directory are no CAs.
+        $caPath = \dirname($certFile);
+        copy($certFile, "{$caPath}/{$hash}.0");
+
+        [$client] = self::handshake(self::server('server.test'), new ClientTls(caPath: $caPath));
+
+        Assert::same(self::commonName($client->tls?->peerCertificate), 'server.test');
+    }
+
+    public function takesTheKeyFromTheCertificateFile(): void
+    {
+        [$client] = self::handshake(
+            serverTls: new ServerTls(self::withKeyInside('server.test')),
+            clientTls: self::trusting('server.test'),
+        );
+
+        Assert::same(self::commonName($client->tls?->peerCertificate), 'server.test');
+    }
+
+    public function takesTheKeyFromTheFileOfAServerNameCertificate(): void
+    {
+        $server = new ServerTls(
+            certificate: certificate('a.test'),
+            sniCertificates: ['b.test' => self::withKeyInside('b.test')],
+        );
+        $client = new ClientTls(peerName: 'b.test', caFile: certificate('b.test')->certFile);
+
+        [$clientSocket] = self::handshake($server, $client);
+
+        Assert::same(self::commonName($clientSocket->tls?->peerCertificate), 'b.test');
+    }
+
+    public function decryptsTheKeyWithThePassphrase(): void
+    {
+        $certificate = certificate('server.test');
+        \assert($certificate->keyFile !== null);
+        $key = openssl_pkey_get_private((string) file_get_contents($certificate->keyFile));
+        \assert($key !== false);
+        $keyFile = \dirname($certificate->certFile) . '/server.test-encrypted.key';
+        openssl_pkey_export_to_file($key, $keyFile, passphrase: 'secret');
+
+        [$client] = self::handshake(
+            serverTls: new ServerTls(new Certificate($certificate->certFile, $keyFile, passphrase: 'secret')),
+            clientTls: self::trusting('server.test'),
+        );
+
+        Assert::same(self::commonName($client->tls?->peerCertificate), 'server.test');
+    }
+
+    public function connectsToATls12ServerWithTheCiphersGiven(): void
+    {
+        // not the first of the default ciphers of PHP
+        $clientTls = new ClientTls(
+            caFile: certificate('server.test')->certFile,
+            ciphers: 'ECDHE-ECDSA-CHACHA20-POLY1305',
+        );
+
+        $client = self::connectToTls12($clientTls);
+
+        Assert::same($client->tls?->protocol, 'TLSv1.2');
+        Assert::same($client->tls->cipher, 'ECDHE-ECDSA-CHACHA20-POLY1305');
+    }
+
+    public function refusesATls12ServerIfTls13IsRequired(): void
+    {
+        $clientTls = new ClientTls(caFile: certificate('server.test')->certFile, minVersion: TlsVersion::Tls13);
+        Expect::exception(TlsFailed::class);
+
+        self::connectToTls12($clientTls);
+    }
+
+    public function acceptsATls12ClientInTheOrderOfItsCiphers(): void
+    {
+        $serverTls = new ServerTls(
+            certificate: certificate('server.test'),
+            ciphers: 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256',
+        );
+
+        $server = self::acceptTls12($serverTls);
+
+        Assert::same($server->tls?->protocol, 'TLSv1.2');
+        Assert::same($server->tls->cipher, 'ECDHE-ECDSA-CHACHA20-POLY1305');
+    }
+
+    public function refusesATls12ClientIfTls13IsRequired(): void
+    {
+        $serverTls = new ServerTls(certificate: certificate('server.test'), minVersion: TlsVersion::Tls13);
+        Expect::exception(TlsFailed::class);
+
+        self::acceptTls12($serverTls);
     }
 
     public function needsAPeerNameWithoutAHost(): void
@@ -270,6 +451,117 @@ final class TlsTest
             });
         } finally {
             $server->close();
+        }
+    }
+
+    /**
+     * @param non-empty-string $name
+     */
+    private static function withKeyInside(string $name): Certificate
+    {
+        $certificate = certificate($name);
+        \assert($certificate->keyFile !== null);
+        $certFile = \dirname($certificate->certFile) . "/{$name}-with-key.pem";
+        file_put_contents(
+            filename: $certFile,
+            data: file_get_contents($certificate->certFile) . file_get_contents($certificate->keyFile),
+        );
+
+        return new Certificate($certFile);
+    }
+
+    /**
+     * Connects to a server of plain PHP streams that speaks TLS 1.2 only: ServerTls cannot stop at 1.2.
+     */
+    private static function connectToTls12(ClientTls $clientTls): Socket
+    {
+        $certificate = certificate('server.test');
+        $server = stream_socket_server(
+            address: 'tcp://127.0.0.1:0',
+            context: stream_context_create([
+                'ssl' => ['local_cert' => $certificate->certFile, 'local_pk' => $certificate->keyFile],
+            ]),
+        );
+        \assert($server !== false);
+        $address = (string) stream_socket_get_name($server, remote: false);
+        $port = (int) substr($address, (int) strrpos($address, ':') + 1);
+        \assert($port > 0 && $port <= 65535);
+
+        try {
+            return group(static function (Group $group) use ($server, $port, $clientTls) {
+                $group->spawn(static function () use ($server) {
+                    // polled: a wait in stream_socket_accept() would block the event loop, the client too
+                    while (true) {
+                        $peer = @stream_socket_accept($server, timeout: 0);
+
+                        if ($peer !== false) {
+                            break;
+                        }
+
+                        delay(ms(1));
+                    }
+
+                    self::rawHandshake($peer, STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
+
+                    return $peer;
+                });
+
+                return connect('127.0.0.1', $port, tls: $clientTls, resolver: new StaticResolver(['127.0.0.1']));
+            });
+        } finally {
+            fclose($server);
+        }
+    }
+
+    /**
+     * Accepts a client of plain PHP streams that speaks TLS 1.2 only and offers its ciphers in another order
+     * than the server prefers: ClientTls cannot stop at 1.2.
+     */
+    private static function acceptTls12(ServerTls $serverTls): Socket
+    {
+        $server = listen('127.0.0.1', 0);
+        \assert($server->address instanceof InetAddress);
+        $address = 'tcp://' . $server->address;
+
+        try {
+            return group(static function (Group $group) use ($server, $serverTls, $address) {
+                $accepted = $group->spawn(static function () use ($server, $serverTls) {
+                    $socket = $server->accept();
+                    \assert($socket !== null);
+                    $socket->enableTls($serverTls);
+
+                    return $socket;
+                });
+
+                $client = stream_socket_client(
+                    address: $address,
+                    context: stream_context_create([
+                        'ssl' => [
+                            'verify_peer' => false,
+                            'ciphers' => 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305'
+                                . ':ECDHE-ECDSA-AES256-GCM-SHA384',
+                        ],
+                    ]),
+                );
+                \assert($client !== false);
+                $group->spawn(static fn() => self::rawHandshake($client, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT));
+
+                return $accepted->await();
+            });
+        } finally {
+            $server->close();
+        }
+    }
+
+    /**
+     * @param resource $stream
+     */
+    private static function rawHandshake(mixed $stream, int $method): void
+    {
+        stream_set_blocking($stream, false);
+
+        while (@stream_socket_enable_crypto($stream, true, $method) === 0) {
+            delay(ms(1));
         }
     }
 

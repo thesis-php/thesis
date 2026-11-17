@@ -91,6 +91,8 @@ final class DnsResolver implements Resolver
         private readonly int $attempts = 2,
     ) {
         // A default value cannot call a function or a static method.
+        // A test of the default would wait for seconds.
+        // @infection-ignore DecrementInteger, IncrementInteger
         $this->timeout = $timeout ?? sec(5);
     }
 
@@ -123,7 +125,8 @@ final class DnsResolver implements Resolver
 
         $cached = $this->cache[$name] ?? null;
 
-        if ($cached !== null && $cached->expiresAt > Instant::now()) {
+        // An entry that expires in this very nanosecond is as good as expired: no test can hit it.
+        if ($cached !== null && /* @infection-ignore GreaterThan */ $cached->expiresAt > Instant::now()) {
             return $cached->addresses;
         }
 
@@ -196,6 +199,8 @@ final class DnsResolver implements Resolver
 
         for ($attempt = 0; $attempt < $this->attempts; ++$attempt) {
             foreach ($this->nameservers as $nameserver) {
+                // A test would draw ids for a long time to see a bound.
+                // @infection-ignore DecrementInteger, IncrementInteger
                 $request = Message::query(random_int(0, 0xFFFF), $name, $type);
 
                 try {
@@ -228,6 +233,8 @@ final class DnsResolver implements Resolver
      */
     private static function udp(InetAddress $nameserver, string $request): Response
     {
+        // PHP leaves the message empty only for a failure it cannot name ("Unknown error"), and no test can cause one.
+        // @infection-ignore FunctionCallRemoval
         error_clear_last();
         // A socket per query: a random source port, along with a random id, protects from spoofed answers.
         $stream = @stream_socket_client(
@@ -248,6 +255,8 @@ final class DnsResolver implements Resolver
         try {
             stream_set_blocking($stream, false);
             $watcher = new StreamWatcher($stream);
+            // A failed fwrite() of a socket reports its own warning, which replaces the last error.
+            // @infection-ignore FunctionCallRemoval
             error_clear_last();
 
             if (@fwrite($stream, $request) !== \strlen($request)) {
@@ -255,7 +264,12 @@ final class DnsResolver implements Resolver
             }
 
             while (true) {
+                // Only a read after a wait could take an error of another fiber, and a refusal comes
+                // at the first read: on loopback the OS has it before fwrite() returns.
+                // @infection-ignore FunctionCallRemoval
                 error_clear_last();
+                // A UDP datagram holds at most 65 507 bytes over IPv4, 65 527 over IPv6: a longer read takes it whole.
+                // @infection-ignore DecrementInteger, IncrementInteger
                 $bytes = @fread($stream, 65_535);
 
                 if ($bytes === false) {
@@ -285,11 +299,15 @@ final class DnsResolver implements Resolver
      */
     private static function tcp(InetAddress $nameserver, string $request): Response
     {
+        // The query is one write: Nagle's algorithm has nothing to hold back.
+        // @infection-ignore TrueValue
         $socket = Connector::tcp([$nameserver->ip], $nameserver->port, noDelay: true, host: $nameserver->ip);
 
         try {
             $socket->write(pack('n', \strlen($request)) . $request);
             $buffer = new Buffer();
+            // fill() buffers at least so many bytes, and the message follows its length anyway.
+            // @infection-ignore IncrementInteger
             $buffer->fill($socket, 2);
             $length = $buffer->readUint16();
             $buffer->fill($socket, $length);

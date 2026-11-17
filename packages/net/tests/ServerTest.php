@@ -81,6 +81,33 @@ final class ServerTest
         Assert::same($greetings, ['hello a', 'hello b', 'hello c']);
     }
 
+    public function acceptsAConnectionAsSoonAsItArrives(): void
+    {
+        $server = listen('127.0.0.1', 0);
+        \assert($server->address instanceof InetAddress);
+        $port = $server->address->port;
+
+        // An accept that polled with the backoff of a failed accept would look at 315 ms, then at 635 ms:
+        // the connection comes in the middle, where a delay in the start of the accept shifts nothing.
+        $latency = group(static function (Group $group) use ($server, $port) {
+            $accepted = $group->spawn(static function () use ($server) {
+                $server->accept();
+
+                return hrtime(true);
+            });
+            delay(ms(400));
+            $connectedAt = hrtime(true);
+            $client = connect('127.0.0.1', $port);
+            $acceptedAt = $accepted->await();
+            $client->close();
+
+            return $acceptedAt - $connectedAt;
+        });
+
+        Assert::true($latency < 50_000_000);
+        $server->close();
+    }
+
     public function acceptsThatNeverWaitStillLetOtherCallbacksRun(): void
     {
         $server = listen('127.0.0.1', 0);
@@ -163,7 +190,9 @@ final class ServerTest
 
     public function failsToConnectToAMissingUnixSocket(): void
     {
-        Expect::exception(ConnectFailed::class)->withMessageContaining('No such file or directory');
+        Expect::exception(ConnectFailed::class)->withMessage(
+            'Failed to connect to unix:/nonexistent/thesis.sock: /nonexistent/thesis.sock: No such file or directory',
+        );
 
         connectUnix('/nonexistent/thesis.sock');
     }

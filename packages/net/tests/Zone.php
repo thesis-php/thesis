@@ -17,6 +17,8 @@ final readonly class Zone
      * @param ?non-empty-string $cname a CNAME record put before the addresses
      * @param bool $truncated whether to answer over UDP with the TC flag and no records
      * @param bool $silent whether to never answer
+     * @param bool $byteByByte whether to send the answer over TCP a byte at a time
+     * @param bool $anotherId whether to answer over TCP with another id
      */
     public function __construct(
         public array $a = [],
@@ -26,5 +28,7 @@ final readonly class Zone
         public ?string $cname = null,
         public bool $truncated = false,
         public bool $silent = false,
+        public bool $byteByByte = false,
+        public bool $anotherId = false,
     ) {}
 }

@@ -20,6 +20,8 @@ final readonly class SystemConfig
 
     public static function load(string $resolvConf = '/etc/resolv.conf', string $hosts = '/etc/hosts'): self
     {
+        // file_get_contents() of a readable path returns a string, even of a directory: the casts are for PHPStan.
+        // @infection-ignore CastString
         return self::parse(
             resolvConf: is_readable($resolvConf) ? (string) file_get_contents($resolvConf) : '',
             hosts: is_readable($hosts) ? (string) file_get_contents($hosts) : '',
@@ -109,15 +111,15 @@ final readonly class SystemConfig
     ) {}
 
     /**
-     * @return \Generator<list<non-empty-string>> the fields of each line, without comments and empty lines
+     * @return \Generator<list<non-empty-string>> the fields of each line without comments, none of an empty line
      */
     private static function lines(string $contents): \Generator
     {
         foreach (explode("\n", $contents) as $line) {
             $line = preg_replace('/[#;].*/', '', $line) ?? '';
-            $fields = preg_split('/\s+/', trim($line), flags: PREG_SPLIT_NO_EMPTY);
+            $fields = preg_split('/\s+/', $line, flags: PREG_SPLIT_NO_EMPTY);
 
-            if ($fields !== false && $fields !== []) {
+            if ($fields !== false) {
                 yield $fields;
             }
         }

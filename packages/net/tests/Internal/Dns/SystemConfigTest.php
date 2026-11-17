@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net\Internal\Dns;
 
 use Testo\Assert;
+use Testo\Data\DataSet;
 use Testo\Test;
 
 #[Test]
@@ -14,15 +15,16 @@ final class SystemConfigTest
     {
         $config = SystemConfig::parse(
             resolvConf: <<<'CONF'
+                options rotate ndots:5 ndots:bad unknown:1 timeout:2 attempts:3
                 # comment
-                nameserver 10.0.0.1
+                  nameserver 10.0.0.1
                 nameserver ::1 ; comment
                 nameserver not-an-ip
+                nameserver
                 nameserver 10.0.0.2
                 nameserver 10.0.0.3
                 domain ignored.test
-                search svc.test. cluster.test
-                options ndots:5 timeout:2 attempts:3 rotate
+                search . svc.test. cluster.test
                 CONF,
             hosts: '',
         );
@@ -32,6 +34,17 @@ final class SystemConfigTest
         Assert::same($config->ndots, 5);
         Assert::same($config->timeout, 2);
         Assert::same($config->attempts, 3);
+    }
+
+    #[DataSet(['options ndots:-1 timeout:0 attempts:0', 0, 1, 1])]
+    #[DataSet(['options ndots:16 timeout:31 attempts:6', 15, 30, 5])]
+    public function clampsOptions(string $resolvConf, int $ndots, int $timeout, int $attempts): void
+    {
+        $config = SystemConfig::parse($resolvConf, hosts: '');
+
+        Assert::same($config->ndots, $ndots);
+        Assert::same($config->timeout, $timeout);
+        Assert::same($config->attempts, $attempts);
     }
 
     public function defaultsToTheLocalServer(): void
@@ -50,11 +63,11 @@ final class SystemConfigTest
         $config = SystemConfig::parse(
             resolvConf: '',
             hosts: <<<'HOSTS'
+                garbage line
                 127.0.0.1	localhost
                 ::1	localhost ip6-localhost
                 10.0.0.5 DB db.local # primary
                 # 10.0.0.6 commented
-                garbage line
                 HOSTS,
         );
 

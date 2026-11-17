@@ -59,7 +59,6 @@ final readonly class ClientTls
                 'capath' => $this->caPath,
                 'alpn_protocols' => $this->alpnProtocols === [] ? null : implode(',', $this->alpnProtocols),
                 'ciphers' => $this->ciphers,
-                'disable_compression' => true,
                 // The context of a connected socket is its own, so the captured certificate is this peer's.
                 'capture_peer_cert' => true,
                 ...$this->certificate?->contextOptions() ?? [],

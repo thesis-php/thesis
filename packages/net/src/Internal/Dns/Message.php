@@ -121,7 +121,7 @@ final readonly class Message
             return new Response(truncated: true, rcode: $rcode, addresses: [], ttl: 0);
         }
 
-        $type = new Buffer(bytes: substr($question, -4, 2))->readUint16();
+        $type = new Buffer(bytes: substr($question, -4))->readUint16();
         $size = $type === self::AAAA ? 16 : 4;
         $addresses = [];
         $ttl = null;
@@ -140,6 +140,8 @@ final readonly class Message
             }
 
             $address = inet_ntop($buffer->read($length));
+            // The assert only narrows the type for PHPStan: inet_ntop() of 4 or 16 bytes is an address.
+            // @infection-ignore LogicalAnd
             \assert(\is_string($address) && $address !== '');
             $addresses[] = $address;
             $ttl = min($ttl ?? $recordTtl, $recordTtl);

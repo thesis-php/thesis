@@ -26,6 +26,23 @@ final class MessageTest
         Message::query(1, 'db..test', Message::A);
     }
 
+    public function takesTheLongestName(): void
+    {
+        $label = str_repeat('a', 63);
+
+        $query = Message::query(1, "{$label}.{$label}.{$label}." . str_repeat('b', 61), Message::A);
+
+        Assert::same(\strlen($query), 12 + 255 + 4);
+    }
+
+    public function rejectsALongName(): void
+    {
+        $label = str_repeat('a', 63);
+        Expect::exception(DnsFailed::class);
+
+        Message::query(1, "{$label}.{$label}.{$label}." . str_repeat('b', 62), Message::A);
+    }
+
     public function rejectsALongLabel(): void
     {
         Expect::exception(DnsFailed::class);
@@ -40,10 +57,10 @@ final class MessageTest
                 'abcd8180000100030000000002646204746573740000010001'
                 // CNAME to x.test, ttl 300
                 . 'c00c000500010000012c00080178047465737400'
-                // A 10.0.0.1, ttl 60
-                . 'c00c000100010000003c00040a000001'
-                // A 10.0.0.2, ttl 30
-                . 'c00c000100010000001e00040a000002',
+                // A 10.0.0.1, ttl 30
+                . 'c00c000100010000001e00040a000001'
+                // A 10.0.0.2, ttl 60
+                . 'c00c000100010000003c00040a000002',
             ),
             query: Message::query(0xABCD, 'db.test', Message::A),
         );
@@ -51,6 +68,56 @@ final class MessageTest
         Assert::same($response?->rcode, Message::NOERROR);
         Assert::same($response->addresses, ['10.0.0.1', '10.0.0.2']);
         Assert::same($response->ttl, 30);
+    }
+
+    public function skipsTheRecordsOfAnotherTypeOrClass(): void
+    {
+        $response = Message::parse(
+            bytes: self::bytes(
+                'abcd8180000100030000000002646204746573740000010001'
+                // type 99 of 4 bytes
+                . 'c00c006300010000003c00040a000009'
+                // A of class CH
+                . 'c00c000100030000003c00040a000008'
+                . 'c00c000100010000003c00040a000001',
+            ),
+            query: Message::query(0xABCD, 'db.test', Message::A),
+        );
+
+        Assert::same($response?->addresses, ['10.0.0.1']);
+    }
+
+    public function skipsTheOwnerNamesOfAnyForm(): void
+    {
+        $response = Message::parse(
+            bytes: self::bytes(
+                'abcd8180000100030000000002646204746573740000010001'
+                // db.test without compression
+                . '026462047465737400000100010000003c00040a000001'
+                // a pointer beyond the first 256 bytes
+                . 'c10c000100010000003c00040a000002'
+                // a label of 63 bytes before a pointer
+                . '3f' . str_repeat('61', 63) . 'c00c000100010000003c00040a000003',
+            ),
+            query: Message::query(0xABCD, 'db.test', Message::A),
+        );
+
+        Assert::same($response?->addresses, ['10.0.0.1', '10.0.0.2', '10.0.0.3']);
+    }
+
+    public function hasNoTtlWithoutAddresses(): void
+    {
+        $response = Message::parse(
+            bytes: self::bytes(
+                'abcd8180000100010000000002646204746573740000010001'
+                // CNAME to x.test, ttl 300
+                . 'c00c000500010000012c00080178047465737400',
+            ),
+            query: Message::query(0xABCD, 'db.test', Message::A),
+        );
+
+        Assert::same($response?->addresses, []);
+        Assert::same($response->ttl, 0);
     }
 
     public function matchesTheQuestionWhateverTheCase(): void
@@ -91,6 +158,7 @@ final class MessageTest
 
         Assert::same($response?->rcode, 2);
         Assert::same($response->addresses, []);
+        Assert::same($response->ttl, 0);
     }
 
     public function stopsAtTheTruncatedFlag(): void
@@ -101,6 +169,7 @@ final class MessageTest
 
         Assert::true($response?->truncated);
         Assert::same($response->addresses, []);
+        Assert::same($response->ttl, 0);
     }
 
     public function rejectsATruncatedMessage(): void

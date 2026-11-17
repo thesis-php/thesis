@@ -91,6 +91,19 @@ function tcpPair(string $host = '127.0.0.1'): array
 }
 
 /**
+ * Whether Nagle's algorithm is off for $socket, which the API does not show.
+ */
+function noDelay(Socket $socket): bool
+{
+    $stream = \Closure::bind(static fn() => $socket->stream, null, Socket::class)();
+    \assert(\is_resource($stream));
+    $raw = socket_import_stream($stream);
+    \assert($raw !== false);
+
+    return socket_get_option($raw, SOL_TCP, TCP_NODELAY) !== 0;
+}
+
+/**
  * @param positive-int $length
  */
 function readExactly(Socket $socket, int $length): string

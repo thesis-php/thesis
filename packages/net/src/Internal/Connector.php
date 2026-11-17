@@ -34,7 +34,8 @@ final readonly class Connector
     {
         $context = ['socket' => ['tcp_nodelay' => $noDelay]];
         $attempt = static fn(string $ip) => self::attempt(
-            uri: str_contains($ip, ':') ? "tcp://[{$ip}]:{$port}" : "tcp://{$ip}:{$port}",
+            scheme: 'tcp',
+            address: str_contains($ip, ':') ? "[{$ip}]:{$port}" : "{$ip}:{$port}",
             context: $context,
             host: $host,
         );
@@ -53,7 +54,7 @@ final readonly class Connector
      */
     public static function unix(string $path): Socket
     {
-        $outcome = self::attempt("unix://{$path}", context: [], host: null);
+        $outcome = self::attempt(scheme: 'unix', address: $path, context: [], host: null);
 
         if ($outcome instanceof Socket) {
             return $outcome;
@@ -74,6 +75,8 @@ final readonly class Connector
         /** @var Channel<Socket|non-empty-string> $outcomes room for every attempt, so that none waits to report */
         $outcomes = new Channel(\count($ips));
 
+        // Only two attempts that connect in one tick leave a socket in the channel, and no test can time that.
+        // @infection-ignore UnwrapFinally
         try {
             return group(static function (Group $group) use ($ips, $attempt, $outcomes) {
                 $failures = [];
@@ -117,7 +120,8 @@ final readonly class Connector
                 return $reason;
             });
         } finally {
-            // Attempts that connected in the same tick as the winner.
+            // Attempts that connected in the same tick as the winner, see above.
+            // @infection-ignore While_
             while (($outcome = $outcomes->tryReceive()) !== null) {
                 if ($outcome instanceof Socket) {
                     $outcome->close();
@@ -164,18 +168,20 @@ final readonly class Connector
     }
 
     /**
-     * @param non-empty-string $uri
+     * @param 'tcp'|'unix' $scheme
+     * @param non-empty-string $address
      * @param array<string, array<string, mixed>> $context
      * @param ?non-empty-string $host
      * @return Socket|non-empty-string the reason of a failure
      */
-    private static function attempt(string $uri, array $context, ?string $host): Socket|string
+    private static function attempt(string $scheme, string $address, array $context, ?string $host): Socket|string
     {
-        $address = explode('://', $uri, 2)[1] ?? $uri;
+        // PHP leaves the message empty only for a failure it cannot name ("Unknown error"), and no test can cause one.
+        // @infection-ignore FunctionCallRemoval
         error_clear_last();
         // A context of its own: enableTls() sets options on it, and the default context is shared by every stream.
         $stream = @stream_socket_client(
-            address: $uri,
+            address: "{$scheme}://{$address}",
             error_code: $errno,
             error_message: $error,
             timeout: null,
@@ -184,6 +190,8 @@ final readonly class Connector
         );
 
         if ($stream === false) {
+            // the message of PHP, see above
+            // @infection-ignore LogicalAnd
             return \sprintf(
                 '%s: %s',
                 $address,
@@ -206,7 +214,7 @@ final readonly class Connector
             return \sprintf('%s: %s', $address, $reason);
         }
 
-        return Socket::create($stream, unix: str_starts_with($uri, 'unix:'), host: $host);
+        return Socket::create($stream, unix: $scheme === 'unix', host: $host);
     }
 
     /**
@@ -217,8 +225,13 @@ final readonly class Connector
     {
         if (\function_exists('socket_import_stream')) {
             $socket = @socket_import_stream($stream);
+            // A TCP stream is imported and its option is read, and a failed connect has an error:
+            // the checks only narrow the types for PHPStan.
+            // @infection-ignore DecrementInteger, IncrementInteger
             $errno = $socket === false ? 0 : socket_get_option($socket, SOL_SOCKET, SO_ERROR);
 
+            // see above
+            // @infection-ignore DecrementInteger, LogicalAnd
             $reason = \is_int($errno) && $errno !== 0 ? socket_strerror($errno) : '';
 
             if ($reason !== '') {

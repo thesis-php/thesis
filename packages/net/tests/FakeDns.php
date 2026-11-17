@@ -8,6 +8,8 @@ use Thesis\Async\Group;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Buffer;
 use Thesis\Net\Internal\Dns\Message;
+use function Thesis\Async\delay;
+use function Thesis\Time\ms;
 
 /**
  * A name server on 127.0.0.1, UDP and TCP on the same port, answering from a zone. It runs in daemons of a group.
@@ -109,7 +111,7 @@ final class FakeDns
                 continue;
             }
 
-            $response = $this->answer($query, 'udp');
+            [$response] = $this->answer($query, 'udp');
 
             if ($response !== null) {
                 \assert(\is_string($peer));
@@ -125,17 +127,33 @@ final class FakeDns
             $buffer->fill($socket, 2);
             $length = $buffer->readUint16();
             $buffer->fill($socket, $length);
-            $response = $this->answer($buffer->read($length), 'tcp');
+            [$response, $zone] = $this->answer($buffer->read($length), 'tcp');
 
-            if ($response !== null) {
-                $socket->write(pack('n', \strlen($response)) . $response);
+            if ($response === null) {
+                return;
+            }
+
+            $response = pack('n', \strlen($response)) . $response;
+
+            if (!$zone->byteByByte) {
+                $socket->write($response);
+
+                return;
+            }
+
+            foreach (str_split($response) as $byte) {
+                $socket->write($byte);
+                delay(ms(1));
             }
         } finally {
             $socket->close();
         }
     }
 
-    private function answer(string $query, string $transport): ?string
+    /**
+     * @return array{?string, Zone} the response, null to keep silent, and the zone of the name asked for
+     */
+    private function answer(string $query, string $transport): array
     {
         $buffer = new Buffer(bytes: $query);
         $id = $buffer->readUint16();
@@ -152,7 +170,11 @@ final class FakeDns
         $zone = $this->zone[$name] ?? new Zone(rcode: Message::NXDOMAIN);
 
         if ($zone->silent) {
-            return null;
+            return [null, $zone];
+        }
+
+        if ($zone->anotherId && $transport === 'tcp') {
+            $id ^= 1;
         }
 
         $truncated = $zone->truncated && $transport === 'udp';
@@ -178,7 +200,7 @@ final class FakeDns
 
         $question = substr($query, 12);
 
-        return new Buffer()
+        $response = new Buffer()
             ->writeUint16($id)
             ->writeUint16(0x8180 | ($truncated ? 0x0200 : 0) | $zone->rcode)
             ->writeUint16(1)
@@ -189,6 +211,8 @@ final class FakeDns
             ->write(implode('', $records))
             ->drain()
         ;
+
+        return [$response, $zone];
     }
 
     private static function record(int $type, int $ttl, string $data): string

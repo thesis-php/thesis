@@ -28,10 +28,13 @@ skills ship with the package and reach its users through llm/skills.
   nothing leaves it intact. A failed or cancelled handshake closes the socket.
 - Writes never interleave: the fast path (`fwrite()` without the mutex) is taken only while `$writers === 0`;
   anything that has to wait goes through `$writeMutex`. A fast path that wrote partially takes the free mutex
-  without a wait, so no other write can slip in. After an `fwrite()` that sent nothing, the same bytes are passed again:
-  OpenSSL requires it.
+  without a wait, so no other write can slip in. After an `fwrite()` that sent nothing, the retry begins
+  with the same bytes: OpenSSL has made a record of them and sends it first. PHP turns on
+  `SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER` and `SSL_MODE_ENABLE_PARTIAL_WRITE`, so the retry may be another string
+  and shorter, as long as it holds the record: a chunk of `WRITE_CHUNK` from the same offset does.
 - An `fwrite()` that returns 0 *with* an error has failed: OpenSSL reports a broken pipe this way, not as `false`,
-  and waiting for writability then would spin forever.
+  and waiting for writability then would spin forever. The fast path of `write()` leaves it to `finishWrite()`,
+  whose retry fails the same way.
 - `read()`, `write()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch
   the stream: it yields for a tick after 16 calls in one tick, so a peer that never pauses, one that reads faster
   than we write (another process on the same host), or a flood of connections does not starve the event loop.
@@ -78,6 +81,10 @@ skills ship with the package and reach its users through llm/skills.
 - `Socket` is a final class, not an interface: protocol tests use `socketPair()`, decorators wrap `Reader`/`Writer`.
 - `enableTls()` is explicit and `accept()` does no handshake: a slow client must not stall the accept loop,
   and plaintext-first protocols need the upgrade anyway.
+- TLS context options that are the defaults of PHP are not set: compression is off (`disable_compression`),
+  a server picks the cipher in its own order (`honor_cipher_order`).
+- `Certificate::contextOptions()` always has `local_pk`, the certificate file if the key is in it:
+  a certificate of `SNI_server_certs` without one fails every handshake that picks it.
 - Rejected: `ALPN` together with SNI certificates is not refused at construction: PHP loses ALPN only on connections
   that pick an SNI certificate, which degrades to the default protocol instead of failing (documented in README).
 
@@ -92,4 +99,14 @@ skills ship with the package and reach its users through llm/skills.
 - A connection that hangs is a listener with `backlog: 1` and a full accept queue: Linux drops the SYNs.
 - Certificates are generated per process by `certificate()` in `tests/helpers.php`: self-signed CAs valid for
   their name, `localhost` and `127.0.0.1`.
-- Keep both ends of a `socketPair()` in variables: an end that goes out of scope closes, and the other sees EOF.
+- Keep both ends of a `socketPair()` or `tcpPair()` in variables: an end that goes out of scope closes,
+  and the other sees EOF.
+- ClientTls and ServerTls cannot stop at TLS 1.2, so the tests of TLS 1.2 (ciphers, the cipher order, the version
+  methods) talk to a peer of plain PHP streams in `TlsTest`, polled with `delay()`: a blocking accept or handshake
+  would stop the event loop and the other side with it.
+- A stale error is planted with `@trigger_error('unrelated', E_USER_WARNING)` right before the call whose
+  `error_clear_last()` it tests: a later suspension lets other fibers replace it.
+- A test of leaked sockets counts `get_resources('stream')` with `gc_disable()`: the cycle collector frees
+  a forgotten socket some time later, and whether it has run decides the count.
+- Timing tests against the backoff of `Server::accept()` (5 ms doubling) connect in the middle of a long gap
+  between its polls: the start of an accept shifts them by tens of milliseconds.

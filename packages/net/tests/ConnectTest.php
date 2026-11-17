@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 use Testo\Assert;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Group;
@@ -73,21 +74,9 @@ final class ConnectTest
 
     public function startsTheNextAttemptWhileThePreviousHangs(): void
     {
-        // A listener whose accept queue is full drops SYNs, so a connection to it hangs.
-        $full = listen('127.0.0.1', 0, backlog: 1);
+        [$full, $fillers] = self::hangingListener();
         \assert($full->address instanceof InetAddress);
         $port = $full->address->port;
-        $fillers = [];
-
-        for ($i = 0; $i < 3; ++$i) {
-            $fillers[] = stream_socket_client(
-                address: "tcp://127.0.0.1:{$port}",
-                error_code: $errno,
-                error_message: $error,
-                timeout: null,
-                flags: STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
-            );
-        }
 
         $server = listen('::1', $port);
         $start = Instant::now();
@@ -109,6 +98,42 @@ final class ConnectTest
         unset($fillers);
     }
 
+    public function triesTheNextAddressAtOnceIfOneFails(): void
+    {
+        [$full, $fillers] = self::hangingListener();
+        \assert($full->address instanceof InetAddress);
+        $port = $full->address->port;
+        // nothing listens on [::1] at this port
+        $server = listen('127.0.0.2', $port);
+        $start = Instant::now();
+
+        $socket = timeout(sec(2), static fn() => connect(
+            host: 'triple.test',
+            port: $port,
+            resolver: new StaticResolver(['127.0.0.1', '::1', '127.0.0.2']),
+        ));
+
+        Assert::same((string) $socket->remoteAddress, "127.0.0.2:{$port}");
+        // one delay for the address that hangs, none for the one that refuses
+        Assert::true(Instant::now()->since($start) < ms(400));
+        $full->close();
+        $server->close();
+        unset($fillers);
+    }
+
+    #[DataSet([true])]
+    #[DataSet([false])]
+    public function turnsNagleOffUnlessAsked(bool $noDelay): void
+    {
+        $server = listen('127.0.0.1', 0);
+        \assert($server->address instanceof InetAddress);
+
+        $socket = connect('127.0.0.1', $server->address->port, noDelay: $noDelay);
+
+        Assert::same(noDelay($socket), $noDelay);
+        $server->close();
+    }
+
     public function wrapsAResolverFailure(): void
     {
         Expect
@@ -122,20 +147,9 @@ final class ConnectTest
 
     public function isCancellable(): void
     {
-        $full = listen('127.0.0.1', 0, backlog: 1);
+        [$full, $fillers] = self::hangingListener();
         \assert($full->address instanceof InetAddress);
         $port = $full->address->port;
-        $fillers = [];
-
-        for ($i = 0; $i < 3; ++$i) {
-            $fillers[] = stream_socket_client(
-                address: "tcp://127.0.0.1:{$port}",
-                error_code: $errno,
-                error_message: $error,
-                timeout: null,
-                flags: STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
-            );
-        }
 
         Expect::exception(TimedOut::class);
 
@@ -162,6 +176,30 @@ final class ConnectTest
 
         Assert::notNull($accepted);
         $server->close();
+    }
+
+    /**
+     * A listener whose accept queue is full drops SYNs, so a connection to it hangs.
+     *
+     * @return array{Server, list<mixed>} the listener and the connections that fill its queue, to keep
+     */
+    private static function hangingListener(): array
+    {
+        $full = listen('127.0.0.1', 0, backlog: 1);
+        \assert($full->address instanceof InetAddress);
+        $fillers = [];
+
+        for ($i = 0; $i < 3; ++$i) {
+            $fillers[] = stream_socket_client(
+                address: "tcp://127.0.0.1:{$full->address->port}",
+                error_code: $errno,
+                error_message: $error,
+                timeout: null,
+                flags: STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
+            );
+        }
+
+        return [$full, $fillers];
     }
 
     /**

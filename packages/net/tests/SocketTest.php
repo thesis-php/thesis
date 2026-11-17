@@ -113,6 +113,7 @@ final class SocketTest
         socket_close($socket);
         delay(ms(10));
         Expect::exception(ReadFailed::class)->withMessage('The connection is broken: reset by the peer or timed out.');
+        @trigger_error('unrelated', E_USER_WARNING);
 
         $accepted->read(100);
     }
@@ -127,6 +128,45 @@ final class SocketTest
         Expect::exception(SocketClosed::class)->withMessage('The socket is closed.');
 
         $left->read(1);
+    }
+
+    public function rejectsEveryOperationAfterClose(): void
+    {
+        [$left] = socketPair();
+        $left->close();
+
+        $failures = [
+            self::failure(static fn() => $left->write('x')),
+            self::failure($left->closeWrite(...)),
+            self::failure(static fn() => $left->enableTls(new ClientTls(peerName: 'server.test'))),
+        ];
+
+        foreach ($failures as $failure) {
+            Assert::instanceOf($failure, SocketClosed::class);
+            Assert::same($failure->getMessage(), 'The socket is closed.');
+        }
+    }
+
+    public function closeEndsEveryWaitingWrite(): void
+    {
+        [$left, $right] = socketPair();
+
+        $bytes = str_repeat('a', 10_000_000);
+
+        [$first, $second] = group(static function (Group $group) use ($left, $bytes) {
+            $first = $group->spawn(static fn() => self::failure(static fn() => $left->write($bytes)));
+            // waits for the write above
+            $second = $group->spawn(static fn() => self::failure(static fn() => $left->write('b')));
+            delay(ms(10));
+            $left->close();
+
+            return [$first->await(), $second->await()];
+        });
+
+        Assert::instanceOf($first, SocketClosed::class);
+        Assert::instanceOf($second, SocketClosed::class);
+        Assert::same($second->getMessage(), 'The socket was closed while writing.');
+        Assert::false($right->isClosed);
     }
 
     public function closeEndsAWaitingRead(): void
@@ -211,6 +251,25 @@ final class SocketTest
         Assert::true(memory_get_peak_usage() - $before < 4 * 1_048_576);
     }
 
+    public function writeDoesNotSlipIntoRoomFreedForAWaitingWrite(): void
+    {
+        [$left, $right] = socketPair();
+        $a = str_repeat('a', 4_000_000);
+
+        $received = group(static function (Group $group) use ($left, $right, $a) {
+            $group->spawn(static fn() => $left->write($a));
+            delay(ms(1));
+            // frees room while the first write still waits, then a second write starts before it resumes
+            $received = readExactly($right, 1000);
+            $group->spawn(static fn() => $left->write('bcde'));
+            delay(ms(1));
+
+            return $received . readExactly($right, 4_000_004 - 1000);
+        });
+
+        Assert::true($received === $a . 'bcde');
+    }
+
     public function writeCancelledAfterSendingAPartClosesTheSocket(): void
     {
         [$left, $right] = socketPair();
@@ -249,6 +308,24 @@ final class SocketTest
         $left->write('x');
     }
 
+    public function closeWriteWaitsForTheWriteInProgress(): void
+    {
+        [$left, $right] = socketPair();
+        $bytes = str_repeat('a', 4_000_000);
+
+        $received = group(static function (Group $group) use ($left, $right, $bytes) {
+            $group->spawn(static fn() => $left->write($bytes));
+            delay(ms(1));
+            $group->spawn($left->closeWrite(...));
+
+            return readExactly($right, 4_000_000);
+        });
+
+        Assert::true($received === $bytes);
+        Expect::exception(UnexpectedEof::class);
+        $right->read(1);
+    }
+
     public function closeWriteSendsTheEndAndKeepsReading(): void
     {
         [$client, $server] = tcpPair();
@@ -282,5 +359,19 @@ final class SocketTest
         [$client] = tcpPair('::1');
 
         Assert::string((string) $client->remoteAddress)->startsWith('[::1]:');
+    }
+
+    /**
+     * @param \Closure(): void $operation
+     */
+    private static function failure(\Closure $operation): ?\Throwable
+    {
+        try {
+            $operation();
+
+            return null;
+        } catch (\Throwable $error) {
+            return $error;
+        }
     }
 }

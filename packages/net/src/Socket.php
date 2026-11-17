@@ -178,14 +178,19 @@ final class Socket implements Reader, Writer, Closer
 
         if ($this->writers === 0) {
             $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
+            // A failed fwrite() of a socket reports its own warning, which replaces the last error.
+            // @infection-ignore FunctionCallRemoval
             error_clear_last();
             $written = @fwrite($stream, $bytes);
 
             if ($written === \strlen($bytes)) {
+                // Without it the write takes the mutex and writes nothing more.
+                // @infection-ignore ReturnRemoval
                 return;
             }
 
-            if ($written === false || ($written === 0 && error_get_last() !== null)) {
+            // 0 bytes with an error (a broken pipe of TLS) fails in finishWrite(), which passes the same bytes again.
+            if ($written === false) {
                 throw new WriteFailed(lastError('Failed to write to the socket.'));
             }
         }
@@ -308,9 +313,14 @@ final class Socket implements Reader, Writer, Closer
             $this->exclusively(function () use ($bytes, $length, &$written) {
                 while ($written < $length) {
                     $stream = $this->stream ?? throw new SocketClosed('The socket was closed while writing.');
+                    // Only a write that sends nothing once the socket is writable could read an error of another
+                    // call, and no test can make the OS do that.
+                    // @infection-ignore FunctionCallRemoval
                     error_clear_last();
-                    // After a write that sent nothing, the same bytes are passed again: TLS requires it.
-                    $sent = @fwrite($stream, $written === 0 ? $bytes : substr($bytes, $written, self::WRITE_CHUNK));
+                    // After a write that sent nothing, TLS sends the record it has made of the first bytes,
+                    // so a retry begins with the same bytes. PHP lets the buffer move and be shorter
+                    // (SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE): a chunk holds the record.
+                    $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
 
                     // OpenSSL reports a broken pipe as 0 bytes written with a warning: waiting for writability
                     // would spin.
@@ -321,6 +331,9 @@ final class Socket implements Reader, Writer, Closer
                     if ($sent > 0) {
                         $written += $sent;
                     } elseif (!$this->watcher->writable()) {
+                        // The watcher ends a wait with false only after close(), so the loop would throw the same
+                        // at its start: the throw says it where the wait ends, as in read().
+                        // @infection-ignore Throw_
                         throw new SocketClosed('The socket was closed while writing.');
                     }
                 }
@@ -344,13 +357,9 @@ final class Socket implements Reader, Writer, Closer
         ++$this->writers;
 
         try {
+            // released by its destructor once the method returns or throws
             $lock = ($this->writeMutex ??= new LocalMutex())->acquire();
-
-            try {
-                $fn();
-            } finally {
-                $lock->release();
-            }
+            $fn();
         } finally {
             --$this->writers;
         }

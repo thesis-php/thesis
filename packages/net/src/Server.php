@@ -32,6 +32,9 @@ final class Server
      */
     public static function create(mixed $stream, ?string $unixPath = null): self
     {
+        // A blocking listener would hang in accept() if another process took the connection between the poll
+        // of stream_socket_accept() and its accept: no test can time that.
+        // @infection-ignore FalseValue, FunctionCallRemoval
         stream_set_blocking($stream, false);
 
         return new self(
@@ -83,6 +86,8 @@ final class Server
     {
         $this->pacer->pace();
         $backoff = null;
+        // As true, only the first wait would begin with the first backoff, 5 ms: too short for a test to tell.
+        // @infection-ignore FalseValue
         $woken = false;
 
         while ($this->stream !== null) {
@@ -101,10 +106,9 @@ final class Server
                 if (!$this->watcher->delay($backoff->next())) {
                     return null;
                 }
-            } elseif ($this->watcher->readable()) {
-                $woken = true;
             } else {
-                return null;
+                // false only after close(), which ends the loop
+                $woken = $this->watcher->readable();
             }
         }
 
