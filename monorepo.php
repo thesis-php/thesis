@@ -39,7 +39,7 @@ return new Config(
         'ext-tokenizer' => '*',
         'ext-zlib' => '*',
         'composer/semver' => '^3.4',
-        'infection/infection' => '^0.33',
+        'infection/infection' => '^0.35.10',
         'llm/skills' => '^1.17',
         'symfony/console' => '^8.0',
         'symfony/var-dumper' => '^8.0',
