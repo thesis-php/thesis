@@ -21,7 +21,7 @@ return new Manifest(
     ],
     skip: [
         new InfectionSkip(
-            mutator: 'PregMatchRemoveCaret',
+            mutators: ['PregMatchRemoveCaret'],
             class: Location::class,
             method: 'of',
             reason: 'The lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway.',

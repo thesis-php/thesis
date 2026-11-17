@@ -556,6 +556,7 @@ final readonly class Generator
      */
     private function infection(): string
     {
+        /** @var array<non-empty-string, array{ignore?: string, ignoreSourceCodeByRegex?: string}> $ignored */
         $ignored = [];
         $errors = [];
 
@@ -565,7 +566,7 @@ final readonly class Generator
                     continue;
                 }
 
-                $error = $this->missingMethod($package, $skip);
+                $error = $this->missingCode($package, $skip);
 
                 if ($error !== null) {
                     $errors[] = \sprintf(
@@ -577,11 +578,17 @@ final readonly class Generator
                     );
                 }
 
-                $ignored[$skip->mutator] = ($ignored[$skip->mutator] ?? '')
-                    . self::comment($skip->reason, str_repeat(' ', 16))
+                [$key, $value] = $skip->code === null
+                    ? ['ignore', $skip->class . '::' . $skip->method]
+                    : ['ignoreSourceCodeByRegex', preg_quote($skip->code)];
+                $entry = self::comment($skip->reason, str_repeat(' ', 16))
                     . str_repeat(' ', 16)
-                    . json_encode($skip->class . '::' . $skip->method, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
+                    . json_encode($value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
                     . ",\n";
+
+                foreach ($skip->mutators as $mutator) {
+                    $ignored[$mutator][$key] = ($ignored[$mutator][$key] ?? '') . $entry;
+                }
             }
         }
 
@@ -592,12 +599,16 @@ final readonly class Generator
         ksort($ignored);
         $mutators = '';
 
-        foreach ($ignored as $mutator => $entries) {
-            $mutators .= \sprintf(
-                "        \"%s\": {\n            \"ignore\": [\n%s            ],\n        },\n",
-                $mutator,
-                $entries,
-            );
+        foreach ($ignored as $mutator => $lists) {
+            $mutators .= "        \"{$mutator}\": {\n";
+
+            foreach (['ignore', 'ignoreSourceCodeByRegex'] as $key) {
+                if (isset($lists[$key])) {
+                    $mutators .= "            \"{$key}\": [\n{$lists[$key]}            ],\n";
+                }
+            }
+
+            $mutators .= "        },\n";
         }
 
         return <<<JSON5
@@ -636,12 +647,12 @@ final readonly class Generator
     }
 
     /**
-     * The class is found by psr-4 and the method by its declaration, without loading the code of the package:
-     * a skip left after a rename fails sync instead of skipping nothing.
+     * The class is found by psr-4, the method by its declaration and the line by its text, without loading the code
+     * of the package: a skip left after a rename fails sync instead of skipping nothing.
      *
-     * @return ?non-empty-string what is wrong, null if the method is there
+     * @return ?non-empty-string what is wrong, null if the code is there
      */
-    private function missingMethod(Package $package, InfectionSkip $skip): ?string
+    private function missingCode(Package $package, InfectionSkip $skip): ?string
     {
         $namespace = $package->namespace();
 
@@ -658,6 +669,10 @@ final readonly class Generator
 
         if (preg_match('/\bfunction\s+&?' . preg_quote($skip->method, '/') . '\s*\(/i', $code) !== 1) {
             return \sprintf('has no method %s() in %s', $skip->method, $file);
+        }
+
+        if ($skip->code !== null && !\in_array($skip->code, array_map(trim(...), explode("\n", $code)), true)) {
+            return \sprintf('has no line "%s" in %s', $skip->code, $file);
         }
 
         return null;

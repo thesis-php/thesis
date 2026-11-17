@@ -28,7 +28,7 @@ return new Manifest(
             reason: 'final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.',
         ),
         new InfectionSkip(
-            mutator: 'GreaterThan',
+            mutators: ['GreaterThan'],
             class: IsoInterval::class,
             method: 'longestToken',
             reason: 'No two rules match a token of the same length: they differ in the first byte, or COMBINED_PERIOD has a hyphen where PERIOD cannot.',

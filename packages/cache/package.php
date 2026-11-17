@@ -24,7 +24,7 @@ return new Manifest(
     ],
     skip: [
         new InfectionSkip(
-            mutator: 'LogicalAnd',
+            mutators: ['LogicalAnd'],
             class: Expiries::class,
             method: 'compare',
             reason: 'The assert only narrows the types for PHPStan: the heap compares its own values, which are all Expiry.',

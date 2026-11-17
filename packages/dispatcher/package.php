@@ -23,7 +23,7 @@ return new Manifest(
     rootEntry: true,
     skip: [
         new InfectionSkip(
-            mutator: 'Coalesce',
+            mutators: ['Coalesce'],
             class: Dispatcher::class,
             method: 'dispatch',
             reason: 'Without the table every event resolves its listeners again and gets the same ones: only slower, which no test sees.',

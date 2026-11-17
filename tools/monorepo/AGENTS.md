@@ -21,9 +21,11 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   so a renamed package or file does not leave a stale entry in `tools/*.php`: `optional` (a dev dependency used in
   `src/` behind a check) for composer-dependency-analyser, `FixerSkip` and `RectorSkip` with a required reason.
   `sync` throws on a skipped path that does not exist. `InfectionSkip` names a method of `src/` (Infection ignores
-  by `Class::method`), `sync` finds its file by psr-4 and its declaration by a regex, without loading the package,
-  and throws if it is gone. Infection reads only JSON5, so `sync` writes the whole `tools/infection.json5`. The tools are installed globally and do not load our
-  autoloader, so `sync` writes plain arrays to `tools/manifests.php` and their configs `require` it.
+  by `Class::method`) and optionally a line of it (`ignoreSourceCodeByRegex`, matched by the text alone),
+  `sync` finds the file by psr-4, the method by its declaration and the line by its text, without loading
+  the package, and throws if one is gone. Infection reads only JSON5, so `sync` writes the whole
+  `tools/infection.json5`. The tools are installed globally and do not load our autoloader,
+  so `sync` writes plain arrays to `tools/manifests.php` and their configs `require` it.
   PHP CS Fixer and Rector skip it: to write what they want, `sync` would have to repeat their rules (imports,
   their order), and otherwise they would fight with `sync` over the file. `optional` covers the whole `src/`
   of the package, not single files: precise paths are bookkeeping that only shields a forgotten check.

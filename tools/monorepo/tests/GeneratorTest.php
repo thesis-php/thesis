@@ -617,31 +617,43 @@ final readonly class GeneratorTest
     {
         $fixture = self
             ::fixture()
-            ->file('packages/async/src/Semaphore.php', "<?php\n\nfinal class Semaphore { function acquire() {} }\n")
+            ->file('packages/async/src/Semaphore.php', <<<'PHP'
+                <?php
+
+                final class Semaphore
+                {
+                    function acquire()
+                    {
+                        return $this->count() + 1;
+                    }
+                }
+
+                PHP)
             ->file('packages/bytes/src/Internal/Reader.php', "<?php\n\nfinal class Reader { static function read() {} }\n")
             ->package('async', <<<'PHP'
                 skip: [
                     new Thesis\Monorepo\InfectionSkip(
-                        mutator: 'Coalesce',
+                        mutators: ['Coalesce'],
                         class: 'Thesis\Async\Semaphore',
                         method: 'acquire',
                         reason: 'Only slower.',
+                    ),
+                    new Thesis\Monorepo\InfectionSkip(
+                        mutators: ['IncrementInteger', 'Plus'],
+                        class: 'Thesis\Async\Semaphore',
+                        method: 'acquire',
+                        reason: 'One line.',
+                        code: 'return $this->count() + 1;',
                     ),
                 ],
                 PHP)
             ->package('bytes', <<<'PHP'
                 skip: [
                     new Thesis\Monorepo\InfectionSkip(
-                        mutator: 'IncrementInteger',
+                        mutators: ['IncrementInteger', 'Coalesce'],
                         class: 'Thesis\Bytes\Internal\Reader',
                         method: 'read',
                         reason: 'Never seen.',
-                    ),
-                    new Thesis\Monorepo\InfectionSkip(
-                        mutator: 'Coalesce',
-                        class: 'Thesis\Bytes\Internal\Reader',
-                        method: 'read',
-                        reason: 'The same.',
                     ),
                 ],
                 PHP)
@@ -658,7 +670,7 @@ final readonly class GeneratorTest
                             "ignore": [
                                 // Only slower.
                                 "Thesis\\Async\\Semaphore::acquire",
-                                // The same.
+                                // Never seen.
                                 "Thesis\\Bytes\\Internal\\Reader::read",
                             ],
                         },
@@ -666,6 +678,16 @@ final readonly class GeneratorTest
                             "ignore": [
                                 // Never seen.
                                 "Thesis\\Bytes\\Internal\\Reader::read",
+                            ],
+                            "ignoreSourceCodeByRegex": [
+                                // One line.
+                                "return \\$this\\-\\>count\\(\\) \\+ 1;",
+                            ],
+                        },
+                        "Plus": {
+                            "ignoreSourceCodeByRegex": [
+                                // One line.
+                                "return \\$this\\-\\>count\\(\\) \\+ 1;",
                             ],
                         },
                     },
@@ -696,6 +718,10 @@ final readonly class GeneratorTest
         "class: 'Thesis\\Bytes\\Reader', method: 'write'",
         'packages/bytes/package.php: the class Thesis\Bytes\Reader of a skipped mutant has no method write() in src/Reader.php, fix or remove the skip.',
     ])]
+    #[DataSet([
+        "class: 'Thesis\\Bytes\\Reader', method: 'read', code: 'return 1;'",
+        'packages/bytes/package.php: the class Thesis\Bytes\Reader of a skipped mutant has no line "return 1;" in src/Reader.php, fix or remove the skip.',
+    ])]
     public static function failsOnSkippedMutantThatDoesNotExist(string $symbol, string $error): void
     {
         $fixture = self
@@ -703,7 +729,7 @@ final readonly class GeneratorTest
             ->file('packages/async/src/Semaphore.php', "<?php\n\nfinal class Semaphore { function read() {} }\n")
             ->file('packages/bytes/src/Reader.php', "<?php\n\nfinal class Reader { function read() {} }\n")
             ->package('bytes', <<<PHP
-                skip: [new Thesis\\Monorepo\\InfectionSkip(mutator: 'Coalesce', {$symbol}, reason: 'Gone.')],
+                skip: [new Thesis\\Monorepo\\InfectionSkip(mutators: ['Coalesce'], {$symbol}, reason: 'Gone.')],
                 PHP)
         ;
 
