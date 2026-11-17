@@ -22,7 +22,9 @@ services:
       RABBITMQ_DEFAULT_PASS: thesis
     healthcheck:
       # ping answers before the AMQP listener accepts connections, and the first tests would be refused.
-      test: rabbitmq-diagnostics --quiet check_port_connectivity
+      # nc, not rabbitmq-diagnostics: it starts an Erlang VM per check, and the ones that outlive
+      # the timeout are never killed and pile up by gigabytes.
+      test: [CMD, nc, -z, localhost, '5672']
       interval: 2s
       timeout: 5s
       retries: 30
