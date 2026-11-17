@@ -20,7 +20,7 @@ A draft, not a decision. It expands "Observability of the task tree" of `roadmap
 |---|---|---|
 | Record, then report | `observe()` writes NDJSON to a file, a report is built from it | the course, a bug, CI |
 | Live | the events go to a Unix socket or a file, another process shows them like `top` | a long-running process |
-| Snapshot on demand | SIGQUIT or SIGUSR1 through `SignalTrap` dumps the live tasks | a hung process, production |
+| Snapshot on demand | SIGQUIT or SIGUSR1 through `SignalTrap` dumps the live tasks | a deadlock, production |
 
 ## Why a listener must not suspend the fiber
 
@@ -63,8 +63,8 @@ of the losses: the program never slows down for its observer.
   and take where each waits from `ReflectionFiber::getTrace()` at the moment of the dump. A dump that costs nothing
   until it is asked for, fit for production. The price: the names and the locations live only in the tracer
   (a decision, so that a task without an observation does not pay memory for them), so without an observation
-  there are none. A choice to make explicitly: walk the tree, the events, or both. The dump also shows a run
-  that never ends, which `BlockingDetector` does not see.
+  there are none. A choice to make explicitly: walk the tree, the events, or both. Through `SignalTrap` the dump
+  never shows a run that never ends: the signal waits for the loop that run holds, see `endless-runs.md`.
 - **A chain of causes** in `CancellationTracker`: it stops at the first cause, a task failed
   by the `TaskCancelled` of another one is not followed.
 
