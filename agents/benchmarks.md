@@ -25,3 +25,9 @@ Read before writing or changing a benchmark, or a change justified by one. How t
 - A benchmark of a complexity class has `#[Warmup(1)]`: the first call autoloads the classes, which makes
   the smallest data set expensive and hides the growth from it.
 - A benchmark does not run on virtual time: it measures the real driver.
+- Trap: `tally_hooks` of Tally 1.0.1 is built for the module API of PHP 8.6 before RC7 (20260924), the image has
+  RC7 (20261112), and every case fails with "PHP did not load Tally's tally_hooks extension". Until a release
+  of Tally is built for it, build the extension in the container as root (`apk add bash $PHPIZE_DEPS`, then
+  `vendor/phpstan/tally/build/build-tally-hooks.sh var/tally-hooks/tally_hooks.so`) and load it by an ini file
+  in a directory of `PHP_INI_SCAN_DIR` (`/usr/local/etc/php/conf.d:/workspace/var/tally-ini`), which `tally.php`
+  passes to the cases. CI meets the same trap.

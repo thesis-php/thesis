@@ -71,10 +71,8 @@ The file goes away with the last stage.
 Each stage ends with a green `make check` and a commit. Before each stage
 read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `agents/benchmarks.md` for 1 and 5.
 
-1. **Baseline benchmarks on Revolt.** Tally benchmarks in `packages/async/benchmarks/` (next to `AllBench`):
-   two tasks ping-ponging over a `Channel`, 10_000 `timeout()` cancelled before they fire, a fan-out
-   of `delay()`, an echo over a socket pair through `StreamWatcher`, `checkpoint()` in a loop.
-   Accepted on the current code, so stage 2 is compared against them.
+1. Done: `ChannelBench`, `TimeoutBench`, `DelayBench`, `StreamWatcherBench` and `CheckpointBench` of async
+   have their numbers of Revolt (`UvDriver`, the default of the image, counted on aarch64) in `#[Expected]`.
 2. **The core beside Revolt.** `Internal\Loop` with the clock, the ready queue, microtasks, timers, streams
    and signals, tested on its own (`tests/Internal/LoopTest.php`): order within a tick, a cancelled timer,
    a timer far away (saturation at `PHP_INT_MAX`), EINTR, a closed stream, a stream without a descriptor,
