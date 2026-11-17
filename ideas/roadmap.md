@@ -117,7 +117,7 @@ grow from what `async` already has and amphp lacks, so they come first.
   along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over `http-server`.
   The tools around `Trace\observe()`: [trace.md](trace.md).
 - **Other models of concurrency** on top of the task tree: lazy tasks, `select()` over operations, effects,
-  transparent futures, actors, an event loop on `Io\Poll`: [async.md](async.md).
+  transparent futures, actors, an event loop on `Io\Poll` ([loop.md](loop.md)): [async.md](async.md).
 - **Deadlines across services**: the time left of a cancellation passed on in HTTP and grpc headers
   (`grpc-timeout`) and as `statement_timeout` of postgres.
 - **Resilience** on `async`: a circuit breaker, a bulkhead, hedged requests, a retry policy on `Async\Backoff`,
@@ -142,13 +142,5 @@ grow from what `async` already has and amphp lacks, so they come first.
    ([postgres.md](postgres.md)): typed rows 1.8 times faster than ext-pgsql, pipelining it lacks.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
-5. Waits outside a group: should thesis/async forbid them? In `{main}` a wait runs the event loop, so Revolt throws
-   out of it (`UncaughtThrowable` of a foreign callback, "Event loop terminated"), and a value handed over
-   by `resume()` is lost (the known gap of `ContinuationImpl::park()`); the body of `group()` runs in the calling
-   fiber, so this is true inside a group in `{main}` too. In the root scope, in any fiber, a wait has no cancellation,
-   no deadline and no trace events (`BlockingDetector` and `LongWaitDetector` do not see it). An idea: the body
-   of `group()` called in `{main}` runs in a fiber of its own, so that only `join()` waits in `{main}`, and `suspend()`
-   in the root scope throws `LogicException` telling to wrap the code in `group()`. The price: thesis code called
-   from `Amp\async()` or a Revolt callback stops working, the callable of `virtualTime()` and the tests
-   of testo-plugin need a group, `ScopedValue`s are carried into the fiber and `synchronized()` held around
-   `group()` is not reentrant inside it.
+5. Waits outside a group: answered by the loop of our own ([loop.md](loop.md)), the body of `group()` in `{main}`
+   runs in a fiber of its own and `suspend()` in the root scope throws `LogicException`.
