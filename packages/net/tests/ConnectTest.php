@@ -49,7 +49,9 @@ final class ConnectTest
 
     public function fallsBackToTheNextAddress(): void
     {
-        $server = listen('127.0.0.1', self::freePort('::1'));
+        // Nothing listens on [::1] at the port the OS has picked for 127.0.0.1. A port found free on [::1]
+        // and then taken on 127.0.0.1 may be held there by a TCP connection of another test: "Address in use".
+        $server = listen('127.0.0.1', 0);
         \assert($server->address instanceof InetAddress);
 
         $socket = connect('dual.test', $server->address->port, resolver: new StaticResolver(['::1', '127.0.0.1']));

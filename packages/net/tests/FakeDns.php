@@ -22,18 +22,7 @@ final class FakeDns
      */
     public static function start(Group $group, array $zone): self
     {
-        $udp = stream_socket_server(
-            address: 'udp://127.0.0.1:0',
-            error_code: $errno,
-            error_message: $error,
-            flags: STREAM_SERVER_BIND,
-        );
-        \assert($udp !== false, $error);
-        $name = stream_socket_get_name($udp, false);
-        \assert($name !== false);
-        $port = (int) substr($name, (int) strrpos($name, ':') + 1);
-        \assert($port > 0 && $port <= 65535);
-        $tcp = listen('127.0.0.1', $port);
+        [$udp, $tcp, $port] = self::bind();
         stream_set_blocking($udp, false);
         $address = new InetAddress(ip: '127.0.0.1', port: $port);
         $dns = new self($address, $zone);
@@ -70,6 +59,39 @@ final class FakeDns
         public readonly InetAddress $address,
         private readonly array $zone,
     ) {}
+
+    /**
+     * TCP first: the OS picks a port free for TCP, while a port it picks for UDP may be held by a TCP connection
+     * of another test (the same ephemeral range), and listening on it fails with "Address in use".
+     * The UDP port may still be taken by a UDP socket, then another port is tried.
+     *
+     * @return array{resource, Server, int<1, 65535>}
+     */
+    private static function bind(): array
+    {
+        for ($attempt = 1;; ++$attempt) {
+            $tcp = listen('127.0.0.1', 0);
+            \assert($tcp->address instanceof InetAddress);
+            $port = $tcp->address->port;
+            \assert($port > 0);
+            $udp = @stream_socket_server(
+                address: "udp://127.0.0.1:{$port}",
+                error_code: $errno,
+                error_message: $error,
+                flags: STREAM_SERVER_BIND,
+            );
+
+            if ($udp !== false) {
+                return [$udp, $tcp, $port];
+            }
+
+            $tcp->close();
+
+            if ($attempt === 10) {
+                throw new \RuntimeException(\sprintf('Failed to bind udp://127.0.0.1:%d: %s', $port, $error));
+            }
+        }
+    }
 
     /**
      * @param resource $udp

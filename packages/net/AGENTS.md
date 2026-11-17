@@ -85,6 +85,10 @@ skills ship with the package and reach its users through llm/skills.
 
 - Real sockets over loopback, real time: keep delays at 10–50 ms. `tests/FakeDns.php` is a name server
   (UDP and TCP on one port) answering from `Zone`s, run in daemons of the test's group.
+- A port is taken with `listen(..., 0)` in the protocol and on the address it is used on, never found free
+  elsewhere and reused: a port the OS picked for UDP or for another address may be held on this one by a TCP
+  connection of another test (the same ephemeral range), and the listen fails with "Address in use" now and then.
+  `FakeDns` listens on TCP first and binds UDP to its port, trying another port if a UDP socket holds it.
 - A connection that hangs is a listener with `backlog: 1` and a full accept queue: Linux drops the SYNs.
 - Certificates are generated per process by `certificate()` in `tests/helpers.php`: self-signed CAs valid for
   their name, `localhost` and `127.0.0.1`.
