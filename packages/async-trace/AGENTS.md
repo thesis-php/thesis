@@ -78,6 +78,12 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - `BlockingDetector` takes the time of the events, not a clock of its own: `Instant::now()` is `hrtime()`
   outside virtual time, and under it `VirtualTime\advance()` is CPU work without a wait, which a test needs.
   Rejected: an injected monotonic clock, a second time that a test would have to move along with the virtual one.
+- `BlockingDetector` does not see the root scope, and `README.md` tells to run the code in a task. Rejected:
+  `Suspended`/`Resumed` with `scope: null` for the root. It would catch only waits of thesis/async called outside
+  a group (the top of a script): amphp and raw Revolt callbacks wait through a `Suspension` of Revolt, never
+  through `suspend()`. The price was a break of the type of `$scope`, a new `VERSION` of the NDJSON and a `from`
+  that cannot tell the fibers of the root apart. Rejected: a group around the callable of `observe()`, it adds
+  a scope, a join and a cancellation to every trace.
 - A run of `BlockingDetector` ends at `Joining` too: the join of a group waits for its tasks without `suspend()`,
   so no `Suspended` comes, and the run of the body would last until another fiber starts. Trap: a run that begins
   while another is open has lost its end to a wait outside the tree (in the root scope): it is dropped,

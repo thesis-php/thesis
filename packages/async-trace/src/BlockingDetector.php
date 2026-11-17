@@ -32,7 +32,8 @@ use function Thesis\Time\toNs;
  * at the join of a group or at the end of a task. The time is that of the events: the monotonic clock,
  * or the virtual one under `VirtualTime\run()`, where CPU work takes no time but `VirtualTime\advance()`.
  * Not seen: a run that never ends (an endless loop), code after the join of a group up to its next wait,
- * code outside the scope tree (before the first group, raw callbacks of the event loop).
+ * code outside the scope tree (the callable of `observe()` outside a group, raw callbacks of the event loop):
+ * the waits of the root scope have no events.
  *
  * It listens to the waits, so each costs a backtrace: a tool of debugging, not of every request in production.
  *
