@@ -1,16 +1,20 @@
 includes:
-    - /composer/vendor/phpstan/phpstan-strict-rules/rules.neon
-    - ../packages/phpstan-extension/extension.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - packages/phpstan-extension/extension.neon
 
 parameters:
     level: max
     paths:
-        - ../bin/monorepo
-        - ../monorepo.php
-        - ../testo.php
-        - ../tools
-        - ../packages
-    tmpDir: ../var/phpstan
+        - bin/monorepo
+        - .php-cs-fixer.php
+        - composer-dependency-analyser.php
+        - monorepo.php
+        - rector.php
+        - tally.php
+        - testo.php
+        - tools
+        - packages
+    tmpDir: var/phpstan
     editorUrl: ''
     editorUrlTitle: '%%relFile%%:%%line%%'
 

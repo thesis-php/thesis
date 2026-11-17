@@ -41,7 +41,7 @@
         "ext-uri": "*",
         "composer-runtime-api": "^2.1",
         "internal/container": "^1.1",
-        "phpstan/phpstan": "^2.3",
+        "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
         "revolt/event-loop": "^1.0.9",
         "testo/testo": "^0.10.29"
@@ -56,9 +56,14 @@
         "ext-zlib": "*",
         "amphp/amp": "^3",
         "composer/semver": "^3.4",
+        "ergebnis/composer-normalize": "^2.57",
+        "friendsofphp/php-cs-fixer": "^3.95.30",
         "infection/infection": "^0.35.10",
         "llm/skills": "^1.17",
+        "phpstan/phpstan-strict-rules": "^2.1.1",
         "phpstan/tally": "^1.0.1",
+        "rector/rector": "^2.8.5",
+        "shipmonk/composer-dependency-analyser": "^1.8.4",
         "symfony/console": "^8.0",
         "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
@@ -137,6 +142,7 @@
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
+            "Thesis\\PhpCsFixer\\": "tools/php-cs-fixer/src/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
             "Thesis\\SourceLocation\\": "packages/source-location/tests/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",
@@ -158,6 +164,7 @@
     },
     "config": {
         "allow-plugins": {
+            "ergebnis/composer-normalize": true,
             "infection/extension-installer": true,
             "llm/skills": true
         }

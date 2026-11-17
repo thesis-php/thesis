@@ -5,33 +5,29 @@ declare(strict_types=1);
 use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
+use Thesis\Monorepo\Internal\Monorepo;
+use Thesis\Monorepo\Internal\ToolSkips;
 use Thesis\PhpCsFixer\StaticCallChainFixer;
 
-// PHP CS Fixer is installed globally in the image and does not load the autoloader of the monorepo.
-require_once __DIR__ . '/php-cs-fixer/src/StaticCallChainFixer.php';
-
-$root = dirname(__DIR__);
-/** @var array{optional: array<string, list<string>>, fixer: list<string>, rector: array<string, list<string>>} */
-$manifests = require __DIR__ . '/manifests.php';
-$skipped = [
-    // Generated: a generator that writes what the fixer wants would have to repeat its rules (imports, their order).
-    __DIR__ . '/manifests.php',
-    ...array_map(static fn(string $path) => $root . '/' . $path, $manifests['fixer']),
-];
+$skipped = ToolSkips::of(Monorepo::load(__DIR__))->fixer;
 
 return new Config()
     ->setFinder(
         Finder
             ::create()
-            ->in([$root . '/tools', $root . '/packages'])
+            ->in([__DIR__ . '/tools', __DIR__ . '/packages'])
             ->filter(static fn(SplFileInfo $file) => !in_array($file->getPathname(), $skipped, true))
             ->append([
-                $root . '/bin/monorepo',
-                $root . '/monorepo.php',
+                __DIR__ . '/bin/monorepo',
+                __DIR__ . '/.php-cs-fixer.php',
+                __DIR__ . '/composer-dependency-analyser.php',
+                __DIR__ . '/monorepo.php',
+                __DIR__ . '/rector.php',
+                __DIR__ . '/tally.php',
             ]),
     )
     ->setParallelConfig(ParallelConfigFactory::detect())
-    ->setCacheFile($root . '/var/php-cs-fixer.cache')
+    ->setCacheFile(__DIR__ . '/var/php-cs-fixer.cache')
     ->setRiskyAllowed(true)
     ->registerCustomFixers([new StaticCallChainFixer()])
     ->setRules([

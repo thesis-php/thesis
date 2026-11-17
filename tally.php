@@ -8,7 +8,7 @@ use Tally\Configuration;
 // are left out, because they move the memory layout of the counted process.
 return Configuration
     ::create()
-    ->withPaths([dirname(__DIR__) . '/packages'])
+    ->withPaths([__DIR__ . '/packages'])
     ->withEnvironmentVariables([
         'PATH',
         'HOME',

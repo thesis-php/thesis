@@ -19,14 +19,19 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   (phpstan/extension-installer for `packages/phpstan-extension`). Rejected: a raw array of composer.json keys
   merged last, it bypasses the model; a library modelling composer.json (symplify/composer-json-manipulator
   is abandoned), our DTOs are that model.
+- The quality tools (PHP CS Fixer, Rector, PHPStan, composer-dependency-analyser, Infection, Tally,
+  composer-normalize) are `requireDev` of `monorepo.php`, their versions are in the lock, their configs are
+  in the root under the names the tools look for, so `make` passes no `--config`. Rejected: the tools
+  of the Docker image: a rebuilt image changed their versions under a commit that changed nothing.
 - Exceptions of a package to the quality tools are typed fields of `Manifest`, with paths relative to the package,
-  so a renamed package or file does not leave a stale entry in `tools/*.php`: `optional` (a dev dependency used in
+  so a renamed package or file does not leave a stale entry in a config: `optional` (a dev dependency used in
   `src/` behind a check) for composer-dependency-analyser, `FixerSkip` and `RectorSkip` with a required reason.
-  `sync` throws on a skipped path that does not exist. A mutant of Infection is skipped in the code
-  (`agents/tests.md`), so `tools/infection.json5` is not generated. The tools are installed globally
-  and do not load our autoloader, so `sync` writes plain arrays to `tools/manifests.php` and their configs `require` it.
-  PHP CS Fixer and Rector skip it: to write what they want, `sync` would have to repeat their rules (imports,
-  their order), and otherwise they would fight with `sync` over the file. `optional` covers the whole `src/`
+  The configs in the root read them with `ToolSkips::of(Monorepo::load(__DIR__))`: the tools are in `vendor/`
+  and load our autoloader. `sync` calls it too and throws on a skipped path that does not exist. A mutant
+  of Infection is skipped in the code (`agents/tests.md`), so `infection.json5` takes nothing from the manifests.
+  Rejected: a generated file of plain arrays that the configs `require` (`tools/manifests.php`, while the tools
+  came from the Docker image without our autoloader): PHP CS Fixer and Rector had to skip it, or they would fight
+  with `sync` over its imports and their order. `optional` covers the whole `src/`
   of the package, not single files: precise paths are bookkeeping that only shields a forgotten check.
   PHPStan is not modelled: `@phpstan-ignore` in the code is precise and reports itself when it is no longer needed.
   A fixer skip excludes the whole file: the fixer cannot turn off one rule for one file.

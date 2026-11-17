@@ -9,8 +9,8 @@ use Testo\Data\DataProvider;
 use Testo\Test;
 
 /**
- * The fixtures go through the php-cs-fixer binary with the config of the monorepo: the classes of PHP CS Fixer
- * are not in vendor/, and the fixer is only correct together with the rules that run around it.
+ * The fixtures go through the php-cs-fixer binary with the config of the monorepo: the fixer is only correct
+ * together with the rules that run around it.
  */
 #[Test]
 final readonly class StaticCallChainFixerTest
@@ -73,9 +73,9 @@ final readonly class StaticCallChainFixerTest
 
             $process = proc_open(
                 command: [
-                    'php-cs-fixer',
+                    \dirname(__DIR__, 3) . '/vendor/bin/php-cs-fixer',
                     'fix',
-                    '--config=' . \dirname(__DIR__, 2) . '/php-cs-fixer.php',
+                    '--config=' . \dirname(__DIR__, 3) . '/.php-cs-fixer.php',
                     '--path-mode=override',
                     '--using-cache=no',
                     // The tests run on every PHP version of CI, the fixer refuses the ones it does not support yet.

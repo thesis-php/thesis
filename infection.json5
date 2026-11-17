@@ -3,7 +3,7 @@
 {
     "source": {
         "directories": [
-            "../packages"
+            "packages"
         ],
         "excludes": [
             "tests",
@@ -11,17 +11,13 @@
         ]
     },
     "logs": {
-        "text": "../var/infection.log",
+        "text": "var/infection.log",
         "stryker": {
             "report": "/^(?>main|\\d+\\.\\d+\\.x)$/D"
         },
     },
-    "tmpDir": "../var",
+    "tmpDir": "var",
     "testFramework": "testo",
-    // Infection looks for the config of any test framework (testo.php) in phpUnit.configDir.
-    "phpUnit": {
-        "configDir": "..",
-    },
     // A mutant that hangs a test (an endless loop, an event loop that never ends) waits out the timeout, and most
     // of the timeouts of thesis/async are such hangs: the default of 10 s took two thirds of its run. A timeout counts
     // as killed, so it stays above the slowest honest run: a mutant of the core of async runs nearly all its tests,

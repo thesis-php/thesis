@@ -1,10 +1,8 @@
 # tools/php-cs-fixer
 
-Custom rules of PHP CS Fixer for `tools/php-cs-fixer.php`.
+Custom rules of PHP CS Fixer for `.php-cs-fixer.php` in the root, autoloaded as `Thesis\PhpCsFixer\`
+(`autoloadDev` of `monorepo.php`).
 
-- PHP CS Fixer is installed globally in the Docker image, not in `vendor/`: the config loads every rule
-  with `require_once`, and the rules are not in the autoloader of the monorepo. PHPStan sees the classes
-  of PHP CS Fixer, the tests do not.
 - A test runs the `php-cs-fixer` binary with the real config over `tests/Fixture/*.php.inc` (the input, `-----`,
   the expected output; no separator means the input must stay as is), all fixtures in one run.
   It also runs the expected output, which must not change: `make fixer-check` right after `make fixer` must pass.

@@ -42,11 +42,6 @@ final readonly class SyncCommandTest
      */
     private static function run(Fixture $fixture): array
     {
-        // sync writes tools/manifests.php: the monorepo has the directory, the fixture does not.
-        if (!is_dir($fixture->root . '/tools')) {
-            mkdir($fixture->root . '/tools');
-        }
-
         $application = new Application();
         $application->addCommand(new SyncCommand($fixture->root));
         $tester = new CommandTester($application->find('sync'));

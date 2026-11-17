@@ -12,7 +12,7 @@ Read before writing or changing a benchmark, or a change justified by one. How t
 - The directory of a package is listed in `autoloadDev` of `monorepo.php` (`Thesis\Async\Benchmarks\`):
   the dependency analyser knows the code only through the autoloader, and Tally would be an unused dependency.
 - `make bench P=<name>` counts and writes the results to `var/tally`, `make bench-accept P=<name>` makes them
-  the expected numbers. `DRIVER=` chooses the Revolt driver as for the tests: `tools/tally.php` keeps
+  the expected numbers. `DRIVER=` chooses the Revolt driver as for the tests: `tally.php` keeps
   `REVOLT_DRIVER` among the variables that Tally passes to a case.
 - The job `bench` of `check.yaml` runs `make bench` on one PHP and the default driver, and the release waits
   for it. Its results are the artifact `tally-results`: `gh run download <run> -p 'tally-*' -D var/tally`,

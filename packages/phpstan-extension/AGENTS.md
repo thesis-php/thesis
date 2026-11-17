@@ -37,7 +37,7 @@ How to use it is in `README.md`.
   one, and its constraint could not follow the version inside each release of PHPStan.
 - Classes of the extension are `@internal` (`Internal\`, flat until there are many): users include `extension.neon`,
   never reference them.
-- The monorepo analyses itself with the extension: `tools/phpstan.neon` includes `extension.neon`,
+- The monorepo analyses itself with the extension: `phpstan.neon` of the root includes `extension.neon`,
   not through phpstan/extension-installer.
 - `map()` gives every key the same `R` of the PHPDoc: `$fn` is one callable, its return type for each item
   is not known. Rejected: inferring `$fn` per item type, PHPStan has no API for it.
@@ -56,15 +56,14 @@ How to use it is in `README.md`.
   only into the process of a test. Rejected: a Testo test that analyses the fixtures in its process. It builds
   the analysis from classes outside the API of PHPStan (`ContainerFactory`, `Analyser`, `PathRoutingParser`),
   repeats the CLI by hand (`Analyser::analyse()` does not tell `pathRoutingParser` which files are analysed,
-  without it a fixture loses its function bodies and the test passes on any type) and cannot load
-  `tools/phpstan.neon` (the strict rules are in the global Composer of the image). A tried run killed 49 mutants
+  without it a fixture loses its function bodies and the test passes on any type). A tried run killed 49 mutants
   and found only what a review finds: a fixture for unpacked arguments, a redundant check in `MapReturnType`.
 - A fixture function is named after what it checks, not after the function of the package: a namespaced `all()`
   would clash with the imported `Thesis\Async\all`.
 - The fixtures of a rule are `types/*Errors.php`, next to those of the types: every error the rule must report
   is ignored by `@phpstan-ignore` on the line before it. PHPStan fails on an error that is not ignored
   and on an ignore that matches no error, so both a missed and an extra error fail `make phpstan`.
-- `PhpParser\` lives inside `phpstan.phar`: `tools/composer-dependency-analyser.php` ignores it as unknown.
+- `PhpParser\` lives inside `phpstan.phar`: `composer-dependency-analyser.php` ignores it as unknown.
   The analyser does not read `types/`, it is outside the autoload. It also loads every class it meets
   to find its file, so `src/` uses no class of PHPStan that extends one of PhpParser (`InClassMethodNode`):
   the analyser fails on it. A rule takes the node of PhpParser (`ClassMethod`) and the class from `Scope`.

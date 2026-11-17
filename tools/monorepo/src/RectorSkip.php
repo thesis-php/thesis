@@ -12,10 +12,9 @@ namespace Thesis\Monorepo;
 final readonly class RectorSkip
 {
     /**
-     * @param non-empty-string $rule the class of the rule. Rector is not in the vendor of the monorepo,
-     *     but `::class` of a missing class is still a string
+     * @param non-empty-string $rule the class of the rule
      * @param non-empty-list<non-empty-string> $paths files or directories, relative to the package
-     * @param non-empty-string $reason why the rule does not apply, it goes to the generated tools/manifests.php
+     * @param non-empty-string $reason why the rule does not apply, read by rector.php
      */
     public function __construct(
         public string $rule,

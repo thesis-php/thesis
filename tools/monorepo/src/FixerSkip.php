@@ -14,7 +14,7 @@ final readonly class FixerSkip
 {
     /**
      * @param non-empty-list<non-empty-string> $paths files, relative to the package
-     * @param non-empty-string $reason why a rule does not apply, it goes to the generated tools/manifests.php
+     * @param non-empty-string $reason why a rule does not apply, read by .php-cs-fixer.php
      */
     public function __construct(
         public array $paths,

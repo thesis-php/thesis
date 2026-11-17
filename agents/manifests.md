@@ -18,7 +18,6 @@ or changing the public API of a package that others use. How the generator works
   - `testo.php`: one suite per `packages/<name>/tests` and `tools/<name>/tests`, named after the directory.
     A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
     the root `testo.plugins.php` those of every suite (`PhpErrorsPlugin`: a PHP error fails the test),
-  - `tools/manifests.php`: what the configs of fixer, rector and dependency-analyser take from the manifests,
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,
     from the descriptions.
 - `keywords` of a manifest and of `monorepo.php` go to `composer.json` and are the topics of the repository
