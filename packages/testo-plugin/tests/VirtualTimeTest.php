@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Thesis\TestoPlugin;
 
 use Testo\Assert;
-use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Instant;
 use function Thesis\Async\burnCpu;
 use function Thesis\Async\delay;
 use function Thesis\Time\hours;
+use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 /**
@@ -34,8 +34,10 @@ final class VirtualTimeTest
 
     public function withoutAttributeTestRunsOnRealTime(): void
     {
-        Expect::exception(\LogicException::class);
+        $realStart = hrtime(true);
 
-        burnCpu(sec(1));
+        burnCpu(ms(10));
+
+        Assert::int(hrtime(true) - $realStart)->greaterThanOrEqual(10 * 1_000_000);
     }
 }
