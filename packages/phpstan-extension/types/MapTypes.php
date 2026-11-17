@@ -16,6 +16,7 @@ use function Thesis\Async\map;
  * @param non-empty-array<string, string> $nonEmpty
  * @param array{a: string, b?: string} $optional
  * @param \Generator<int, string> $generator
+ * @param array{array{a: string}, 2, callable(string): int<0, max>} $arguments
  */
 function mapKeepsKeysOfItems(
     array $strings,
@@ -24,6 +25,7 @@ function mapKeepsKeysOfItems(
     array $nonEmpty,
     array $optional,
     \Generator $generator,
+    array $arguments,
 ): void {
     $length = static fn(string $string) => \strlen($string);
 
@@ -39,4 +41,6 @@ function mapKeepsKeysOfItems(
     assertType('non-empty-array<string, int<0, max>>', map($nonEmpty, 2, $length));
     // A generator may repeat a key: only the PHPDoc is sure.
     assertType('array<int, int<0, max>>', map($generator, 2, $length));
+    // Which of the unpacked arguments are the items is not known.
+    assertType("array<'a', int<0, max>>", map(...$arguments));
 }

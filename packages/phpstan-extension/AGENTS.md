@@ -57,6 +57,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   with the extension and reports every type that differs. The package has no `tests/`, so no Testo suite:
   Testo fails one without tests. Rejected: `PHPStan\Testing\TypeInferenceTestCase` (PHPUnit), a Testo test
   that runs PHPStan on the fixtures (a second run of what `make phpstan` checks).
+- No mutation testing (`infect` of `check.yaml`): the code runs only inside PHPStan, and Infection loads a mutant
+  only into the process of a test. Rejected: a Testo test that analyses the fixtures in its process. It builds
+  the analysis from classes outside the API of PHPStan (`ContainerFactory`, `Analyser`, `PathRoutingParser`),
+  repeats the CLI by hand (`Analyser::analyse()` does not tell `pathRoutingParser` which files are analysed,
+  without it a fixture loses its function bodies and the test passes on any type) and cannot load
+  `tools/phpstan.neon` (the strict rules are in the global Composer of the image). A tried run killed 49 mutants
+  and found only what a review finds: a fixture for unpacked arguments, a redundant check in `MapReturnType`.
 - A fixture function is named after what it checks, not after the function of the package: a namespaced `all()`
   would clash with the imported `Thesis\Async\all`.
 - The fixtures of a rule are `types/*Errors.php`, next to those of the types: every error the rule must report
