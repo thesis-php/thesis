@@ -1,10 +1,7 @@
 # thesis/async-trace
 
 The tools around `Trace\observe()` of thesis/async. thesis/async keeps only the events, everything built on them
-lives here. The plan of the tools is `docs/trace-ideas.md` of the monorepo. The format is described in `README.md`.
-
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
+lives here. The format is described in `README.md`.
 
 ## Invariants that must not be broken
 

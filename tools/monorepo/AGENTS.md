@@ -6,15 +6,13 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 - `Manifest` and `Config` are the public format of `packages/*/package.php` and `monorepo.php`, the only `@api`.
   Keep them plain readonly DTOs with named arguments: humans and agents write them by hand. The rest is in `Internal\`.
 - `packages/<name>/.split` (`Monorepo::SPLIT`) lists the entries of the package that its split repository has
-  (`agents/repositories.md`): `src`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `skills`
-  and `dist` of the manifest.
-  An allowlist: a new file of the monorepo stays out of the split, and so out of every install, without anyone
-  remembering to exclude it. `sync` throws on a `dist` path that does not exist or is not a top-level entry:
-  the split keeps whole entries, a path inside one would name nothing. Rejected: a list of excluded files
-  (a forgotten one leaks into every install); `.gitattributes` with `export-ignore` over an exact copy
-  of the package (only the archive was trimmed: the repository, an install from source and `dev-main`
-  of Packagist had the tests and the files of the monorepo, and a commit that changed only them was a commit
-  of the split).
+  (`agents/repositories.md`). An allowlist: a new file of the monorepo stays out of the split, and so out
+  of every install, without anyone remembering to exclude it. `sync` throws on a `dist` path that does not exist
+  or is not a top-level entry: the split keeps whole entries, a path inside one would name nothing.
+  Rejected: a list of excluded files (a forgotten one leaks into every install); `.gitattributes`
+  with `export-ignore` over an exact copy of the package (only the archive was trimmed: the repository,
+  an install from source and `dev-main` of Packagist had the tests and the files of the monorepo,
+  and a commit that changed only them was a commit of the split).
 - Every composer.json is generated entirely, from typed properties of `Manifest` and `Config`: a key without
   a property does not exist, so nothing is read back from the current file. `type` (default `library`)
   and `extra` are written as given: `extra` is free-form by the design of composer, a config of a plugin
@@ -25,7 +23,7 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   so a renamed package or file does not leave a stale entry in `tools/*.php`: `optional` (a dev dependency used in
   `src/` behind a check) for composer-dependency-analyser, `FixerSkip` and `RectorSkip` with a required reason.
   `sync` throws on a skipped path that does not exist. A mutant of Infection is skipped in the code
-  (`agents/php.md`), so `tools/infection.json5` is not generated. The tools are installed globally
+  (`agents/tests.md`), so `tools/infection.json5` is not generated. The tools are installed globally
   and do not load our autoloader, so `sync` writes plain arrays to `tools/manifests.php` and their configs `require` it.
   PHP CS Fixer and Rector skip it: to write what they want, `sync` would have to repeat their rules (imports,
   their order), and otherwise they would fight with `sync` over the file. `optional` covers the whole `src/`
@@ -65,12 +63,11 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   of a renamed repository, the rulesets of the API and `git push` alike. Rejected: relying on the push failing there:
   an older package of the same name lacks the branch (`main`), so the push creates it instead of fast-forwarding.
   That is how the app created `main` in the older `amqp` and `exceptionally`.
-- `github` refuses an existing repository without our rulesets: older packages of the organization share names
-  with new ones. Taking one over is done by hand, by adding the rulesets. A name that GitHub redirects to a renamed
-  repository (`full_name` differs) is free: the repository is created, which ends the redirect.
+- `github` refuses an existing repository without our rulesets (`agents/repositories.md`). A name that GitHub
+  redirects to a renamed repository (`full_name` differs) is free: the repository is created, which ends the redirect.
 - The organization, the default branch and the id of the app are constants of `Repositories`, not of `Config`:
   they describe the infrastructure, not the packages, and nobody writes them by hand.
-- Files and HTTP go through `exceptionally()` (the root rule on warnings), the error goes into
+- Files and HTTP go through `exceptionally()` (`agents/errors.md`), the error goes into
   the `MonorepoException` or the output of the command: `sync` used to succeed without writing a file.
   `@` stays in `Monorepo::read()` of a missing file, the check of a loose object of an earlier run
   and the cleanup of a temporary file.
@@ -109,8 +106,8 @@ Invariants:
 
 Decisions:
 
-- Our own split instead of splitsh-lite (`agents/repositories.md`): splitsh needs libgit2 1.5 exactly,
-  so CI built it in a Docker image on every run. Ours is one `git rev-list --topo-order` and one
+- Our own split instead of splitsh-lite and the other tools rejected in `agents/repositories.md`.
+  Ours is one `git rev-list --topo-order` and one
   `git cat-file --batch` for all packages at once, ids are `sha1()` in PHP and the commits are written
   as loose objects directly. No cache: the cache of splitsh was keyed by the name of the ref, so a ref moved back
   got its old split.
@@ -147,10 +144,6 @@ Decisions:
   (`Remote`): the arguments of a process are visible to everyone in `ps`.
 - The check that every parent is split before its children is unreachable while `--topo-order` holds,
   no test can trigger it: it turns a broken order into an error instead of a split with a new root.
-- Rejected: `git subtree split` (a process per commit, slow as the history grows); a fork of splitsh with
-  a prebuilt image (still cgo pinned to libgit2 1.5, plus an image and a registry to maintain); a tool in Go
-  (a toolchain to distribute for what is git plumbing); an action that copies files into a new commit
-  (no history, no deterministic commits).
 
 ## release
 

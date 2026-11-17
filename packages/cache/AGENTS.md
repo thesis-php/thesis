@@ -2,9 +2,6 @@
 
 A cache interface, an in-process cache and stampede protection. The API is described in `README.md`.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - A TTL is `?Time\Duration`: null keeps the entry, zero or negative deletes it (as in PSR-16).

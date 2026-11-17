@@ -2,10 +2,6 @@
 
 An experimental structured concurrency library on top of `revolt/event-loop`.
 The model, the API and the guarantees are described in `README.md` — read it first.
-Design sketches of this and several alternative models live in `docs/ideas/async/` of the monorepo.
-
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
 
 ## Invariants that must not be broken
 
@@ -38,9 +34,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   children (a body while its tasks run) or a task that failed on its own is not cancelled for its own callbacks.
   They live in their own list: the hot path of `suspend()` is untouched. The root scope stores no waits either.
 - `Internal\ScopeCancellation` keeps no cancellation state of its own (only the unsubscribe functions by id)
-  and subscribes only through `Scope::onCancel()`: amphp unsubscribes
-  in `finally` and then reuses the fiber's `Suspension` for the next wait, so a callback that runs after `unsubscribe()`
-  would wake the wrong wait (this is how a join broke with "Must call suspend() before calling resume()").
+  and subscribes only through `Scope::onCancel()`: amphp unsubscribes in `finally` and then reuses the fiber's
+  `Suspension` for the next wait, so a callback that runs after `unsubscribe()` would wake the wrong wait
+  (this is how a join broke with "Must call suspend() before calling resume()").
 - `checkpoint()` must yield to the event loop through `EventLoop::defer()`, not only check a flag:
   CPU-bound code starves timers, so a flag set by a `timeout()` timer would never be seen.
   Not `EventLoop::queue()` either: microtasks run before timers.
@@ -102,8 +98,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   with `close()`, the tasks and daemons scopes of a group too, or they form a cycle that only the cycle collector frees.
 - `Internal\Scope::current()` is on the hot path of every wait: keep it a single `WeakMap` lookup (see the note on
   `CURRENT_SCOPE`). Per-fiber state (`CURRENT_SCOPE`, `CONTEXT`, the locks of `synchronized()`) is a plain
-  `WeakMap` keyed by `Internal\fiberKey()`; call it again instead of keeping the key in a variable across a call
-  that may suspend, or a suspended fiber holds itself through its own stack (`valueGoesAwayWithFiber` catches it).
+  `WeakMap` keyed by `Internal\fiberKey()`, by the rules of `agents/fibers.md` (`valueGoesAwayWithFiber`).
 - Cancellation is propagated eagerly: `Scope::notify()` marks every scope of the non-shielded subtree, and a new scope
   inherits the mark from its parent unless it is a shield. `Scope::isCancelled()` stays a flag read; do not walk the
   tree. One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
@@ -113,10 +108,10 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   clock; `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
 - `Internal\Scope::now()` is the only clock of the library (`Instant`, deadlines, the rate limiters): never call
   `hrtime()` or `microtime()` elsewhere. Within `virtualTime()`, it reads `Internal\Scope::$virtualClock`, bound by
-  `virtualTime()`: never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding is on
-  `Scope`, not on `Internal\VirtualClock`, so that an application that never calls `virtualTime()` never loads the class. The
-  clock is not read in `suspend()`. The virtual clock starts at `Scope::now()` rounded up to a whole second, not at
-  zero: a time captured before `virtualTime()` stays in the past.
+  `virtualTime()`: never find the clock through `EventLoop::getDriver()`, the driver may be decorated. The binding
+  is on `Scope`, not on `Internal\VirtualClock`, so that an application that never calls `virtualTime()` never loads
+  the class. The clock is not read in `suspend()`. The virtual clock starts at `Scope::now()` rounded up
+  to a whole second, not at zero: a time captured before `virtualTime()` stays in the past.
 - `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run during two pumps in a
   row: the pump is a defer, and the defers of a tick run before the stream and signal callbacks found ready in it,
   so after one idle pump a stream written to inside the process may still be ready behind it.
@@ -131,16 +126,14 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   counting from the wake-up only if the bucket has been full for a whole token interval by then. A smaller lateness
   keeps the schedule: a real timer is late on every call, and restarting from each wake-up ran a `burst: 1` limiter
   a quarter below its rate.
-- A duration passed in is `Time\Duration` only (`delay()`, `timeout()`, `timeoutOr()`, `StreamWatcher::delay()`,
-  the window of the rate limiter, `burnCpu()`), and `remaining()` returns one. A point in time is `Instant`,
+- A duration is `Time\Duration` (`php.md`), `remaining()` returns one. A point in time is `Instant`,
   not a `Duration` (as `thesis/time` decided) and not a float: the difference of two is a `Duration`.
   Its shape follows the `Instant` sketched in the future scope of the Duration RFC: `add(Duration)`, the difference
   is a signed `Duration`, no adding of two instants. A native one would not follow `virtualTime()`, so ours stays
   even then; it may wrap the native one. A rate (`$perSecond`) is not a duration and stays a float.
-- Inside, time is `int` nanoseconds: `Internal\Scope::now()` is `hrtime(true)` or the virtual clock, and so are
-  the deadlines, `Instant`, the rate limiters and the virtual timers. Exact like `Duration` (the same representation,
-  `ns()`/`toNs()` convert without a loss) and as cheap as a float. Revolt is the only float boundary: `$ns / 1e9`
-  into `EventLoop::delay()`, rounded back in `VirtualTimeDriver`. An int overflow turns into a float and a
+- Inside, time is `int` nanoseconds (`php.md`): `Internal\Scope::now()` is `hrtime(true)` or the virtual clock,
+  and so are the deadlines, `Instant`, the rate limiters and the virtual timers. Revolt is the only float boundary:
+  `$ns / 1e9` into `EventLoop::delay()`, rounded back in `VirtualTimeDriver`. An int overflow turns into a float and a
   `TypeError`, so every sum with a `Duration` or a rate from outside is guarded. A deadline, a virtual timer,
   the virtual clock and the times of the rate limiters saturate at `PHP_INT_MAX` (`Scope::after()`,
   `VirtualTimeDriver::enqueue()`, `VirtualClock::advance()`, the window, `tokenAt()`): a timeout of centuries is still
@@ -157,7 +150,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - In `{main}`, `GroupImpl::join()` runs the event loop and Revolt may throw out of it: an `UncaughtThrowable` fails
   the group and the join goes on; a loop that ran dry fails the group too, but if it runs dry while the body is already
   cancelled, the join gives up and rethrows. Never let such an exception skip the join or `$bodyScope->close()`.
-
 - Tracing (`Trace\observe()`) only observes and costs nothing without an observation: every hook is
   `Scope::$tracer?->...`, which evaluates no arguments while it is null, and `suspend()` reads `Scope::$tracer`
   once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was.
@@ -197,7 +189,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   where it is created), events from inside `notify()` (user code in the middle of the walk), a null check per event
   in `suspend()` (the traced wait is a separate method instead), a full backtrace per wait (`caller()` of
   thesis/source-location takes the first frame outside this library and Revolt, and names the call that waits).
-
 - Rejected: `Once` (a lazy value computed once for concurrent callers, `Sync\Once` of the old thesis).
   Under structured concurrency it has no single meaning: the init runs either in the scope of the first caller,
   so cancelling that caller must make the next one retry, or in a group of an owner, so no caller's cancellation
@@ -245,8 +236,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   Rejected: running the cases concurrently in one `virtualTime()`, it was five times slower (thousands of live fibers).
   Rejected: a random stress of groups, channels and semaphores with general checks.
   It never found a defect, not even the ones a review found by reading, and its seed reproduces only on one driver.
-- Do not re-check at runtime what static analysis guarantees: a `positive-int` parameter is not validated with a
-  `ValueError`. Runtime checks are only for what types cannot express (`Deferred::fail()` rejecting `Cancelled`).
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,
   a third party's callable is named by its role, and anything else is a `$fn`.
   - `$body`: runs in the current fiber inside a new scope (`group()`, `timeout()`, `shield()`, `Scope::run()`).

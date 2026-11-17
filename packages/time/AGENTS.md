@@ -1,10 +1,7 @@
 # thesis/time
 
-Functions for `Time\Duration` of PHP 8.6, a polyfill of it for PHP 8.5, and PSR-20 clocks. The API is described in `README.md`,
-the class itself in https://wiki.php.net/rfc/duration_class.
-
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
+Functions for `Time\Duration` of PHP 8.6, a polyfill of it for PHP 8.5, and PSR-20 clocks.
+The API is described in `README.md`, the class itself in https://wiki.php.net/rfc/duration_class.
 
 ## Invariants that must not be broken
 

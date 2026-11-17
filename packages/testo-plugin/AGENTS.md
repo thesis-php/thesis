@@ -2,9 +2,6 @@
 
 Plugins for Testo that the tests of thesis packages and of their users need. The API is described in `README.md`.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - `VirtualTimePlugin` and `#[VirtualTime]` register the same `Internal\VirtualTimeInterceptor`, which conflicts

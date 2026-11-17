@@ -2,9 +2,6 @@
 
 Where in the source code: `Location` and `caller()`. The API is described in `README.md`.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - Nothing here throws: a location is taken while an error is reported (thesis/formatter) or while a trace is recorded

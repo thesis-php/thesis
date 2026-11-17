@@ -5,9 +5,6 @@ interfaces, and the streams: `Stream` over a non-blocking PHP resource, and `std
 Streams wait through thesis/async.
 The API and the design decisions are described in `README.md` — read it first.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - `Buffer` is the hot path of every binary protocol: a change to it is justified by a benchmark, not by taste.
@@ -17,8 +14,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Every read is O(1): the cursor advances, consumed bytes are discarded only in `fill()`.
 - A failed read throws `UnexpectedEof` and leaves the cursor where it was.
 - Range checks of written values are `assert()` only, never a runtime `if`: they cost nothing in production.
-- 64-bit PHP is required (`php-64bit`): `int` is int64. `readUint64()` throws `\OverflowException` above
-  `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
+- `readUint64()` throws `\OverflowException` above `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
 - Marks of `reserve()` are absolute positions, invalidated by `fill()`, `flush()` and `drain()`.
 - `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close) and an `IoException`
@@ -67,7 +63,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - No zlib streams and no in-memory pipe until HTTP needs them (`Content-Encoding`, a request body that the parser
   writes and the handler reads). Nobody else does: WebSocket permessage-deflate is raw deflate per message
   on `deflate_add()`, MongoDB compresses whole messages, protocol tests use `socketPair()` of thesis/net,
-  values between fibers go through `Channel` of thesis/async. The roadmap keeps what a first version found.
+  values between fibers go through `Channel` of thesis/async.
 - stdio is functions with a `static` stream, typed `Reader&Closer` and `Writer&Closer`: its class is internal.
   Rejected: constants (`const STDOUT = new Stream(...)`):
   a constant initializer cannot call `fopen()` for a duplicate, it runs when its file loads (for every process

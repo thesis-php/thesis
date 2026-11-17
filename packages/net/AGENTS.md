@@ -4,10 +4,6 @@ Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled 
 Uses `async` (every wait) and `io` (`Socket` is a `Reader`/`Writer`/`Closer`, DNS messages are coded with `Buffer`).
 The API and the guarantees are in `README.md` — read it first.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`:
-skills ship with the package and reach its users through llm/skills.
-
 ## Invariants that must not be broken
 
 - No method takes a timeout or a cancellation: every wait goes through a `StreamWatcher` of thesis/async.

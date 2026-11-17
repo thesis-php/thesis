@@ -2,7 +2,7 @@
 
 `exceptionally()` throws the PHP errors of a callable as `\ErrorException`. The API is in `README.md`.
 
-## Invariants
+## Invariants that must not be broken
 
 - The handler stack of PHP is global, a call belongs to one fiber. So the levels live per fiber (`$levelsOfFibers`,
   keyed by `\Fiber::getCurrent() ?? $main`), and every `Internal\ErrorHandler`, of a finished call too, reads
@@ -77,7 +77,6 @@
   and one of F set again.
 - Rejected: a finished handler that takes itself off when it gets an error: it cannot tell a call by PHP
   from a call by the handler above that passes on, and its restore drops that one.
-- The parameters are `$fn` and `$levels`, not `$function` and `$errorLevels` of 0.3: the release breaks the API anyway.
 - Rejected: one handler set once and never restored: code that sets a handler for a while and restores it
   (a test framework per test) would remove ours and leave its own forever.
 - A call costs about 400 ns (PHP 8.5, no opcache), a `file_get_contents()` of a small file 3 to 4 µs.

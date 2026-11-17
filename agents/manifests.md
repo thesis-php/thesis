@@ -13,9 +13,7 @@ or changing the public API of a package that others use. How the generator works
 - Generated from the manifests and `monorepo.php` by `make sync`, never edited by hand:
   - `packages/<name>/composer.json` and the root `composer.json`,
   - `LICENSE` of the root and of every package, from the year in the manifest,
-  - `packages/<name>/.split`: the split repository, and so every install, has only `src/`, `composer.json`,
-    `LICENSE`, `README.md`, `CHANGELOG.md`, `skills/` and the top-level entries in `dist` of the manifest
-    (a polyfill, resources that `src/` loads), see `repositories.md`,
+  - `packages/<name>/.split`: what the split repository, and so every install, has (`repositories.md`),
   - `skills.json` (`sources`),
   - `testo.php`: one suite per `packages/<name>/tests` and `tools/<name>/tests`, named after the directory.
     A package that needs Testo plugins returns a list of them from `packages/<name>/testo.plugins.php`,
@@ -31,14 +29,12 @@ or changing the public API of a package that others use. How the generator works
   They are how the package is found on Packagist and GitHub: a stale one hides a feature or promises a removed one.
 - An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in `tools/*`.
   PHPStan errors are ignored in the code instead, by `@phpstan-ignore identifier (reason)`.
-- CI runs `make sync` and fails on any change in git, so the generated files are committed.
 
 ### A package
 
-- `packages/<name>/` holds `package.php`, `src/`, `tests/`, `README.md`, `AGENTS.md`, `LICENSE` and optionally
-  `skills/`. Without `tests/` (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite
-  and no `autoload-dev`. A package that continues an older repository of the same name keeps its `CHANGELOG.md`
-  there (`exceptionally`).
+- `packages/<name>/` holds `package.php`, `src/`, `tests/`, `README.md`, `CHANGELOG.md` (`changelogs.md`),
+  `AGENTS.md`, `LICENSE` and optionally `skills/` and `benchmarks/` (`benchmarks.md`). Without `tests/`
+  (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite and no `autoload-dev`.
 - `rootEntry: true` of the manifest puts the entry point named after the package in the root namespace
   (`php.md`): the psr-4 prefix of `src/` and `tests/` becomes `Thesis\`, so the class is `src/Dispatcher.php`,
   a function is in `src/api.php`, its test is `tests/DispatcherTest.php`, and the rest moves to `src/<Name>/`
@@ -88,7 +84,6 @@ or changing the public API of a package that others use. How the generator works
   `Thesis\Internal\` and its test helpers in the root, where they would collide with those of another package),
   and `Thesis\<Name>\` for `src/` with the root class in `classmap` (it saves `src/<Name>/`, but
   `composer dump-autoload -o` of every user warns that the file does not comply with psr-4).
-
 - Rejected for eager files: one `autoload.files.php` per scope that `require_once`s them (most held
   a single line, a forgotten line showed only as an undefined function in the tests), listing every file
   in the manifest (bookkeeping that the code already says), runtime `glob()` (a cost for every user,

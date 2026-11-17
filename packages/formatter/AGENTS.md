@@ -2,9 +2,6 @@
 
 Functions that format values and code for error messages. The API is described in `README.md`.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - Formatting never fails and never grows without a bound: it runs while an error is reported, often on a value

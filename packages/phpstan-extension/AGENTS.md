@@ -3,9 +3,6 @@
 The PHPStan extension of all thesis packages: the types that their PHPDoc cannot express.
 How to use it is in `README.md`.
 
-This file is for agents changing this package. It is not loaded while an agent works in another package,
-so how to *use* this package belongs in `README.md` or in a skill under `skills/<skill-name>/SKILL.md`.
-
 ## Invariants that must not be broken
 
 - The PHPDoc of a package stays its contract: correct without the extension, only wider. An extension narrows it,
@@ -47,9 +44,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Nothing for the functions whose generics are already precise: `race()` (the union of the template),
   `timeout()`, `timeoutOr()`, `group()`, `shield()`, `synchronized()`, `Group::spawn()`.
   Nothing for `some()`: the best honest type is its PHPDoc, a shape or a list would lie about the order.
-  Nothing for the other packages. `dispatcher` had `ListenerRule` for the methods marked `#[Listener]`
-  (public, not abstract, the dispatcher as the second parameter): the mark is gone, the listeners
-  of a `Subscriber` are checked by the type of `listeners()` and an unlisted private one is `method.unused`.
+  Nothing for the other packages: `ListenerRule` of `dispatcher` left with `#[Listener]` (its `AGENTS.md`).
 
 ## Tests
 
