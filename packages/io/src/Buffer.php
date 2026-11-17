@@ -106,7 +106,8 @@ final class Buffer implements \Countable
      */
     public function drain(): string
     {
-        $bytes = $this->offset === 0 ? $this->bytes : substr($this->bytes, $this->offset);
+        // substr() of the whole string returns it without a copy
+        $bytes = substr($this->bytes, $this->offset);
         $this->bytes = '';
         $this->offset = 0;
 
@@ -380,7 +381,7 @@ final class Buffer implements \Countable
             if ($byte < 0x80) {
                 // the 10th byte may only hold bit 63
                 if ($shift === 63 && $byte > 1) {
-                    break;
+                    throw new \OverflowException('Varint overflows 64 bits.');
                 }
 
                 $this->offset = $offset + 1;

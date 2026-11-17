@@ -201,26 +201,23 @@ final class Stream implements Reader, Writer, Closer
         ++$this->writers;
 
         try {
+            // released by its destructor once the method returns or throws
             $lock = ($this->writeMutex ??= new LocalMutex())->acquire();
 
-            try {
-                while ($written < $length) {
-                    $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
-                    error_clear_last();
-                    $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
+            while ($written < $length) {
+                $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
+                error_clear_last();
+                $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
 
-                    if ($sent === false) {
-                        throw new WriteFailed(lastError('Failed to write to the stream.'));
-                    }
-
-                    if ($sent > 0) {
-                        $written += $sent;
-                    } elseif (!$this->watcher->writable()) {
-                        throw new StreamClosed('The stream was closed while writing.');
-                    }
+                if ($sent === false) {
+                    throw new WriteFailed(lastError('Failed to write to the stream.'));
                 }
-            } finally {
-                $lock->release();
+
+                if ($sent > 0) {
+                    $written += $sent;
+                } elseif (!$this->watcher->writable()) {
+                    throw new StreamClosed('The stream was closed while writing.');
+                }
             }
         } catch (\Throwable $error) {
             if ($written > 0) {

@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Lifecycle\AfterTest;
 use Testo\Test;
 use Thesis\Async\Group;
+use Thesis\Async\Task;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
@@ -178,6 +179,46 @@ final class StreamTest
         $left->write('x');
     }
 
+    public function readThrowsStreamClosedAfterClose(): void
+    {
+        [$left] = self::pair();
+        $left->close();
+        Expect::exception(StreamClosed::class)->withMessage('The stream is closed.');
+
+        $left->read(1);
+    }
+
+    public function closeEndsEveryWaitingWrite(): void
+    {
+        [$left, $right] = self::pair();
+
+        $errors = timeout(sec(1), static fn() => group(static function (Group $group) use ($left) {
+            /** @var list<Task<string>> $writes */
+            $writes = [];
+
+            // the first write waits for the peer holding the lock, the second one waits for the lock
+            foreach (['a', 'b'] as $byte) {
+                $writes[] = $group->spawn(static function () use ($left, $byte) {
+                    try {
+                        $left->write(str_repeat($byte, 10_000_000));
+                    } catch (StreamClosed $error) {
+                        return $error->getMessage();
+                    }
+
+                    return 'written';
+                });
+                delay(ms(1));
+            }
+
+            $left->close();
+
+            return array_map(static fn(Task $write): string => $write->await(), $writes);
+        }));
+
+        Assert::same($errors, ['The stream was closed while writing.', 'The stream was closed while writing.']);
+        unset($right);
+    }
+
     public function secondConcurrentReaderIsAnError(): void
     {
         [$left, $right] = self::pair();
@@ -337,6 +378,13 @@ final class StreamTest
         $stream->close();
 
         Assert::false(\is_resource($handle));
+    }
+
+    public function rejectsResourceThatIsNotAStream(): void
+    {
+        Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Expected a stream resource');
+
+        new Stream(stream_context_create());
     }
 
     public function rejectsClosedResource(): void

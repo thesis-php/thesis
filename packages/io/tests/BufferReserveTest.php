@@ -164,8 +164,17 @@ final class BufferReserveTest
         yield 'uint32 above' => [static function (Buffer $b): void {
             $b->patchUint32($b->reserve(4), 4_294_967_296);
         }];
-        yield 'mark beyond end' => [static function (Buffer $b): void {
-            $b->patchUint32($b->reserve(2), 0);
+        yield 'uint8 mark at end' => [static function (Buffer $b): void {
+            $b->patchUint8($b->reserve(0), 0);
+        }];
+        yield 'uint16 mark a byte short' => [static function (Buffer $b): void {
+            $b->patchUint16($b->reserve(1), 0);
+        }];
+        yield 'uint32 mark a byte short' => [static function (Buffer $b): void {
+            $b->patchUint32($b->reserve(3), 0);
+        }];
+        yield 'uint64 mark a byte short' => [static function (Buffer $b): void {
+            $b->patchUint64($b->reserve(7), 0);
         }];
         yield 'size since mark beyond end' => [static function (Buffer $b): void {
             $b->sizeSince(1);
