@@ -305,7 +305,7 @@ final class LocalTokenBucketRateLimiterTest
      * A token 2^63 nanoseconds away is just beyond int: as a float, PHP_INT_MAX is 2^63.
      */
     #[DataSet([1e-10])]
-    #[DataSet([1e9 / 9.223372036854775808e18])]
+    #[DataSet([1e9 / 2.0 ** 63])]
     public function tokenTooFarAwayDoesNotOverflowClock(float $perSecond): void
     {
         $limiter = new LocalTokenBucketRateLimiter(perSecond: $perSecond, burst: 1);

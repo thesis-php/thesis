@@ -689,6 +689,51 @@ final class VirtualTimeTest
         EventLoop::cancel($timer);
     }
 
+    public function microtaskQueuedOutsideCallbackOfDriverIsActivity(): void
+    {
+        /** @var array{resource, resource} $pair */
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
+        [$reader, $writer] = $pair;
+        stream_set_blocking($reader, false);
+        // Not a callback of the driver: StreamSelectDriver calls the handler from pcntl_signal_dispatch()
+        // in its dispatch, unless the signals are handled asynchronously, as the runner of the tests sets them.
+        $asyncSignals = pcntl_async_signals(false);
+        pcntl_signal(SIGUSR1, static function () use ($writer) {
+            EventLoop::queue(static function () use ($writer) {
+                fwrite($writer, 'ping');
+            });
+        });
+
+        try {
+            $elapsed = virtualTime(
+                fn: static function () use ($reader) {
+                    $watcher = new StreamWatcher($reader);
+                    $start = Instant::now();
+
+                    try {
+                        return timeout(sec(100), static function () use ($watcher, $start) {
+                            // The firing defer of this timer resets the pump: in the next tick,
+                            // the microtask of the handler is the only activity.
+                            delay(sec(1));
+                            posix_kill(posix_getpid(), SIGUSR1);
+                            $watcher->readable();
+
+                            return secondsSince($start);
+                        });
+                    } finally {
+                        $watcher->close();
+                    }
+                },
+                driver: new StreamSelectDriver(),
+            );
+        } finally {
+            pcntl_signal(SIGUSR1, SIG_DFL);
+            pcntl_async_signals($asyncSignals);
+        }
+
+        Assert::same($elapsed, 1.0);
+    }
+
     public function identifiersAreThoseOfCallbacksOfUser(): void
     {
         $timer = EventLoop::delay(1, static function () {});

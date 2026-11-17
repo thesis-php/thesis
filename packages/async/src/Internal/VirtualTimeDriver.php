@@ -23,7 +23,9 @@ use Revolt\EventLoop\Suspension;
  * when there has been none during two runs of the pump in a row, nothing can run, and the clock jumps. One is not
  * enough: the pump is a defer, and the defers of a tick run before the callbacks of the streams and signals
  * the inner driver has found ready in it. So only a stream that is to become ready from outside the process
- * may be jumped past. Without a timer there is no pump, and the inner
+ * may be jumped past, or one written to by code that enters the loop past the callbacks of this driver
+ * (a handler of `pcntl_signal()`, a watcher of the native handle, a destructor run by the garbage collector)
+ * and queues no microtask. Without a timer there is no pump, and the inner
  * driver blocks on the streams and signals for real. When nothing at all is left,
  * Revolt ends the loop: a deadlock fails at once.
  *
@@ -133,14 +135,12 @@ final class VirtualTimeDriver implements Driver
     #[\Override] // @phpstan-ignore method.childParameterType (Revolt documents a signature, but its type is \Closure)
     public function queue(\Closure $closure, mixed ...$args): void
     {
-        // A microtask given is work to do, even before it runs, as a callback of counted().
-        // The pump only compares the count with the one it saw, so a decrement is a change too. And a microtask
-        // runs in the tick that has queued it, after a callback that is counted itself.
-        // @infection-ignore Increment
+        // A microtask given is work to do, even before it runs, as a callback of counted(). It is the only trace
+        // of code that enters the loop past the callbacks of this driver: a handler of pcntl_signal(),
+        // a watcher of the native handle, a destructor run by the garbage collector.
         ++$this->activity;
 
         $this->inner->queue(function (mixed ...$args) use ($closure) {
-            // @infection-ignore Increment
             ++$this->activity;
             $closure(...$args);
         }, ...$args);

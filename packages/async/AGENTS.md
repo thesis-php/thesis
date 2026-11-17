@@ -115,6 +115,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - `Internal\VirtualTimeDriver` jumps the clock only when nothing has been given, enabled or run during two pumps in a
   row: the pump is a defer, and the defers of a tick run before the stream and signal callbacks found ready in it,
   so after one idle pump a stream written to inside the process may still be ready behind it.
+  Trap: code may enter the loop past the callbacks of the driver (a handler of `pcntl_signal()` on StreamSelect,
+  a watcher of `getHandle()`, a destructor run by the garbage collector). A microtask it queues is counted
+  (`microtaskQueuedOutsideCallbackOfDriverIsActivity`), a stream it writes to directly may be jumped past.
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
   `virtualTime()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is
