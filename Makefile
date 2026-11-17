@@ -70,11 +70,11 @@ github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs G
 # Quality
 
 fixer: var ## Fix code style [P=]
-	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php --path-mode=intersection --diff $(ARGS) $(PATHS)
+	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php $(if $(P),--path-mode=intersection) --diff $(ARGS) $(PATHS)
 .PHONY: fixer
 
 fixer-check: var ## Check code style [P=]
-	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php --path-mode=intersection --diff --dry-run $(ARGS) $(PATHS)
+	$(RUN) php-cs-fixer fix --config=tools/php-cs-fixer.php $(if $(P),--path-mode=intersection) --diff --dry-run $(ARGS) $(PATHS)
 .PHONY: fixer-check
 
 rector: var ## Apply Rector rules [P=]
