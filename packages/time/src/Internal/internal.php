@@ -32,7 +32,8 @@ function fromUnits(int|float $value, int $nanosecondsPerUnit): Duration
     }
 
     if (!is_finite($value)) {
-        throw new \ValueError(\sprintf('A duration must be finite, %s given', $value));
+        // var_export(): PHP 8.5 warns when %s coerces NAN to a string.
+        throw new \ValueError(\sprintf('A duration must be finite, %s given', var_export($value, return: true)));
     }
 
     $nanoseconds = round($value * $nanosecondsPerUnit);
