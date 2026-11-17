@@ -621,7 +621,9 @@ final readonly class Generator
                 "phpUnit": {
                     "configDir": "..",
                 },
-                "minCoveredMsi": 99,
+                // A mutant is killed by a test or skipped in a manifest with the reason, none is left to a percentage.
+                "minMsi": 100,
+                "minCoveredMsi": 100,
                 "mutators": {
                     "@default": true,
             {$mutators}    },

@@ -112,6 +112,9 @@ is not here: the tools fix the code anyway.
 ### Tests
 
 - Write the failing test first, then the fix.
+- `make infect P=<name>` kills every mutant of a package in the matrix of the job `infect` of `check.yaml`.
+  A surviving mutant gets a test. A mutant that shows code to be redundant gets the code simplified. Only one
+  that no input tells from the code is an `InfectionSkip` of the manifest, with the reason (`manifests.md`).
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
