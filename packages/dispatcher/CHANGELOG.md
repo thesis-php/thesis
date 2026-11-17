@@ -26,9 +26,3 @@ The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis)
 ### Removed
 
 - **BC break:** `Dispatcher::subscribe()` and its unsubscribe closures. Pass the listeners to the constructor.
-
-## [0.2.0] - 2026-05-07
-
-### Changed
-
-- **BC break** `Dispatcher::subscribe()` now requires the hook class to be `final`. Passing a non-final class throws `\ValueError`.

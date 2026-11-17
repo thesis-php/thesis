@@ -18,6 +18,10 @@ Read before writing or editing a `CHANGELOG.md` of a package. How a heading beco
 - A paragraph right under the version heading is only for what concerns the whole package
   (it moved to the monorepo, it was written anew): `packages/amqp/CHANGELOG.md`.
 - A package that was never released has only `### Added`, with a line per main feature.
+- A package that takes the name of an older one keeps its sections only if it continues it, as they were
+  (`exceptionally`, `formatter`): the breaks of its API are listed in `[Unreleased]`. A package written anew
+  (`amqp`, `dispatcher`) or a different one (`time`) starts with `[Unreleased]`, and the paragraph under it says so:
+  the old history stays in the tags and the GitHub Releases of the same repository.
 
 ### Content
 
@@ -34,4 +38,8 @@ Read before writing or editing a `CHANGELOG.md` of a package. How a heading beco
 
 ## Decisions
 
+- Rejected: the history of every older package copied into its changelog. The sections of a package written anew
+  describe an API that is gone, and some contradict its `[Unreleased]` (`dispatcher` 0.2.0 required final
+  event classes in `subscribe()`, both are gone). The older changelogs also skip versions (`amqp` 1.0.1, 1.0.2)
+  and list tooling: copied, they break the rules of this file, rewritten, they are no longer what was released.
 - Rejected: changesets (a note per change, collected into a release): a second place for what `[Unreleased]` holds.

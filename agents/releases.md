@@ -87,8 +87,8 @@ Open:
   when any package fails and a replaced run of it ends as cancelled, and a second writer of `main` races
   with the split. The pushed tag carries the commits.
 - Rejected: reading a top heading that is not a version the release writes (`0.5.0-rc.1`) as a tag
-  of an older package: the headings of the older packages are a fixed set (`dispatcher` 0.2.0,
-  `exceptionally` 0.3.0, `formatter` 0.1.0), all parse, and a new heading is written in our format.
+  of an older package: the headings of the older packages are a fixed set (`exceptionally` 0.3.0,
+  `formatter` 0.1.0, `changelogs.md`), all parse, and a new heading is written in our format.
 - Rejected: a version higher than the last tag instead of the next one: a typo would publish a version for good.
 - Rejected: tags of the monorepo (`<name>/vX.Y.Z`), and splitting tags or branches other than `main`:
   nothing needs them without maintenance branches.
