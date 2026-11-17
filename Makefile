@@ -64,7 +64,7 @@ release: vendor ## Release the changelog headings at COMMIT without a tag; pushe
 .PHONY: release
 
 github: vendor ## Bring thesis-php/<name> to the state of the manifests, needs GITHUB_TOKEN [ARGS=--dry-run]
-	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_TOKEN php) bin/monorepo github $(ARGS)
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_TOKEN -e PACKAGIST_USERNAME -e PACKAGIST_TOKEN php) bin/monorepo github $(ARGS)
 .PHONY: github
 
 # Quality

@@ -12,6 +12,7 @@ use Thesis\Monorepo\Internal\GitHub\HttpApi;
 use Thesis\Monorepo\Internal\GitHub\Repositories;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
+use Thesis\Monorepo\Internal\Packagist\HttpPackagist;
 
 /**
  * @internal
@@ -36,9 +37,15 @@ final readonly class GitHubCommand
             return Command::FAILURE;
         }
 
+        // Only to write: a dry run reads Packagist without them.
+        $packagist = new HttpPackagist(
+            username: self::env('PACKAGIST_USERNAME'),
+            token: self::env('PACKAGIST_TOKEN'),
+        );
+
         try {
             $monorepo = Monorepo::load($this->root);
-            $synced = Repositories::sync($monorepo, new HttpApi($token), $dryRun);
+            $synced = Repositories::sync($monorepo, new HttpApi($token), $packagist, $dryRun);
         } catch (MonorepoException $exception) {
             $io->error($exception->getMessage());
 
@@ -60,5 +67,16 @@ final readonly class GitHubCommand
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param non-empty-string $name
+     * @return ?non-empty-string
+     */
+    private static function env(string $name): ?string
+    {
+        $value = getenv($name);
+
+        return $value === false || $value === '' ? null : $value;
     }
 }

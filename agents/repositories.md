@@ -24,9 +24,14 @@ a change made there would be lost on the next split or would diverge from the mo
 - **Settings come from the manifests.** `bin/monorepo github` brings every `thesis-php/<name>` to the state
   derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
   the description, the homepage (`packages/<name>` in the monorepo), the disabled features and the rulesets.
-  It does not register the package on Packagist yet: that is done by hand before the first release.
   GitHub itself is the state, the command is idempotent and deletes nothing.
   CI runs it before the split, so a new package gets its repository with its first push.
+- **Packagist.** `github` also adds the webhook of Packagist to every repository (any webhook to its URL counts:
+  the older packages have the one of its GitHub integration) and registers the package once `main` exists,
+  by the run after the first split: Packagist reads `composer.json` at once and refuses a repository without it.
+  It needs the main API token of a maintainer of `thesis` (`vars.PACKAGIST_USERNAME`, `secrets.PACKAGIST_TOKEN`):
+  Packagist creates no package with the safe one. The app needs the permission of repository webhooks.
+  The abandoned flag of a reused name is not touched (below).
 - **Older repositories of the same name.** `github` refuses a repository that exists without the rulesets
   of the split: the organization holds older packages under the same names, and taking one over is a decision,
   not a side effect of a push. A package named like an older repository fails CI until that repository is renamed,

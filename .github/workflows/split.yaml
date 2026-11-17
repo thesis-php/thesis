@@ -20,7 +20,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # The app creates thesis-php/<name> and bypasses the rulesets that make it read-only.
+      # The app creates thesis-php/<name>, bypasses the rulesets that make it read-only
+      # and adds the webhook of Packagist.
       - id: token
         uses: actions/create-github-app-token@v3
         with:
@@ -29,11 +30,15 @@ jobs:
           owner: thesis-php
           permission-administration: write
           permission-contents: write
-      # Before the split: a package needs its repository before the first push.
+          permission-repository-hooks: write
+      # Before the split: a package needs its repository before the first push. It is registered on Packagist
+      # by the run after it, once main exists. The main API token: Packagist creates no package with the safe one.
       - id: github
         run: make github
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          PACKAGIST_USERNAME: ${{ vars.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
       # Even when github failed for some repositories: the others get their splits, the job fails anyway.
       # A repository without the rulesets of the split gets no push: an older package of the same name lacks main,
       # so a push would create it. A push is never forced.

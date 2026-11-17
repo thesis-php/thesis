@@ -8,11 +8,12 @@ use Thesis\Monorepo\Internal\Json;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Package;
+use Thesis\Monorepo\Internal\Packagist\Packagist;
 
 /**
  * Brings thesis-php/<dir> of every package to the state derived from its manifest: a public read-only copy
- * of packages/<dir> that only the app of the split may push to. Deletes nothing. A repository that fails
- * does not stop the others: the split still pushes every package whose repository is fine.
+ * of packages/<dir> that only the app of the split may push to, registered on Packagist. Deletes nothing.
+ * A repository that fails does not stop the others: the split still pushes every package whose repository is fine.
  *
  * @internal
  */
@@ -37,9 +38,9 @@ final class Repositories
      */
     public private(set) array $errors = [];
 
-    public static function sync(Monorepo $monorepo, Api $api, bool $dryRun): self
+    public static function sync(Monorepo $monorepo, Api $api, Packagist $packagist, bool $dryRun): self
     {
-        $repositories = new self($api, $dryRun);
+        $repositories = new self($api, $packagist, $dryRun);
 
         foreach ($monorepo->packages as $package) {
             try {
@@ -68,6 +69,7 @@ final class Repositories
 
     private function __construct(
         private readonly Api $api,
+        private readonly Packagist $packagist,
         private readonly bool $dryRun,
     ) {}
 
@@ -122,12 +124,11 @@ final class Repositories
             );
         }
 
-        // A new repository gets the default branch from its first push, the split of main.
-        if (
-            $actual !== null
-            && ($actual['default_branch'] ?? null) !== self::DEFAULT_BRANCH
-            && $this->api->get(\sprintf('repos/%s/branches/%s', $repository, self::DEFAULT_BRANCH)) !== null
-        ) {
+        // A new repository gets main from its first push, the split, after this run.
+        $hasMain = $actual !== null
+            && $this->api->get(\sprintf('repos/%s/branches/%s', $repository, self::DEFAULT_BRANCH)) !== null;
+
+        if ($hasMain && ($actual['default_branch'] ?? null) !== self::DEFAULT_BRANCH) {
             $this->change(
                 repository: $repository,
                 what: 'default branch set to ' . self::DEFAULT_BRANCH,
@@ -138,6 +139,55 @@ final class Repositories
         }
 
         $this->rulesets($repository, existing: $rulesets);
+        $this->packagist($package, $repository, $hasMain);
+    }
+
+    /**
+     * The webhook goes first: a push after the registration is not missed. A package is registered once main
+     * exists: Packagist reads the composer.json of the repository right away and refuses one without it.
+     *
+     * @param non-empty-string $repository
+     */
+    private function packagist(Package $package, string $repository, bool $hasMain): void
+    {
+        if (!self::hasPackagistHook($this->api->get(\sprintf('repos/%s/hooks', $repository)) ?? [])) {
+            $this->change(
+                repository: $repository,
+                what: 'Packagist webhook created',
+                apply: fn() => $this->api->send('POST', \sprintf('repos/%s/hooks', $repository), [
+                    'name' => 'web',
+                    'active' => true,
+                    'events' => ['push'],
+                    'config' => $this->packagist->hook(),
+                ]),
+            );
+        }
+
+        if ($hasMain && !$this->packagist->exists($package->name())) {
+            $this->change(
+                repository: $repository,
+                what: \sprintf('%s registered on Packagist', $package->name()),
+                apply: fn() => $this->packagist->create('https://github.com/' . $repository),
+            );
+        }
+    }
+
+    /**
+     * Any webhook of Packagist will do: the older packages have the one of its GitHub integration.
+     *
+     * @param array<array-key, mixed> $hooks what GET repos/<name>/hooks returns
+     */
+    private static function hasPackagistHook(array $hooks): bool
+    {
+        foreach ($hooks as $hook) {
+            $url = \is_array($hook) && \is_array($hook['config'] ?? null) ? $hook['config']['url'] ?? null : null;
+
+            if (\is_string($url) && str_starts_with($url, Packagist::HOOK_URL)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

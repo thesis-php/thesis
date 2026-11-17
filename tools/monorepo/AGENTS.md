@@ -41,9 +41,13 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   Rejected: layers, no cycles, a validator of code references against `require`.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
 - `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
-  creates it, sets the settings that differ, creates or replaces the two rulesets. It compares only the keys it sends
+  creates it, sets the settings that differ, creates or replaces the two rulesets, adds the webhook of Packagist
+  and registers the package there (`Internal\Packagist`). It compares only the keys it sends
   (`Json::canonical`): GitHub returns more and in its own order. CI runs it with the token of the app,
-  locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`.
+  locally `GITHUB_TOKEN=$(gh auth token) make github ARGS=--dry-run`: a dry run reads Packagist without
+  `PACKAGIST_USERNAME` and `PACKAGIST_TOKEN`, only a write needs them. Whether a package is registered
+  is `GET packages/<name>.json`: Packagist caches a 200 for hours, but not a 404, so the run after
+  the registration finds it.
 - A failure of one package does not block the others, the job still fails: `github` collects an error
   per repository and goes on, CI runs `split` after a failed `github`, and `split` pushes in parallel
   and reports every failed push at the end. `split` pushes only to a repository with the rulesets of the split

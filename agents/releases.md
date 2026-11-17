@@ -59,10 +59,8 @@ the changelogs in `changelogs.md`, the code in `tools/monorepo/AGENTS.md`.
     of the commit of the run, whatever the tag has: edited after the tag, or older than it when the job
     of an older push is re-run after a later push tagged the version. One that exists is never updated.
     Both are edited by hand on GitHub.
-
-Open:
-
-- The release assumes the package is registered on Packagist, which `github` does not automate yet.
+  - That the package is on Packagist: `github` registers it by the push after its first split (`repositories.md`),
+    and Packagist reads the tags made before.
 
 ## Decisions
 

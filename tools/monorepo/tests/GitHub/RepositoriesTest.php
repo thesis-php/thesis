@@ -17,13 +17,14 @@ final readonly class RepositoriesTest
     {
         $api = new FakeApi();
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
         Assert::same($api->writes, [
             'POST orgs/thesis-php/repos',
             'PATCH repos/thesis-php/io',
             'POST repos/thesis-php/io/rulesets',
             'POST repos/thesis-php/io/rulesets',
+            'POST repos/thesis-php/io/hooks',
         ]);
         Assert::same($api->bodies['POST orgs/thesis-php/repos'] ?? null, ['name' => 'io', 'visibility' => 'public']);
         Assert::same($api->bodies['PATCH repos/thesis-php/io'] ?? null, self::settings());
@@ -33,6 +34,7 @@ final readonly class RepositoriesTest
                 . 'has_pull_requests updated',
             'thesis-php/io: ruleset "read-only branches" created',
             'thesis-php/io: ruleset "read-only tags" created',
+            'thesis-php/io: Packagist webhook created',
         ]);
     }
 
@@ -40,7 +42,7 @@ final readonly class RepositoriesTest
     {
         $api = new FakeApi(self::inSync());
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
         Assert::same($api->writes, []);
         Assert::same($changes, []);
@@ -52,7 +54,7 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io'] = [...self::repository(), 'description' => 'Old.', 'has_issues' => true];
         $api = new FakeApi($resources);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
         Assert::same($api->writes, ['PATCH repos/thesis-php/io']);
         Assert::same($api->bodies['PATCH repos/thesis-php/io'] ?? null, [
@@ -69,7 +71,7 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io/branches/main'] = ['name' => 'main'];
         $api = new FakeApi($resources);
 
-        Repositories::sync(self::monorepo(), $api, dryRun: false);
+        Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false);
 
         Assert::same($api->writes, ['PATCH repos/thesis-php/io']);
         Assert::same($api->bodies['PATCH repos/thesis-php/io'] ?? null, ['default_branch' => 'main']);
@@ -81,7 +83,7 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io'] = [...self::repository(), 'default_branch' => 'master'];
         $api = new FakeApi($resources);
 
-        Repositories::sync(self::monorepo(), $api, dryRun: false);
+        Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false);
 
         Assert::same($api->writes, []);
     }
@@ -93,7 +95,7 @@ final readonly class RepositoriesTest
         $resources['repos/thesis-php/io/rulesets/2'] = [...$ruleset, 'bypass_actors' => []];
         $api = new FakeApi($resources);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
         Assert::same($api->writes, ['PUT repos/thesis-php/io/rulesets/2']);
         Assert::same($changes, ['thesis-php/io: ruleset "read-only tags" updated']);
@@ -106,7 +108,12 @@ final readonly class RepositoriesTest
             'repos/thesis-php/io/rulesets' => [],
         ]);
 
-        $synced = Repositories::sync(new Fixture()->package('io')->package('net')->load(), $api, dryRun: false);
+        $synced = Repositories::sync(
+            monorepo: new Fixture()->package('io')->package('net')->load(),
+            api: $api,
+            packagist: new FakePackagist(),
+            dryRun: false,
+        );
 
         Assert::same($synced->errors, [
             'thesis-php/io exists, but is not a split of packages/io: it has no rulesets of the split. Rename or delete it, or add the rulesets by hand to take it over.',
@@ -116,6 +123,7 @@ final readonly class RepositoriesTest
             'PATCH repos/thesis-php/net',
             'POST repos/thesis-php/net/rulesets',
             'POST repos/thesis-php/net/rulesets',
+            'POST repos/thesis-php/net/hooks',
         ]);
     }
 
@@ -125,20 +133,101 @@ final readonly class RepositoriesTest
             'repos/thesis-php/io' => ['full_name' => 'thesis-php/io-legacy', 'default_branch' => '0.2.x'],
         ]);
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: false)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
 
         Assert::same($api->writes[0] ?? null, 'POST orgs/thesis-php/repos');
         Assert::same($changes[0] ?? null, 'thesis-php/io: created, the redirect to thesis-php/io-legacy is gone');
+    }
+
+    public static function createsPackagistWebhookWhenMissing(): void
+    {
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io/hooks'] = [['config' => ['url' => 'https://example.com/hook']]];
+        $api = new FakeApi($resources);
+
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false)->changes;
+
+        Assert::same($api->writes, ['POST repos/thesis-php/io/hooks']);
+        Assert::same($api->bodies['POST repos/thesis-php/io/hooks'] ?? null, [
+            'name' => 'web',
+            'active' => true,
+            'events' => ['push'],
+            'config' => [
+                'url' => 'https://packagist.org/api/github?username=thesis',
+                'content_type' => 'json',
+                'secret' => 'token',
+            ],
+        ]);
+        Assert::same($changes, ['thesis-php/io: Packagist webhook created']);
+    }
+
+    public static function keepsWebhookOfPackagistIntegration(): void
+    {
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io/hooks'] = [['config' => ['url' => 'https://packagist.org/api/github']]];
+        $api = new FakeApi($resources);
+
+        Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: false);
+
+        Assert::same($api->writes, []);
+    }
+
+    public static function registersOnPackagistOnceMainExists(): void
+    {
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io/branches/main'] = ['name' => 'main'];
+        $packagist = new FakePackagist();
+
+        $changes = Repositories::sync(self::monorepo(), new FakeApi($resources), $packagist, dryRun: false)->changes;
+
+        Assert::same($packagist->created, ['https://github.com/thesis-php/io']);
+        Assert::same($changes, ['thesis-php/io: thesis/io registered on Packagist']);
+    }
+
+    public static function leavesPackagistWithoutMain(): void
+    {
+        $packagist = new FakePackagist();
+
+        Repositories::sync(self::monorepo(), new FakeApi(self::inSync()), $packagist, dryRun: false);
+
+        Assert::same($packagist->created, []);
+    }
+
+    public static function registersNothingInDryRun(): void
+    {
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io/branches/main'] = ['name' => 'main'];
+        $packagist = new FakePackagist();
+
+        $changes = Repositories::sync(self::monorepo(), new FakeApi($resources), $packagist, dryRun: true)->changes;
+
+        Assert::same($packagist->created, []);
+        Assert::same($changes, ['thesis-php/io: thesis/io registered on Packagist']);
+    }
+
+    public static function failureOfPackagistIsErrorOfItsRepository(): void
+    {
+        $resources = self::inSync();
+        $resources['repos/thesis-php/io/branches/main'] = ['name' => 'main'];
+
+        $synced = Repositories::sync(
+            monorepo: self::monorepo(),
+            api: new FakeApi($resources),
+            packagist: new FakePackagist(failing: 'Packagist: down.'),
+            dryRun: false,
+        );
+
+        Assert::same($synced->errors, ['Packagist: down.']);
     }
 
     public static function writesNothingInDryRun(): void
     {
         $api = new FakeApi();
 
-        $changes = Repositories::sync(self::monorepo(), $api, dryRun: true)->changes;
+        $changes = Repositories::sync(self::monorepo(), $api, new FakePackagist(['thesis/io']), dryRun: true)->changes;
 
         Assert::same($api->writes, []);
-        Assert::same(\count($changes), 4);
+        Assert::same(\count($changes), 5);
     }
 
     private static function monorepo(): Monorepo
@@ -159,6 +248,9 @@ final readonly class RepositoriesTest
             ],
             'repos/thesis-php/io/rulesets/1' => self::ruleset(1, 'read-only branches', 'branch'),
             'repos/thesis-php/io/rulesets/2' => self::ruleset(2, 'read-only tags', 'tag'),
+            'repos/thesis-php/io/hooks' => [
+                ['id' => 3, 'config' => ['url' => 'https://packagist.org/api/github?username=thesis']],
+            ],
         ];
     }
 
