@@ -48,7 +48,7 @@ final readonly class Package
     public function namespace(): string
     {
         if ($this->manifest->rootEntry) {
-            return Monorepo::NAMESPACE;
+            return Monorepo::ROOT_NAMESPACE;
         }
 
         $pascalCase = str_replace(
@@ -57,6 +57,6 @@ final readonly class Package
             subject: ucwords($this->dir, '-'),
         );
 
-        return Monorepo::NAMESPACE . $pascalCase . '\\';
+        return Monorepo::ROOT_NAMESPACE . $pascalCase . '\\';
     }
 }

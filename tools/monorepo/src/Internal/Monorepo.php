@@ -13,7 +13,7 @@ use Thesis\Monorepo\Manifest;
 final readonly class Monorepo
 {
     public const string VENDOR = 'thesis';
-    public const string NAMESPACE = 'Thesis\\';
+    public const string ROOT_NAMESPACE = 'Thesis\\';
     public const string PACKAGES_DIR = 'packages';
     public const string CONFIG = 'monorepo.php';
     public const string MANIFEST = 'package.php';
