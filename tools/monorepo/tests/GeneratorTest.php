@@ -252,6 +252,52 @@ final readonly class GeneratorTest
         Generator::generate($fixture->load());
     }
 
+    #[DataSet(['See [async](../async/README.md).', '../async/README.md'])]
+    #[DataSet(['See [async](docs/../../async "Async").', 'docs/../../async'])]
+    #[DataSet(['See [async](<../async/README.md>).', '../async/README.md'])]
+    #[DataSet(['See [the root](/AGENTS.md#topics).', '/AGENTS.md#topics'])]
+    #[DataSet(["See [async][1].\n\n[1]: ../async/README.md", '../async/README.md'])]
+    #[DataSet(['<img src="../../logo.png" alt="Logo">', '../../logo.png'])]
+    public static function failsOnReadmeLinkOutsideOfPackage(string $readme, string $link): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes')
+            ->file('packages/bytes/README.md', "# Bytes\n\n{$readme}\n")
+        ;
+
+        Expect::exception(MonorepoException::class)->withMessage(\sprintf(
+            'packages/bytes/README.md: %s links outside of the package, which the split repository and Packagist do not have: link a package by https://github.com/thesis-php/<name>.',
+            $link,
+        ));
+
+        Generator::generate($fixture->load());
+    }
+
+    public static function allowsReadmeLinksWithinPackageAndUrls(): void
+    {
+        $fixture = new Fixture()
+            ->package('bytes')
+            ->file('packages/bytes/README.md', <<<'MD'
+                # Bytes
+
+                See [async](https://github.com/thesis-php/async), [usage](#usage), [skills](./skills/../src/Bytes.php),
+                [mail](mailto:bytes@example.com) and [docs][docs].
+
+                [docs]: docs/usage.md
+
+                ```php
+                $path = '[x](../async)';
+                ```
+
+                Not a link: `[x](../async)`.
+                MD)
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::true(isset($files['packages/bytes/composer.json']));
+    }
+
     public static function autoloadsFilesWithoutClassLikeDeclarations(): void
     {
         $fixture = self

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Monorepo\Internal;
 
 use Thesis\Monorepo\FixerSkip;
+use Thesis\Monorepo\Internal\GitHub\Repositories;
 
 /**
  * @internal
@@ -32,6 +33,7 @@ final readonly class Generator
         ];
 
         foreach ($monorepo->packages as $package) {
+            $generator->checkReadmeLinks($package);
             $files[$package->path() . '/composer.json'] = Json::encode($generator->packageComposer($package));
             $files[$package->path() . '/LICENSE'] = $generator->license($package->manifest->licenseSince);
             $files[$package->path() . '/.gitattributes'] = $generator->gitattributes($package);
@@ -263,6 +265,79 @@ final readonly class Generator
             . "# The split repository is a copy of the package, the archive that composer installs has only these.\n"
             . "/* export-ignore\n"
             . implode('', $lines);
+    }
+
+    /**
+     * The split repository and Packagist show the package alone, so a link out of it (../async, or /AGENTS.md,
+     * which GitHub resolves from the root of the repository) works only in the monorepo.
+     */
+    private function checkReadmeLinks(Package $package): void
+    {
+        $path = $package->path() . '/README.md';
+        $readme = $this->monorepo->read($path);
+
+        if ($readme === null) {
+            return;
+        }
+
+        // A link in code is an example, not a link.
+        $text = preg_replace(['/^ *(```|~~~).*?^ *\1/ms', '/`[^`\n]*`/'], '', $readme);
+        \assert($text !== null);
+        preg_match_all(
+            '/\]\(\s*<?([^\s>)]+)|^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)|\b(?:href|src)\s*=\s*["\']([^"\']+)/m',
+            $text,
+            $matches,
+            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL,
+        );
+        $errors = [];
+
+        foreach ($matches as $match) {
+            $link = $match[1] ?? $match[2] ?? $match[3] ?? '';
+
+            if (self::isOutsideOfPackage($link)) {
+                $errors[] = \sprintf(
+                    '%s: %s links outside of the package, which the split repository and Packagist do not have: '
+                    . 'link a package by https://github.com/%s/<name>.',
+                    $path,
+                    $link,
+                    Repositories::ORGANIZATION,
+                );
+            }
+        }
+
+        if ($errors !== []) {
+            throw new MonorepoException(implode("\n", $errors));
+        }
+    }
+
+    private static function isOutsideOfPackage(string $link): bool
+    {
+        $isUrl = preg_match('~^([a-z][a-z0-9+.-]*:|//)~i', $link) === 1;
+
+        if ($isUrl || str_starts_with($link, '#')) {
+            return false;
+        }
+
+        if (str_starts_with($link, '/')) {
+            return true;
+        }
+
+        $path = substr($link, 0, strcspn($link, '?#'));
+        $depth = 0;
+
+        foreach (explode('/', $path) as $segment) {
+            $depth += match ($segment) {
+                '..' => -1,
+                '', '.' => 0,
+                default => 1,
+            };
+
+            if ($depth < 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function license(int $since): string

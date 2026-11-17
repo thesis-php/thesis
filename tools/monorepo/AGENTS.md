@@ -39,6 +39,10 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   are not checked: a check is added when a real problem shows up, not in advance, and preferably by running
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.
   Rejected: layers, no cycles, a validator of code references against `require`.
+- `sync` throws on a link of `README.md` of a package out of the package (`../async`, or `/AGENTS.md`,
+  which GitHub resolves from the root of the repository): it works only in the monorepo, the split repository
+  and Packagist show the package alone. A package links another by `https://github.com/thesis-php/<name>`.
+  Links in code (fenced blocks, inline code) are examples and are skipped.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
 - `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
   creates it, sets the settings that differ, creates or replaces the two rulesets, adds the webhook of Packagist
