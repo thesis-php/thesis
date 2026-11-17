@@ -10,7 +10,8 @@ use Thesis\Dispatcher\Internal\Listener;
  * Calls the listeners of an event one by one, in the order they are given. A listener gets the events
  * of the type of its first parameter: a class or an interface, a union or an intersection of them,
  * or every event for `object`, `mixed` and no type. The second argument of a listener is this dispatcher,
- * for the events the listener dispatches itself.
+ * for the events the listener dispatches itself. An object with several listeners
+ * is a {@see Dispatcher\Subscriber}, given among them.
  *
  * @api
  */
@@ -30,12 +31,14 @@ final class Dispatcher
     private array $listenersByClass = [];
 
     /**
-     * @param iterable<callable(never, self): void> $listeners called in the order of iteration, the keys are ignored
+     * @param iterable<(callable(never, self): void)|Dispatcher\Subscriber> $listeners called in the order
+     *                                                                                 of iteration, the keys
+     *                                                                                 are ignored
      * @throws \InvalidArgumentException if a listener cannot take an event or is a generator
      */
     public function __construct(iterable $listeners = [])
     {
-        $this->listeners = array_map(Listener::of(...), iterator_to_array($listeners, preserve_keys: false));
+        $this->listeners = Listener::all($listeners);
     }
 
     /**

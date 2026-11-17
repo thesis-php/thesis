@@ -20,7 +20,6 @@ use function Thesis\Async\suspend;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
 use function Thesis\AsyncTrace\Tests\unheardEvents;
-use function Thesis\Dispatcher\listenersOf;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
@@ -194,14 +193,14 @@ final class TextLogTest
     {
         $log = new TextLog();
 
-        $log->onSuspended(new Suspended(scope: 1, at: Instant::now(), caller: null));
+        new Dispatcher([$log])->dispatch(new Suspended(scope: 1, at: Instant::now(), caller: null));
 
         Assert::same($log->lines, ['0 #1 suspended']);
     }
 
     public function takesNoEventOfNewerAsyncItDoesNotKnow(): void
     {
-        Assert::false(new Dispatcher(listenersOf(new TextLog()))->listens(Event::class));
+        Assert::false(new Dispatcher([new TextLog()])->listens(Event::class));
     }
 
     public function listensToEveryEventOfAsync(): void
@@ -229,7 +228,7 @@ final class TextLogTest
     private static function record(callable $program): TextLog
     {
         $log = new TextLog();
-        observe(new Dispatcher(listenersOf($log)), $program);
+        observe(new Dispatcher([$log]), $program);
 
         return $log;
     }

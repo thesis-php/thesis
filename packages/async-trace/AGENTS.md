@@ -20,13 +20,15 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of virtual time. `at` counts from the first event the writer sees, never from the origin of `Instant`
   (unknown, and a rounded-up second on virtual time). The wall clock is read once, for `start` of the header,
   from the injected `ClockInterface`, so a test fixes it.
-- A writer of the events (`NdjsonWriter`, `TextLog`) has a method marked `#[Listener]` for every event class
-  of `Thesis\Async\Trace`,
+- A writer of the events (`NdjsonWriter`, `TextLog`) has a listener for every event class of `Thesis\Async\Trace`,
   never one of `Event`: an event added to async in a minor reaches an older async-trace, and the dispatcher
   does not route it to methods of other classes (`takesNoEventOfNewerAsyncItDoesNotKnow`). A new event of async
   gets its method here in the same change: `unheardEvents()` of `tests/helpers.php` reads the `@phpstan-sealed`
   list of `Event` (PHPStan keeps it complete), and `listensToEveryEventOfAsync` of each writer fails on a class
   the dispatcher does not route to it.
+- A writer and a tool are a `Subscriber` of thesis/dispatcher: the listeners are private methods given
+  by `yield` in `listeners()`. PHPStan reports one that is not given as unused, and they are not the API
+  of the class: a test gives the object to a dispatcher and dispatches the event.
 - A tool listens only to the events it needs: `observe()` does not build an event nobody gets, and `Suspended`
   and `Resumed` cost a backtrace per wait. `WhoCancelled` never listens to the waits (`listensToNoWaitsAndRuns`).
 - A tool reports to the dispatcher of the trace that holds it, the second argument of its listener
@@ -48,12 +50,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A header line carries the format, the version and the wall-clock start, the events carry no version.
   Rejected: `"v":1` on every line, it lengthens every line for what the first one says.
 - The event is named by the short name of its class (`TaskCreated`), the same as in the PHP API.
-- A method per event marked `#[Listener]` of thesis/dispatcher: each method says what it listens to, and the dispatcher
-  routes by the type. The price: an event that the listener does not know is not written, and a missing method
-  is found by a test, not by PHPStan. Rejected: `__invoke(Event)` with a `match` over the sealed `Event`, PHPStan
-  would point at a missing arm, but an older async-trace would throw `UnhandledMatchError` on a newer event of async;
-  a `default` that skips it hides a missing arm from PHPStan (`php.md`). Rejected: `__invoke()` of the union
-  of the known events with a `match`, the same routing as the methods with ten classes in one signature.
+- A method per event, given by `listeners()` of a `Subscriber`: each method says what it listens to,
+  and the dispatcher routes by the type. The price: an event that the listener does not know is not written,
+  and a missing method is found by a test, not by PHPStan. Rejected: `__invoke(Event)` with a `match`
+  over the sealed `Event`, PHPStan would point at a missing arm, but an older async-trace would throw
+  `UnhandledMatchError` on a newer event of async; a `default` that skips it hides a missing arm from PHPStan
+  (`php.md`). Rejected: `__invoke()` of the union of the known events with a `match`, the same routing
+  as the methods with ten classes in one signature.
   Rejected: a fallback listener of `Event`, it would get the known events too and write them twice.
 - The text is made for reading and for comparing in a test, not for parsing: a name or a callee may hold ` in `,
   an error is the short name of its class. A tool reads the NDJSON. A name and a value are PHP literals

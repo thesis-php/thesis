@@ -1,6 +1,6 @@
 {
     "name": "thesis/phpstan-extension",
-    "description": "PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot.",
+    "description": "PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.",
     "keywords": [
         "php",
         "phpstan",
@@ -29,8 +29,7 @@
         "phpstan/phpstan": "^2.3"
     },
     "require-dev": {
-        "thesis/async": "^0.1",
-        "thesis/dispatcher": "^0.3"
+        "thesis/async": "^0.1"
     },
     "autoload": {
         "psr-4": {

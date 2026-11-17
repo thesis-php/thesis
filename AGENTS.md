@@ -86,7 +86,7 @@ the whole monorepo is for the final check.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
 - `io`: Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio. Requires: async, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
-- `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot.
+- `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.
 - `testo-plugin`: Testo plugins for thesis packages: tests on the virtual time of thesis/async, PHP errors as failures. Requires: async.
 - `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.

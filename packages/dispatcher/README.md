@@ -7,13 +7,12 @@ Synchronous event dispatcher: a listener gets the events of the type of its para
 
 ```php
 use Thesis\Dispatcher;
-use function Thesis\Dispatcher\listenersOf;
 
 $dispatcher = new Dispatcher([
     static function (UserRegistered $event) { /* ... */ },
     static function (OrderPlaced|OrderCancelled $event) { /* ... */ },
     new AuditLog(), // __invoke(DomainEvent $event)
-    ...listenersOf(new Mailer()), // methods marked #[Listener]
+    new Mailer(), // a Subscriber: several listeners of one object
 ]);
 
 $dispatcher->dispatch(new UserRegistered('user@example.com'));
@@ -67,29 +66,32 @@ it does not declare.
 
 ### Subscribers
 
-An object with several listeners marks its methods with `#[Listener]`, and `listenersOf()` gives them
-to the dispatcher, among any other listeners:
+An object with several listeners implements `Subscriber` and is given to the dispatcher as it is,
+among any other listeners:
 
 ```php
-use Thesis\Dispatcher\Listener;
-use function Thesis\Dispatcher\listenersOf;
+use Thesis\Dispatcher\Subscriber;
 
-final class Mailer
+final class Mailer implements Subscriber
 {
-    #[Listener]
-    public function onRegistered(UserRegistered $event): void { /* ... */ }
+    public function listeners(): iterable
+    {
+        yield $this->onRegistered(...);
+        yield $this->onPlaced(...);
+    }
 
-    #[Listener]
-    public function onPlaced(OrderPlaced|OrderCancelled $event): void { /* ... */ }
+    private function onRegistered(UserRegistered $event): void { /* ... */ }
+
+    private function onPlaced(OrderPlaced|OrderCancelled $event): void { /* ... */ }
 }
 
-$dispatcher = new Dispatcher([...listenersOf(new Mailer()), $otherListener]);
+$dispatcher = new Dispatcher([new Mailer(), $otherListener]);
 ```
 
-The methods come in the order of `ReflectionClass::getMethods()`: those declared in the class, then the inherited
-ones. A marked method may be static, it must be public. The mark is not inherited: an override is a listener only if
-it is marked too. `listenersOf()` throws `\InvalidArgumentException` for a marked method that is not public
-and for an object without marked methods, the dispatcher checks every method as any listener.
+Its listeners take the place of the object, in the order it gives them, and the constructor checks each
+as any listener. `listeners()` is called once, by the constructor, and may return any iterable.
+A subscriber is never called itself, an invokable one too. Its listeners may be private methods:
+PHPStan reports one that `listeners()` does not give as unused.
 
 ## Dispatching
 

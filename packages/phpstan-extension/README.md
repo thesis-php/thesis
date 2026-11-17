@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/phpstan-extension)](https://github.com/thesis-php/phpstan-extension/releases)
 
 A [PHPStan](https://phpstan.org) extension for the thesis packages: precise types where the generics of PHPDoc
-cannot express them, and checks of what PHP itself cannot check. One extension for all packages: it does nothing for a package you do not use.
+cannot express them. One extension for all packages: it does nothing for a package you do not use.
 
 ## Installation
 
@@ -59,35 +59,3 @@ assertType('array{sales: Report, costs: Report}', map(['sales' => $sales, 'costs
 
 Without such a key or for a generator, the type of the PHPDoc stays. `race()`, `timeout()`, `group()` and the others
 need no extension: their generics are precise.
-
-## thesis/dispatcher
-
-A method marked `#[Listener]` must be public and have a body. The dispatcher calls it with the event and itself,
-so its second parameter, if any, must take `Thesis\Dispatcher`, and the ones after it must be optional:
-
-```php
-abstract class Mailer
-{
-    #[Listener] // thesis.listenerNotPublic: listenersOf() rejects it
-    protected function onRegistered(UserRegistered $event): void { /* ... */ }
-
-    #[Listener] // thesis.listenerAbstract: the mark is not inherited, so its implementations are not listeners
-    abstract public function onPlaced(OrderPlaced $event): void;
-
-    #[Listener]
-    public function onCancelled(
-        OrderCancelled $event,
-        int $attempt = 1, // thesis.listenerSecondParameter: it would get the dispatcher
-    ): void { /* ... */ }
-
-    #[Listener]
-    public function onShipped(
-        OrderShipped $event,
-        Dispatcher $dispatcher,
-        Clock $clock, // thesis.listenerRequiredParameter: the dispatcher passes the event and itself only
-    ): void { /* ... */ }
-}
-```
-
-`listenersOf()` finds the first error only when it runs, and the second never. The last two fail
-only on the first event of the listener.

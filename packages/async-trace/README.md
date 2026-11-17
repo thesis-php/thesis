@@ -10,10 +10,9 @@ one line per event, and as lines of text for tests, who has cancelled a scope, a
 use Thesis\Dispatcher;
 use Thesis\AsyncTrace\NdjsonWriter;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Dispatcher\listenersOf;
 
 $file = fopen('trace.ndjson', 'w');
-observe(new Dispatcher(listenersOf(new NdjsonWriter($file))), $main);
+observe(new Dispatcher([new NdjsonWriter($file)]), $main);
 ```
 
 ## Installation
@@ -26,8 +25,8 @@ Requires 64-bit PHP 8.5+. No extensions.
 
 ## `NdjsonWriter`
 
-A listener of every event of `Trace\observe()`, a method per event marked `#[Listener]`: give it to the dispatcher
-by `listenersOf()`, among other listeners if needed. It writes a header line before the first event, then a line
+A `Subscriber` of thesis/dispatcher with a listener of every event of `Trace\observe()`: give it to the dispatcher
+as it is, among other listeners if needed. It writes a header line before the first event, then a line
 per event, and keeps nothing of them: a value, an error and a task are formatted at once.
 
 It writes synchronously, as a listener must: pass a blocking stream (a file, `php://stderr`).
@@ -37,7 +36,7 @@ It never throws: a line it could not write is counted in `$writer->lost`. Wrap `
 
 ## `TextLog`
 
-A listener of every event, a method per event like `NdjsonWriter`, that keeps each as a line of text,
+A `Subscriber` with a listener of every event like `NdjsonWriter`, that keeps each as a line of text,
 `<seconds> #<scope> <what>`. On virtual time the lines are the same on every run, so a test compares them
 with what it expects:
 
@@ -46,7 +45,7 @@ use Testo\Assert;
 use Thesis\AsyncTrace\TextLog;
 
 $log = new TextLog();
-observe(new Dispatcher(listenersOf($log)), static fn() => timeoutOr(sec(2), static fn() => delay(sec(5))));
+observe(new Dispatcher([$log]), static fn() => timeoutOr(sec(2), static fn() => delay(sec(5))));
 
 Assert::same($log->lines, [
     '0 #1 timeout 2s in root',
@@ -89,7 +88,7 @@ use Thesis\AsyncTrace\WhoCancelled;
 $print = static function (CancelledBy $report) {
     fwrite(STDERR, $report . "\n");
 };
-observe(new Dispatcher([...listenersOf(new WhoCancelled()), $print]), $main);
+observe(new Dispatcher([new WhoCancelled(), $print]), $main);
 // #3 task 'fetch' at /app/src/main.php:12 is cancelled by the deadline of timeout 2s at /app/src/main.php:10
 ```
 
@@ -125,7 +124,7 @@ use function Thesis\Time\ms;
 $print = static function (Blocked $report) {
     fwrite(STDERR, $report . "\n");
 };
-observe(new Dispatcher([...listenersOf(new BlockingDetector(threshold: ms(50))), $print]), $main);
+observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $print]), $main);
 // #2 task 'work' at /app/src/main.php:8 has run 0.12s without a wait: from Thesis\Async\delay()
 // at /app/src/main.php:9 to Thesis\Async\Channel::receive() at /app/src/main.php:14
 ```

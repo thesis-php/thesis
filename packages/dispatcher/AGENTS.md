@@ -20,9 +20,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   it is a plain nested call, its listeners run before the next listener of the outer event.
 - Every listener is called with the event and the dispatcher, `$listener($event, $this)`: nothing about
   the second parameter is reflected or decided per listener. The parameters after the event are a contract
-  of types (`callable(never, self): void` of the constructor, `php.md`), not of the constructor's checks.
-  `ListenerRule` of `phpstan-extension` checks them for a marked method: `listenersOf()` gives closures
-  of any signature, PHPStan does not see through it.
+  of types (`callable(never, self): void` of the constructor and of `Subscriber::listeners()`, `php.md`),
+  not of the constructor's checks.
 - `dispatch()` does not care whether a listener suspends the fiber: `resolve()` does not suspend, so concurrent
   dispatches from other fibers see a consistent table. A ban on suspending belongs to the user of the dispatcher
   (the trace of thesis/async calls its listeners inside a wait), not here.
@@ -31,10 +30,15 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   a generator is rejected, its body would never run. Trap: `?object` is a `ReflectionNamedType` named `object`,
   so a check by name alone takes it for every event; only `mixed` allows `null` and still means every event.
 - Trap, open: a closure written right inside `new Dispatcher([...])` gets its parameter typed `never` by PHPStan
-  from `iterable<callable(never, self): void>` of the constructor: `static function (Foo $event)` sees `$event`
+  from `callable(never, self): void` of the type of the constructor: `static function (Foo $event)` sees `$event`
   as `never`, and every use of it is reported (`cast.useless`). A closure assigned to a variable first keeps
-  its declared type, as the tests of thesis/async and thesis/async-trace do. A fix belongs in the type
-  of the constructor or in phpstan-extension, it is not made yet.
+  its declared type, as the tests of thesis/async and thesis/async-trace do, and so does one written
+  in `Subscriber::listeners()`. Not fixed yet. A fix that PHPStan accepts: a method that takes one listener
+  with a template, `@template T of object` and `callable(T, self): void`. The closure keeps its type and
+  the parameters after the event are still checked, which the type of an iterable cannot do: a template is one
+  for the whole call. Rejected: `callable-string|callable-array|object`, a type without a signature. The closure
+  keeps its type, but `checkMissingCallableSignature` reports the type itself, and PHPStan reads `callable-array`
+  as `callable(): mixed`, which rejects `[$object, 'method']` with a parameter.
 - Trap: an internal function that declares one parameter (`$queue->push(...)`) passes PHPStan as a listener
   and throws `ArgumentCountError` on its first event. PHP ignores an argument that a user function does not declare,
   an internal one rejects it.
@@ -79,23 +83,25 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   so the failure points at the listener that failed.
 - Rejected: stripping `null` from `?A`: the dispatcher never passes `null`, a nullable type is a mistake
   of the listener. Rejected: rejecting intersections and DNF: in the normal form they cost nothing more.
-- Several listeners of one object are its methods marked `#[Listener]`, given by `listenersOf()`: an invokable object
-  with a `match` over the events hides what it listens to, a list of `$object->onX(...)` where the dispatcher
-  is built is far from the methods. Rejected: the constructor expanding a marked object by itself (an object
-  that is also invokable is ambiguous, and `iterable<callable>` stops being the truth), an interface that returns
-  `[$this->onX(...), ...]` (the list is again apart from the methods).
-- A marked method is public. Rejected: calling one that is not through `getClosure()`: the dispatcher calls it
-  from outside the class, so it is a part of the public contract, and reflection around the visibility hides that.
-- A marked method that is not public or no marked method is an error, not a skip: a forgotten mark otherwise
-  shows only as a listener that never runs. `ListenerRule` of `phpstan-extension` reports a mark on a method
-  that is not public or is abstract before it runs: `listenersOf()` never sees an abstract one,
-  the mark is not inherited by its implementations.
-- Rejected: caching the marked methods of a class in `listenersOf()`. It is called once per object where
-  a dispatcher is built, and the dispatcher reflects every closure again in `Listener::of()` without a cache:
-  a cache would save about 2 of 10 µs per object of 5 listeners, at the cost of a table of every class
-  kept forever. If building dispatchers per request becomes hot, the cache belongs to the whole of it.
-- The attribute `Listener` and `Internal\Listener` share the short name: they are the same notion,
-  the mark of a method and a listener with its parsed type, and the namespaces tell them apart.
+- Several listeners of one object are given by `Subscriber::listeners()`, and the object goes to the constructor
+  as it is, `new Dispatcher([$tool, $listener])`: where a dispatcher is built nobody has to know whether a listener
+  is one callable or several, and a class may change from one to the other without breaking its users.
+  A subscriber is never called itself, an invokable one too. Its listeners are private methods given by `yield`:
+  PHPStan checks each by the return type of `listeners()` and reports one that is not given as `method.unused`,
+  so the list apart from the methods is not a trap, and the listeners are not the public API of the class.
+  No listeners is not an error: a subscriber may listen to nothing by its settings.
+- Rejected: the methods marked `#[Listener]` of 0.3.0, found by reflection. A mark fits a container that scans
+  classes, not an object given by hand: it needed a rule of `phpstan-extension` for what PHP does not check
+  (public, not abstract, the dispatcher as the second parameter), and a forgotten mark showed only as a listener
+  that never runs. Rejected with it, the ways to give a marked object to the dispatcher:
+  `[...listenersOf(new BlockingDetector()), $print]` (it shows how a class is written wherever it is used,
+  and a tool that reports always stands next to a listener of its reports), a constructor that takes any `object`
+  and looks for the marks (`callable|object` takes a closure and an invokable object of any signature, PHPStan
+  stops checking them), an empty marker interface next to the marks (two declarations that can disagree).
+- Rejected: `withListener()` and `withSubscriber()` instead of the list: the types are precise, but where
+  a dispatcher is built one has to know again which of the two a class is. Rejected: an invokable object
+  with a `match` over the events (it hides what it listens to), a list of `$object->onX(...)` where the dispatcher
+  is built (far from the methods).
 - Rejected: `subscribe()` and unsubscribing of the older 0.2 (a mutable table, listeners added during a dispatch
   called in the same dispatch, only final classes). A listener that must stop is a check in the listener,
   a set that changes is a new dispatcher.

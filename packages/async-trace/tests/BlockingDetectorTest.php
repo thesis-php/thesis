@@ -15,7 +15,6 @@ use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\VirtualTime\advance;
-use function Thesis\Dispatcher\listenersOf;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -105,7 +104,7 @@ final class BlockingDetectorTest
             $reports[] = $report;
         };
         $start = Instant::now();
-        $dispatcher = new Dispatcher([...listenersOf(new BlockingDetector(threshold: ms(100))), $listener]);
+        $dispatcher = new Dispatcher([new BlockingDetector(threshold: ms(100)), $listener]);
         observe($dispatcher, static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
                 delay(sec(1));
@@ -122,7 +121,7 @@ final class BlockingDetectorTest
 
     public function listensToNoCancellations(): void
     {
-        $dispatcher = new Dispatcher(listenersOf(new BlockingDetector(threshold: ms(100))));
+        $dispatcher = new Dispatcher([new BlockingDetector(threshold: ms(100))]);
 
         Assert::false($dispatcher->listens(ScopeCancelled::class));
     }
@@ -148,7 +147,7 @@ final class BlockingDetectorTest
         $listener = static function (Blocked $report) use (&$reports) {
             $reports[] = (string) $report;
         };
-        observe(new Dispatcher([...listenersOf(new BlockingDetector(threshold: ms(50))), $listener]), $program);
+        observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $listener]), $program);
 
         return $reports;
     }

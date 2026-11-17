@@ -11,11 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A listener gets the dispatcher as its second argument, to dispatch events of its own:
   `static function (OrderPlaced $event, Dispatcher $dispatcher)`.
+- `Dispatcher\Subscriber`: an object with several listeners, given to the constructor among them:
+  `new Dispatcher([new Mailer(), $listener])`.
 
 ### Changed
 
 - **BC break:** A second parameter of a listener that does not take `Thesis\Dispatcher` gets it anyway
   and fails. Declare it after a parameter of the dispatcher.
+
+### Removed
+
+- **BC break:** `#[Dispatcher\Listener]` and `Dispatcher\listenersOf()`. Implement `Dispatcher\Subscriber`:
+  its `listeners()` gives them, `yield $this->onRegistered(...)`.
 
 ## [0.3.0] - 2026-11-17
 

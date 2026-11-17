@@ -30,7 +30,7 @@
         "php": "^8.5",
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
-        "thesis/dispatcher": "^0.3",
+        "thesis/dispatcher": "^0.4",
         "thesis/source-location": "^0.1",
         "thesis/time": "^0.3"
     },

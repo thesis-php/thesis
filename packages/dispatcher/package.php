@@ -9,7 +9,7 @@ use Thesis\Monorepo\Manifest;
 return new Manifest(
     description: 'Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class.',
     licenseSince: 2026,
-    version: '0.3',
+    version: '0.4',
     keywords: ['php', 'event-dispatcher', 'events'],
     require: [
         'thesis/formatter' => '*',

@@ -8,6 +8,3 @@ services:
     -
         class: Thesis\PhpstanExtension\Internal\MapReturnType
         tags: [phpstan.broker.dynamicFunctionReturnTypeExtension]
-
-rules:
-    - Thesis\PhpstanExtension\Internal\ListenerRule

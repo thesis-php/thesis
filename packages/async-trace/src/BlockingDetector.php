@@ -17,7 +17,7 @@ use Thesis\Async\Trace\TimeoutCreated;
 use Thesis\AsyncTrace\Internal\Describe;
 use Thesis\AsyncTrace\Internal\Run;
 use Thesis\Dispatcher;
-use Thesis\Dispatcher\Listener;
+use Thesis\Dispatcher\Subscriber;
 use Time\Duration;
 use function Thesis\Time\ns;
 use function Thesis\Time\toNs;
@@ -25,7 +25,7 @@ use function Thesis\Time\toNs;
 /**
  * Finds blocking code, the most common bug of async PHP: code of a task that runs longer than $threshold without
  * a wait, while no other task can run. Such a run gets a {@see Blocked} in the dispatcher of the trace when it ends,
- * with the waits around it. A method per event: `listenersOf(new BlockingDetector(threshold: ms(50)))`.
+ * with the waits around it. Give it to the dispatcher of the trace: `new Dispatcher([$detector, $listener])`.
  *
  * A run is of the event loop, not of a scope: one fiber runs at a time. It begins when a task starts or a wait
  * is over and ends at the next wait of any scope (a `timeout()` or a `shield()` waits in the fiber of its task),
@@ -39,7 +39,7 @@ use function Thesis\Time\toNs;
  *
  * @api
  */
-final class BlockingDetector
+final class BlockingDetector implements Subscriber
 {
     private readonly int $threshold;
 
@@ -74,60 +74,65 @@ final class BlockingDetector
         $this->threshold = toNs($threshold);
     }
 
-    #[Listener]
-    public function onGroupCreated(GroupCreated $event): void
+    #[\Override]
+    public function listeners(): iterable
+    {
+        yield $this->onGroupCreated(...);
+        yield $this->onTaskCreated(...);
+        yield $this->onTimeoutCreated(...);
+        yield $this->onShieldCreated(...);
+        yield $this->onTaskStarted(...);
+        yield $this->onSuspended(...);
+        yield $this->onResumed(...);
+        yield $this->onJoining(...);
+        yield $this->onEnded(...);
+    }
+
+    private function onGroupCreated(GroupCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
     }
 
-    #[Listener]
-    public function onTaskCreated(TaskCreated $event): void
+    private function onTaskCreated(TaskCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
         $this->tasks[$event->scope] = true;
     }
 
-    #[Listener]
-    public function onTimeoutCreated(TimeoutCreated $event): void
+    private function onTimeoutCreated(TimeoutCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
     }
 
-    #[Listener]
-    public function onShieldCreated(ShieldCreated $event): void
+    private function onShieldCreated(ShieldCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
     }
 
-    #[Listener]
-    public function onTaskStarted(TaskStarted $event): void
+    private function onTaskStarted(TaskStarted $event): void
     {
         $this->begin($event, 'the start of the task');
     }
 
-    #[Listener]
-    public function onSuspended(Suspended $event, Dispatcher $dispatcher): void
+    private function onSuspended(Suspended $event, Dispatcher $dispatcher): void
     {
         $wait = $event->caller === null ? 'a wait of unknown code' : (string) $event->caller;
         $this->end($event, $wait, $dispatcher);
         $this->waits[$event->scope] = $wait;
     }
 
-    #[Listener]
-    public function onResumed(Resumed $event): void
+    private function onResumed(Resumed $event): void
     {
         $this->begin($event, $this->waits[$event->scope] ?? 'a wait of unknown code');
         unset($this->waits[$event->scope]);
     }
 
-    #[Listener]
-    public function onJoining(Joining $event, Dispatcher $dispatcher): void
+    private function onJoining(Joining $event, Dispatcher $dispatcher): void
     {
         $this->end($event, 'the join of the group', $dispatcher);
     }
 
-    #[Listener]
-    public function onEnded(Ended $event, Dispatcher $dispatcher): void
+    private function onEnded(Ended $event, Dispatcher $dispatcher): void
     {
         if (isset($this->tasks[$event->scope])) {
             $this->end($event, 'the end of the task', $dispatcher);

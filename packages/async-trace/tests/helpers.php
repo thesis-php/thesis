@@ -6,18 +6,17 @@ namespace Thesis\AsyncTrace\Tests;
 
 use Thesis\Async\Trace\Event;
 use Thesis\Dispatcher;
-use function Thesis\Dispatcher\listenersOf;
+use Thesis\Dispatcher\Subscriber;
 
 /**
- * The events of the `@phpstan-sealed` list of `Event` that the dispatcher does not give to the listener.
+ * The events of the `@phpstan-sealed` list of `Event` that the dispatcher does not give to the subscriber.
  * PHPStan keeps that list complete: a class not in it cannot implement `Event`.
  *
- * @param object $subscriber with methods marked `#[Listener]`
  * @return list<string>
  */
-function unheardEvents(object $subscriber): array
+function unheardEvents(Subscriber $subscriber): array
 {
-    $dispatcher = new Dispatcher(listenersOf($subscriber));
+    $dispatcher = new Dispatcher([$subscriber]);
     $doc = new \ReflectionClass(Event::class)->getDocComment();
 
     if ($doc === false || preg_match('/@phpstan-sealed\h+(\S+)/', $doc, $matches) !== 1) {

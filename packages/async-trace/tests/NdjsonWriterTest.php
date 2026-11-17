@@ -19,7 +19,6 @@ use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
 use function Thesis\AsyncTrace\Tests\unheardEvents;
-use function Thesis\Dispatcher\listenersOf;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -206,7 +205,7 @@ final class NdjsonWriterTest
 
     public function takesNoEventOfNewerAsyncItDoesNotKnow(): void
     {
-        $dispatcher = new Dispatcher(listenersOf(new NdjsonWriter(self::memory('w+'), self::clock())));
+        $dispatcher = new Dispatcher([new NdjsonWriter(self::memory('w+'), self::clock())]);
 
         Assert::false($dispatcher->listens(Event::class));
     }
@@ -220,7 +219,7 @@ final class NdjsonWriterTest
     {
         $writer = new NdjsonWriter(self::memory('r'), self::clock());
 
-        $writer->onJoining(new Joining(scope: 1, at: Instant::now()));
+        new Dispatcher([$writer])->dispatch(new Joining(scope: 1, at: Instant::now()));
 
         Assert::same($writer->lost, 2);
     }
@@ -246,7 +245,7 @@ final class NdjsonWriterTest
     private static function write(callable $program): array
     {
         $stream = self::memory('w+');
-        observe(new Dispatcher(listenersOf(new NdjsonWriter($stream, self::clock()))), $program);
+        observe(new Dispatcher([new NdjsonWriter($stream, self::clock())]), $program);
 
         return self::read($stream);
     }

@@ -20,7 +20,6 @@ use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
-use function Thesis\Dispatcher\listenersOf;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
@@ -149,7 +148,7 @@ final class WhoCancelledTest
         };
         $start = Instant::now();
         $line = __LINE__ + 4;
-        $dispatcher = new Dispatcher([...listenersOf(new WhoCancelled()), $listener]);
+        $dispatcher = new Dispatcher([new WhoCancelled(), $listener]);
         observe($dispatcher, static fn() => group(static function (Group $group) {
             delay(sec(1));
             $group->spawn(static fn() => delay(sec(5)))->cancel();
@@ -175,7 +174,7 @@ final class WhoCancelledTest
             $order[] = 'CancelledBy #' . $report->scope;
         };
         observe(
-            dispatcher: new Dispatcher([$ended, ...listenersOf(new WhoCancelled()), $report]),
+            dispatcher: new Dispatcher([$ended, new WhoCancelled(), $report]),
             fn: static fn() => timeoutOr(sec(1), static fn() => delay(sec(5))),
         );
 
@@ -184,7 +183,7 @@ final class WhoCancelledTest
 
     public function listensToNoWaitsAndRuns(): void
     {
-        $dispatcher = new Dispatcher(listenersOf(new WhoCancelled()));
+        $dispatcher = new Dispatcher([new WhoCancelled()]);
 
         foreach ([TaskStarted::class, Suspended::class, Resumed::class, Joining::class] as $class) {
             Assert::false($dispatcher->listens($class));
@@ -221,7 +220,7 @@ final class WhoCancelledTest
         $listener = static function (CancelledBy $report) use (&$reports) {
             $reports[] = (string) $report;
         };
-        observe(new Dispatcher([...listenersOf(new WhoCancelled()), $listener]), $program);
+        observe(new Dispatcher([new WhoCancelled(), $listener]), $program);
 
         return $reports;
     }

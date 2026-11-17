@@ -7,7 +7,7 @@ use Thesis\Monorepo\Manifest;
 use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
-    description: 'PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot.',
+    description: 'PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'phpstan', 'phpstan-extension', 'static-analysis'],
@@ -16,7 +16,6 @@ return new Manifest(
     ],
     requireDev: [
         'thesis/async' => '*',
-        'thesis/dispatcher' => '*',
     ],
     skip: [
         new RectorSkip(

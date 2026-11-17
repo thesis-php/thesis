@@ -16,14 +16,14 @@ use Thesis\AsyncTrace\Internal\Cancellation;
 use Thesis\AsyncTrace\Internal\Describe;
 use Thesis\AsyncTrace\Internal\TracedScope;
 use Thesis\Dispatcher;
-use Thesis\Dispatcher\Listener;
+use Thesis\Dispatcher\Subscriber;
 
 /**
  * Tells what has cancelled a scope, which `Cancelled` itself does not: a scope that ends as cancelled
  * gets a {@see CancelledBy}, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()` and where
- * it is written, or the failure that has cancelled it. A method per event: `listenersOf($whoCancelled)`.
- * The report goes to the dispatcher of the trace, among its events: a listener of the reports stands next to it,
- * after the listeners of the events that should see an `Ended` before its report.
+ * it is written, or the failure that has cancelled it. Give it to the dispatcher of the trace,
+ * `new Dispatcher([$whoCancelled, $listener])`: the report goes there, among the events. A listener
+ * of the reports stands next to it, after the listeners of the events that should see an `Ended` before its report.
  *
  * It listens only to the scopes being created, cancelled and ended, not to the waits: those cost a backtrace each.
  * It keeps a short description of each live scope and forgets it when the scope ends. A failed task is kept
@@ -31,7 +31,7 @@ use Thesis\Dispatcher\Listener;
  *
  * @api
  */
-final class WhoCancelled
+final class WhoCancelled implements Subscriber
 {
     /**
      * @var array<positive-int, TracedScope>
@@ -45,8 +45,18 @@ final class WhoCancelled
      */
     private array $failed = [];
 
-    #[Listener]
-    public function onGroupCreated(GroupCreated $event): void
+    #[\Override]
+    public function listeners(): iterable
+    {
+        yield $this->onGroupCreated(...);
+        yield $this->onTaskCreated(...);
+        yield $this->onTimeoutCreated(...);
+        yield $this->onShieldCreated(...);
+        yield $this->onScopeCancelled(...);
+        yield $this->onEnded(...);
+    }
+
+    private function onGroupCreated(GroupCreated $event): void
     {
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
@@ -56,8 +66,7 @@ final class WhoCancelled
         );
     }
 
-    #[Listener]
-    public function onTaskCreated(TaskCreated $event): void
+    private function onTaskCreated(TaskCreated $event): void
     {
         $group = $this->scopes[$event->group] ?? null;
         $cancellation = null;
@@ -75,8 +84,7 @@ final class WhoCancelled
         );
     }
 
-    #[Listener]
-    public function onTimeoutCreated(TimeoutCreated $event): void
+    private function onTimeoutCreated(TimeoutCreated $event): void
     {
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
@@ -86,8 +94,7 @@ final class WhoCancelled
         );
     }
 
-    #[Listener]
-    public function onShieldCreated(ShieldCreated $event): void
+    private function onShieldCreated(ShieldCreated $event): void
     {
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
@@ -97,8 +104,7 @@ final class WhoCancelled
         );
     }
 
-    #[Listener]
-    public function onScopeCancelled(ScopeCancelled $event): void
+    private function onScopeCancelled(ScopeCancelled $event): void
     {
         $cancellation = new Cancellation(
             at: $event->at,
@@ -121,8 +127,7 @@ final class WhoCancelled
         }
     }
 
-    #[Listener]
-    public function onEnded(Ended $event, Dispatcher $dispatcher): void
+    private function onEnded(Ended $event, Dispatcher $dispatcher): void
     {
         $scope = $this->scopes[$event->scope] ?? null;
 

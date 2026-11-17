@@ -36,10 +36,7 @@
     "autoload": {
         "psr-4": {
             "Thesis\\": "src/"
-        },
-        "files": [
-            "src/Dispatcher/api.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
@@ -48,7 +45,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.3.x-dev"
+            "dev-main": "0.4.x-dev"
         }
     }
 }

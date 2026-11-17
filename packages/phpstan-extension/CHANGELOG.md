@@ -10,5 +10,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
-- A rule for `#[Thesis\Dispatcher\Listener]`: the marked method must be public, have a body and take
-  the dispatcher as its second parameter, if it has one.

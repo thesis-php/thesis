@@ -17,19 +17,19 @@ use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
 use Thesis\AsyncTrace\Internal\Seconds;
-use Thesis\Dispatcher\Listener;
+use Thesis\Dispatcher\Subscriber;
 use function Thesis\Formatter\formatValue;
 
 /**
  * Keeps every event of `Thesis\Async\Trace` as a line of text, `<seconds> #<scope> <what>`:
  * `1 #2 suspended in Thesis\Async\delay`. On virtual time the lines are the same on every run,
- * so a test compares them with what it expects. A method per event: `new Dispatcher(listenersOf($log))`.
+ * so a test compares them with what it expects. Give it to the dispatcher: `new Dispatcher([$log])`.
  *
  * The lines stay in memory, it is for a test or a short program, not for a process that lives long.
  *
  * @api
  */
-final class TextLog
+final class TextLog implements Subscriber
 {
     private const string ASYNC_NAMESPACE = 'Thesis\Async\\';
 
@@ -43,8 +43,22 @@ final class TextLog
      */
     private ?Instant $origin = null;
 
-    #[Listener]
-    public function onGroupCreated(GroupCreated $event): void
+    #[\Override]
+    public function listeners(): iterable
+    {
+        yield $this->onGroupCreated(...);
+        yield $this->onTaskCreated(...);
+        yield $this->onTimeoutCreated(...);
+        yield $this->onShieldCreated(...);
+        yield $this->onTaskStarted(...);
+        yield $this->onSuspended(...);
+        yield $this->onResumed(...);
+        yield $this->onScopeCancelled(...);
+        yield $this->onJoining(...);
+        yield $this->onEnded(...);
+    }
+
+    private function onGroupCreated(GroupCreated $event): void
     {
         $this->add(
             event: $event,
@@ -56,8 +70,7 @@ final class TextLog
         );
     }
 
-    #[Listener]
-    public function onTaskCreated(TaskCreated $event): void
+    private function onTaskCreated(TaskCreated $event): void
     {
         $this->add(
             event: $event,
@@ -69,8 +82,7 @@ final class TextLog
         );
     }
 
-    #[Listener]
-    public function onTimeoutCreated(TimeoutCreated $event): void
+    private function onTimeoutCreated(TimeoutCreated $event): void
     {
         $this->add(
             event: $event,
@@ -82,8 +94,7 @@ final class TextLog
         );
     }
 
-    #[Listener]
-    public function onShieldCreated(ShieldCreated $event): void
+    private function onShieldCreated(ShieldCreated $event): void
     {
         $this->add(
             event: $event,
@@ -93,26 +104,22 @@ final class TextLog
         );
     }
 
-    #[Listener]
-    public function onTaskStarted(TaskStarted $event): void
+    private function onTaskStarted(TaskStarted $event): void
     {
         $this->add($event, 'started');
     }
 
-    #[Listener]
-    public function onSuspended(Suspended $event): void
+    private function onSuspended(Suspended $event): void
     {
         $this->add($event, $event->caller === null ? 'suspended' : 'suspended in ' . $event->caller->callee);
     }
 
-    #[Listener]
-    public function onResumed(Resumed $event): void
+    private function onResumed(Resumed $event): void
     {
         $this->add($event, $event->error === null ? 'resumed' : 'resumed by ' . self::error($event->error));
     }
 
-    #[Listener]
-    public function onScopeCancelled(ScopeCancelled $event): void
+    private function onScopeCancelled(ScopeCancelled $event): void
     {
         $this->add($event, \sprintf(
             'cancelled: %s by %s%s, reached %s',
@@ -123,14 +130,12 @@ final class TextLog
         ));
     }
 
-    #[Listener]
-    public function onJoining(Joining $event): void
+    private function onJoining(Joining $event): void
     {
         $this->add($event, 'joining');
     }
 
-    #[Listener]
-    public function onEnded(Ended $event): void
+    private function onEnded(Ended $event): void
     {
         $this->add($event, $event->error === null
             ? 'returned ' . formatValue($event->value)

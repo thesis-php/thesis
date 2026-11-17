@@ -17,7 +17,7 @@ use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
-use Thesis\Dispatcher\Listener;
+use Thesis\Dispatcher\Subscriber;
 use Thesis\SourceLocation\Caller;
 use Thesis\SourceLocation\Location;
 use Thesis\Time\WallClock;
@@ -26,7 +26,7 @@ use function Thesis\Formatter\formatValue;
 use function Thesis\Time\toNs;
 
 /**
- * Writes every event of `Thesis\Async\Trace` to a stream as a line of JSON: `new Dispatcher(listenersOf($writer))`.
+ * Writes every event of `Thesis\Async\Trace` to a stream as a line of JSON: `new Dispatcher([$writer])`.
  * A header line `{"format":"thesis/async-trace","version":1,"start":...}` goes before the first event.
  * The values, the errors and the tasks are formatted at once, nothing of an event is kept.
  *
@@ -36,7 +36,7 @@ use function Thesis\Time\toNs;
  *
  * @api
  */
-final class NdjsonWriter
+final class NdjsonWriter implements Subscriber
 {
     public const int VERSION = 1;
     private const int FLAGS = JSON_THROW_ON_ERROR
@@ -65,8 +65,22 @@ final class NdjsonWriter
         private readonly ClockInterface $clock = new WallClock(),
     ) {}
 
-    #[Listener]
-    public function onGroupCreated(GroupCreated $event): void
+    #[\Override]
+    public function listeners(): iterable
+    {
+        yield $this->onGroupCreated(...);
+        yield $this->onTaskCreated(...);
+        yield $this->onTimeoutCreated(...);
+        yield $this->onShieldCreated(...);
+        yield $this->onTaskStarted(...);
+        yield $this->onSuspended(...);
+        yield $this->onResumed(...);
+        yield $this->onScopeCancelled(...);
+        yield $this->onJoining(...);
+        yield $this->onEnded(...);
+    }
+
+    private function onGroupCreated(GroupCreated $event): void
     {
         $this->write($event, 'GroupCreated', [
             'parent' => $event->parent,
@@ -77,8 +91,7 @@ final class NdjsonWriter
         ]);
     }
 
-    #[Listener]
-    public function onTaskCreated(TaskCreated $event): void
+    private function onTaskCreated(TaskCreated $event): void
     {
         $this->write($event, 'TaskCreated', [
             'group' => $event->group,
@@ -90,8 +103,7 @@ final class NdjsonWriter
         ]);
     }
 
-    #[Listener]
-    public function onTimeoutCreated(TimeoutCreated $event): void
+    private function onTimeoutCreated(TimeoutCreated $event): void
     {
         $this->write($event, 'TimeoutCreated', [
             'parent' => $event->parent,
@@ -101,8 +113,7 @@ final class NdjsonWriter
         ]);
     }
 
-    #[Listener]
-    public function onShieldCreated(ShieldCreated $event): void
+    private function onShieldCreated(ShieldCreated $event): void
     {
         $this->write($event, 'ShieldCreated', [
             'parent' => $event->parent,
@@ -111,26 +122,22 @@ final class NdjsonWriter
         ]);
     }
 
-    #[Listener]
-    public function onTaskStarted(TaskStarted $event): void
+    private function onTaskStarted(TaskStarted $event): void
     {
         $this->write($event, 'TaskStarted', []);
     }
 
-    #[Listener]
-    public function onSuspended(Suspended $event): void
+    private function onSuspended(Suspended $event): void
     {
         $this->write($event, 'Suspended', ['caller' => self::caller($event->caller)]);
     }
 
-    #[Listener]
-    public function onResumed(Resumed $event): void
+    private function onResumed(Resumed $event): void
     {
         $this->write($event, 'Resumed', ['error' => self::error($event->error)]);
     }
 
-    #[Listener]
-    public function onScopeCancelled(ScopeCancelled $event): void
+    private function onScopeCancelled(ScopeCancelled $event): void
     {
         $this->write($event, 'ScopeCancelled', [
             'cause' => $event->cause->name,
@@ -141,14 +148,12 @@ final class NdjsonWriter
         ]);
     }
 
-    #[Listener]
-    public function onJoining(Joining $event): void
+    private function onJoining(Joining $event): void
     {
         $this->write($event, 'Joining', []);
     }
 
-    #[Listener]
-    public function onEnded(Ended $event): void
+    private function onEnded(Ended $event): void
     {
         $this->write($event, 'Ended', [
             'value' => $event->error === null ? formatValue($event->value) : null,

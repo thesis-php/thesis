@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Dispatcher\Internal;
 
 use Thesis\Dispatcher;
+use Thesis\Dispatcher\Subscriber;
 use function Thesis\Formatter\formatReflectedFunction;
 use function Thesis\Formatter\formatReflectedParameter;
 
@@ -17,9 +18,31 @@ use function Thesis\Formatter\formatReflectedParameter;
 final readonly class Listener
 {
     /**
+     * A subscriber stands for its listeners, in their order. It is never a listener itself, an invokable one too.
+     *
+     * @param iterable<(callable(never, Dispatcher): void)|Subscriber> $listeners
+     * @return list<self>
+     * @throws \InvalidArgumentException
+     */
+    public static function all(iterable $listeners): array
+    {
+        $all = [];
+
+        foreach ($listeners as $listener) {
+            $callables = $listener instanceof Subscriber ? $listener->listeners() : [$listener];
+
+            foreach ($callables as $callable) {
+                $all[] = self::of($callable);
+            }
+        }
+
+        return $all;
+    }
+
+    /**
      * @param callable(never, Dispatcher): void $listener
      */
-    public static function of(callable $listener): self
+    private static function of(callable $listener): self
     {
         /** @var \Closure(object, Dispatcher): void $fn the parameter of the event is checked below */
         $fn = \Closure::fromCallable($listener);
