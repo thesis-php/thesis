@@ -41,13 +41,13 @@ jobs:
       - uses: actions/checkout@v6
       - run: make test
 
-  # Mutation testing of the released packages: the others join once their mutants are killed (agents/php.md).
+  # Mutation testing of the packages whose mutants are killed: the others join once they are (agents/php.md).
   infect:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: [dispatcher, exceptionally, formatter, source-location, time]
+        package: [cache, dispatcher, exceptionally, formatter, source-location, testo-plugin, time]
     steps:
       - uses: actions/checkout@v6
       - run: make infect P=${{ matrix.package }}
