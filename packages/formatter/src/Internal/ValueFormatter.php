@@ -21,34 +21,36 @@ final class ValueFormatter
     private const int MAX_STRING_CHARACTERS = 100;
     private const string IDENTIFIER = '/^[a-zA-Z_][a-zA-Z0-9_]*$/D';
 
-    private string $output = '';
-
     /**
      * @return non-empty-string
      */
     public static function format(mixed $value): string
     {
-        $formatter = new self();
-        $formatter->write($value, depth: 0);
-
         /** @var non-empty-string */
-        return $formatter->output;
+        return self::write($value, depth: 0, maxLength: self::MAX_LENGTH);
     }
 
-    private function __construct() {}
-
-    private function write(mixed $value, int $depth): void
+    /**
+     * @param int $maxLength what is left of MAX_LENGTH before this value, negative once it is used up
+     */
+    private static function write(mixed $value, int $depth, int $maxLength): string
     {
-        if (\is_array($value)) {
-            $kind = array_is_list($value) && $value !== [] ? 'list' : 'array';
-            $this->items($kind, $value, $depth);
-        } elseif (\is_object($value) && $value::class === \stdClass::class) {
-            $this->items('object', get_object_vars($value), $depth);
-        } elseif (\is_string($value)) {
-            $this->string($value);
-        } else {
-            $this->output .= self::single($value);
-        }
+        return match (true) {
+            \is_array($value) => self::items(
+                kind: array_is_list($value) && $value !== [] ? 'list' : 'array',
+                items: $value,
+                depth: $depth,
+                maxLength: $maxLength,
+            ),
+            \is_object($value) && $value::class === \stdClass::class => self::items(
+                kind: 'object',
+                items: get_object_vars($value),
+                depth: $depth,
+                maxLength: $maxLength,
+            ),
+            \is_string($value) => self::string($value, $maxLength),
+            default => self::single($value),
+        };
     }
 
     private static function single(mixed $value): string
@@ -69,56 +71,53 @@ final class ValueFormatter
      * @param 'list'|'array'|'object' $kind
      * @param array<mixed> $items
      */
-    private function items(string $kind, array $items, int $depth): void
+    private static function items(string $kind, array $items, int $depth, int $maxLength): string
     {
-        $this->output .= $kind . '{';
+        $output = $kind . '{';
 
         if ($items !== [] && $depth >= self::MAX_DEPTH) {
-            $this->output .= '...}';
-
-            return;
+            return $output . '...}';
         }
 
         $isFirst = true;
 
         foreach ($items as $key => $item) {
             if (!$isFirst) {
-                $this->output .= ', ';
+                $output .= ', ';
             }
 
-            if (\strlen($this->output) >= self::MAX_LENGTH) {
-                $this->output .= '...';
+            if (\strlen($output) >= $maxLength) {
+                $output .= '...';
 
                 break;
             }
 
             if ($kind !== 'list') {
-                $this->key($key);
-                $this->output .= ': ';
+                $output .= self::key($key, $maxLength - \strlen($output)) . ': ';
             }
 
-            $this->write($item, $depth + 1);
+            $output .= self::write($item, $depth + 1, $maxLength - \strlen($output));
             $isFirst = false;
         }
 
-        $this->output .= '}';
+        return $output . '}';
     }
 
-    private function key(int|string $key): void
+    private static function key(int|string $key, int $maxLength): string
     {
         if (\is_int($key) || preg_match(self::IDENTIFIER, $key) === 1) {
-            $this->output .= $key;
-        } else {
-            $this->string($key);
+            return (string) $key;
         }
+
+        return self::string($key, $maxLength);
     }
 
-    private function string(string $string): void
+    private static function string(string $string, int $maxLength): string
     {
-        $this->output .= StringFormatter::format(
+        return StringFormatter::format(
             string: $string,
             maxCharacters: self::MAX_STRING_CHARACTERS,
-            maxLength: max(0, self::MAX_LENGTH - \strlen($this->output)),
+            maxLength: max(0, $maxLength),
         );
     }
 }

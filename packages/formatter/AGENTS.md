@@ -10,7 +10,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - Formatting never fails and never grows without a bound: it runs while an error is reported, often on a value
   from outside. Every function takes any input of its native type and formats what it does not recognize
   as a value or a string literal (`formatFunction(42)` is `42()`), never asserts on it.
-- `formatValue()` writes into one buffer (`ValueFormatter::$output`): items stop once it reaches `MAX_LENGTH`,
+- `formatValue()` has one budget of `MAX_LENGTH` for the whole output: each part of `ValueFormatter` gets
+  what is left of it before the part (`$maxLength`) and returns its string, items stop once it is used up,
   and a string or a key gets only what is left of it, so the output goes past `MAX_LENGTH` by the punctuation
   around the last item (515 bytes in the tests) and by a name of a class or a closure, which do not come from
   outside. Nesting stops at `MAX_DEPTH`, which also ends cycles of objects and references.
@@ -47,6 +48,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   a zero-width character in an error message is more often a trap than an emoji.
 - A string is measured for the budget by its escaped length, a quote, a backslash and a dollar count as two
   bytes: the quoting is chosen after the cut, and one of the two quotings escapes them.
+- `ValueFormatter` is static: the only state of the old object-function was its output buffer, which told
+  how much of the budget was used, and the budget left is passed down as an `int` instead.
 - The limits are constants, not parameters: nobody has needed another one. A parameter would also promise
   an exact bound, which `MAX_LENGTH` is not.
 - `formatClass()` and `formatProperty()` take any string and `formatFunction()` any callable, string or pair
