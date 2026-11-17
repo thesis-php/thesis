@@ -6,7 +6,7 @@
 Fast binary I/O for PHP: an in-memory byte buffer with typed big/little-endian encoding and varints,
 minimal `Reader` / `Writer` / `Closer` interfaces for streams, and the streams themselves: non-blocking
 streams over PHP resources and stdio.
-Streams wait through [thesis/async](../async/README.md): every wait is cancelled by the task tree.
+Streams wait through [thesis/async](https://github.com/thesis-php/async): every wait is cancelled by the task tree.
 
 It is the byte layer for binary protocol implementations (AMQP, Kafka, protobuf, gRPC, NATS, ...):
 codecs work on a `Buffer`, connections move bytes between a `Buffer` and a socket.

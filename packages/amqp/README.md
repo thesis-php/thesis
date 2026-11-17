@@ -1,6 +1,6 @@
 # Thesis AMQP
 
-An AMQP 0.9.1 client for RabbitMQ on [thesis/async](../async/README.md): publisher confirms that block
+An AMQP 0.9.1 client for RabbitMQ on [thesis/async](https://github.com/thesis-php/async): publisher confirms that block
 until the broker has the message, consumers as iterators, reconnects with a backoff.
 
 > **Experimental.** The API is unstable.

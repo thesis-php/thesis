@@ -1,6 +1,6 @@
 # Thesis Net
 
-Non-blocking TCP and Unix sockets for [thesis/async](../async/README.md): TLS, an async DNS resolver,
+Non-blocking TCP and Unix sockets for [thesis/async](https://github.com/thesis-php/async): TLS, an async DNS resolver,
 Happy Eyeballs. The transport of protocol clients and servers (HTTP, Postgres, AMQP, NATS, ...).
 
 > **Experimental.** The API is unstable.
@@ -32,7 +32,7 @@ $in = new Buffer();
 $in->fill($socket, 7);
 ```
 
-`Socket` is a `Reader`, a `Writer` and a `Closer` of [thesis/io](../io/README.md): a protocol encodes into a `Buffer`
+`Socket` is a `Reader`, a `Writer` and a `Closer` of [thesis/io](https://github.com/thesis-php/io): a protocol encodes into a `Buffer`
 and flushes it, and fills a `Buffer` from the socket to decode.
 
 There is no timeout parameter anywhere. Every wait is a wait of thesis/async: it is cancelled with its scope,

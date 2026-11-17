@@ -105,14 +105,9 @@ What amphp has, then what thesis makes of it.
 
 - Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
   or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
-- Links between packages in a README (`[thesis/async](../async/README.md)` in `amqp`, `async`, `io`, `net`)
-  work only in the monorepo: the split repository and Packagist have no `../async`. Replace them all at once
-  with links to the repositories of the packages (`https://github.com/thesis-php/async`), and make `bin/monorepo`
-  check that a README links no path outside its package.
-- Register a new package on Packagist in `bin/monorepo github`, next to creating its repository: the release
-  assumes the package is there (`agents/releases.md`), and now it is added by hand before the first release.
-  It needs an API token of Packagist in the secrets of the monorepo and the webhook of the split repository,
-  so that a pushed tag updates the package. A reused name (`thesis/time`) is only checked, never re-registered.
+- Make `bin/monorepo` check that a README links no path outside its package (`../async/README.md`):
+  such a link works only in the monorepo, the split repository and Packagist have no `../async`.
+  A package links another by its repository: `https://github.com/thesis-php/async`.
 - A constant or a default value derived from simpler numbers is written as the computation, not its result:
   `1024 * 1024`, not `1_048_576`; `24 * 60 * 60` seconds, not `86_400`; `60 * NANOSECONDS_PER_SECOND`,
   not `60_000_000_000` (PHP folds it at compile time). A bare literal stays where the number itself is the meaning:

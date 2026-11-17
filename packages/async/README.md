@@ -81,7 +81,7 @@ $report = new Report($sales, $costs);
 `all()`, `allSettled()`, `race()`, `some()`, `map()` and `each()` cover most cases without a task handle. All of them are built on `group()`.
 
 `all()` keeps the keys but not a type per key: its signature is `array<K, callable(): T>` → `array<K, T>`,
-so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. With [`thesis/phpstan-extension`](../phpstan-extension/README.md)
+so the result above is typed as `array<'sales'|'costs', Sales|Costs>`. With [`thesis/phpstan-extension`](https://github.com/thesis-php/phpstan-extension)
 PHPStan gives it a type per key: `array{sales: Sales, costs: Costs}`, the same for `allSettled()`,
 and `all()` and `map()` of a list return a list.
 Without it, when the results have different types, spawn the tasks in a `group()` and await their handles:
@@ -220,7 +220,7 @@ try {
 ```
 
 Durations are `Time\Duration` of PHP 8.6 (a polyfill on 8.5), created with the functions of
-[`thesis/time`](../time/README.md): `ms(300)`, `sec(5)`, `minutes(1.5)`. The unit is in the code, not in a convention.
+[`thesis/time`](https://github.com/thesis-php/time): `ms(300)`, `sec(5)`, `minutes(1.5)`. The unit is in the code, not in a convention.
 
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,
 and an outer cancellation always outranks a deadline. A deadline that is zero or negative has already passed:
