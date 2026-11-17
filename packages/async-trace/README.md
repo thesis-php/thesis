@@ -76,20 +76,20 @@ of [thesis/formatter](https://github.com/thesis-php/formatter), an error is the 
 
 A line is for reading and comparing, not parsing: a tool reads the NDJSON.
 
-## `WhoCancelled`
+## `CancellationTracker`
 
-`Cancelled` carries nothing: a task that ends cancelled does not tell by whom. `WhoCancelled` does: each scope
-that ends as cancelled gets a `CancelledBy` report, with what has cancelled the scope and where it is written.
+`Cancelled` carries nothing: a task that ends cancelled does not tell by whom. `CancellationTracker` does: each scope
+that ends as cancelled gets a `CancelOrigin` report, with what has cancelled the scope and where it is written.
 The report goes to the same dispatcher as the events of the trace:
 
 ```php
-use Thesis\AsyncTrace\CancelledBy;
-use Thesis\AsyncTrace\WhoCancelled;
+use Thesis\AsyncTrace\CancelOrigin;
+use Thesis\AsyncTrace\CancellationTracker;
 
-$print = static function (CancelledBy $report) {
+$print = static function (CancelOrigin $report) {
     fwrite(STDERR, $report . "\n");
 };
-observe(new Dispatcher([new WhoCancelled(), $print]), $main);
+observe(new Dispatcher([new CancellationTracker(), $print]), $main);
 // #3 task 'fetch' at /app/src/main.php:12 is cancelled by the deadline of timeout 2s at /app/src/main.php:10
 ```
 
@@ -108,21 +108,21 @@ the reason of the cancellation it was created under. The report has the fields t
 It listens only to the scopes being created, cancelled and ended, not to the waits, which cost a backtrace each.
 It forgets a scope when the scope ends, fit for a process that lives long. A listener of the reports is called
 inside a listener of `observe()`, with the same rules: it must not throw or suspend the fiber. A report is dispatched
-at once, before the listeners that stand after `WhoCancelled` get the `Ended` that has caused it: put a writer
+at once, before the listeners that stand after `CancellationTracker` get the `Ended` that has caused it: put a writer
 of the events (`NdjsonWriter`, `TextLog`) before it to keep the end before the report.
 
 ## `BlockingDetector`
 
 Code that runs without a wait holds every other task: a synchronous call to a database, a long loop, a blocking
-`file_get_contents()`. `BlockingDetector` reports each run longer than its threshold as `Blocked`, with the waits
+`file_get_contents()`. `BlockingDetector` reports each run longer than its threshold as `BlockingRun`, with the waits
 around it, to the same dispatcher as the events:
 
 ```php
-use Thesis\AsyncTrace\Blocked;
+use Thesis\AsyncTrace\BlockingRun;
 use Thesis\AsyncTrace\BlockingDetector;
 use function Thesis\Time\ms;
 
-$print = static function (Blocked $report) {
+$print = static function (BlockingRun $report) {
     fwrite(STDERR, $report . "\n");
 };
 observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $print]), $main);

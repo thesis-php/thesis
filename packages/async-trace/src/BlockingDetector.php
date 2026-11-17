@@ -25,8 +25,9 @@ use function Thesis\Time\toNs;
 
 /**
  * Finds blocking code, the most common bug of async PHP: code of a task that runs longer than $threshold without
- * a wait, while no other task can run. Such a run gets a {@see Blocked} in the dispatcher of the trace when it ends,
- * with the waits around it. Give it to the dispatcher of the trace: `new Dispatcher([$detector, $listener])`.
+ * a wait, while no other task can run. Such a run gets a {@see BlockingRun} in the dispatcher of the trace
+ * when it ends, with the waits around it. Give it to the dispatcher of the trace:
+ * `new Dispatcher([$detector, $listener])`.
  *
  * A run is of the event loop, not of a scope: one fiber runs at a time. It begins when a task starts, a wait
  * is over, the join of a group is over, or a group, a `timeout()` or a `shield()` is created in the root scope,
@@ -229,7 +230,7 @@ final class BlockingDetector implements Subscriber
         $duration = toNs($event->at->since($run->at));
 
         if ($duration > $this->threshold) {
-            $dispatcher->dispatch(new Blocked(
+            $dispatcher->dispatch(new BlockingRun(
                 scope: $run->scope,
                 what: $run->what,
                 at: $run->at,

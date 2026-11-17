@@ -11,7 +11,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A listener only observes (`observe()` of thesis/async): `NdjsonWriter` and `TextLog` never throw (a failed write
   is counted in `$lost`), never suspend (a synchronous `fwrite()`, no thesis/io), and keep nothing of an event but
   the `Instant` of the first one: a value, an error and a task are formatted inside the method of the event.
-  A tool (`WhoCancelled`) keeps only strings, numbers and `Instant`s, and only of live scopes: a process that
+  A tool (`CancellationTracker`) keeps only strings, numbers and `Instant`s, and only of live scopes: a process that
   lives long must not grow with it.
 - The NDJSON is the base every other tool reads, and `README.md` is its specification: a change of the format
   changes the table there in the same commit. A field added or an event added keeps `VERSION`, a field removed
@@ -30,7 +30,7 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   by `yield` in `listeners()`. PHPStan reports one that is not given as unused, and they are not the API
   of the class: a test gives the object to a dispatcher and dispatches the event.
 - A tool listens only to the events it needs: `observe()` does not build an event nobody gets, and `Suspended`
-  and `Resumed` cost a backtrace per wait. `WhoCancelled` never listens to the waits (`listensToNoWaitsAndRuns`).
+  and `Resumed` cost a backtrace per wait. `CancellationTracker` never listens to the waits (`listensToNoWaitsAndRuns`).
 - A tool reports to the dispatcher of the trace that holds it, the second argument of its listener
   (`onEnded(Ended $event, Dispatcher $dispatcher)`), a class per finding under the sealed `Report`.
   A report holds only formatted values, so its listener may keep it. It is dispatched inside a listener
@@ -67,11 +67,17 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A location is `{file, line}` of the full path, not `"file:line"` (a reader would split it, and a path may hold
   `:`) and not `Location::$shortFile` (it depends on the root of the project that writes the trace).
 - Reports go to the dispatcher of the trace, among the events: one dispatcher is built for a program, a listener
-  takes the reports of its type (`CancelledBy` alone), and a tool may listen to the reports of another one.
+  takes the reports of its type (`CancelOrigin` alone), and a tool may listen to the reports of another one.
   The price: a report is dispatched before the listeners after the tool get the event that has caused it.
   Rejected: a dispatcher of reports given to the constructor of a tool, two dispatchers to build and one more
   argument per tool. Rejected: a `callable(Report): void`, no routing by type and no `listens()`.
-- `WhoCancelled` reports when a scope ends as cancelled, not when it is cancelled: the question is asked when
+- A report is a noun of what is found (`CancelOrigin`, `BlockingRun`, `LongWait`), never a participle: the events
+  of the same dispatcher are participles (`ScopeCancelled`). A tool is named by its role: a `Detector` applies
+  a threshold, the `Tracker` explains every cancelled scope. Rejected: `Blocked`, which elsewhere means waiting
+  (`Thread.State.BLOCKED`, Go's block profile); `Cancellation` and `CancelReason`, next to `Cancelled`,
+  `CancelCause`, `Amp\Cancellation` and the field `reason`; `Stall`/`Hang`, synonyms that do not tell the CPU
+  from the wait; `Who*` tools; a `Report` suffix, which events do not have either.
+- `CancellationTracker` reports when a scope ends as cancelled, not when it is cancelled: the question is asked when
   `Cancelled` comes out, and then the scope is known whole. A scope under a shield that never ends gets nothing.
   The reason is formatted at `ScopeCancelled`, while the scope that has cancelled is alive, and shared by every
   scope it has reached. Trap: a task that fails ends before its group is cancelled by its failure, so a failed task

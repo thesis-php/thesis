@@ -12,7 +12,7 @@ use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TimeoutCreated;
-use Thesis\AsyncTrace\Internal\Cancellation;
+use Thesis\AsyncTrace\Internal\Cause;
 use Thesis\AsyncTrace\Internal\Describe;
 use Thesis\AsyncTrace\Internal\TracedScope;
 use Thesis\Dispatcher;
@@ -20,9 +20,9 @@ use Thesis\Dispatcher\Subscriber;
 
 /**
  * Tells what has cancelled a scope, which `Cancelled` itself does not: a scope that ends as cancelled
- * gets a {@see CancelledBy}, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()` and where
+ * gets a {@see CancelOrigin}, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()` and where
  * it is written, or the failure that has cancelled it. Give it to the dispatcher of the trace,
- * `new Dispatcher([$whoCancelled, $listener])`: the report goes there, among the events. A listener
+ * `new Dispatcher([$tracker, $listener])`: the report goes there, among the events. A listener
  * of the reports stands next to it, after the listeners of the events that should see an `Ended` before its report.
  *
  * It listens only to the scopes being created, cancelled and ended, not to the waits: those cost a backtrace each.
@@ -31,7 +31,7 @@ use Thesis\Dispatcher\Subscriber;
  *
  * @api
  */
-final class WhoCancelled implements Subscriber
+final class CancellationTracker implements Subscriber
 {
     /**
      * @var array<positive-int, TracedScope>
@@ -62,25 +62,25 @@ final class WhoCancelled implements Subscriber
             what: Describe::scope($event),
             parent: $event->parent,
             task: false,
-            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+            cause: $event->cancelled ? $this->causeOf($event->parent) : null,
         );
     }
 
     private function onTaskCreated(TaskCreated $event): void
     {
         $group = $this->scopes[$event->group] ?? null;
-        $cancellation = null;
+        $cause = null;
 
         if ($event->cancelled && $group !== null) {
-            $cancellation = ($event->daemon ? $group->daemonsCancellation : $group->tasksCancellation)
-                ?? $group->cancellation;
+            $cause = ($event->daemon ? $group->daemonsCause : $group->tasksCause)
+                ?? $group->cause;
         }
 
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
             parent: $event->group,
             task: true,
-            cancellation: $cancellation,
+            cause: $cause,
         );
     }
 
@@ -90,7 +90,7 @@ final class WhoCancelled implements Subscriber
             what: Describe::scope($event),
             parent: $event->parent,
             task: false,
-            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+            cause: $event->cancelled ? $this->causeOf($event->parent) : null,
         );
     }
 
@@ -100,29 +100,29 @@ final class WhoCancelled implements Subscriber
             what: Describe::scope($event),
             parent: $event->parent,
             task: false,
-            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+            cause: $event->cancelled ? $this->causeOf($event->parent) : null,
         );
     }
 
     private function onScopeCancelled(ScopeCancelled $event): void
     {
-        $cancellation = new Cancellation(
+        $cause = new Cause(
             at: $event->at,
-            cause: $event->cause,
+            kind: $event->cause,
             by: $event->by,
             reason: $this->reason($event),
         );
         $scope = $this->scopes[$event->scope] ?? null;
 
         if ($scope !== null && $event->cause === CancelCause::CancelTasks) {
-            $scope->tasksCancellation = $cancellation;
+            $scope->tasksCause = $cause;
         } elseif ($scope !== null && $event->cause === CancelCause::DaemonsAfterTasks) {
-            $scope->daemonsCancellation = $cancellation;
+            $scope->daemonsCause = $cause;
         }
 
         foreach ($event->reached as $reached) {
             if (isset($this->scopes[$reached])) {
-                $this->scopes[$reached]->cancellation ??= $cancellation;
+                $this->scopes[$reached]->cause ??= $cause;
             }
         }
     }
@@ -142,16 +142,16 @@ final class WhoCancelled implements Subscriber
         }
 
         $error = $event->error;
-        $cancellation = $scope->cancellation;
+        $cause = $scope->cause;
 
-        if ($error instanceof Cancelled && $cancellation !== null) {
-            $dispatcher->dispatch(new CancelledBy(
+        if ($error instanceof Cancelled && $cause !== null) {
+            $dispatcher->dispatch(new CancelOrigin(
                 scope: $event->scope,
                 what: $scope->what,
-                at: $cancellation->at,
-                cause: $cancellation->cause,
-                by: $cancellation->by,
-                reason: $cancellation->reason,
+                at: $cause->at,
+                cause: $cause->kind,
+                by: $cause->by,
+                reason: $cause->reason,
             ));
 
             return;
@@ -168,9 +168,9 @@ final class WhoCancelled implements Subscriber
     /**
      * @param ?positive-int $parent
      */
-    private function cancellationOf(?int $parent): ?Cancellation
+    private function causeOf(?int $parent): ?Cause
     {
-        return $parent === null ? null : $this->scopes[$parent]->cancellation ?? null;
+        return $parent === null ? null : $this->scopes[$parent]->cause ?? null;
     }
 
     /**

@@ -15,7 +15,7 @@ use Time\Duration;
  *
  * @api
  */
-final readonly class Blocked implements Report
+final readonly class BlockingRun implements Report
 {
     /**
      * @param positive-int $scope the scope whose code has woken up and run

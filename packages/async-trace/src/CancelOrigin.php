@@ -13,7 +13,7 @@ use Thesis\Async\Trace\CancelCause;
  *
  * @api
  */
-final readonly class CancelledBy implements Report
+final readonly class CancelOrigin implements Report
 {
     /**
      * @param positive-int $scope

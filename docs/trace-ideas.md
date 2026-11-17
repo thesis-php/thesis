@@ -69,8 +69,9 @@ of the losses: the program never slows down for its observer.
   is not seen, that is the dump.
 - **A watchdog of long waits**: done, `LongWaitDetector` of thesis/async-trace, a wait that lasts a threshold
   reported once with its caller, from an unreferenced timer of the loop outside the tree.
-- **Who has cancelled me**: done, `WhoCancelled` of thesis/async-trace, to the first cause: the deadline, the call
-  of `Task::cancel()` or `Group::cancelTasks()` (`ScopeCancelled::$caller`), the failure (`ScopeCancelled::$error`).
+- **Who has cancelled me**: done, `CancellationTracker` of thesis/async-trace, to the first cause: the deadline,
+  the call of `Task::cancel()` or `Group::cancelTasks()` (`ScopeCancelled::$caller`), the failure
+  (`ScopeCancelled::$error`).
   A chain of causes (a task failed by the `TaskCancelled` of another one) is not followed yet.
 
 ### The course and understanding concurrency
@@ -105,7 +106,7 @@ of the losses: the program never slows down for its observer.
 ## Order
 
 1. The tools of debugging first, each with the part of the model of the state it needs, instead of a model designed
-   ahead of its users: who has cancelled me (done, `WhoCancelled`), the detector of blocking code
+   ahead of its users: who has cancelled me (done, `CancellationTracker`), the detector of blocking code
    (done, `BlockingDetector`), the watchdog of long waits (done, `LongWaitDetector`). Done before: the NDJSON record (`NdjsonWriter`)
    and the text format (`TextLog`).
 2. The export to Perfetto: the course and debugging for a small price.
@@ -119,7 +120,7 @@ of the losses: the program never slows down for its observer.
 
 thesis/async keeps only the events, the tools go to thesis/async-trace, with a `bin/` for the reports and `top` later.
 A tool reports to the dispatcher of the trace that holds it, the second argument of a listener (`Report`,
-`CancelledBy`): a listener takes the reports of its type, under the rules of a listener of `observe()`.
+`CancelOrigin`): a listener takes the reports of its type, under the rules of a listener of `observe()`.
 
 ## To discuss next
 

@@ -24,7 +24,7 @@ use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
 #[Test]
-final class WhoCancelledTest
+final class CancellationTrackerTest
 {
     public function reportsDeadlineToEveryScopeItHasReached(): void
     {
@@ -141,21 +141,21 @@ final class WhoCancelledTest
 
     public function givesStructuredReport(): void
     {
-        /** @var list<CancelledBy> $reports */
+        /** @var list<CancelOrigin> $reports */
         $reports = [];
-        $listener = static function (CancelledBy $report) use (&$reports) {
+        $listener = static function (CancelOrigin $report) use (&$reports) {
             $reports[] = $report;
         };
         $start = Instant::now();
         $line = __LINE__ + 4;
-        $dispatcher = new Dispatcher([new WhoCancelled(), $listener]);
+        $dispatcher = new Dispatcher([new CancellationTracker(), $listener]);
         observe($dispatcher, static fn() => group(static function (Group $group) {
             delay(sec(1));
             $group->spawn(static fn() => delay(sec(5)))->cancel();
         }));
 
         $report = $reports[0] ?? null;
-        Assert::instanceOf($report, CancelledBy::class);
+        Assert::instanceOf($report, CancelOrigin::class);
         Assert::same($report->scope, 2);
         Assert::same($report->by, 1);
         Assert::same($report->cause, CancelCause::Handle);
@@ -170,20 +170,20 @@ final class WhoCancelledTest
         $ended = static function (Ended $event) use (&$order) {
             $order[] = 'Ended #' . $event->scope;
         };
-        $report = static function (CancelledBy $report) use (&$order) {
-            $order[] = 'CancelledBy #' . $report->scope;
+        $report = static function (CancelOrigin $report) use (&$order) {
+            $order[] = 'CancelOrigin #' . $report->scope;
         };
         observe(
-            dispatcher: new Dispatcher([$ended, new WhoCancelled(), $report]),
+            dispatcher: new Dispatcher([$ended, new CancellationTracker(), $report]),
             fn: static fn() => timeoutOr(sec(1), static fn() => delay(sec(5))),
         );
 
-        Assert::same($order, ['Ended #1', 'CancelledBy #1']);
+        Assert::same($order, ['Ended #1', 'CancelOrigin #1']);
     }
 
     public function listensToNoWaitsAndRuns(): void
     {
-        $dispatcher = new Dispatcher([new WhoCancelled()]);
+        $dispatcher = new Dispatcher([new CancellationTracker()]);
 
         foreach ([TaskStarted::class, Suspended::class, Resumed::class, Joining::class] as $class) {
             Assert::false($dispatcher->listens($class));
@@ -217,10 +217,10 @@ final class WhoCancelledTest
     {
         /** @var list<string> $reports */
         $reports = [];
-        $listener = static function (CancelledBy $report) use (&$reports) {
+        $listener = static function (CancelOrigin $report) use (&$reports) {
             $reports[] = (string) $report;
         };
-        observe(new Dispatcher([new WhoCancelled(), $listener]), $program);
+        observe(new Dispatcher([new CancellationTracker(), $listener]), $program);
 
         return $reports;
     }

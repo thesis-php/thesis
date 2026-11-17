@@ -190,9 +190,9 @@ final class BlockingDetectorTest
 
     public function givesStructuredReport(): void
     {
-        /** @var list<Blocked> $reports */
+        /** @var list<BlockingRun> $reports */
         $reports = [];
-        $listener = static function (Blocked $report) use (&$reports) {
+        $listener = static function (BlockingRun $report) use (&$reports) {
             $reports[] = $report;
         };
         $start = Instant::now();
@@ -205,7 +205,7 @@ final class BlockingDetectorTest
         }));
 
         $report = $reports[0] ?? null;
-        Assert::instanceOf($report, Blocked::class);
+        Assert::instanceOf($report, BlockingRun::class);
         Assert::same($report->scope, 2);
         Assert::same(toNs($report->at->since($start)), 1_000_000_000);
         Assert::same(toNs($report->duration), 250_000_000);
@@ -236,7 +236,7 @@ final class BlockingDetectorTest
     {
         /** @var list<string> $reports */
         $reports = [];
-        $listener = static function (Blocked $report) use (&$reports) {
+        $listener = static function (BlockingRun $report) use (&$reports) {
             $reports[] = (string) $report;
         };
         observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $listener]), $program);

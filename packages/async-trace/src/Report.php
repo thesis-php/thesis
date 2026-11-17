@@ -12,7 +12,7 @@ use Thesis\Async\Instant;
  * A listener of the reports runs inside a listener of `observe()`: it must not throw or suspend the fiber.
  *
  * @api
- * @phpstan-sealed CancelledBy|Blocked|LongWait
+ * @phpstan-sealed CancelOrigin|BlockingRun|LongWait
  */
 interface Report extends \Stringable
 {
