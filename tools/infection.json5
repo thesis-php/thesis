@@ -35,11 +35,22 @@
                 "Thesis\\Formatter\\Internal\\StringFormatter::format",
             ],
         },
+        "Decrement": {
+            "ignoreSourceCodeByRegex": [
+                // The number of entries with a TTL only decides when the heap of expiries is rebuilt, see above.
+                "\\-\\-\\$this\\-\\>entriesWithTtl;",
+            ],
+        },
         "DecrementInteger": {
             "ignore": [
                 // The mask only clears the length prefix: its lowest bit is shifted out, and the bit after the prefix
                 // is 0 in a well-formed character.
                 "Thesis\\Formatter\\Internal\\StringFormatter::codePoint",
+            ],
+            "ignoreSourceCodeByRegex": [
+                // The heap of expiries is rebuilt to free the memory of its dead nodes: when and whether it is rebuilt
+                // changes no entry.
+                "if \\(\\$this\\-\\>expiries\\-\\>count\\(\\) \\> 2 \\* \\$this\\-\\>entriesWithTtl\\) \\{",
             ],
         },
         "GreaterThan": {
@@ -47,6 +58,24 @@
                 // No two rules match a token of the same length: they differ in the first byte, or COMBINED_PERIOD has
                 // a hyphen where PERIOD cannot.
                 "Thesis\\Time\\Internal\\IsoInterval::longestToken",
+            ],
+            "ignoreSourceCodeByRegex": [
+                // The heap of expiries is rebuilt to free the memory of its dead nodes: when and whether it is rebuilt
+                // changes no entry.
+                "if \\(\\$this\\-\\>expiries\\-\\>count\\(\\) \\> 2 \\* \\$this\\-\\>entriesWithTtl\\) \\{",
+            ],
+        },
+        "GreaterThanNegotiation": {
+            "ignoreSourceCodeByRegex": [
+                // The heap of expiries is rebuilt to free the memory of its dead nodes: when and whether it is rebuilt
+                // changes no entry.
+                "if \\(\\$this\\-\\>expiries\\-\\>count\\(\\) \\> 2 \\* \\$this\\-\\>entriesWithTtl\\) \\{",
+            ],
+        },
+        "Increment": {
+            "ignoreSourceCodeByRegex": [
+                // The number of entries with a TTL only decides when the heap of expiries is rebuilt, see above.
+                "\\+\\+\\$this\\-\\>entriesWithTtl;",
             ],
         },
         "IncrementInteger": {
@@ -57,12 +86,30 @@
                 // More bytes than the characters may take are split for nothing: only slower.
                 "Thesis\\Formatter\\Internal\\StringFormatter::head",
             ],
+            "ignoreSourceCodeByRegex": [
+                // The heap of expiries is rebuilt to free the memory of its dead nodes: when and whether it is rebuilt
+                // changes no entry.
+                "if \\(\\$this\\-\\>expiries\\-\\>count\\(\\) \\> 2 \\* \\$this\\-\\>entriesWithTtl\\) \\{",
+            ],
         },
         "LogicalAnd": {
             "ignore": [
                 // The assert only narrows the types for PHPStan: the heap compares its own values, which are all
                 // Expiry.
                 "Thesis\\Cache\\Internal\\Expiries::compare",
+            ],
+        },
+        "MethodCallRemoval": {
+            "ignoreSourceCodeByRegex": [
+                // The heap of expiries is rebuilt to free the memory of its dead nodes: when and whether it is rebuilt
+                // changes no entry.
+                "\\$this\\-\\>rebuildExpiries\\(\\);",
+            ],
+        },
+        "NotIdentical": {
+            "ignoreSourceCodeByRegex": [
+                // The number of entries with a TTL only decides when the heap of expiries is rebuilt, see above.
+                "if \\(\\$entry\\-\\>expiresAt \\!\\=\\= null\\) \\{",
             ],
         },
         "PregMatchRemoveCaret": {

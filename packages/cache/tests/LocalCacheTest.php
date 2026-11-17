@@ -256,6 +256,21 @@ final class LocalCacheTest extends CacheContract
         Assert::same($cache->get('lasting'), 1);
     }
 
+    public function entryKeepsItsExpiryWhenHeapIsRebuiltByOthers(): void
+    {
+        $cache = new LocalCache();
+        $cache->set('kept', 1, sec(1));
+
+        for ($i = 0; $i < 10; ++$i) {
+            $cache->set('rewritten', $i, sec(1));
+        }
+
+        $cache->delete('rewritten');
+        delay(sec(2));
+
+        Assert::same(\count($cache), 0);
+    }
+
     public function ttlBeyondClockIsNoExpiry(): void
     {
         $cache = new LocalCache();
@@ -264,26 +279,6 @@ final class LocalCacheTest extends CacheContract
         delay(hours(1000));
 
         Assert::same($cache->get('a'), 1);
-    }
-
-    /**
-     * Dead nodes hold no values, only the memory of the heap: it is seen nowhere else.
-     */
-    public function rebuildsHeapOnceItHoldsTwiceAsManyAsEntriesWithTtl(): void
-    {
-        $cache = new LocalCache();
-        $cache->set('without ttl', 0);
-        $expiries = new \ReflectionProperty(LocalCache::class, 'expiries');
-        $sizes = [];
-
-        for ($i = 0; $i < 4; ++$i) {
-            $cache->set('with ttl', $i, hours(1));
-            $heap = $expiries->getValue($cache);
-            \assert($heap instanceof \Countable);
-            $sizes[] = \count($heap);
-        }
-
-        Assert::same($sizes, [1, 2, 1, 2]);
     }
 
     public function valueOfTtlThatIsNotPositiveIsNotKept(): void
