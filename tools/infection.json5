@@ -22,6 +22,11 @@
     "phpUnit": {
         "configDir": "..",
     },
+    // A mutant that hangs a test (an endless loop, an event loop that never ends) waits out the timeout, and most
+    // of the timeouts of thesis/async are such hangs: the default of 10 s took two thirds of its run. A timeout counts
+    // as killed, so it stays above the slowest honest run: a mutant of the core of async runs nearly all its tests,
+    // the suites of io and net take about 4 s on real time, CI is slower and runs the mutants in parallel.
+    "timeout": 5,
     // A mutant is killed by a test or skipped with the reason, none is left to a percentage.
     "minMsi": 100,
     "minCoveredMsi": 100,
