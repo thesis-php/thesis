@@ -32,11 +32,11 @@ final readonly class QueueBind implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $queue = readShortString($buffer);
-        $exchange = readShortString($buffer);
-        $routingKey = readShortString($buffer);
+        $queue = Fields::readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
         $bit = $buffer->readUint8();
-        $arguments = readTable($buffer);
+        $arguments = Fields::readTable($buffer);
 
         return new self(
             queue: $queue,
@@ -51,10 +51,10 @@ final readonly class QueueBind implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->queue);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->routingKey);
+        Fields::writeShortString($buffer, $this->queue);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->routingKey);
         $buffer->writeUint8($this->noWait ? 0b00000001 : 0);
-        writeTable($buffer, $this->arguments);
+        Fields::writeTable($buffer, $this->arguments);
     }
 }

@@ -28,7 +28,7 @@ final readonly class QueueDelete implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $queue = readShortString($buffer);
+        $queue = Fields::readShortString($buffer);
         $bits = $buffer->readUint8();
 
         return new self(
@@ -43,7 +43,7 @@ final readonly class QueueDelete implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->queue);
+        Fields::writeShortString($buffer, $this->queue);
         $buffer->writeUint8(
             ($this->ifUnused ? 0b00000001 : 0)
             | ($this->ifEmpty ? 0b00000010 : 0)

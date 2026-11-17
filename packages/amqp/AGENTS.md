@@ -14,15 +14,16 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   on a slow consumer would stop heartbeats, confirms and every other channel of the connection. It writes only
   the replies the protocol requires (close-ok, cancel-ok, flow-ok); a `ConnectionClosed` of such a write
   is caught in `run()`, which never throws.
-- `src/Internal/Protocol/*` (except `Method`, `ProtocolError`, `internal.php`) and `src/ReplyCode.php` are generated:
+- `src/Internal/Protocol/*` (except `Method`, `ProtocolError`, `Fields`) and `src/ReplyCode.php` are generated:
   change `codegen/generate.php` and run `php packages/amqp/codegen/generate.php`. `CodegenTest` fails on a stale file.
   The generated code passes the fixer as it is: a change of the generator is checked with `make fixer P=amqp`.
 - A synchronous method holds `callMutex` until its reply arrives, even if the caller is cancelled meanwhile:
   the reply still comes, and the next call must not take it for its own. The reader releases the lock
   (`Internal\PendingCall`).
 - Confirm tags are assigned (`Internal\Confirms`) and the frames written under `publishMutex` of `Channel`,
-  in one order, after `ensureOpen()` inside the mutex: the wait for it may outlive the channel. The `Deferred` of each confirm is taken when its tag
-  is assigned, never looked up after the write: the reader may settle and forget it while a large write waits.
+  in one order, after `ensureOpen()` inside the mutex: the wait for it may outlive the channel.
+  The `Deferred` of each confirm is taken when its tag is assigned, never looked up after the write:
+  the reader may settle and forget it while a large write waits.
   A write that throws with the connection intact (nothing went out) gives its tags back; once a byte went out,
   net closes the socket.
 - `$settledUpTo` is the highest tag settled with `multiple`: a later ack of a lower tag is dropped,
@@ -58,8 +59,6 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   declarations, it hides errors and repeats them in an order the application does not control.
 - Removed from the API of the older thesis/amqp: `noWait`, `immediate` (RabbitMQ rejects it), bcmath for decimals,
   `Config::fromArray()`, its own time span type (`Time\Duration` instead).
-- `MethodTest` skips the lowercase files of `src/Internal/Protocol`: `class_exists('decodeMethod')` includes the file
-  of functions a second time and redeclares them.
 - The fake broker of the tests (`FakeServer`, `FakePeer`) speaks the protocol over a real local TCP socket,
   so `Client` is tested end to end. Heartbeat tests run on `#[VirtualTime]` of thesis/testo-plugin.
   `tests/Integration` checks against the RabbitMQ of `compose.yaml` what a fake cannot: the semantics of the broker.

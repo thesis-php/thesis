@@ -24,7 +24,7 @@ final readonly class ConnectionSecure implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $challenge = readLongString($buffer);
+        $challenge = Fields::readLongString($buffer);
 
         return new self(challenge: $challenge);
     }
@@ -32,6 +32,6 @@ final readonly class ConnectionSecure implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeLongString($buffer, $this->challenge);
+        Fields::writeLongString($buffer, $this->challenge);
     }
 }

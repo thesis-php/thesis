@@ -20,10 +20,10 @@ use Thesis\Amqp\Internal\Protocol\ConnectionStartOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionTune;
 use Thesis\Amqp\Internal\Protocol\ConnectionTuneOk;
 use Thesis\Amqp\Internal\Protocol\Method;
+use Thesis\Amqp\Internal\Protocol\Methods;
 use Thesis\Io\Buffer;
 use Thesis\Net\Socket;
 use function Thesis\Amqp\Internal\message;
-use function Thesis\Amqp\Internal\Protocol\decodeMethod;
 
 /**
  * The broker side of one connection: reads the frames of the client and sends those a test scripts.
@@ -156,7 +156,7 @@ final readonly class FakePeer
             Assert::same($this->in->readUint8(), Frames::END);
 
             $frame = match ($type) {
-                Frames::METHOD => decodeMethod($payload),
+                Frames::METHOD => Methods::decode($payload),
                 Frames::HEADER => ContentHeader::decode($payload),
                 Frames::BODY => $payload->drain(),
                 default => null,

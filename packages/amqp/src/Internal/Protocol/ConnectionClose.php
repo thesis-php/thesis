@@ -33,7 +33,7 @@ final readonly class ConnectionClose implements Method
     public static function decode(Buffer $buffer): self
     {
         $replyCode = $buffer->readUint16();
-        $replyText = readShortString($buffer);
+        $replyText = Fields::readShortString($buffer);
         $classId = $buffer->readUint16();
         $methodId = $buffer->readUint16();
 
@@ -49,7 +49,7 @@ final readonly class ConnectionClose implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16($this->replyCode);
-        writeShortString($buffer, $this->replyText);
+        Fields::writeShortString($buffer, $this->replyText);
         $buffer->writeUint16($this->classId);
         $buffer->writeUint16($this->methodId);
     }

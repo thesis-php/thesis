@@ -40,21 +40,21 @@ final readonly class BasicProperties
     public static function decode(Buffer $buffer): self
     {
         $flags = $buffer->readUint16();
-        $contentType = ($flags & 0x8000) !== 0 ? readShortString($buffer) : null;
-        $contentEncoding = ($flags & 0x4000) !== 0 ? readShortString($buffer) : null;
-        $headers = ($flags & 0x2000) !== 0 ? readTable($buffer) : null;
+        $contentType = ($flags & 0x8000) !== 0 ? Fields::readShortString($buffer) : null;
+        $contentEncoding = ($flags & 0x4000) !== 0 ? Fields::readShortString($buffer) : null;
+        $headers = ($flags & 0x2000) !== 0 ? Fields::readTable($buffer) : null;
         $deliveryMode = ($flags & 0x1000) !== 0 ? $buffer->readUint8() : null;
         $priority = ($flags & 0x0800) !== 0 ? $buffer->readUint8() : null;
-        $correlationId = ($flags & 0x0400) !== 0 ? readShortString($buffer) : null;
-        $replyTo = ($flags & 0x0200) !== 0 ? readShortString($buffer) : null;
-        $expiration = ($flags & 0x0100) !== 0 ? readShortString($buffer) : null;
-        $messageId = ($flags & 0x0080) !== 0 ? readShortString($buffer) : null;
+        $correlationId = ($flags & 0x0400) !== 0 ? Fields::readShortString($buffer) : null;
+        $replyTo = ($flags & 0x0200) !== 0 ? Fields::readShortString($buffer) : null;
+        $expiration = ($flags & 0x0100) !== 0 ? Fields::readShortString($buffer) : null;
+        $messageId = ($flags & 0x0080) !== 0 ? Fields::readShortString($buffer) : null;
         $timestamp = ($flags & 0x0040) !== 0 ? $buffer->readUint64() : null;
-        $type = ($flags & 0x0020) !== 0 ? readShortString($buffer) : null;
-        $userId = ($flags & 0x0010) !== 0 ? readShortString($buffer) : null;
-        $appId = ($flags & 0x0008) !== 0 ? readShortString($buffer) : null;
+        $type = ($flags & 0x0020) !== 0 ? Fields::readShortString($buffer) : null;
+        $userId = ($flags & 0x0010) !== 0 ? Fields::readShortString($buffer) : null;
+        $appId = ($flags & 0x0008) !== 0 ? Fields::readShortString($buffer) : null;
         if (($flags & 0x0004) !== 0) {
-            readShortString($buffer);
+            Fields::readShortString($buffer);
         }
 
         return new self(
@@ -92,13 +92,13 @@ final readonly class BasicProperties
             | ($this->appId === null ? 0 : 0x0008),
         );
         if ($this->contentType !== null) {
-            writeShortString($buffer, $this->contentType);
+            Fields::writeShortString($buffer, $this->contentType);
         }
         if ($this->contentEncoding !== null) {
-            writeShortString($buffer, $this->contentEncoding);
+            Fields::writeShortString($buffer, $this->contentEncoding);
         }
         if ($this->headers !== null) {
-            writeTable($buffer, $this->headers);
+            Fields::writeTable($buffer, $this->headers);
         }
         if ($this->deliveryMode !== null) {
             $buffer->writeUint8($this->deliveryMode);
@@ -107,28 +107,28 @@ final readonly class BasicProperties
             $buffer->writeUint8($this->priority);
         }
         if ($this->correlationId !== null) {
-            writeShortString($buffer, $this->correlationId);
+            Fields::writeShortString($buffer, $this->correlationId);
         }
         if ($this->replyTo !== null) {
-            writeShortString($buffer, $this->replyTo);
+            Fields::writeShortString($buffer, $this->replyTo);
         }
         if ($this->expiration !== null) {
-            writeShortString($buffer, $this->expiration);
+            Fields::writeShortString($buffer, $this->expiration);
         }
         if ($this->messageId !== null) {
-            writeShortString($buffer, $this->messageId);
+            Fields::writeShortString($buffer, $this->messageId);
         }
         if ($this->timestamp !== null) {
             $buffer->writeUint64($this->timestamp);
         }
         if ($this->type !== null) {
-            writeShortString($buffer, $this->type);
+            Fields::writeShortString($buffer, $this->type);
         }
         if ($this->userId !== null) {
-            writeShortString($buffer, $this->userId);
+            Fields::writeShortString($buffer, $this->userId);
         }
         if ($this->appId !== null) {
-            writeShortString($buffer, $this->appId);
+            Fields::writeShortString($buffer, $this->appId);
         }
     }
 }

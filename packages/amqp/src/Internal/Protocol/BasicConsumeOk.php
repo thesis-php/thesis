@@ -24,7 +24,7 @@ final readonly class BasicConsumeOk implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $consumerTag = readShortString($buffer);
+        $consumerTag = Fields::readShortString($buffer);
 
         return new self(consumerTag: $consumerTag);
     }
@@ -32,6 +32,6 @@ final readonly class BasicConsumeOk implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->consumerTag);
+        Fields::writeShortString($buffer, $this->consumerTag);
     }
 }

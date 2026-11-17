@@ -20,7 +20,7 @@ final readonly class ChannelOpenOk implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        readLongString($buffer);
+        Fields::readLongString($buffer);
 
         return new self();
     }
@@ -28,6 +28,6 @@ final readonly class ChannelOpenOk implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeLongString($buffer, '');
+        Fields::writeLongString($buffer, '');
     }
 }

@@ -25,7 +25,7 @@ final readonly class BasicCancel implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $consumerTag = readShortString($buffer);
+        $consumerTag = Fields::readShortString($buffer);
         $bit = $buffer->readUint8();
 
         return new self(
@@ -37,7 +37,7 @@ final readonly class BasicCancel implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->consumerTag);
+        Fields::writeShortString($buffer, $this->consumerTag);
         $buffer->writeUint8($this->noWait ? 0b00000001 : 0);
     }
 }

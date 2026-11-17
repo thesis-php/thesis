@@ -25,8 +25,8 @@ final readonly class ConnectionUpdateSecret implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $newSecret = readLongString($buffer);
-        $reason = readShortString($buffer);
+        $newSecret = Fields::readLongString($buffer);
+        $reason = Fields::readShortString($buffer);
 
         return new self(
             newSecret: $newSecret,
@@ -37,7 +37,7 @@ final readonly class ConnectionUpdateSecret implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeLongString($buffer, $this->newSecret);
-        writeShortString($buffer, $this->reason);
+        Fields::writeLongString($buffer, $this->newSecret);
+        Fields::writeShortString($buffer, $this->reason);
     }
 }

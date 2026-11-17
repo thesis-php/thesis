@@ -32,11 +32,11 @@ final readonly class ExchangeUnbind implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $destination = readShortString($buffer);
-        $source = readShortString($buffer);
-        $routingKey = readShortString($buffer);
+        $destination = Fields::readShortString($buffer);
+        $source = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
         $bit = $buffer->readUint8();
-        $arguments = readTable($buffer);
+        $arguments = Fields::readTable($buffer);
 
         return new self(
             destination: $destination,
@@ -51,10 +51,10 @@ final readonly class ExchangeUnbind implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->destination);
-        writeShortString($buffer, $this->source);
-        writeShortString($buffer, $this->routingKey);
+        Fields::writeShortString($buffer, $this->destination);
+        Fields::writeShortString($buffer, $this->source);
+        Fields::writeShortString($buffer, $this->routingKey);
         $buffer->writeUint8($this->noWait ? 0b00000001 : 0);
-        writeTable($buffer, $this->arguments);
+        Fields::writeTable($buffer, $this->arguments);
     }
 }

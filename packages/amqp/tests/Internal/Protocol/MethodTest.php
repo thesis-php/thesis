@@ -18,11 +18,9 @@ final class MethodTest
         $tested = 0;
 
         foreach ($classes as $file) {
-            $name = basename($file, '.php');
-            $class = __NAMESPACE__ . '\\' . $name;
+            $class = __NAMESPACE__ . '\\' . basename($file, '.php');
 
-            // internal.php is not a class: class_exists() would include it a second time.
-            if (lcfirst($name) === $name || !is_subclass_of($class, Method::class)) {
+            if (!is_subclass_of($class, Method::class)) {
                 continue;
             }
 
@@ -31,7 +29,7 @@ final class MethodTest
                 $buffer = new Buffer();
                 $method->encode($buffer);
 
-                Assert::equals(decodeMethod($buffer), $method);
+                Assert::equals(Methods::decode($buffer), $method);
                 Assert::same($buffer->count(), 0);
             }
 

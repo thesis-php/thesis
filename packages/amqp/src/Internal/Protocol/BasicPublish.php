@@ -28,8 +28,8 @@ final readonly class BasicPublish implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $exchange = readShortString($buffer);
-        $routingKey = readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
         $bits = $buffer->readUint8();
 
         return new self(
@@ -44,8 +44,8 @@ final readonly class BasicPublish implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->routingKey);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->routingKey);
         $buffer->writeUint8(
             ($this->mandatory ? 0b00000001 : 0)
             | ($this->immediate ? 0b00000010 : 0),

@@ -40,12 +40,16 @@ or changing the public API of a package that others use. How the generator works
 - Functions, constants and code run at load (the polyfill of `time`, the warning of `async` on Windows) live
   in eager files: PHP files of `src/` and `tests/` without a class, an interface, a trait or an enum.
   The functions and constants of a namespace are in `api.php`, those of an `Internal` namespace in `internal.php`,
-  test helpers in `tests/helpers.php`. Only code run at load and generated code get files of their own
-  (`polyfill.php`, `decodeMethod.php`). `make sync` finds them (`EagerFiles`) and writes them
-  to `autoload.files` and `autoload-dev.files`, nothing lists them by hand, so CI fails
-  on a new one until `make sync` is run. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
+  test helpers in `tests/helpers.php`. Only code run at load gets a file of its own (`polyfill.php`).
+  `make sync` finds them (`EagerFiles`) and writes them to `autoload.files` and `autoload-dev.files`,
+  nothing lists them by hand, so CI fails on a new one until `make sync` is run. A deleted one breaks
+  `vendor/autoload.php` and with it `make sync`: remove its line from the `composer.json` files by hand
+  and run `composer dump-autoload` first. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
   is loaded with it by PSR-4. The files are sorted by path and must not depend on each other at load time.
   `files`/`devFiles` of the manifest are only for files outside `src/` and `tests/` (`amqp/codegen/generate.php`).
+- A function of `internal.php` is a helper that several classes or `api.php` share. Functions with helpers
+  of their own that nobody else calls are a class with `private static` helpers instead
+  (`Amqp\Internal\Protocol\Fields`): PHP has no private functions.
 
 ### Dependencies
 
@@ -80,3 +84,6 @@ or changing the public API of a package that others use. How the generator works
   a single line, a forgotten line showed only as an undefined function in the tests), listing every file
   in the manifest (bookkeeping that the code already says), runtime `glob()` (a cost for every user,
   magic by file name), static methods instead of functions (a worse API), `functions.php` (holds constants too).
+- Rejected: no functions in `Internal` so that the autoloader loads them lazily. An eager file costs microseconds
+  once per process, and the processes of this ecosystem live long. Most internal functions serve `api.php`,
+  which is eager anyway, so a class would only rename them.

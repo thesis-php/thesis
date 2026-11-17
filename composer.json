@@ -81,8 +81,6 @@
             "Thesis\\Time\\": "packages/time/src/"
         },
         "files": [
-            "packages/amqp/src/Internal/Protocol/decodeMethod.php",
-            "packages/amqp/src/Internal/Protocol/internal.php",
             "packages/amqp/src/Internal/internal.php",
             "packages/async/src/Internal/internal.php",
             "packages/async/src/Trace/api.php",

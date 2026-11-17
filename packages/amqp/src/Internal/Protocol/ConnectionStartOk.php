@@ -30,10 +30,10 @@ final readonly class ConnectionStartOk implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $clientProperties = readTable($buffer);
-        $mechanism = readShortString($buffer);
-        $response = readLongString($buffer);
-        $locale = readShortString($buffer);
+        $clientProperties = Fields::readTable($buffer);
+        $mechanism = Fields::readShortString($buffer);
+        $response = Fields::readLongString($buffer);
+        $locale = Fields::readShortString($buffer);
 
         return new self(
             clientProperties: $clientProperties,
@@ -46,9 +46,9 @@ final readonly class ConnectionStartOk implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeTable($buffer, $this->clientProperties);
-        writeShortString($buffer, $this->mechanism);
-        writeLongString($buffer, $this->response);
-        writeShortString($buffer, $this->locale);
+        Fields::writeTable($buffer, $this->clientProperties);
+        Fields::writeShortString($buffer, $this->mechanism);
+        Fields::writeLongString($buffer, $this->response);
+        Fields::writeShortString($buffer, $this->locale);
     }
 }

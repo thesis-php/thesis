@@ -39,8 +39,6 @@
             "Thesis\\Amqp\\": "src/"
         },
         "files": [
-            "src/Internal/Protocol/decodeMethod.php",
-            "src/Internal/Protocol/internal.php",
             "src/Internal/internal.php"
         ]
     },

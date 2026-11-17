@@ -31,9 +31,9 @@ final readonly class BasicReturn implements Method
     public static function decode(Buffer $buffer): self
     {
         $replyCode = $buffer->readUint16();
-        $replyText = readShortString($buffer);
-        $exchange = readShortString($buffer);
-        $routingKey = readShortString($buffer);
+        $replyText = Fields::readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
 
         return new self(
             replyCode: $replyCode,
@@ -47,8 +47,8 @@ final readonly class BasicReturn implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16($this->replyCode);
-        writeShortString($buffer, $this->replyText);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->routingKey);
+        Fields::writeShortString($buffer, $this->replyText);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->routingKey);
     }
 }

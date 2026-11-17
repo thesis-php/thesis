@@ -35,9 +35,9 @@ final readonly class ConnectionStart implements Method
     {
         $versionMajor = $buffer->readUint8();
         $versionMinor = $buffer->readUint8();
-        $serverProperties = readTable($buffer);
-        $mechanisms = readLongString($buffer);
-        $locales = readLongString($buffer);
+        $serverProperties = Fields::readTable($buffer);
+        $mechanisms = Fields::readLongString($buffer);
+        $locales = Fields::readLongString($buffer);
 
         return new self(
             versionMajor: $versionMajor,
@@ -53,8 +53,8 @@ final readonly class ConnectionStart implements Method
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint8($this->versionMajor);
         $buffer->writeUint8($this->versionMinor);
-        writeTable($buffer, $this->serverProperties);
-        writeLongString($buffer, $this->mechanisms);
-        writeLongString($buffer, $this->locales);
+        Fields::writeTable($buffer, $this->serverProperties);
+        Fields::writeLongString($buffer, $this->mechanisms);
+        Fields::writeLongString($buffer, $this->locales);
     }
 }

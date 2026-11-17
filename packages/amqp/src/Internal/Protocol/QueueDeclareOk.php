@@ -30,7 +30,7 @@ final readonly class QueueDeclareOk implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $queue = readShortString($buffer);
+        $queue = Fields::readShortString($buffer);
         $messageCount = $buffer->readUint32();
         $consumerCount = $buffer->readUint32();
 
@@ -44,7 +44,7 @@ final readonly class QueueDeclareOk implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->queue);
+        Fields::writeShortString($buffer, $this->queue);
         $buffer->writeUint32($this->messageCount);
         $buffer->writeUint32($this->consumerCount);
     }

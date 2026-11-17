@@ -31,10 +31,10 @@ final readonly class QueueUnbind implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $queue = readShortString($buffer);
-        $exchange = readShortString($buffer);
-        $routingKey = readShortString($buffer);
-        $arguments = readTable($buffer);
+        $queue = Fields::readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
+        $arguments = Fields::readTable($buffer);
 
         return new self(
             queue: $queue,
@@ -48,9 +48,9 @@ final readonly class QueueUnbind implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->queue);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->routingKey);
-        writeTable($buffer, $this->arguments);
+        Fields::writeShortString($buffer, $this->queue);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->routingKey);
+        Fields::writeTable($buffer, $this->arguments);
     }
 }

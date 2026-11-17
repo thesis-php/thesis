@@ -24,8 +24,8 @@ final readonly class ConnectionOpen implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $virtualHost = readShortString($buffer);
-        readShortString($buffer);
+        $virtualHost = Fields::readShortString($buffer);
+        Fields::readShortString($buffer);
         $buffer->skip(1);
 
         return new self(virtualHost: $virtualHost);
@@ -34,8 +34,8 @@ final readonly class ConnectionOpen implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->virtualHost);
-        writeShortString($buffer, '');
+        Fields::writeShortString($buffer, $this->virtualHost);
+        Fields::writeShortString($buffer, '');
         $buffer->writeUint8(0);
     }
 }

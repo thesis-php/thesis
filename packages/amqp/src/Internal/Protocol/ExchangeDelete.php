@@ -27,7 +27,7 @@ final readonly class ExchangeDelete implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $exchange = readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
         $bits = $buffer->readUint8();
 
         return new self(
@@ -41,7 +41,7 @@ final readonly class ExchangeDelete implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->exchange);
         $buffer->writeUint8(
             ($this->ifUnused ? 0b00000001 : 0)
             | ($this->noWait ? 0b00000010 : 0),

@@ -15,13 +15,13 @@ use Thesis\Amqp\Internal\Protocol\ConnectionStart;
 use Thesis\Amqp\Internal\Protocol\ConnectionStartOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionTune;
 use Thesis\Amqp\Internal\Protocol\ConnectionTuneOk;
+use Thesis\Amqp\Internal\Protocol\Fields;
 use Thesis\Amqp\Internal\Protocol\Method;
 use Thesis\Amqp\Internal\Protocol\ProtocolError;
 use Thesis\Amqp\ReplyCode;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Net\Socket;
-use function Thesis\Amqp\Internal\Protocol\writeTable;
 use function Thesis\Time\toSec;
 
 /**
@@ -184,7 +184,7 @@ final readonly class Handshake
     private function amqPlain(): string
     {
         $buffer = new Buffer();
-        writeTable($buffer, ['LOGIN' => $this->config->user, 'PASSWORD' => $this->config->password]);
+        Fields::writeTable($buffer, ['LOGIN' => $this->config->user, 'PASSWORD' => $this->config->password]);
         $buffer->skip(4);
 
         return $buffer->drain();

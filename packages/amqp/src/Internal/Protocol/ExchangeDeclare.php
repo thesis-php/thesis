@@ -35,10 +35,10 @@ final readonly class ExchangeDeclare implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $exchange = readShortString($buffer);
-        $type = readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $type = Fields::readShortString($buffer);
         $bits = $buffer->readUint8();
-        $arguments = readTable($buffer);
+        $arguments = Fields::readTable($buffer);
 
         return new self(
             exchange: $exchange,
@@ -56,8 +56,8 @@ final readonly class ExchangeDeclare implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->type);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->type);
         $buffer->writeUint8(
             ($this->passive ? 0b00000001 : 0)
             | ($this->durable ? 0b00000010 : 0)
@@ -65,6 +65,6 @@ final readonly class ExchangeDeclare implements Method
             | ($this->internal ? 0b00001000 : 0)
             | ($this->noWait ? 0b00010000 : 0),
         );
-        writeTable($buffer, $this->arguments);
+        Fields::writeTable($buffer, $this->arguments);
     }
 }

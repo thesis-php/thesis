@@ -31,11 +31,11 @@ final readonly class BasicDeliver implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $consumerTag = readShortString($buffer);
+        $consumerTag = Fields::readShortString($buffer);
         $deliveryTag = $buffer->readUint64();
         $bit = $buffer->readUint8();
-        $exchange = readShortString($buffer);
-        $routingKey = readShortString($buffer);
+        $exchange = Fields::readShortString($buffer);
+        $routingKey = Fields::readShortString($buffer);
 
         return new self(
             consumerTag: $consumerTag,
@@ -49,10 +49,10 @@ final readonly class BasicDeliver implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->consumerTag);
+        Fields::writeShortString($buffer, $this->consumerTag);
         $buffer->writeUint64($this->deliveryTag);
         $buffer->writeUint8($this->redelivered ? 0b00000001 : 0);
-        writeShortString($buffer, $this->exchange);
-        writeShortString($buffer, $this->routingKey);
+        Fields::writeShortString($buffer, $this->exchange);
+        Fields::writeShortString($buffer, $this->routingKey);
     }
 }

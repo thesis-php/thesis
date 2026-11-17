@@ -6,13 +6,13 @@ namespace Thesis\Amqp\Internal;
 
 use Thesis\Amqp\Internal\Protocol\BasicProperties;
 use Thesis\Amqp\Internal\Protocol\Method;
+use Thesis\Amqp\Internal\Protocol\Methods;
 use Thesis\Amqp\Internal\Protocol\ProtocolError;
 use Thesis\Amqp\ReplyCode;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Net\Socket;
-use function Thesis\Amqp\Internal\Protocol\decodeMethod;
 
 /**
  * Encodes and reads frames: a frame is a type, a channel, a size, the payload and the end octet.
@@ -121,7 +121,7 @@ final class Frames
 
         try {
             $frame = match ($type) {
-                self::METHOD => decodeMethod($payload),
+                self::METHOD => Methods::decode($payload),
                 self::HEADER => ContentHeader::decode($payload),
                 self::BODY => $payload->drain(),
                 self::HEARTBEAT => null,

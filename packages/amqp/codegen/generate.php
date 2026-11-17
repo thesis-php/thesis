@@ -39,9 +39,9 @@ const READ = [
     'long' => '$buffer->readUint32()',
     'longlong' => '$buffer->readUint64()',
     'timestamp' => '$buffer->readUint64()',
-    'shortstr' => 'readShortString($buffer)',
-    'longstr' => 'readLongString($buffer)',
-    'table' => 'readTable($buffer)',
+    'shortstr' => 'Fields::readShortString($buffer)',
+    'longstr' => 'Fields::readLongString($buffer)',
+    'table' => 'Fields::readTable($buffer)',
 ];
 
 const WRITE = [
@@ -50,9 +50,9 @@ const WRITE = [
     'long' => '$buffer->writeUint32(%s);',
     'longlong' => '$buffer->writeUint64(%s);',
     'timestamp' => '$buffer->writeUint64(%s);',
-    'shortstr' => 'writeShortString($buffer, %s);',
-    'longstr' => 'writeLongString($buffer, %s);',
-    'table' => 'writeTable($buffer, %s);',
+    'shortstr' => 'Fields::writeShortString($buffer, %s);',
+    'longstr' => 'Fields::writeLongString($buffer, %s);',
+    'table' => 'Fields::writeTable($buffer, %s);',
 ];
 
 const RESERVED_VALUES = [
@@ -70,9 +70,9 @@ const SKIP = [
     'short' => '$buffer->skip(2);',
     'long' => '$buffer->skip(4);',
     'longlong' => '$buffer->skip(8);',
-    'shortstr' => 'readShortString($buffer);',
-    'longstr' => 'readLongString($buffer);',
-    'table' => 'readTable($buffer);',
+    'shortstr' => 'Fields::readShortString($buffer);',
+    'longstr' => 'Fields::readLongString($buffer);',
+    'table' => 'Fields::readTable($buffer);',
 ];
 
 /**
@@ -121,7 +121,7 @@ function generate(string $specFile): array
         }
     }
 
-    $files['src/Internal/Protocol/decodeMethod.php'] = decodeMethod($decoders);
+    $files['src/Internal/Protocol/Methods.php'] = methodsClass($decoders);
     $files['src/ReplyCode.php'] = replyCode($spec);
 
     ksort($files);
@@ -453,19 +453,19 @@ function propertiesClass(array $fields): string
 /**
  * @param array<int, array<int, string>> $decoders method classes by class id and method id
  */
-function decodeMethod(array $decoders): string
+function methodsClass(array $decoders): string
 {
     $arms = [];
 
     foreach ($decoders as $classId => $methods) {
-        $arms[] = "        {$classId} => match (\$methodId) {";
+        $arms[] = "            {$classId} => match (\$methodId) {";
 
         foreach ($methods as $methodId => $class) {
-            $arms[] = "            {$methodId} => {$class}::decode(\$buffer),";
+            $arms[] = "                {$methodId} => {$class}::decode(\$buffer),";
         }
 
-        $arms[] = '            default => throw ProtocolError::unknownMethod($classId, $methodId),';
-        $arms[] = '        },';
+        $arms[] = '                default => throw ProtocolError::unknownMethod($classId, $methodId),';
+        $arms[] = '            },';
     }
 
     $arms = implode("\n", $arms);
@@ -483,20 +483,25 @@ function decodeMethod(array $decoders): string
         use Thesis\\Io\\Buffer;
 
         /**
-         * Decodes the payload of a method frame: the class id, the method id and the fields.
-         *
          * @internal
-         * @throws ProtocolError
          */
-        function decodeMethod(Buffer \$buffer): Method
+        final class Methods
         {
-            \$classId = \$buffer->readUint16();
-            \$methodId = \$buffer->readUint16();
+            /**
+             * Decodes the payload of a method frame: the class id, the method id and the fields.
+             *
+             * @throws ProtocolError
+             */
+            public static function decode(Buffer \$buffer): Method
+            {
+                \$classId = \$buffer->readUint16();
+                \$methodId = \$buffer->readUint16();
 
-            return match (\$classId) {
+                return match (\$classId) {
         {$arms}
-                default => throw ProtocolError::unknownMethod(\$classId, \$methodId),
-            };
+                    default => throw ProtocolError::unknownMethod(\$classId, \$methodId),
+                };
+            }
         }
 
         PHP;

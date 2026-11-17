@@ -34,10 +34,10 @@ final readonly class BasicConsume implements Method
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
-        $queue = readShortString($buffer);
-        $consumerTag = readShortString($buffer);
+        $queue = Fields::readShortString($buffer);
+        $consumerTag = Fields::readShortString($buffer);
         $bits = $buffer->readUint8();
-        $arguments = readTable($buffer);
+        $arguments = Fields::readTable($buffer);
 
         return new self(
             queue: $queue,
@@ -54,14 +54,14 @@ final readonly class BasicConsume implements Method
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
         $buffer->writeUint16(0);
-        writeShortString($buffer, $this->queue);
-        writeShortString($buffer, $this->consumerTag);
+        Fields::writeShortString($buffer, $this->queue);
+        Fields::writeShortString($buffer, $this->consumerTag);
         $buffer->writeUint8(
             ($this->noLocal ? 0b00000001 : 0)
             | ($this->noAck ? 0b00000010 : 0)
             | ($this->exclusive ? 0b00000100 : 0)
             | ($this->noWait ? 0b00001000 : 0),
         );
-        writeTable($buffer, $this->arguments);
+        Fields::writeTable($buffer, $this->arguments);
     }
 }

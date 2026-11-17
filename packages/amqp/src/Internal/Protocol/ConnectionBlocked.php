@@ -24,7 +24,7 @@ final readonly class ConnectionBlocked implements Method
 
     public static function decode(Buffer $buffer): self
     {
-        $reason = readShortString($buffer);
+        $reason = Fields::readShortString($buffer);
 
         return new self(reason: $reason);
     }
@@ -32,6 +32,6 @@ final readonly class ConnectionBlocked implements Method
     public function encode(Buffer $buffer): void
     {
         $buffer->writeUint16(self::CLASS_ID)->writeUint16(self::METHOD_ID);
-        writeShortString($buffer, $this->reason);
+        Fields::writeShortString($buffer, $this->reason);
     }
 }
