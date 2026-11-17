@@ -61,3 +61,25 @@ final class HeartbeatTest
 
 The lifecycle hooks of a test (`#[BeforeTest]`, `#[AfterTest]`) run on its clock, and every data set gets a clock
 of its own. A test that has the attribute in a suite with the plugin is not wrapped twice.
+
+## PHP errors
+
+PHP only prints a warning, a notice or a deprecation, and the test passes. `PhpErrorsPlugin` throws one
+as `ErrorException` where it happens, in the test and in the tasks it starts alike, so the test fails
+and the trace points at the cause. An error suppressed by `@` is left alone, and a handler that the test sets itself
+sees the errors first.
+
+Every suite, with the plugin in `testo.php`:
+
+```php
+use Testo\Application\Config\ApplicationConfig;
+use Testo\Application\Config\SuiteConfig;
+use Thesis\TestoPlugin\PhpErrorsPlugin;
+
+return new ApplicationConfig(
+    suites: [
+        new SuiteConfig(name: 'unit', location: [__DIR__ . '/tests']),
+    ],
+    plugins: [new PhpErrorsPlugin()],
+);
+```

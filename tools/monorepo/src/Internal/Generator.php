@@ -447,6 +447,9 @@ final readonly class Generator
         }
 
         $src = $src === '' ? '[]' : "[\n{$src}    ]";
+        $rootPlugins = is_file($this->monorepo->root . '/' . $plugins)
+            ? "    plugins: require __DIR__ . '/{$plugins}',\n"
+            : '';
 
         return <<<PHP
             <?php
@@ -462,7 +465,7 @@ final readonly class Generator
                 src: {$src},
                 suites: [
             {$suites}    ],
-            );
+            {$rootPlugins});
 
             PHP;
     }

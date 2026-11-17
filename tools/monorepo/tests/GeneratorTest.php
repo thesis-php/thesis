@@ -467,6 +467,27 @@ final readonly class GeneratorTest
         ;
     }
 
+    public static function writesPluginsOfEverySuiteFromTheRoot(): void
+    {
+        $fixture = self::fixture()->file('testo.plugins.php', "<?php\n\nreturn [];\n");
+
+        $files = Generator::generate($fixture->load());
+
+        Assert
+            ::string($files['testo.php'] ?? '')
+            ->contains("    plugins: require __DIR__ . '/testo.plugins.php',\n);\n")
+        ;
+    }
+
+    public static function writesNoPluginsOfEverySuiteWithoutTheRootFile(): void
+    {
+        $fixture = self::fixture();
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files['testo.php'] ?? '')->notContains('    plugins:');
+    }
+
     public static function writesNoTestsOfPackageWithoutTests(): void
     {
         $fixture = self::fixture()->package('stan');

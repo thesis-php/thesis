@@ -52,4 +52,5 @@ return new ApplicationConfig(
         new SuiteConfig(name: 'testo-plugin', location: [__DIR__ . '/packages/testo-plugin/tests']),
         new SuiteConfig(name: 'time', location: [__DIR__ . '/packages/time/tests']),
     ],
+    plugins: require __DIR__ . '/testo.plugins.php',
 );

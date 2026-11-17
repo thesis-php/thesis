@@ -28,7 +28,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 | [thesis/net](packages/net) | Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. |
 | [thesis/phpstan-extension](packages/phpstan-extension) | PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them, checks of what PHP cannot. |
 | [thesis/source-location](packages/source-location) | Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved. |
-| [thesis/testo-plugin](packages/testo-plugin) | Testo plugins for thesis packages: tests on the virtual time of thesis/async. |
+| [thesis/testo-plugin](packages/testo-plugin) | Testo plugins for thesis packages: tests on the virtual time of thesis/async, PHP errors as failures. |
 | [thesis/time](packages/time) | Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks. |
 
 <!-- packages:end -->
