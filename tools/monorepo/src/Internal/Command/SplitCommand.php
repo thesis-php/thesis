@@ -23,6 +23,11 @@ use Thesis\Monorepo\Internal\Split\Split;
 final readonly class SplitCommand
 {
     /**
+     * TODO: delete once amqp is ready to be published: until then every push of main would update thesis-php/amqp.
+     */
+    private const array HELD_BACK = ['amqp'];
+
+    /**
      * @param ?string $remote SPLIT_REMOTE, null to print the splits without pushing them
      * @param ?Api $api GITHUB_TOKEN, required for a push: it tells which repositories are splits
      */
@@ -63,6 +68,12 @@ final readonly class SplitCommand
         $failed = [];
 
         foreach ($split->commits as $package => $commit) {
+            if (\in_array($package, self::HELD_BACK, strict: true)) {
+                $io->writeln(\sprintf('%s: held back, nothing is pushed.', $package));
+
+                continue;
+            }
+
             try {
                 $isSplit = Repositories::isSplit($this->api, $package);
             } catch (MonorepoException $exception) {
