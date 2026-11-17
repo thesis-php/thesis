@@ -165,17 +165,16 @@ final class LocalCache implements Cache, \Countable
     }
 
     /**
-     * Makes $entry the most recently used.
+     * Makes $entry the most recently used. It is new or unlinked, so it has no neighbours yet.
      *
      * @param Entry<V> $entry
      */
     private function link(Entry $entry): void
     {
-        $entry->olderKey = $this->mostRecentlyUsed?->key;
-
         if ($this->mostRecentlyUsed === null) {
             $this->leastRecentlyUsed = $entry;
         } else {
+            $entry->olderKey = $this->mostRecentlyUsed->key;
             $this->mostRecentlyUsed->newer = $entry;
         }
 

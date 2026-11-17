@@ -58,6 +58,13 @@
                 "Thesis\\Formatter\\Internal\\StringFormatter::head",
             ],
         },
+        "LogicalAnd": {
+            "ignore": [
+                // The assert only narrows the types for PHPStan: the heap compares its own values, which are all
+                // Expiry.
+                "Thesis\\Cache\\Internal\\Expiries::compare",
+            ],
+        },
         "PregMatchRemoveCaret": {
             "ignore": [
                 // The lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway.

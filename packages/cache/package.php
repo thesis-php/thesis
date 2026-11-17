@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Thesis\Cache\Internal\Expiries;
+use Thesis\Monorepo\InfectionSkip;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
@@ -19,5 +21,13 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
         'thesis/testo-plugin' => '*',
+    ],
+    skip: [
+        new InfectionSkip(
+            mutator: 'LogicalAnd',
+            class: Expiries::class,
+            method: 'compare',
+            reason: 'The assert only narrows the types for PHPStan: the heap compares its own values, which are all Expiry.',
+        ),
     ],
 );
