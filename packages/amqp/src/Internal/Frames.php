@@ -36,7 +36,7 @@ final class Frames
     /**
      * The frame size of RabbitMQ: a body is split into frames of it when the server sets no limit.
      */
-    public const int DEFAULT_MAX = 131_072;
+    public const int DEFAULT_MAX = 128 * 1024;
 
     /**
      * @param int<0, 65535> $channel

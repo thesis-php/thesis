@@ -88,7 +88,7 @@ final readonly class Handshake
         // Rounded up: a heartbeat under a second must not become 0, which takes the interval of the server.
         $seconds = toSec($this->config->heartbeat, \RoundingMode::PositiveInfinity);
         /** @var int<0, 65535> $heartbeat */
-        $heartbeat = self::negotiate(min(65535, max(0, $seconds)), $tune->heartbeat);
+        $heartbeat = self::negotiate(min(0xFFFF, max(0, $seconds)), $tune->heartbeat);
         $tuneOk = new ConnectionTuneOk($channelMax, $frameMax, $heartbeat);
         $this->send($tuneOk);
 

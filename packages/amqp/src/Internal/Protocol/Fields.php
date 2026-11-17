@@ -145,7 +145,7 @@ final class Fields
 
     private static function writeInt(Buffer $buffer, int $value): void
     {
-        if ($value >= -2_147_483_648 && $value <= 2_147_483_647) {
+        if ($value >= -0x80_00_00_00 && $value <= 0x7F_FF_FF_FF) {
             $buffer->write('I')->writeInt32($value);
         } else {
             $buffer->write('l')->writeInt64($value);

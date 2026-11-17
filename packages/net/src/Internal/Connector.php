@@ -22,7 +22,7 @@ final readonly class Connector
      * How long an attempt has before the next address is tried alongside, as RFC 8305 (Happy Eyeballs) recommends.
      * In nanoseconds.
      */
-    private const int ATTEMPT_DELAY = 250_000_000;
+    private const int ATTEMPT_DELAY = 250 * 1_000_000;
 
     /**
      * @param non-empty-list<non-empty-string> $ips

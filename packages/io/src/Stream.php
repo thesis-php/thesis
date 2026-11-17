@@ -25,13 +25,13 @@ final class Stream implements Reader, Writer, Closer
      * Bytes passed to one fwrite() after a partial write: about what a pipe takes at once,
      * so that a large write is neither copied whole for every syscall nor split into many.
      */
-    private const int WRITE_CHUNK = 65_536;
+    private const int WRITE_CHUNK = 64 * 1024;
 
     /**
      * fread() allocates its whole length up front, so one read is bounded whatever the caller asks for:
      * a length from a header must not cost its size in memory before a byte has arrived.
      */
-    private const int MAX_READ = 1_048_576;
+    private const int MAX_READ = 1024 * 1024;
 
     /**
      * Reads and writes that do not wait before one yields: a file, /dev/null or a fast peer never makes them wait,

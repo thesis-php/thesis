@@ -20,7 +20,7 @@ final class Buffer implements \Countable
     /**
      * Consumed bytes are discarded on {@see fill()} once their amount reaches this value.
      */
-    private const int COMPACT_THRESHOLD = 65_536;
+    private const int COMPACT_THRESHOLD = 64 * 1024;
 
     private int $offset = 0;
 
@@ -44,7 +44,7 @@ final class Buffer implements \Countable
     public function __construct(
         public readonly Order $order = Order::Network,
         private string $bytes = '',
-        private readonly int $chunkSize = 65_536,
+        private readonly int $chunkSize = 64 * 1024,
     ) {
         if ($order === Order::Little) {
             $this->big = false;
@@ -690,7 +690,7 @@ final class Buffer implements \Countable
      * @throws IoException of the reader: {@see ReadFailed}, a closed stream
      * @throws \OverflowException if the delimiter is not found within $maxLength bytes
      */
-    public function fillUntil(Reader $reader, string $delimiter, int $maxLength = 65_536): void
+    public function fillUntil(Reader $reader, string $delimiter, int $maxLength = 64 * 1024): void
     {
         // number of unread bytes already searched, so that they are not rescanned after each chunk
         $scanned = 0;

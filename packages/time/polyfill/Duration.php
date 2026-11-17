@@ -15,6 +15,8 @@ final readonly class Duration
 {
     private const int MAX_SECONDS = 9_223_372_035;
     private const int NANOSECONDS_PER_SECOND = 1_000_000_000;
+    private const int SECONDS_PER_MINUTE = 60;
+    private const int SECONDS_PER_HOUR = 60 * self::SECONDS_PER_MINUTE;
     private const string OUT_OF_RANGE = 'The maximum representable range is 9_223_372_035 seconds (roughly 292 years)';
     private const string PARSE_FAILURE = 'The ISO 8601 duration string could not be parsed';
     private const string MISSING_PERIOD = 'The ISO 8601 duration string is missing the period (P) aspect';
@@ -93,7 +95,7 @@ final readonly class Duration
 
         return new self(
             seconds: intdiv($microseconds, 1_000_000),
-            nanoseconds: $microseconds % 1_000_000 * 1_000,
+            nanoseconds: $microseconds % 1_000_000 * 1000,
             negative: false,
         );
     }
@@ -105,8 +107,8 @@ final readonly class Duration
         }
 
         return new self(
-            seconds: intdiv($milliseconds, 1_000),
-            nanoseconds: $milliseconds % 1_000 * 1_000_000,
+            seconds: intdiv($milliseconds, 1000),
+            nanoseconds: $milliseconds % 1000 * 1_000_000,
             negative: false,
         );
     }
@@ -117,11 +119,11 @@ final readonly class Duration
             throw self::negativeArgument('fromMinutes', 1, 'minutes');
         }
 
-        if ($minutes > intdiv(self::MAX_SECONDS, 60)) {
+        if ($minutes > intdiv(self::MAX_SECONDS, self::SECONDS_PER_MINUTE)) {
             throw new TimeException(self::OUT_OF_RANGE);
         }
 
-        return new self($minutes * 60, 0, false);
+        return new self($minutes * self::SECONDS_PER_MINUTE, 0, false);
     }
 
     public static function fromHours(int $hours): self
@@ -130,11 +132,11 @@ final readonly class Duration
             throw self::negativeArgument('fromHours', 1, 'hours');
         }
 
-        if ($hours > intdiv(self::MAX_SECONDS, 3_600)) {
+        if ($hours > intdiv(self::MAX_SECONDS, self::SECONDS_PER_HOUR)) {
             throw new TimeException(self::OUT_OF_RANGE);
         }
 
-        return new self($hours * 3_600, 0, false);
+        return new self($hours * self::SECONDS_PER_HOUR, 0, false);
     }
 
     public static function fromIso8601DurationString(string $specification): self
@@ -161,7 +163,11 @@ final readonly class Duration
             throw new TimeException(self::DAYS_FOUND);
         }
 
-        return new self($interval->hours * 3_600 + $interval->minutes * 60 + $interval->seconds, 0, false);
+        $seconds = $interval->hours * self::SECONDS_PER_HOUR
+            + $interval->minutes * self::SECONDS_PER_MINUTE
+            + $interval->seconds;
+
+        return new self($seconds, 0, false);
     }
 
     public static function compare(self $a, self $b): int

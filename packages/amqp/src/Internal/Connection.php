@@ -111,7 +111,7 @@ final class Connection
         return new self(
             socket: $socket,
             in: $in,
-            channelMax: $tune->channelMax === 0 ? 65535 : $tune->channelMax,
+            channelMax: $tune->channelMax === 0 ? 0xFFFF : $tune->channelMax,
             frameMax: $tune->frameMax,
             heartbeat: $tune->heartbeat,
         );

@@ -105,15 +105,6 @@ What amphp has, then what thesis makes of it.
 
 - Try [phpstan/tally](https://github.com/phpstan/tally) for benchmarks: it does not depend on wall-clock time
   or the speed of the CPU, so it may be stable enough for CI, unlike `#[Bench]` of Testo.
-- A constant or a default value derived from simpler numbers is written as the computation, not its result:
-  `1024 * 1024`, not `1_048_576`; `24 * 60 * 60` seconds, not `86_400`; `60 * NANOSECONDS_PER_SECOND`,
-  not `60_000_000_000` (PHP folds it at compile time). A bare literal stays where the number itself is the meaning:
-  a count (`10_000` messages), a limit of a protocol (`65535`), a bound with no simpler form
-  (`Duration::MAX_SECONDS`). Candidates: the buffer sizes of `Buffer`, `Stream`, `SharedStream`, `Socket`,
-  `Channel`, `Frames::DEFAULT_MAX`, `DnsResolver::MAX_TTL`, `Connector::ATTEMPT_DELAY`,
-  `Scope::LONGEST_DURATION`, the chain of `NANOSECONDS_PER_*` in `thesis/time`. Open: the same for literals
-  in code (`4_294_967_295` in `amqp` `Config` as `0xFF_FF_FF_FF` or `2 ** 32 - 1`, the int32 bounds of AMQP,
-  the microsecond bounds of `time`). Then the rule goes to `agents/php.md`, next to the one on `_` in literals.
 
 ## After the roadmap
 

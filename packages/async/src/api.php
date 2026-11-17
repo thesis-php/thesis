@@ -20,6 +20,7 @@ use Thesis\Async\Internal\Workers;
 use Time\Duration;
 use function Thesis\Async\Internal\fiberKey;
 use function Thesis\Time\ns;
+use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
 /**
@@ -709,7 +710,8 @@ function virtualTime(callable $fn, ?EventLoop\Driver $driver = null): mixed
     // the clock does not go back, to a whole second, so that the times of a dump read well. Not rounded
     // at the end of time (an outer burnCpu() of centuries): the rounding would overflow.
     $now = Scope::now();
-    $start = $now <= PHP_INT_MAX - 999_999_999 ? intdiv($now + 999_999_999, 1_000_000_000) * 1_000_000_000 : $now;
+    $second = toNs(sec(1));
+    $start = $now <= PHP_INT_MAX - ($second - 1) ? intdiv($now + $second - 1, $second) * $second : $now;
     $clock = new VirtualClock($start);
     EventLoop::setDriver(new VirtualTimeDriver($clock, $driver));
     Scope::$virtualClock = $clock;

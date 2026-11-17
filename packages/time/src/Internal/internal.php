@@ -8,10 +8,20 @@ use Time\Duration;
 use Time\TimeException;
 
 const NANOSECONDS_PER_MICROSECOND = 1000;
-const NANOSECONDS_PER_MILLISECOND = 1_000_000;
-const NANOSECONDS_PER_SECOND = 1_000_000_000;
-const NANOSECONDS_PER_MINUTE = 60_000_000_000;
-const NANOSECONDS_PER_HOUR = 3_600_000_000_000;
+const NANOSECONDS_PER_MILLISECOND = 1000 * NANOSECONDS_PER_MICROSECOND;
+const NANOSECONDS_PER_SECOND = 1000 * NANOSECONDS_PER_MILLISECOND;
+const MICROSECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MICROSECOND;
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+const NANOSECONDS_PER_MINUTE = SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND;
+const NANOSECONDS_PER_HOUR = SECONDS_PER_HOUR * NANOSECONDS_PER_SECOND;
+
+/**
+ * The longest `Time\Duration` in whole seconds, as the class has it: PHP_INT_MAX nanoseconds less a part of a second.
+ *
+ * @internal
+ */
+const MAX_SECONDS = 9_223_372_035;
 
 /**
  * Every Duration fits in int nanoseconds: its range ends at 9_223_372_035.999999999 seconds, below PHP_INT_MAX.
@@ -39,7 +49,7 @@ function fromUnits(int|float $value, int $nanosecondsPerUnit): Duration
     $nanoseconds = round($value * $nanosecondsPerUnit);
 
     // 2^63: PHP_INT_MAX is not representable as a float, and -2^63 would overflow when negated.
-    if ($nanoseconds >= 9.223_372_036_854_775_808e18 || $nanoseconds <= -9.223_372_036_854_775_808e18) {
+    if ($nanoseconds >= 2.0 ** 63 || $nanoseconds <= -(2.0 ** 63)) {
         throw outOfRange();
     }
 

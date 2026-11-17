@@ -85,7 +85,7 @@ final class Channel
     /**
      * How many bytes of a batch are written at once.
      */
-    private const int BATCH_BYTES = 1_048_576;
+    private const int BATCH_BYTES = 1024 * 1024;
 
     /**
      * How many messages of a batch may wait for a confirm before the batch waits for the oldest one.

@@ -11,11 +11,15 @@ use function Thesis\Time\Internal\divide;
 use function Thesis\Time\Internal\fromNanoseconds;
 use function Thesis\Time\Internal\fromUnits;
 use function Thesis\Time\Internal\outOfRange;
+use const Thesis\Time\Internal\MAX_SECONDS;
+use const Thesis\Time\Internal\MICROSECONDS_PER_SECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_HOUR;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MICROSECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MILLISECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MINUTE;
 use const Thesis\Time\Internal\NANOSECONDS_PER_SECOND;
+use const Thesis\Time\Internal\SECONDS_PER_HOUR;
+use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
 
 /**
  * Unlike Duration::fromNanoseconds(), takes a negative value too.
@@ -269,9 +273,9 @@ function format(Duration $duration): string
         };
     }
 
-    $hours = intdiv($duration->seconds, 3600);
-    $minutes = intdiv($duration->seconds % 3600, 60);
-    $nanoseconds = $duration->seconds % 60 * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
+    $hours = intdiv($duration->seconds, SECONDS_PER_HOUR);
+    $minutes = intdiv($duration->seconds % SECONDS_PER_HOUR, SECONDS_PER_MINUTE);
+    $nanoseconds = $duration->seconds % SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
     $seconds = decimal($nanoseconds, NANOSECONDS_PER_SECOND);
 
     return $sign . match (true) {
@@ -293,14 +297,16 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
     $seconds = $to->getTimestamp() - $from->getTimestamp();
 
     // Far beyond the range of Duration, and the multiplication below would overflow.
-    if ($seconds > 9_223_372_036 || $seconds < -9_223_372_036) {
+    if ($seconds > MAX_SECONDS + 1 || $seconds < -(MAX_SECONDS + 1)) {
         throw outOfRange();
     }
 
     // In microseconds, a second over the range can still come back into it, and nothing overflows.
-    $microseconds = $seconds * 1_000_000 + (int) $to->format('u') - (int) $from->format('u');
+    $microseconds = $seconds * MICROSECONDS_PER_SECOND + (int) $to->format('u') - (int) $from->format('u');
 
-    if ($microseconds > 9_223_372_035_999_999 || $microseconds < -9_223_372_035_999_999) {
+    $maxMicroseconds = MAX_SECONDS * MICROSECONDS_PER_SECOND + MICROSECONDS_PER_SECOND - 1;
+
+    if ($microseconds > $maxMicroseconds || $microseconds < -$maxMicroseconds) {
         throw outOfRange();
     }
 
@@ -316,11 +322,11 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
  */
 function shift(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
 {
-    $microseconds = $time->getTimestamp() * 1_000_000 + $time->getMicrosecond() + toUs($duration);
+    $microseconds = $time->getTimestamp() * MICROSECONDS_PER_SECOND + $time->getMicrosecond() + toUs($duration);
     // A timestamp is floored, and the microseconds are counted up from it, before 1970 too.
-    $seconds = divide($microseconds, 1_000_000, \RoundingMode::NegativeInfinity);
-    $fraction = $microseconds - $seconds * 1_000_000;
-    \assert($fraction >= 0 && $fraction < 1_000_000);
+    $seconds = divide($microseconds, MICROSECONDS_PER_SECOND, \RoundingMode::NegativeInfinity);
+    $fraction = $microseconds - $seconds * MICROSECONDS_PER_SECOND;
+    \assert($fraction >= 0 && $fraction < MICROSECONDS_PER_SECOND);
 
     return $time->setTimestamp($seconds)->setMicrosecond($fraction);
 }

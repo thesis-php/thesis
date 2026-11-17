@@ -110,8 +110,8 @@ final readonly class Config
             authMechanisms: $mechanisms === [] ? [AuthMechanism::Plain, AuthMechanism::AmqPlain] : $mechanisms,
             heartbeat: isset($query['heartbeat']) ? sec(self::int($query, 'heartbeat')) : null,
             connectTimeout: isset($query['connection_timeout']) ? ms(self::int($query, 'connection_timeout')) : null,
-            channelMax: min(65535, self::int($query, 'channel_max')),
-            frameMax: min(4_294_967_295, self::int($query, 'frame_max')),
+            channelMax: min(0xFFFF, self::int($query, 'channel_max')),
+            frameMax: min(0xFF_FF_FF_FF, self::int($query, 'frame_max')),
             connectionName: $query['connection_name'][0] ?? null,
         );
     }

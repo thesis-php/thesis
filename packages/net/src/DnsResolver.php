@@ -34,7 +34,7 @@ final class DnsResolver implements Resolver
      * A day, as most resolvers cap it: a record with a huge TTL must not stay in a long-running process for good.
      * In seconds, as the TTLs on the wire.
      */
-    private const int MAX_TTL = 86_400;
+    private const int MAX_TTL = 24 * 60 * 60;
 
     /**
      * The resolver configured by /etc/resolv.conf and /etc/hosts, read once.

@@ -42,7 +42,7 @@ final class SharedStream implements Reader, Writer, Closer
     /**
      * fread() allocates its whole length up front, so one read is bounded whatever the caller asks for.
      */
-    private const int MAX_READ = 1_048_576;
+    private const int MAX_READ = 1024 * 1024;
     private const int OPS_PER_TICK = 16;
 
     public bool $isClosed {

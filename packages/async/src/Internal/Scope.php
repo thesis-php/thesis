@@ -27,7 +27,7 @@ final class Scope
     /**
      * The longest `Time\Duration` in nanoseconds: a little less than PHP_INT_MAX, the saturated deadline.
      */
-    public const int LONGEST_DURATION = 9_223_372_035_999_999_999;
+    public const int LONGEST_DURATION = 9_223_372_035 * 1_000_000_000 + 999_999_999;
 
     /**
      * The clock of {@see self::now()} while `Thesis\Async\virtualTime()` runs, bound by it.

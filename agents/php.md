@@ -23,6 +23,15 @@ is not here: the tools fix the code anyway.
   is not (`1000`, `3600`, `8192`). A hex literal of up to 4 digits has no `_` (`0xFFFF`, `0x8000`), a longer one
   is grouped by bytes (`0x7F_FF_FF_FF`, `0x01_02_03_04`). Never in a number that names something rather than
   counts (a year, a port, a protocol code: `$port <= 65535`) and never in a fraction.
+- A number derived from simpler ones is written as the computation, PHP folds it at compile time:
+  `1024 * 1024`, `24 * 60 * 60` seconds, `250 * 1_000_000` nanoseconds, `60 * SECONDS_PER_MINUTE`, `2.0 ** 63`.
+  The bound of a binary type is hex (`0xFFFF`, `0xFF_FF_FF_FF`, `-0x80_00_00_00`). A bare literal stays where
+  the number itself is the meaning: a count (`10_000` messages), a limit or a code of a protocol (`65_535` bytes
+  of a datagram, `PIPE_BUF` 4096, a port), a bound with no simpler form (`MAX_SECONDS` of `Time\Duration`).
+- A number is named by a constant when it repeats with one meaning (`SECONDS_PER_HOUR`) or nothing at its place
+  says what it is. It stays a literal where the line already names it: a default of a named parameter
+  (`$heartbeat ?? sec(60)`), a variable (`$defaultPort = ... 5672`), a field on the same line (the flags
+  of the generated `BasicProperties`), a table of protocol codes (`Methods`), a test.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.

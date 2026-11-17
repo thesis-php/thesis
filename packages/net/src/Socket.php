@@ -30,13 +30,13 @@ final class Socket implements Reader, Writer, Closer
     /**
      * Bytes passed to one fwrite() after a partial write, so that a large write is not copied for every syscall.
      */
-    private const int WRITE_CHUNK = 1_048_576;
+    private const int WRITE_CHUNK = 1024 * 1024;
 
     /**
      * fread() allocates its whole length up front, so one read is bounded whatever the caller asks for:
      * a length from a header must not cost its size in memory before a byte has arrived.
      */
-    private const int MAX_READ = 1_048_576;
+    private const int MAX_READ = 1024 * 1024;
 
     /**
      * Reads and writes that do not wait before one yields: enough to drain a burst without a wait for each,
