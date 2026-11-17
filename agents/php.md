@@ -26,6 +26,10 @@ is not here: the tools fix the code anyway.
 - The pipe operator (`|>`) is for an explicit pipeline of several transformations of one value, where it replaces
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
+- A `match` over a closed set (the cases of an enum, the types of a union, a `@phpstan-sealed` interface) names
+  every member, the last one too (`$event instanceof Ended`), and has no `default`: a member added later fails
+  `match.unhandled` in PHPStan instead of falling silently into `default`. `default` is for an open set:
+  a code of a protocol, a string, an implementation of an open interface, `mixed`.
 - No return types on closures and arrow functions: `static fn() => new X()`, not `static fn(): X => new X()`.
   The exception is a closure whose type PHPStan cannot infer through a generic parameter without it
   (nested `callable(): T`, `ScopedValue::with()` in a `group()` in the tests of thesis/async).
@@ -114,6 +118,9 @@ is not here: the tools fix the code anyway.
 
 - Rejected: a mechanical rule for named arguments like "name every argument of a call with more than two",
   it is noise around the standard library.
+- Rejected: `reportAlwaysTrueInLastCondition: true` of PHPStan (it came with the scaffold): it reports the last arm
+  of an exhaustive `match` as always true, so it forced the `default` that hides a new member of a closed set.
+  Turned off, PHPStan still reports a missing member and an always true arm that is not the last.
 - Rejected: a Rector or PHP CS Fixer rule for the named arguments of a multi-line call and for the order
   of static constructors. Both are fragile (the parameters of a method are known only through reflection,
   a static constructor is not always one that returns `self`) and cost much code to write and maintain.

@@ -148,7 +148,7 @@ final class Frames
             $frame === null => 'a heartbeat',
             \is_string($frame) => 'a content body',
             $frame instanceof ContentHeader => 'a content header',
-            default => $frame::class,
+            $frame instanceof Method => $frame::class,
         };
     }
 }
