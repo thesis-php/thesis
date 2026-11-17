@@ -246,7 +246,7 @@ final class Tracer
     /**
      * Called after {@see Scope::notify()} has marked the subtree: no listener runs in the middle of the walk.
      */
-    public function cancelled(Scope $scope, CancelCause $cause, ?Scope $by): void
+    public function cancelled(Scope $scope, CancelCause $cause, ?Scope $by, ?\Throwable $error): void
     {
         $reached = [];
         $cancelled = [];
@@ -277,6 +277,7 @@ final class Tracer
                     CancelCause::Handle, CancelCause::CancelTasks => self::publicCaller(),
                     CancelCause::Failure, CancelCause::Deadline, CancelCause::DaemonsAfterTasks => null,
                 },
+                error: $error,
             ));
         }
     }

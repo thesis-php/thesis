@@ -303,6 +303,36 @@ final class TraceTest
         ]);
     }
 
+    public function givesFailureThatHasCancelledToObserver(): void
+    {
+        $ofTask = new \RuntimeException();
+        $ofBody = new \LogicException();
+        $log = self::record(static function () use ($ofTask, $ofBody) {
+            thrown(static fn() => group(static function (Group $group) use ($ofTask) {
+                $group->spawn(static fn() => never());
+                $group->spawn(static fn() => throw $ofTask);
+            }));
+            thrown(static fn() => group(static function (Group $group) use ($ofBody) {
+                $group->spawn(static fn() => never());
+
+                throw $ofBody;
+            }));
+            timeoutOr(sec(1), static fn() => never());
+        });
+
+        $cancellations = array_values(array_filter(
+            $log->events,
+            static fn(Event $event) => $event instanceof ScopeCancelled,
+        ));
+        $errors = array_map(static fn(ScopeCancelled $event) => [$event->cause, $event->error], $cancellations);
+
+        Assert::same($errors, [
+            [CancelCause::Failure, $ofTask],
+            [CancelCause::Failure, $ofBody],
+            [CancelCause::Deadline, null],
+        ]);
+    }
+
     public function givesTaskToObserver(): void
     {
         $task = static fn() => null;

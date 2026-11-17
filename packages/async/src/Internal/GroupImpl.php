@@ -172,7 +172,7 @@ final class GroupImpl implements Group
             Suppressed::add($this->error, $error);
         }
 
-        $this->bodyScope->cancel(CancelCause::Failure, $by);
+        $this->bodyScope->cancel(CancelCause::Failure, $by, $error);
     }
 
     /**

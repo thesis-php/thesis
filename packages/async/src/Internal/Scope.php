@@ -175,12 +175,13 @@ final class Scope
      * A no-op if the scope is already cancelled, by its owner or through an ancestor: its subtree is notified then.
      *
      * @param ?self $by the scope that cancels it, for the trace: null for none
+     * @param ?\Throwable $error the failure that cancels it, for the trace: only for {@see CancelCause::Failure}
      */
-    public function cancel(CancelCause $cause, ?self $by): void
+    public function cancel(CancelCause $cause, ?self $by, ?\Throwable $error = null): void
     {
         if (!$this->cancelled) {
             $this->notify();
-            self::$tracer?->cancelled($this, $cause, $by);
+            self::$tracer?->cancelled($this, $cause, $by, $error);
         }
     }
 

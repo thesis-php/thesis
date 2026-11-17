@@ -137,6 +137,7 @@ final class NdjsonWriter
             'by' => $event->by,
             'reached' => $event->reached,
             'caller' => self::caller($event->caller),
+            'error' => self::error($event->error),
         ]);
     }
 

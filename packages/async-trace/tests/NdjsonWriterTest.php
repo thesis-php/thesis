@@ -104,6 +104,7 @@ final class NdjsonWriterTest
                 'by' => 1,
                 'reached' => [1],
                 'caller' => null,
+                'error' => null,
             ],
             [
                 'event' => 'Resumed',
@@ -141,6 +142,12 @@ final class NdjsonWriterTest
             'by' => 3,
             'reached' => [1, 2],
             'caller' => null,
+            'error' => [
+                'class' => \RuntimeException::class,
+                'message' => 'boom',
+                'file' => __FILE__,
+                'line' => $line + 5,
+            ],
         ]]);
         Assert::same(self::ofEvent($records, 'Ended')[0] ?? null, [
             'event' => 'Ended',
@@ -171,6 +178,7 @@ final class NdjsonWriterTest
             'by' => 1,
             'reached' => [2],
             'caller' => ['callee' => 'Thesis\Async\Task::cancel', 'file' => __FILE__, 'line' => $line],
+            'error' => null,
         ]]);
     }
 

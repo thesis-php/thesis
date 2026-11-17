@@ -97,7 +97,7 @@ of its class:
 | `TaskStarted` | |
 | `Suspended` | `caller` |
 | `Resumed` | `error` |
-| `ScopeCancelled` | `cause` (a case of `CancelCause`: `Deadline`, `Failure`, ...), `by`, `reached`, `caller` (of `Task::cancel()` and `Group::cancelTasks()`, `null` for the other causes) |
+| `ScopeCancelled` | `cause` (a case of `CancelCause`: `Deadline`, `Failure`, ...), `by`, `reached`, `caller` (of `Task::cancel()` and `Group::cancelTasks()`), `error` (of `Failure`) |
 | `Joining` | |
 | `Ended` | `value`, `error` |
 

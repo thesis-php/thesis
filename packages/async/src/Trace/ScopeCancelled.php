@@ -26,6 +26,8 @@ final readonly class ScopeCancelled implements Event
      * @param ?Caller $caller the call that has cancelled, outside the library: `Thesis\Async\Task::cancel`
      *     or `Thesis\Async\Group::cancelTasks` and where it is written; null for the other causes,
      *     where the library cancels and `$by` says why
+     * @param ?\Throwable $error what has failed, for `Failure`: what the task or the body has thrown,
+     *     or the error of the event loop; null for the other causes
      */
     public function __construct(
         public int $scope,
@@ -34,5 +36,6 @@ final readonly class ScopeCancelled implements Event
         public ?int $by,
         public array $reached,
         public ?Caller $caller,
+        public ?\Throwable $error,
     ) {}
 }
