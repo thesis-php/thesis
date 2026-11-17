@@ -18,7 +18,7 @@ final class ErrorHandler
 
     /**
      * @param ?callable(int, string, string, int): mixed $previous
-     * @param \WeakMap<object, non-empty-list<int>> $levelsOfFibers
+     * @param \WeakMap<object, int> $levelsOfFibers
      */
     public function __construct(
         private readonly mixed $previous,
@@ -32,8 +32,7 @@ final class ErrorHandler
     public function __invoke(int $level, string $message, string $file, int $line): bool
     {
         // The error may be of any fiber, not of the one that set this copy
-        $stack = $this->levelsOfFibers[\Fiber::getCurrent() ?? $this->main] ?? [];
-        $levels = array_last($stack) ?? 0;
+        $levels = $this->levelsOfFibers[\Fiber::getCurrent() ?? $this->main] ?? 0;
         // Per fiber: @ in another fiber does not change it
         $reported = (error_reporting() & $level) !== 0;
 

@@ -20,7 +20,7 @@ use Thesis\Exceptionally\Internal\ErrorHandler;
 function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED): mixed
 {
     // Per fiber: while a call is suspended, other fibers run under its handler
-    /** @var \WeakMap<object, non-empty-list<int>> $levelsOfFibers */
+    /** @var \WeakMap<object, int> $levelsOfFibers */
     static $levelsOfFibers = new \WeakMap();
     // {main} has no \Fiber, so it gets a key of its own
     /** @var \stdClass */
@@ -28,10 +28,8 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
 
     // NEVER keep the key in a variable: kept while the fiber is suspended in $fn(), it is a reference
     // from the stack of the fiber to the fiber itself, a cycle that outlives the last reference to the fiber
-    $levelsOfFibers[\Fiber::getCurrent() ?? $main] = [
-        ...($levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? []),
-        $levels,
-    ];
+    $outerLevels = $levelsOfFibers[\Fiber::getCurrent() ?? $main] ?? null;
+    $levelsOfFibers[\Fiber::getCurrent() ?? $main] = $levels;
 
     $handler = get_error_handler();
 
@@ -53,13 +51,10 @@ function exceptionally(callable $fn, int $levels = E_ALL & ~E_DEPRECATED & ~E_US
             --$top->finishedCalls;
         }
 
-        $stack = $levelsOfFibers[\Fiber::getCurrent() ?? $main];
-        array_pop($stack);
-
-        if ($stack === []) {
+        if ($outerLevels === null) {
             unset($levelsOfFibers[\Fiber::getCurrent() ?? $main]);
         } else {
-            $levelsOfFibers[\Fiber::getCurrent() ?? $main] = $stack;
+            $levelsOfFibers[\Fiber::getCurrent() ?? $main] = $outerLevels;
         }
     }
 

@@ -7,6 +7,9 @@
 - The handler stack of PHP is global, a call belongs to one fiber. So the levels live per fiber (`$levelsOfFibers`,
   keyed by `\Fiber::getCurrent() ?? $main`), and every `Internal\ErrorHandler`, of a finished call too, reads
   the levels of the fiber the error comes from.
+- The map holds one `int` per fiber, the levels of its innermost running call. A call keeps the levels
+  of the outer one in a local variable and puts them back in `finally`: the nested calls of a fiber lie
+  on its stack anyway. `null` there means no outer call, the entry is removed.
 - While an `ErrorHandler` is on top, a call sets the same object again. A new one is made only above a handler
   of other code (or none), which becomes its `$previous`. So `$previous` is never ours, a passed on error makes
   one hop for any number of suspended calls (1 ms through 1000 handlers otherwise,
@@ -77,6 +80,15 @@
 - The parameters are `$fn` and `$levels`, not `$function` and `$errorLevels` of 0.3: the release breaks the API anyway.
 - Rejected: one handler set once and never restored: code that sets a handler for a while and restores it
   (a test framework per test) would remove ours and leave its own forever.
+- A call costs about 400 ns (PHP 8.5, no opcache), a `file_get_contents()` of a small file 3 to 4 µs.
+  Rejected: a list of levels per fiber in the map instead of the local variable, 100 ns more for a call.
+  Rejected: a second function for a callable that does not suspend (a handler per call, a blind restore),
+  190 ns: when the callable suspends after all, errors of other fibers are thrown and the restore takes off
+  a handler of other code, silently.
+  Rejected, may be worth it on a warmer path: no state per fiber, the handler walks `debug_backtrace()`
+  to the nearest frame of `exceptionally()` for its `$levels` and stops at a frame of `\Fiber` (below are
+  the frames of the code that resumed the fiber). 250 ns for a call, but 1 µs more for every reported error
+  at a depth of 5 frames and 5 µs at 50 while any call runs, and it depends on the shape of the backtrace.
 - Rejected: `@` with `error_get_last()`, also for the reason of a `false`: it is empty when the handler
   of the application returned `true`, after a suspension it may be of another fiber, and it keeps only the last one.
 
