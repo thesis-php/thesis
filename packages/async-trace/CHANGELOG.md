@@ -14,3 +14,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WhoCancelled`: a `CancelledBy` report for each scope that ends as cancelled, with the deadline, the call
   or the failure that has cancelled it.
 - `BlockingDetector`: a `Blocked` report for each run of code longer than a threshold, with the waits around it.
+- `LongWaitDetector`: a `LongWait` report for each wait that lasts a threshold, while it still waits.

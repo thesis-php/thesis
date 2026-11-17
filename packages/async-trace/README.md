@@ -4,7 +4,8 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/async-trace)](https://github.com/thesis-php/async-trace/releases)
 
 Tools around the trace of [thesis/async](https://github.com/thesis-php/async): its events written as NDJSON,
-one line per event, and as lines of text for tests, who has cancelled a scope, and code that blocks the others.
+one line per event, and as lines of text for tests, who has cancelled a scope, code that blocks the others,
+and waits that last too long.
 
 ```php
 use Thesis\Dispatcher;
@@ -147,6 +148,38 @@ observe($dispatcher, static fn() => group(static fn(Group $group) => $group->spa
 ```
 
 It listens to the waits, so each costs a backtrace: a tool for debugging, not for every request in production.
+
+## `LongWaitDetector`
+
+A task that hangs gives no sign: a response that never comes, a channel nobody sends to, a lock nobody releases.
+`LongWaitDetector` is a watchdog: a wait that lasts its threshold is reported as `LongWait` while it still waits,
+once per wait, to the same dispatcher as the events:
+
+```php
+use Thesis\AsyncTrace\LongWait;
+use Thesis\AsyncTrace\LongWaitDetector;
+use function Thesis\Time\sec;
+
+$print = static function (LongWait $report) {
+    fwrite(STDERR, $report . "\n");
+};
+observe(new Dispatcher([new LongWaitDetector(threshold: sec(5)), $print]), $main);
+// #2 task 'fetch' at /app/src/main.php:12 has been waiting 5s in Thesis\Async\Channel::receive()
+// at /app/src/main.php:14
+```
+
+The report has `scope`, `what`, `at` (the beginning of the wait), `duration` (how long it has waited, the threshold
+or a hair more) and `wait` (the call that waits). A hang brings no event, so the report comes from a timer
+of the event loop, outside the scope tree. The timer is unreferenced, so it never keeps the program alive,
+and it is there only while a wait is not reported yet. Under `VirtualTime\run()` it is virtual like every timer:
+`delay(hours(1))` with a threshold of 5 seconds is reported at once, at the fifth virtual second.
+A wait that ends exactly at the threshold may be reported or not, as the order of the callbacks of one tick decides.
+
+A listener of the reports is called from that timer, not from a listener of `observe()`, but with the same rules:
+it must not throw or suspend the fiber. Not seen: the waits of the root scope, as with `BlockingDetector`
+(run the code in a task), and a hang of the whole loop, which is blocking code. A process that waits on purpose,
+a server on `accept()` or a consumer on an empty queue, gets a report per such wait: a tool for debugging,
+and each wait costs a backtrace.
 
 ## The format, version 1
 

@@ -95,6 +95,15 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of the body would last until another fiber starts, and a run of the parent begins at `Ended` of the group.
   Trap: a run that begins while another is open has lost its end to a wait outside the tree (in the root scope):
   it is dropped, not reported with a wrong end.
+- `LongWaitDetector` reports from a timer of the event loop: a hang brings no event. One timer for the first wait
+  not reported yet (the waits are kept in the order they begin, so the first one is due first), unreferenced,
+  cancelled once nothing waits, so nothing is left in the loop after `observe()`. A timer that wakes a hair early
+  (Revolt's timers are float seconds) arms again for the rest. A wait is due when it has lasted the threshold,
+  not longer: the timer fires at the threshold, and with `>` a wait due on that very nanosecond would arm a timer
+  of zero seconds again and again, which never moves the virtual clock. The price: a wait that ends exactly
+  at the threshold is reported or not by the order of the callbacks of one tick.
+  Rejected: a timer per wait, a timer created and cancelled on every wait. Rejected: a repeating timer of a fixed
+  period, a report late by up to the period and a wake-up of the loop while nothing waits long.
 - Not yet: following a chain of causes, such as a task failed by the `TaskCancelled` of a task it awaited,
   cancelled in its turn. The first cause covers the deadlines, the calls and the failures.
 - An error is its class, message, file and line, without the previous ones and the trace:

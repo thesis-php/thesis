@@ -5,10 +5,10 @@ declare(strict_types=1);
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others.',
+    description: 'Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long.',
     licenseSince: 2026,
     version: '0.1',
-    keywords: ['php', 'async', 'fibers', 'tracing', 'ndjson', 'debugging', 'cancellation', 'blocking'],
+    keywords: ['php', 'async', 'fibers', 'tracing', 'ndjson', 'debugging', 'cancellation', 'blocking', 'watchdog'],
     require: [
         'psr/clock' => '^1.0',
         'thesis/async' => '*',

@@ -1,6 +1,6 @@
 {
     "name": "thesis/async-trace",
-    "description": "Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others.",
+    "description": "Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long.",
     "keywords": [
         "php",
         "async",
@@ -9,7 +9,8 @@
         "ndjson",
         "debugging",
         "cancellation",
-        "blocking"
+        "blocking",
+        "watchdog"
     ],
     "license": "MIT",
     "type": "library",
