@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A listener gets the dispatcher as its second argument, to dispatch events of its own:
+  `static function (OrderPlaced $event, Dispatcher $dispatcher)`.
+
+### Changed
+
+- **BC break:** A second parameter of a listener that does not take `Thesis\Dispatcher` gets it anyway
+  and fails. Declare it after a parameter of the dispatcher.
+
 ## [0.3.0] - 2026-11-17
 
 The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis) and was written anew.

@@ -159,12 +159,26 @@ final class DispatcherTest
         Assert::same($listener->calls, [$event]);
     }
 
-    public function takesAListenerWithOptionalParametersAfterTheEvent(): void
+    public function passesItselfAsTheSecondArgument(): void
+    {
+        $passed = [];
+        $listener = static function (Other $event, Dispatcher $dispatcher) use (&$passed) {
+            $passed[] = $dispatcher;
+        };
+        $dispatcher = new Dispatcher([$listener]);
+
+        $dispatcher->dispatch(new Other());
+
+        Assert::same($passed, [$dispatcher]);
+    }
+
+    public function takesAListenerWithOptionalParametersAfterTheDispatcher(): void
     {
         $calls = [];
-        $dispatcher = new Dispatcher([static function (Other $event, int $times = 2) use (&$calls) {
+        $listener = static function (Other $event, Dispatcher $dispatcher, int $times = 2) use (&$calls) {
             $calls[] = $times;
-        }]);
+        };
+        $dispatcher = new Dispatcher([$listener]);
 
         $dispatcher->dispatch(new Other());
 
@@ -204,23 +218,21 @@ final class DispatcherTest
         Assert::same($calls, []);
     }
 
-    public function dispatchesFromAListener(): void
+    public function callsTheListenersOfAnEventDispatchedByAListenerBeforeTheNextListener(): void
     {
         $calls = [];
-        $dispatcher = null;
-        $dispatcher = new Dispatcher([
-            static function (Other $event) use (&$dispatcher, &$calls) {
-                $calls[] = Other::class;
-                $dispatcher?->dispatch(new Unrelated());
-            },
-            static function (Unrelated $event) use (&$calls) {
-                $calls[] = Unrelated::class;
-            },
-        ]);
+        $producer = static function (Other $event, Dispatcher $dispatcher) use (&$calls) {
+            $calls[] = 'producer';
+            $dispatcher->dispatch(new Unrelated());
+        };
+        $consumer = static function (Other|Unrelated $event) use (&$calls) {
+            $calls[] = $event::class;
+        };
+        $dispatcher = new Dispatcher([$producer, $consumer]);
 
         $dispatcher->dispatch(new Other());
 
-        Assert::same($calls, [Other::class, Unrelated::class]);
+        Assert::same($calls, ['producer', Unrelated::class, Other::class]);
     }
 
     public function letsAListenerSuspendTheFiber(): void
@@ -367,12 +379,6 @@ final class DispatcherTest
             ' must take the event by value, not by reference.',
         ];
 
-        // @phpstan-ignore generator.valueType (a listener with a second required parameter is the case)
-        yield 'a second required parameter' => [
-            static function (Other $event, int $times) {},
-            'times',
-            ' must be optional: a listener is called with the event only.',
-        ];
     }
 
     /**

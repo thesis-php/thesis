@@ -43,8 +43,27 @@ It gets the event as its first parameter, and the type of that parameter says wh
 
 `self` and `parent` name the class of the method. The constructor checks every listener and throws
 `\InvalidArgumentException` if it cannot take an event: no parameter, a nullable type (the dispatcher never passes
-`null`), a scalar, a class or an interface that does not exist, a variadic or a reference parameter, a second
-parameter that is not optional, a generator (its body would not run).
+`null`), a scalar, a class or an interface that does not exist, a variadic or a reference parameter,
+a generator (its body would not run).
+
+The second argument of a listener is the dispatcher itself, for a listener that dispatches events of its own.
+A listener that does not need it declares the event alone:
+
+```php
+$dispatcher = new Dispatcher([
+    static function (OrderPlaced $event, Dispatcher $dispatcher) {
+        if ($event->total > 1000) {
+            $dispatcher->dispatch(new LargeOrderPlaced($event));
+        }
+    },
+    static function (LargeOrderPlaced $event) { /* ... */ },
+]);
+```
+
+The parameters after the event are checked by PHPStan, not by the constructor: the second one takes
+`Thesis\Dispatcher`, the ones after it are optional. Only a function of PHP itself that declares one parameter
+(`$queue->push(...)`) cannot be a listener: unlike a function written in PHP, it rejects an argument
+it does not declare.
 
 ### Subscribers
 
@@ -79,6 +98,10 @@ It takes any iterable of them (an array, a generator, a tagged collection of a c
 There are no priorities and no stopping. What a listener throws is thrown from `dispatch()`, and the listeners
 after it are not called. A listener may suspend the fiber, and then `dispatch()` waits for it: the next listener
 is called after it returns.
+
+An event dispatched by a listener goes to its listeners at once, before the next listener of the first event
+is called. So a listener that stands after the one that dispatches gets the new event before the one
+that has caused it: put a listener that dispatches after those that take both events.
 
 The listeners of a class are found on its first event and kept, so every next event costs one lookup by its class.
 A dispatcher is immutable: to add listeners, create another one, `new Dispatcher([...$listeners, ...$more])`.

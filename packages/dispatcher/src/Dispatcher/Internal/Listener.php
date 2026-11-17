@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Dispatcher\Internal;
 
+use Thesis\Dispatcher;
 use function Thesis\Formatter\formatReflectedFunction;
 use function Thesis\Formatter\formatReflectedParameter;
 
@@ -16,11 +17,11 @@ use function Thesis\Formatter\formatReflectedParameter;
 final readonly class Listener
 {
     /**
-     * @param callable(never): void $listener
+     * @param callable(never, Dispatcher): void $listener
      */
     public static function of(callable $listener): self
     {
-        /** @var \Closure(object): void $fn the parameter is checked below */
+        /** @var \Closure(object, Dispatcher): void $fn the parameter of the event is checked below */
         $fn = \Closure::fromCallable($listener);
         $function = new \ReflectionFunction($fn);
         $parameters = $function->getParameters();
@@ -55,20 +56,11 @@ final readonly class Listener
             ));
         }
 
-        $next = $parameters[1] ?? null;
-
-        if ($next !== null && !$next->isOptional()) {
-            throw new \InvalidArgumentException(\sprintf(
-                '%s must be optional: a listener is called with the event only.',
-                formatReflectedParameter($next),
-            ));
-        }
-
         return new self($fn, self::types($event));
     }
 
     /**
-     * @param \Closure(object): void $fn
+     * @param \Closure(object, Dispatcher): void $fn
      * @param ?list<list<class-string>> $types null for every event
      */
     private function __construct(

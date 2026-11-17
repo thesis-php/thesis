@@ -16,7 +16,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   a union, an intersection and a DNF go through one match, and a listener is added once per class whatever
   number of its types matches.
 - The order is the order of the constructor. A dispatcher is immutable, so the table is never invalidated
-  and a listener added during `dispatch()` is not a case.
+  and a listener added during `dispatch()` is not a case. For the same reason a listener may dispatch:
+  it is a plain nested call, its listeners run before the next listener of the outer event.
+- Every listener is called with the event and the dispatcher, `$listener($event, $this)`: nothing about
+  the second parameter is reflected or decided per listener. The parameters after the event are a contract
+  of types (`callable(never, self): void` of the constructor, `php.md`), not of the constructor's checks.
+  `ListenerRule` of `phpstan-extension` checks them for a marked method: `listenersOf()` gives closures
+  of any signature, PHPStan does not see through it.
 - `dispatch()` does not care whether a listener suspends the fiber: `resolve()` does not suspend, so concurrent
   dispatches from other fibers see a consistent table. A ban on suspending belongs to the user of the dispatcher
   (the trace of thesis/async calls its listeners inside a wait), not here.
@@ -29,6 +35,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   and every use of it is reported (`cast.useless`). A closure assigned to a variable first keeps its declared type,
   as the tests of thesis/async and thesis/async-trace do. A fix belongs in the type of the constructor
   or in phpstan-extension, it is not made yet.
+- Trap: an internal function that declares one parameter (`$queue->push(...)`) passes PHPStan as a listener
+  and throws `ArgumentCountError` on its first event. PHP ignores an argument that a user function does not declare,
+  an internal one rejects it.
 
 ## Decisions
 
@@ -46,7 +55,23 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - The constructor takes an `iterable` of listeners, not `callable ...$listeners`: no parameter can follow
   a variadic one, so an option added later would go before the listeners and break every call.
   An iterable, not an array: containers give their tagged services as one.
-- Rejected: priorities, until someone needs them.
+- A listener gets the dispatcher as its second argument: a listener that derives events of its own (a tool
+  of thesis/async-trace reports what it has found) needs the dispatcher that holds it, and an immutable dispatcher
+  cannot be given to the constructor of its own listener. Rejected: passing it only to a listener whose second
+  parameter is typed `Thesis\Dispatcher` (reflection per listener and a wrapper closure in the table that holds
+  the dispatcher, a cycle), a constructor that takes a factory of listeners `fn(Dispatcher $self) => [...]`
+  (`$this` leaves the constructor half-built), a listener that returns events (a check per call, and
+  "nothing comes back" below).
+- Rejected: a queue for the events dispatched by a listener, delivered after the listeners of the outer event.
+  `dispatch()` would return before the delivery inside a listener and after it outside, what a listener of the inner
+  event throws would leave the outer `dispatch()`, and a listener may suspend the fiber, so "the outer dispatch"
+  needs a flag per fiber on the hot path. Rejected: a limit of the depth, a counter and a `try` per event against
+  a mistake that fails on its first run.
+- Rejected: priorities, until someone needs them. The order of a listener that dispatches is the one case
+  where they would help ("it goes after those that take both events"), for now it is a line of `README.md`.
+  A number has to be agreed between packages and makes the order a part of the meaning of a listener.
+  If the order becomes a trap, the candidate is two phases without numbers: the listeners that dispatch
+  are called after the rest.
 - Rejected: not caching `listens()` of a class that is not declared yet. Its parameter is a `class-string`,
   and `is_a()` autoloads it, so only a class declared later by `eval()` or a condition is cached wrong:
   a check of `class_exists()` per miss for a case the type already excludes.

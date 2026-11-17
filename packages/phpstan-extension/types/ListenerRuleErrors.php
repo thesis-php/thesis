@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\PhpstanExtension;
 
+use Thesis\Dispatcher;
 use Thesis\Dispatcher\Listener;
 
 /**
@@ -17,6 +18,40 @@ abstract class ListenerRuleErrors
 
     #[Listener]
     final public static function isAStaticListener(object $event): void {}
+
+    #[Listener]
+    final public function takesTheDispatcher(object $event, Dispatcher $dispatcher, int $times = 1): void {}
+
+    #[Listener]
+    final public function takesAnyObject(object $event, ?object $dispatcher = null): void {}
+
+    #[Listener]
+    final public function takesAnything(object $event, mixed $dispatcher): void {}
+
+    #[Listener]
+    final public function takesDispatchers(object $event, Dispatcher ...$dispatchers): void {}
+
+    #[Listener]
+    final public function takesNoDispatcher(
+        object $event,
+        // @phpstan-ignore thesis.listenerSecondParameter (the case)
+        int $times,
+    ): void {}
+
+    #[Listener]
+    final public function takesNoDispatcherByDefault(
+        object $event,
+        // @phpstan-ignore thesis.listenerSecondParameter (the case)
+        int $times = 1,
+    ): void {}
+
+    #[Listener]
+    final public function takesMoreThanTheDispatcher(
+        object $event,
+        Dispatcher $dispatcher,
+        // @phpstan-ignore thesis.listenerRequiredParameter (the case)
+        int $times,
+    ): void {}
 
     // @phpstan-ignore thesis.listenerNotPublic (the case)
     #[Listener]

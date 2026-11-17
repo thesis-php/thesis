@@ -9,7 +9,8 @@ use Thesis\Dispatcher\Internal\Listener;
 /**
  * Calls the listeners of an event one by one, in the order they are given. A listener gets the events
  * of the type of its first parameter: a class or an interface, a union or an intersection of them,
- * or every event for `object`, `mixed` and no type.
+ * or every event for `object`, `mixed` and no type. The second argument of a listener is this dispatcher,
+ * for the events the listener dispatches itself.
  *
  * @api
  */
@@ -24,12 +25,12 @@ final class Dispatcher
      * Filled on the first event of each class: the classes of the events are not known in advance,
      * a listener of an interface gets the events of classes that are not loaded yet.
      *
-     * @var array<class-string, list<\Closure(object): void>>
+     * @var array<class-string, list<\Closure(object, self): void>>
      */
     private array $listenersByClass = [];
 
     /**
-     * @param iterable<callable(never): void> $listeners called in the order of iteration, the keys are ignored
+     * @param iterable<callable(never, self): void> $listeners called in the order of iteration, the keys are ignored
      * @throws \InvalidArgumentException if a listener cannot take an event or is a generator
      */
     public function __construct(iterable $listeners = [])
@@ -39,12 +40,13 @@ final class Dispatcher
 
     /**
      * A listener may suspend the fiber: then so does this call. What a listener throws is thrown here,
-     * the listeners after it are not called.
+     * the listeners after it are not called. An event dispatched by a listener goes to its listeners at once,
+     * before the next listener of $event is called.
      */
     public function dispatch(object $event): void
     {
         foreach ($this->listenersByClass[$event::class] ?? $this->resolve($event::class) as $listener) {
-            $listener($event);
+            $listener($event, $this);
         }
     }
 
@@ -60,7 +62,7 @@ final class Dispatcher
 
     /**
      * @param class-string $class
-     * @return list<\Closure(object): void>
+     * @return list<\Closure(object, self): void>
      */
     private function resolve(string $class): array
     {

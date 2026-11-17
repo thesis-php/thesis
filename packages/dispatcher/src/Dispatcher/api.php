@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Dispatcher;
 
+use Thesis\Dispatcher;
 use function Thesis\Formatter\formatClass;
 use function Thesis\Formatter\formatReflectedFunction;
 
@@ -13,7 +14,7 @@ use function Thesis\Formatter\formatReflectedFunction;
  * those declared in its class first, then the inherited ones. The dispatcher checks each of them as any listener.
  *
  * @api
- * @return non-empty-list<\Closure(never): void>
+ * @return non-empty-list<\Closure(never, Dispatcher): void>
  * @throws \InvalidArgumentException if a marked method is not public or no method is marked
  */
 function listenersOf(object $subscriber): array

@@ -24,6 +24,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `thesis.<camelCase>`, so a user ignores exactly it. A rule checks only what the package cannot check itself
   or checks only at runtime: `ListenerRule` repeats the runtime check of a method that is not public to report it
   without running, and adds the one `listenersOf()` cannot do (an abstract method, the mark is not inherited).
+  The parameters after the event are checked only here: for a callable given to the dispatcher PHPStan does it
+  by the type of the constructor, but `listenersOf()` returns the marked methods as closures of any signature.
 
 ## Decisions
 

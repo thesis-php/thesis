@@ -62,7 +62,8 @@ need no extension: their generics are precise.
 
 ## thesis/dispatcher
 
-A method marked `#[Listener]` must be public and have a body:
+A method marked `#[Listener]` must be public and have a body. The dispatcher calls it with the event and itself,
+so its second parameter, if any, must take `Thesis\Dispatcher`, and the ones after it must be optional:
 
 ```php
 abstract class Mailer
@@ -72,7 +73,21 @@ abstract class Mailer
 
     #[Listener] // thesis.listenerAbstract: the mark is not inherited, so its implementations are not listeners
     abstract public function onPlaced(OrderPlaced $event): void;
+
+    #[Listener]
+    public function onCancelled(
+        OrderCancelled $event,
+        int $attempt = 1, // thesis.listenerSecondParameter: it would get the dispatcher
+    ): void { /* ... */ }
+
+    #[Listener]
+    public function onShipped(
+        OrderShipped $event,
+        Dispatcher $dispatcher,
+        Clock $clock, // thesis.listenerRequiredParameter: the dispatcher passes the event and itself only
+    ): void { /* ... */ }
 }
 ```
 
-`listenersOf()` finds the first error only when it runs, and the second never.
+`listenersOf()` finds the first error only when it runs, and the second never. The last two fail
+only on the first event of the listener.
