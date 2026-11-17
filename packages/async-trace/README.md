@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/async-trace)](https://github.com/thesis-php/async-trace/releases)
 
 Tools around the trace of [thesis/async](https://github.com/thesis-php/async): its events written as NDJSON,
-one line per event.
+one line per event, and as lines of text for tests.
 
 ```php
 use Thesis\Dispatcher;
@@ -34,6 +34,47 @@ It writes synchronously, as a listener must: pass a blocking stream (a file, `ph
 It never throws: a line it could not write is counted in `$writer->lost`. Wrap `observe()` in
 `VirtualTime\run()` for a trace that is the same on every run, `start` of the header aside
 (pass a `Thesis\Time\FrozenClock` as the second argument to fix it too).
+
+## `TextLog`
+
+A listener of every event, a method per event like `NdjsonWriter`, that keeps each as a line of text,
+`<seconds> #<scope> <what>`. On virtual time the lines are the same on every run, so a test compares them
+with what it expects:
+
+```php
+use Testo\Assert;
+use Thesis\AsyncTrace\TextLog;
+
+$log = new TextLog();
+observe(new Dispatcher(listenersOf($log)), static fn() => timeoutOr(sec(2), static fn() => delay(sec(5))));
+
+Assert::same($log->lines, [
+    '0 #1 timeout 2s in root',
+    '0 #1 suspended in Thesis\Async\delay',
+    '2 #1 cancelled: Deadline by #1, reached #1',
+    '2 #1 resumed by Cancelled',
+    '2 #1 threw Cancelled',
+]);
+```
+
+The lines stay in memory: it is for a test or a short program. The seconds are exact, without trailing zeros
+(`0`, `1.5`, `1.000000001`). A scope is `#<number>`, `root` for none. A name and a value are PHP literals
+of [thesis/formatter](https://github.com/thesis-php/formatter), an error is the short name of its class:
+
+| Event | Line |
+|---|---|
+| `GroupCreated` | `group 'checkout' in root`, `all in #1, cancelled` (the function that has created it) |
+| `TaskCreated` | `task 'fetch' in #1`, `daemon in #1` |
+| `TimeoutCreated` | `timeout 1.5s in #1` |
+| `ShieldCreated` | `shield in #1` |
+| `TaskStarted` | `started` |
+| `Suspended` | `suspended in Thesis\Async\delay`, `suspended` if the caller is unknown |
+| `Resumed` | `resumed`, `resumed by Cancelled` |
+| `ScopeCancelled` | `cancelled: Failure by #3, reached #1 #2` |
+| `Joining` | `joining` |
+| `Ended` | `returned 42`, `threw RuntimeException` |
+
+A line is for reading and comparing, not parsing: a tool reads the NDJSON.
 
 ## The format, version 1
 

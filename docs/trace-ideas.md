@@ -53,8 +53,7 @@ of the losses: the program never slows down for its observer.
 
 ### Tests
 
-- **The text format of lines** (`0 #2 suspended in Thesis\Async\delay`) of `TraceTest` becomes public:
-  on virtual time it is a snapshot test of the order of events.
+- **The text format of lines** (`0 #2 suspended in Thesis\Async\delay`): done, `TextLog` of thesis/async-trace.
 - **`testo-plugin`**: a failed test gets its trace in the report. Invariants are checked on the way:
   every created scope has ended, no task has outlived its group. A scope still open at the end of a test
   is a leaked task.
@@ -104,8 +103,8 @@ of the losses: the program never slows down for its observer.
 
 ## Order
 
-1. The NDJSON record (done: `NdjsonWriter` of thesis/async-trace), the public text format, the model of the state:
-   the base, partly in the tests already.
+1. The model of the state: the base, `tests/TraceChecker.php` of thesis/async is its beginning.
+   Done: the NDJSON record (`NdjsonWriter` of thesis/async-trace) and the text format (`TextLog`).
 2. The export to Perfetto: the course and debugging for a small price.
 3. The detector of blocking code, the watchdog of long waits, who has cancelled me.
 4. The dump by a signal, once the choice between the walk of the tree and the events is made.

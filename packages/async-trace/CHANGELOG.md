@@ -10,3 +10,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `NdjsonWriter`: a listener of `Trace\observe()` of thesis/async that writes every event as a line of JSON.
+- `TextLog`: a listener that keeps every event as a line of text, for tests on virtual time.

@@ -18,6 +18,7 @@ use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\AsyncTrace\Tests\unheardEvents;
 use function Thesis\Dispatcher\listenersOf;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
@@ -144,7 +145,12 @@ final class NdjsonWriterTest
             'scope' => 3,
             'at' => 1_000_000_000,
             'value' => null,
-            'error' => ['class' => \RuntimeException::class, 'message' => 'boom', 'file' => __FILE__, 'line' => $line + 5],
+            'error' => [
+                'class' => \RuntimeException::class,
+                'message' => 'boom',
+                'file' => __FILE__,
+                'line' => $line + 5,
+            ],
         ]);
     }
 
@@ -170,31 +176,16 @@ final class NdjsonWriterTest
         Assert::same(array_column(self::ofEvent($records, 'GroupCreated'), 'name'), ["bad \u{FFFD}"]);
     }
 
-    public function listensToEveryEventOfAsync(): void
+    public function takesNoEventOfNewerAsyncItDoesNotKnow(): void
     {
         $dispatcher = new Dispatcher(listenersOf(new NdjsonWriter(self::memory('w+'), self::clock())));
-        // PHPStan keeps the sealed list of Event complete: a class not in it cannot implement Event.
-        $doc = new \ReflectionClass(Event::class)->getDocComment();
-        Assert::string($doc);
-        if (preg_match('/@phpstan-sealed\h+(\S+)/', $doc, $matches) !== 1) {
-            throw new \LogicException('Event has no @phpstan-sealed list.');
-        }
 
-        $missing = [];
-        $unheard = [];
+        Assert::false($dispatcher->listens(Event::class));
+    }
 
-        foreach (explode('|', $matches[1]) as $name) {
-            $class = 'Thesis\Async\Trace\\' . $name;
-
-            if (!class_exists($class)) {
-                $missing[] = $class;
-            } elseif (!$dispatcher->listens($class)) {
-                $unheard[] = $class;
-            }
-        }
-
-        Assert::same($missing, []);
-        Assert::same($unheard, []);
+    public function listensToEveryEventOfAsync(): void
+    {
+        Assert::same(unheardEvents(new NdjsonWriter(self::memory('w+'), self::clock())), []);
     }
 
     public function countsLinesItCouldNotWriteWithoutThrowing(): void

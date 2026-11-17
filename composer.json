@@ -130,6 +130,7 @@
             "packages/amqp/tests/helpers.php",
             "packages/amqp/codegen/generate.php",
             "packages/async/tests/helpers.php",
+            "packages/async-trace/tests/helpers.php",
             "packages/cache/tests/helpers.php",
             "packages/exceptionally/tests/Exceptionally/helpers.php",
             "packages/io/tests/helpers.php",

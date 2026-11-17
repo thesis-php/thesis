@@ -1,6 +1,6 @@
 {
     "name": "thesis/async-trace",
-    "description": "Tools around the trace of thesis/async: its events written as NDJSON, one line per event.",
+    "description": "Tools around the trace of thesis/async: its events written as NDJSON, one line per event, and as lines of text for tests.",
     "license": "MIT",
     "type": "library",
     "authors": [
@@ -41,7 +41,10 @@
     "autoload-dev": {
         "psr-4": {
             "Thesis\\AsyncTrace\\": "tests/"
-        }
+        },
+        "files": [
+            "tests/helpers.php"
+        ]
     },
     "extra": {
         "branch-alias": {
