@@ -89,8 +89,6 @@ of its package). Found by reading `src/` of every package.
   constructor with `@internal static create()` (net `Socket`, `Server`; `Cancelled` has a reason of its own:
   its constructor must stay private). `create()` of net only prepares the stream, which the constructor could do.
   If one way is enough, it is `@internal __construct()`.
-- `exceptionally(callable $function)` instead of `$fn`. A rename breaks calls with a named argument, and the
-  package has users (`CHANGELOG.md`): either a rename with a changelog entry, or an accepted exception.
 - Messages: the rate limiters say "`LocalSlidingWindowRateLimiter needs a positive window, got …`", `Backoff`
   says "`The initial delay of a backoff must be positive.`"; no period in `DnsFailed(lastError('Connection refused'))`
   and in both messages of `Instant`.

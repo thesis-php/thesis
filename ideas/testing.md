@@ -57,8 +57,8 @@ appears in no exception message and in no dump of `Config` or `ConnectionFailed`
 
 ## Mutation testing
 
-Infection (the `testo-mutation-testing` skill) on `io\Buffer`, the protocol of amqp and `time`: it shows
-where the tests run the code but check nothing.
+`make infect` runs on every package but `amqp` and `phpstan-extension` (the matrix of `check.yaml`).
+`amqp` is next: the protocol and the state of a channel, where the tests may run the code and check nothing.
 
 ## Order
 

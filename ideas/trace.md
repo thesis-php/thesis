@@ -53,7 +53,6 @@ of the losses: the program never slows down for its observer.
 
 ### Tests
 
-- **The text format of lines** (`0 #2 suspended in Thesis\Async\delay`): done, `TextLog` of thesis/async-trace.
 - **`testo-plugin`**: a failed test gets its trace in the report. Invariants are checked on the way:
   every created scope has ended, no task has outlived its group. A scope still open at the end of a test
   is a leaked task.
@@ -64,15 +63,10 @@ of the losses: the program never slows down for its observer.
   and take where each waits from `ReflectionFiber::getTrace()` at the moment of the dump. A dump that costs nothing
   until it is asked for, fit for production. The price: the names and the locations live only in the tracer
   (a decision, so that a task without an observation does not pay memory for them), so without an observation
-  there are none. A choice to make explicitly: walk the tree, the events, or both.
-- **A detector of blocking code**: done, `BlockingDetector` of thesis/async-trace. A run that never ends
-  is not seen, that is the dump.
-- **A watchdog of long waits**: done, `LongWaitDetector` of thesis/async-trace, a wait that lasts a threshold
-  reported once with its caller, from an unreferenced timer of the loop outside the tree.
-- **Who has cancelled me**: done, `CancellationTracker` of thesis/async-trace, to the first cause: the deadline,
-  the call of `Task::cancel()` or `Group::cancelTasks()` (`ScopeCancelled::$caller`), the failure
-  (`ScopeCancelled::$error`).
-  A chain of causes (a task failed by the `TaskCancelled` of another one) is not followed yet.
+  there are none. A choice to make explicitly: walk the tree, the events, or both. The dump also shows a run
+  that never ends, which `BlockingDetector` does not see.
+- **A chain of causes** in `CancellationTracker`: it stops at the first cause, a task failed
+  by the `TaskCancelled` of another one is not followed.
 
 ### The course and understanding concurrency
 
@@ -105,22 +99,15 @@ of the losses: the program never slows down for its observer.
 
 ## Order
 
-1. The tools of debugging first, each with the part of the model of the state it needs, instead of a model designed
-   ahead of its users: who has cancelled me (done, `CancellationTracker`), the detector of blocking code
-   (done, `BlockingDetector`), the watchdog of long waits (done, `LongWaitDetector`). Done before: the NDJSON record (`NdjsonWriter`)
-   and the text format (`TextLog`).
-2. The export to Perfetto: the course and debugging for a small price.
-3. The model of the state as a public API, out of what the tools have needed.
-4. The dump by a signal, once the choice between the walk of the tree and the events is made.
-5. `testo-plugin`: the trace of a failed test, the invariants.
-6. The live `top` over a socket.
-7. The HTML player, the metrics, OpenTelemetry.
+Done: the NDJSON record (`NdjsonWriter`), the text format (`TextLog`), `CancellationTracker`, `BlockingDetector`,
+`LongWaitDetector`, each with the part of the model of the state it needs. Next:
 
-## Where it lives
-
-thesis/async keeps only the events, the tools go to thesis/async-trace, with a `bin/` for the reports and `top` later.
-A tool reports to the dispatcher of the trace that holds it, the second argument of a listener (`Report`,
-`CancelOrigin`): a listener takes the reports of its type, under the rules of a listener of `observe()`.
+1. The export to Perfetto: the course and debugging for a small price.
+2. The model of the state as a public API, out of what the tools have needed.
+3. The dump by a signal, once the choice between the walk of the tree and the events is made.
+4. `testo-plugin`: the trace of a failed test, the invariants.
+5. The live `top` over a socket, with a `bin/` of thesis/async-trace.
+6. The HTML player, the metrics, OpenTelemetry.
 
 ## To discuss next
 
