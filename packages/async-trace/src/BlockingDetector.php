@@ -121,6 +121,8 @@ final class BlockingDetector implements Subscriber
     private function onTaskCreated(TaskCreated $event): void
     {
         $this->scopes[$event->scope] = Describe::scope($event);
+        // A set: isset() reads only the key.
+        // @infection-ignore TrueValue
         $this->tasks[$event->scope] = true;
     }
 

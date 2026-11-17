@@ -84,6 +84,14 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   is kept until its group ends to name it in the reason. The error comes from `ScopeCancelled::$error`: the body
   of a group ends after the cancellation by its failure. Rejected: keeping every ended scope that may be a `by`,
   it grows forever in a server.
+  Trap: a scope created cancelled takes the first cancellation of what it is created in, and the scopes of a group
+  are nested: body, tasks, daemons. A daemon takes the cause of the daemons (`DaemonsAfterTasks`), else of the tasks
+  (`cancelTasks()` cancels the daemons too), else of the group; a task takes the cause of the tasks, else of the group.
+- A tool handles only what thesis/async does: `ShieldCreated::$cancelled` is always false (a shield hides
+  the cancellation), `Resumed` always comes before `Ended` of the scope (it is emitted in a `finally`),
+  `ScopeCancelled::$reached` holds only scopes not cancelled before. Code for the other case can never run,
+  and mutation testing shows it as a mutant no test kills. What is guarded is a scope the tool has not seen
+  (events given by hand): it is named `#<id>` and never makes a tool fail.
 - `BlockingDetector` takes the time of the events, not a clock of its own: `Instant::now()` is `hrtime()`
   outside virtual time, and under it `VirtualTime\advance()` is CPU work without a wait, which a test needs.
   Rejected: an injected monotonic clock, a second time that a test would have to move along with the virtual one.

@@ -96,12 +96,8 @@ final class TextLog implements Subscriber
 
     private function onShieldCreated(ShieldCreated $event): void
     {
-        $this->add(
-            event: $event,
-            what: 'shield in '
-            . self::scope($event->parent)
-            . self::cancelled($event->cancelled),
-        );
+        // A shield is never created cancelled: it hides the cancellation of its ancestors.
+        $this->add($event, 'shield in ' . self::scope($event->parent));
     }
 
     private function onTaskStarted(TaskStarted $event): void

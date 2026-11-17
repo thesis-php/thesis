@@ -60,8 +60,7 @@ final class CancellationTracker implements Subscriber
     {
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
-            parent: $event->parent,
-            task: false,
+            group: null,
             cause: $event->cancelled ? $this->causeOf($event->parent) : null,
         );
     }
@@ -72,14 +71,15 @@ final class CancellationTracker implements Subscriber
         $cause = null;
 
         if ($event->cancelled && $group !== null) {
-            $cause = ($event->daemon ? $group->daemonsCause : $group->tasksCause)
-                ?? $group->cause;
+            // The daemons are under the tasks: `cancelTasks()` cancels them too.
+            $cause = $event->daemon
+                ? $group->daemonsCause ?? $group->tasksCause ?? $group->cause
+                : $group->tasksCause ?? $group->cause;
         }
 
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
-            parent: $event->group,
-            task: true,
+            group: $event->group,
             cause: $cause,
         );
     }
@@ -88,19 +88,18 @@ final class CancellationTracker implements Subscriber
     {
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
-            parent: $event->parent,
-            task: false,
+            group: null,
             cause: $event->cancelled ? $this->causeOf($event->parent) : null,
         );
     }
 
     private function onShieldCreated(ShieldCreated $event): void
     {
+        // A shield is never created cancelled: it hides the cancellation of its ancestors.
         $this->scopes[$event->scope] = new TracedScope(
             what: Describe::scope($event),
-            parent: $event->parent,
-            task: false,
-            cause: $event->cancelled ? $this->causeOf($event->parent) : null,
+            group: null,
+            cause: null,
         );
     }
 
@@ -122,7 +121,7 @@ final class CancellationTracker implements Subscriber
 
         foreach ($event->reached as $reached) {
             if (isset($this->scopes[$reached])) {
-                $this->scopes[$reached]->cause ??= $cause;
+                $this->scopes[$reached]->cause = $cause;
             }
         }
     }
@@ -137,6 +136,8 @@ final class CancellationTracker implements Subscriber
 
         unset($this->scopes[$event->scope]);
 
+        // Forgetting the failed tasks only frees memory: the ids are not reused, no later event names them.
+        // @infection-ignore Foreach_
         foreach ($scope->failedTasks as $task) {
             unset($this->failed[$task]);
         }
@@ -153,13 +154,13 @@ final class CancellationTracker implements Subscriber
                 by: $cause->by,
                 reason: $cause->reason,
             ));
-
-            return;
         }
 
-        $group = $scope->parent === null ? null : $this->scopes[$scope->parent] ?? null;
+        $group = $scope->group === null ? null : $this->scopes[$scope->group] ?? null;
 
-        if ($error !== null && !$error instanceof Cancelled && $scope->task && $group !== null) {
+        // A scope remembered as failed without having failed only takes memory until its group ends:
+        // no event names a scope that has ended, but the one whose failure cancels the group.
+        if (/* @infection-ignore LogicalAnd */ $error !== null && !$error instanceof Cancelled && $group !== null) {
             $this->failed[$event->scope] = $scope->what;
             $group->failedTasks[] = $event->scope;
         }
@@ -200,6 +201,8 @@ final class CancellationTracker implements Subscriber
             return 'the root scope';
         }
 
+        // The ids are not reused: a scope is never both live and failed.
+        // @infection-ignore Coalesce
         return $this->scopes[$id]->what ?? $this->failed[$id] ?? '#' . $id;
     }
 

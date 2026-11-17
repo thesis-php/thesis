@@ -86,9 +86,11 @@ final class TextLogTest
 
     public function writesNegativeDurationWithSign(): void
     {
-        $log = self::record(static fn() => timeoutOr(ms(-1500), static fn() => null));
+        $fraction = self::record(static fn() => timeoutOr(ms(-1500), static fn() => null));
+        $whole = self::record(static fn() => timeoutOr(sec(-2), static fn() => null));
 
-        Assert::same($log->lines[0] ?? null, '0 #1 timeout -1.5s in root');
+        Assert::same($fraction->lines[0] ?? null, '0 #1 timeout -1.5s in root');
+        Assert::same($whole->lines[0] ?? null, '0 #1 timeout -2s in root');
     }
 
     public function writesCancellationByDeadlineReachingSubtree(): void
@@ -154,21 +156,29 @@ final class TextLogTest
         ]);
     }
 
-    public function writesShieldAndScopeCreatedCancelled(): void
+    public function writesShieldAndScopesCreatedCancelled(): void
     {
         $log = self::record(static fn() => timeoutOr(sec(0), static function () {
-            group(static fn() => shield(static fn() => null));
+            timeoutOr(sec(1), static fn() => null);
+            group(static function (Group $group) {
+                $group->spawn(static fn() => null);
+                shield(static fn() => null);
+            });
         }));
 
         Assert::same($log->lines, [
             '0 #1 timeout 0s in root',
             '0 #1 cancelled: Deadline by #1, reached #1',
-            '0 #2 group in #1, cancelled',
-            '0 #3 shield in #2',
-            '0 #3 returned null',
-            '0 #2 joining',
+            '0 #2 timeout 1s in #1, cancelled',
             '0 #2 returned null',
-            '0 #1 returned null',
+            '0 #3 group in #1, cancelled',
+            '0 #4 task in #3, cancelled',
+            '0 #5 shield in #3',
+            '0 #5 returned null',
+            '0 #3 joining',
+            '0 #4 threw Cancelled',
+            '0 #3 threw Cancelled',
+            '0 #1 threw Cancelled',
         ]);
     }
 

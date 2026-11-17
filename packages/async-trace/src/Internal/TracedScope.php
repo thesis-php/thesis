@@ -32,14 +32,13 @@ final class TracedScope
 
     /**
      * @param non-empty-string $what
-     * @param ?positive-int $parent the group of a task
+     * @param ?positive-int $group the group of a task, null for the other scopes
      * @param ?Cause $cause what has cancelled the scope itself: a cancellation that has reached it,
      *     or the one of its parent if it is created cancelled
      */
     public function __construct(
         public readonly string $what,
-        public readonly ?int $parent,
-        public readonly bool $task,
+        public readonly ?int $group,
         public ?Cause $cause,
     ) {}
 }

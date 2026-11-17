@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace;
 
+use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Cancelled;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\Trace\CancelCause;
 use Thesis\Async\Trace\Ended;
+use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Joining;
 use Thesis\Async\Trace\Resumed;
+use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
+use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Dispatcher;
 use function Thesis\Async\delay;
@@ -52,6 +57,18 @@ final class CancellationTrackerTest
         Assert::same($reports, [
             '#3 ' . self::at('task', $line + 1) . " is cancelled by the deadline of {$timeout}",
             '#2 ' . self::at('group', $line) . " is cancelled by the deadline of {$timeout}",
+            "#1 {$timeout} is cancelled by the deadline of {$timeout}",
+        ]);
+    }
+
+    public function reportsTimeoutCreatedUnderCancellation(): void
+    {
+        $line = __LINE__ + 1;
+        $reports = self::reports(static fn() => timeoutOr(sec(0), static fn() => timeoutOr(sec(5), static fn() => delay(sec(1)))));
+
+        $timeout = self::at('timeout 0s', $line);
+        Assert::same($reports, [
+            '#2 ' . self::at('timeout 5s', $line) . " is cancelled by the deadline of {$timeout}",
             "#1 {$timeout} is cancelled by the deadline of {$timeout}",
         ]);
     }
@@ -128,6 +145,90 @@ final class CancellationTrackerTest
         ]);
     }
 
+    public function reportsCallOfCancelTasksToDaemonsSpawnedAfter(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => group(static function (Group $group) {
+            $group->cancelTasks();
+            $group->daemon(static fn() => delay(sec(5)));
+        }));
+
+        Assert::same($reports, [
+            '#2 ' . self::at('daemon', $line + 1) . ' is cancelled by Thesis\Async\Group::cancelTasks() at '
+            . __FILE__ . ':' . $line . ' in ' . self::at('group', $line - 1),
+        ]);
+    }
+
+    public function reportsDaemonsSpawnedAfterEndOfTasks(): void
+    {
+        $line = __LINE__ + 1;
+        $reports = self::reports(static fn() => group(static function (Group $group) {
+            $group->spawn(static fn() => delay(sec(1)));
+            $group->daemon(static function () use ($group) {
+                try {
+                    delay(sec(5));
+                } finally {
+                    // The tasks are done: it changes nothing for the daemons, cancelled before.
+                    $group->cancelTasks();
+                    $group->daemon(static fn() => delay(sec(5)), name: 'late');
+                }
+            });
+        }));
+
+        $reason = 'the end of the tasks of ' . self::at('group', $line);
+        Assert::same($reports, [
+            '#3 ' . self::at('daemon', $line + 2) . " is cancelled by {$reason}",
+            '#4 ' . self::at("daemon 'late'", $line + 8) . " is cancelled by {$reason}",
+        ]);
+    }
+
+    public function reportsFirstCancellationOfGroupToTasksSpawnedAfter(): void
+    {
+        $line = __LINE__ + 2;
+        $reports = self::reports(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+            $group->spawn(static function () {
+                try {
+                    delay(sec(5));
+                } catch (Cancelled) {
+                    throw new \RuntimeException('late');
+                }
+            });
+            delay(sec(1));
+            $group->cancelTasks();
+
+            try {
+                delay(sec(1));
+            } finally {
+                $group->spawn(static fn() => delay(sec(5)), name: 'late');
+                $group->daemon(static fn() => delay(sec(5)), name: 'late');
+            }
+        })));
+
+        // The failure of the task comes after cancelTasks() and cancels the body, not the tasks.
+        $reason = 'Thesis\Async\Group::cancelTasks() at ' . __FILE__ . ':' . ($line + 8)
+            . ' in ' . self::at('group', $line - 1);
+        Assert::same($reports, [
+            '#3 ' . self::at("task 'late'", $line + 13) . " is cancelled by {$reason}",
+            '#4 ' . self::at("daemon 'late'", $line + 14) . " is cancelled by {$reason}",
+        ]);
+    }
+
+    public function namesRootScopeThatHasCancelled(): void
+    {
+        $line = __LINE__ + 4;
+        $reports = self::reports(static fn() => group(static function (Group $group) {
+            $task = $group->spawn(static fn() => delay(sec(5)));
+            EventLoop::delay(1, static function () use ($task) {
+                $task->cancel();
+            });
+        }));
+
+        Assert::same($reports, [
+            '#2 ' . self::at('task', $line - 2) . ' is cancelled by Thesis\Async\Task::cancel() at ' . __FILE__ . ':'
+            . $line . ' in the root scope',
+        ]);
+    }
+
     public function reportsNothingForScopesNotCancelled(): void
     {
         $reports = self::reports(static fn() => timeoutOr(sec(5), static function () {
@@ -137,6 +238,64 @@ final class CancellationTrackerTest
         }));
 
         Assert::same($reports, []);
+    }
+
+    public function ignoresScopesItHasNotSeen(): void
+    {
+        $reports = self::dispatch(static function (Dispatcher $dispatcher) {
+            foreach (CancelCause::cases() as $cause) {
+                $dispatcher->dispatch(new ScopeCancelled(
+                    scope: 5,
+                    at: Instant::now(),
+                    cause: $cause,
+                    by: null,
+                    reached: [5],
+                    caller: null,
+                    error: null,
+                ));
+            }
+
+            $dispatcher->dispatch(new TaskCreated(
+                scope: 6,
+                at: Instant::now(),
+                group: 5,
+                daemon: false,
+                name: null,
+                task: static fn() => null,
+                cancelled: true,
+                location: null,
+            ));
+            $dispatcher->dispatch(new Ended(scope: 6, at: Instant::now(), value: null, error: self::cancelled()));
+        });
+
+        Assert::same($reports, []);
+    }
+
+    public function namesScopeItHasNotSeenByItsId(): void
+    {
+        $reports = self::dispatch(static function (Dispatcher $dispatcher) {
+            $dispatcher->dispatch(new GroupCreated(
+                scope: 2,
+                at: Instant::now(),
+                parent: null,
+                function: 'Thesis\Async\all',
+                name: null,
+                cancelled: false,
+                location: null,
+            ));
+            $dispatcher->dispatch(new ScopeCancelled(
+                scope: 2,
+                at: Instant::now(),
+                cause: CancelCause::Handle,
+                by: 9,
+                reached: [2],
+                caller: null,
+                error: null,
+            ));
+            $dispatcher->dispatch(new Ended(scope: 2, at: Instant::now(), value: null, error: self::cancelled()));
+        });
+
+        Assert::same($reports, ['#2 all is cancelled by Thesis\Async\Task::cancel() in #9']);
     }
 
     public function givesStructuredReport(): void
@@ -209,18 +368,41 @@ final class CancellationTrackerTest
         return null;
     }
 
+    private static function cancelled(): Cancelled
+    {
+        $cancelled = null;
+        timeoutOr(sec(0), static function () use (&$cancelled) {
+            try {
+                delay(sec(1));
+            } catch (Cancelled $error) {
+                $cancelled = $error;
+            }
+        });
+
+        return $cancelled ?? throw new \LogicException('The deadline has not cancelled the wait.');
+    }
+
     /**
      * @param callable(): mixed $program
      * @return list<string>
      */
     private static function reports(callable $program): array
     {
+        return self::dispatch(static fn(Dispatcher $dispatcher) => observe($dispatcher, $program));
+    }
+
+    /**
+     * @param callable(Dispatcher): mixed $events gives the events to the dispatcher of the tracker
+     * @return list<string>
+     */
+    private static function dispatch(callable $events): array
+    {
         /** @var list<string> $reports */
         $reports = [];
         $listener = static function (CancelOrigin $report) use (&$reports) {
             $reports[] = (string) $report;
         };
-        observe(new Dispatcher([new CancellationTracker(), $listener]), $program);
+        $events(new Dispatcher([new CancellationTracker(), $listener]));
 
         return $reports;
     }

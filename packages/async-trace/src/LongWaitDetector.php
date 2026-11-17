@@ -116,8 +116,8 @@ final class LongWaitDetector implements Subscriber
 
     private function onEnded(Ended $event): void
     {
-        unset($this->scopes[$event->scope], $this->waits[$event->scope]);
-        $this->disarmIfNothingWaits();
+        // Its waits are over: `Resumed` comes before.
+        unset($this->scopes[$event->scope]);
     }
 
     private function arm(Wait $wait, Dispatcher $dispatcher): string

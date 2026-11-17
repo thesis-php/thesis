@@ -224,6 +224,30 @@ final class NdjsonWriterTest
         Assert::same($writer->lost, 2);
     }
 
+    public function writesRestOfLineAfterShortWrite(): void
+    {
+        $writer = new NdjsonWriter(ShortWriteStream::open(length: 7), self::clock());
+        $memory = self::memory('w+');
+        $at = Instant::now();
+
+        foreach ([$writer, new NdjsonWriter($memory, self::clock())] as $each) {
+            new Dispatcher([$each])->dispatch(new Joining(scope: 1, at: $at));
+        }
+
+        rewind($memory);
+        Assert::same(ShortWriteStream::$bytes, stream_get_contents($memory));
+        Assert::same($writer->lost, 0);
+    }
+
+    public function countsLinesThatStreamTakesNothingOf(): void
+    {
+        $writer = new NdjsonWriter(ShortWriteStream::open(length: 0), self::clock());
+
+        new Dispatcher([$writer])->dispatch(new Joining(scope: 1, at: Instant::now()));
+
+        Assert::same($writer->lost, 2);
+    }
+
     /**
      * @param callable(): mixed $fn
      */

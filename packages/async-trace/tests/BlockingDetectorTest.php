@@ -9,6 +9,8 @@ use Testo\Test;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\Trace\ScopeCancelled;
+use Thesis\Async\Trace\Suspended;
+use Thesis\Async\Trace\TaskStarted;
 use Thesis\Dispatcher;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
@@ -186,6 +188,22 @@ final class BlockingDetectorTest
             '#2 ' . self::at('task', $line) . ' has run 0.1s without a wait: from the start of the task'
             . ' to Thesis\Async\delay() at ' . self::file($line + 2),
         ]);
+    }
+
+    public function namesScopeItHasNotSeenByItsId(): void
+    {
+        /** @var list<string> $reports */
+        $reports = [];
+        $listener = static function (BlockingRun $report) use (&$reports) {
+            $reports[] = (string) $report;
+        };
+        $dispatcher = new Dispatcher([new BlockingDetector(threshold: ms(50)), $listener]);
+
+        $dispatcher->dispatch(new TaskStarted(scope: 9, at: Instant::now()));
+        advance(ms(100));
+        $dispatcher->dispatch(new Suspended(scope: 9, at: Instant::now(), caller: null));
+
+        Assert::same($reports, ['#9 #9 has run 0.1s without a wait: from the start of the task to a wait of unknown code']);
     }
 
     public function givesStructuredReport(): void
