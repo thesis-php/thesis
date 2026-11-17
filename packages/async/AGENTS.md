@@ -182,7 +182,47 @@ The model, the API and the guarantees are described in `README.md` — read it f
   A new event goes into `@phpstan-sealed` of `Trace\Event`: PHPStan rejects a class of it missing there, and then
   points at every `match` over the events that does not handle it (they have no `default`, `php.md`).
 
+## The event loop
+
+`Internal\Loop` is the scheduler of fibers on `Io\Poll` of PHP 8.6 (being built by `ideas/loop.md`: until its stage 3,
+`ContinuationImpl::park()` parks on it only while `Loop::$current` runs, otherwise on Revolt).
+
+- It runs only in {main}, the code it runs only in fibers: `run()` refuses a fiber and itself inside, and ends when
+  its fiber ends. A wait in {main} throws `LogicException`. It holds the fibers it started until they end, and
+  nothing of a run outlives it: a loop that has run is freed, with a fiber left suspended in it too.
+- A tick wakes the waits deferred to it and the due timers, resumes the fibers that were ready when it began and
+  drains the microtasks after each one: what they make ready waits for the next tick, so two fibers that ping-pong
+  cannot starve the streams and the timers. A started fiber is a microtask: it runs after the current one suspends.
+- A wait allocates nothing in the loop: timers, streams and the deferred hold a `Waiter` (`ContinuationImpl`), which
+  puts its fiber to the ready queue. Only a signal handler is a closure, signals are rare.
+- An error that escapes to the loop (a microtask, a wake, a fiber other than the one of `run()`) is thrown into
+  the wait of the fiber of `run()` (`$mainWait`), but only into one that has not fired: a value handed to it
+  is never lost, the error waits for its next wait. One left when that fiber ends is thrown from `run()`.
+- Nothing ready and no referenced timer, no stream wait and no signal handler while the fiber of `run()` waits:
+  `Deadlock` (`@api`, an `\Error`) is thrown into its wait, with the place of every suspended fiber.
+- Timers are a heap with lazy deletion: a cancel nulls the waiter, and the heap is rebuilt once outdated entries
+  outnumber the pending ones (at least 64). Expirations saturate at `PHP_INT_MAX`, the timeout of a wait is capped at
+  `Scope::LONGEST_DURATION`. An unreferenced timer fires but keeps nothing from a deadlock.
+- `Io\Poll` takes a stream once per context (`HandleAlreadyWatchedException`), so the readers and the writers
+  of a stream share one `WatchedStream`, and its watcher is brought up to date lazily, right before a wait:
+  a fiber that waits again in the tick it was woken costs no call to the kernel. Empty events are a `TypeError`,
+  so a stream nobody waits for is removed. Level-triggered: bytes in the buffer of PHP count as readable.
+- `fclose()` makes the watcher inactive and nothing wakes its waiters: the owner ends them before (`StreamWatcher`).
+  A stream that cannot be watched (closed before, or without a descriptor like `php://memory`, which warns
+  and throws `InvalidHandleException`) never blocks: its waiters are woken at once, the read or the write tells.
+- Signals: `pcntl_async_signals(true)` while a handler is there, the handler of `pcntl_signal()` only takes note and
+  writes a byte to a self-pipe watched by the loop, so a signal just before a wait is not lost. A signal during
+  `wait()` throws `FailedPollWaitException` (code 7, nothing about EINTR): the flag the handler sets tells it from
+  a failure. The pipe is drained whenever it is ready. The previous handler comes back with the last one gone.
+- On a virtual clock the loop never sleeps for a timer: where it would (nothing ready, `wait(0)` found nothing),
+  it jumps the clock to the nearest timer, referenced or not.
+- The timeout of `wait()` is rounded up to whole milliseconds: a timer never fires early, its precision is 1 ms.
+  The other end of a socket pair closed makes a stream readable at once (hang-up).
+
 ## Decisions
+
+- `Io\Poll::wait()` takes every ready event (no `maxEvents`): a cap would leave the rest for the next tick, which
+  level-triggered watchers allow, but nothing asks for it.
 
 - Tracing is one stream of event objects to a `Thesis\Dispatcher`, not a method per event: a new event is a new
   class, which breaks no listener at runtime, and the dispatcher tells which events nobody gets, so the tracer

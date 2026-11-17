@@ -35,8 +35,8 @@ return new Manifest(
         'amphp/amp' => '<3',
     ],
     // The amphp bridge: amphp/amp comes with the amphp library it is used with,
-    // and its classes are loaded only when ampCancellable() is called.
-    optional: ['amphp/amp'],
+    // and its classes are loaded only when ampCancellable() is called. ext-pcntl is needed only by the signals.
+    optional: ['amphp/amp', 'ext-pcntl'],
     skip: [
         new RectorSkip(
             rule: ClassPropertyAssignToConstructorPromotionRector::class,

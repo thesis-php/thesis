@@ -8,13 +8,14 @@ use Revolt\EventLoop;
 use Revolt\EventLoop\Suspension;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
+use Thesis\Async\Deadlock;
 
 /**
  * @internal
  * @template T
  * @implements Continuation<T>
  */
-final class ContinuationImpl implements Continuation
+final class ContinuationImpl implements Continuation, Waiter
 {
     private const int PENDING = 0;
     private const int PARKED = 1;
@@ -36,6 +37,15 @@ final class ContinuationImpl implements Continuation
      */
     private ?Suspension $suspension = null;
 
+    /**
+     * The fiber parked on {@see Loop::$current}, and the loop that resumes it.
+     *
+     * @var ?\Fiber<mixed, mixed, mixed, mixed>
+     */
+    private ?\Fiber $fiber = null;
+
+    private ?Loop $loop = null;
+
     public function resume(mixed $value = null): bool
     {
         return $this->fire(value: $value, error: null, interrupted: false);
@@ -50,6 +60,26 @@ final class ContinuationImpl implements Continuation
             );
         }
 
+        return $this->fire(value: null, error: $error, interrupted: false);
+    }
+
+    /**
+     * The event of a timer or a stream of {@see Loop}: a wait that it ends returns true.
+     */
+    #[\Override]
+    public function wake(): void
+    {
+        /** @var T */
+        $ready = true;
+        $this->resume($ready);
+    }
+
+    /**
+     * Fires the continuation with an error that {@see Loop} throws into the wait, a {@see Deadlock}
+     * among them: unlike {@see throw()}, it takes any.
+     */
+    public function fail(\Throwable $error): bool
+    {
         return $this->fire(value: null, error: $error, interrupted: false);
     }
 
@@ -78,7 +108,21 @@ final class ContinuationImpl implements Continuation
             throw new \LogicException('Continuation is already parked.');
         }
 
-        if ($this->state === self::PENDING) {
+        $loop = Loop::$current;
+
+        if ($this->state === self::PENDING && $loop !== null) {
+            $fiber = \Fiber::getCurrent()
+                ?? throw new \LogicException('A wait in {main} cannot be resumed: wrap the code in group().');
+            $this->state = self::PARKED;
+            $this->fiber = $fiber;
+            $this->loop = $loop;
+
+            if ($fiber === $loop->main) {
+                $loop->mainWait = $this;
+            }
+
+            \Fiber::suspend();
+        } elseif ($this->state === self::PENDING) {
             $this->state = self::PARKED;
             /** @var Suspension<null> */
             $suspension = EventLoop::getSuspension();
@@ -108,12 +152,20 @@ final class ContinuationImpl implements Continuation
         }
 
         $suspension = $this->suspension;
+        $fiber = $this->fiber;
+        $loop = $this->loop;
         $this->state = self::FIRED;
         $this->suspension = null;
+        $this->fiber = null;
+        $this->loop = null;
         $this->value = $value;
         $this->error = $error;
         $this->interrupted = $interrupted;
         $suspension?->resume();
+
+        if ($fiber !== null) {
+            $loop?->resume($fiber);
+        }
 
         return true;
     }

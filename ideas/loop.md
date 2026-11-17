@@ -18,53 +18,22 @@ The file goes away with the last stage.
   of the matrix of drivers.
 - Open question 5 of `roadmap.md` is answered: the scheduler runs only in `{main}`, user code only in fibers.
   `group()` called in `{main}` runs its body in a fiber of its own and the scheduler until the group ends;
-  `suspend()` in the root scope throws `LogicException` telling to wrap the code in `group()`.
+  A wait in `{main}` throws `LogicException` telling to wrap the code in `group()` (stage 2: a wait outside
+  a fiber, not in the root scope: a fiber of the user in the root scope, as the tests start, can wait).
 
 ## Design
 
-- The unit of scheduling is a fiber. The core knows five things: ready fibers, timers, streams, signals and
-  microtasks (`onCancel()`). No `repeat`, no `enable()`/`disable()`, no string ids, no global error handler.
-- A wait allocates no closure: `ContinuationImpl` implements an internal `Waiter`, timers, streams and signals
-  hold it and put it to the ready queue. A resume is `$fiber->resume($value)` from the scheduler,
-  no `Suspension`.
-- Time is `int` nanoseconds throughout, the clock is an interface (`hrtime(true)` or virtual). A `Duration`
-  is made only for `Context::wait()`.
-- A tick: read the clock; move the expired timers to ready; resume a snapshot of ready, draining microtasks
-  after each fiber (what the tick scheduled waits for the next one: two ping-pong tasks must not starve I/O
-  and timers); `wait()` for 0 if ready is not empty, else until the nearest timer, else without a timeout;
-  move the ready streams and signals to ready. Nothing referenced and nothing ready: the run ends, or it is
-  a deadlock if fibers are still suspended.
+- Built in stage 2, described in "The event loop" of `packages/async/AGENTS.md`: the core, its tick, timers,
+  streams, signals, deadlocks and the jump of a virtual clock. The clock is a nullable `VirtualClock`
+  rather than an interface: `hrtime(true)` needs no object, and the loop must know a virtual one to jump it.
 - `checkpoint()` puts the fiber to the next tick. The tick number is a property of the loop, so `Pacer`
   compares two numbers instead of resetting itself by a `defer`.
-- Timers: a heap with lazy deletion and a rebuild once outdated entries outnumber pending ones, as
-  `VirtualTimeDriver` has now. Almost every timer of `timeout()` is cancelled, so a cancel must be cheap.
-  A hierarchical wheel only if a benchmark asks for it.
-- One watcher per stream (see the facts below), with the readers and the writers of the stream behind it.
-- Signals: `pcntl_async_signals(true)`, the handler sets a flag and writes a byte to a self-pipe watched
-  by the loop (a signal just before `wait()` is not lost). The flag tells EINTR from a failure of `wait()`.
-  The handler of a signal is restored when its last trap ends.
-- A deadlock is an error that lists where each suspended task waits, instead of "Event loop terminated".
+- Timers: a hierarchical wheel only if a benchmark asks for it.
 - The heartbeat of the detector of endless runs (`endless-runs.md`, open question 1) is the start of the tick,
   a field: no timer wakes an idle process.
 - Virtual time is a clock, not a decorator of a driver: it jumps to the nearest timer only where the loop
   is about to block (ready and microtasks empty, `wait(0)` found nothing). The pump of `VirtualTimeDriver`,
   its two idle pumps and its trap with code that enters the loop past the driver go away.
-
-## Facts of `Io\Poll` (8.6.0RC7, Epoll, Linux image)
-
-- A stream is added as `new StreamPollHandle($stream)`, once per `Context`: a second `add()` throws
-  `HandleAlreadyWatchedException`, so reading and writing of one stream share a watcher (`modifyEvents()`).
-- Level-triggered by default (`OneShot` and `EdgeTriggered` are events to ask for). Bytes in the read buffer
-  of PHP count as readable: after `fgets()` took one line of two, `wait()` reports the stream at once.
-- `fclose()` makes the watcher inactive and `wait()` goes on, but nothing wakes the waiters of the stream:
-  its owner still ends them (`StreamWatcher::close()`).
-- A stream without a descriptor (`php://memory`) makes `add()` warn and throw `InvalidHandleException`,
-  though `StreamPollHandle::isValid()` is true. `SharedStream` of thesis/io meets such streams.
-- A signal during `wait()` throws `FailedPollWaitException` (code 7, nothing about EINTR) after the handler
-  of `pcntl_async_signals()` has run. Worth a report upstream before 8.6.0.
-- The timeout is rounded up to whole milliseconds: 0.5 ms waits about 1.2, 1.5 ms about 2.1, never less.
-  A timer never fires early, but its precision is a millisecond.
-- The other end of a socket pair closed makes the stream readable at once (hang-up): a probe keeps both ends.
 
 ## Stages
 
@@ -73,10 +42,7 @@ read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `age
 
 1. Done: `ChannelBench`, `TimeoutBench`, `DelayBench`, `StreamWatcherBench` and `CheckpointBench` of async
    have their numbers of Revolt (`UvDriver`, the default of the image, counted on aarch64) in `#[Expected]`.
-2. **The core beside Revolt.** `Internal\Loop` with the clock, the ready queue, microtasks, timers, streams
-   and signals, tested on its own (`tests/Internal/LoopTest.php`): order within a tick, a cancelled timer,
-   a timer far away (saturation at `PHP_INT_MAX`), EINTR, a closed stream, a stream without a descriptor,
-   a deadlock, no fiber kept after a run (`fibers.md`: a loop that has run goes away). Nothing uses it yet.
+2. Done: `Internal\Loop` and `tests/Internal/LoopTest.php`. `ContinuationImpl` parks on it while it runs.
 3. **async on the core.** The places that touch Revolt now: `ContinuationImpl::park()`, `delay()` and
    `checkpoint()` in `api.php`, the timer of `Expired`, `Scope::onCancel()` and its throw to the loop,
    `GroupImpl::start()` and `join()` (no `UncaughtThrowable`, `{main}` as decided), `SignalTrapImpl`,
@@ -107,8 +73,8 @@ read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `age
 
 1. The `@api` way to an unreferenced timer for `LongWaitDetector` (stage 5): a function of async, or
    the detector becomes a daemon of a group the user passes.
-2. What a deadlock throws: a new `@api` error of async, or `LogicException` with the list.
+2. Answered in stage 2: `Thesis\Async\Deadlock`, an `@api` `\Error` (as Revolt's was): a group must tell it
+   from other failures, and a `LogicException` is an `\Exception` that a `catch (\Exception)` of user code takes.
 3. A throw from an `onCancel()` callback: today it goes to the event loop. Out of the `group()` that runs
    the scheduler in `{main}`, as a failure of that group?
-4. `maxEvents` of `wait()`: unbounded, or a cap with the rest left for the next tick (level-triggered,
-   so nothing is lost).
+4. Answered in stage 2: unbounded, see "Decisions" of `packages/async/AGENTS.md`.
