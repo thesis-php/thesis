@@ -44,13 +44,12 @@ final class StringFormatter
      * is followed by "...".
      *
      * @param non-negative-int $maxCharacters
-     * @param non-negative-int $maxLength
+     * @param int $maxLength nothing is shown below 1
      * @return non-empty-string
      */
     public static function format(string $string, int $maxCharacters, int $maxLength): string
     {
-        // A character takes 4 bytes at most, one byte more tells whether the string goes on.
-        preg_match_all(self::CHARACTER, substr($string, 0, 4 * $maxCharacters + 1), $matches);
+        preg_match_all(self::CHARACTER, self::head($string, $maxCharacters), $matches);
 
         $shown = '';
         $doubleQuoted = '';
@@ -78,6 +77,15 @@ final class StringFormatter
         $literal = $isEscaped ? '"' . $doubleQuoted . '"' : self::singleQuoted($shown);
 
         return $shown === $string ? $literal : $literal . '...';
+    }
+
+    /**
+     * The bytes that may hold the first $maxCharacters: only the shown part is split, never the whole string.
+     * Whether the string goes on is told by comparing it with the shown part.
+     */
+    private static function head(string $string, int $maxCharacters): string
+    {
+        return substr($string, 0, 4 * $maxCharacters); // a character takes 4 bytes at most
     }
 
     /**

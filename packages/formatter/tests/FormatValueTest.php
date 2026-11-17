@@ -70,6 +70,13 @@ final class FormatValueTest
         Assert::same(formatValue($string), "'{$string}'");
     }
 
+    public function keepsStringOfMaxLengthInCharactersOfFourBytes(): void
+    {
+        $string = str_repeat('😀', 100);
+
+        Assert::same(formatValue($string), "'{$string}'");
+    }
+
     public function cutsLongString(): void
     {
         Assert::same(formatValue(str_repeat('a', 101)), "'" . str_repeat('a', 100) . "'...");
@@ -135,6 +142,29 @@ final class FormatValueTest
             actual: formatValue(array_fill(0, 10, str_repeat('a', 100))),
             expected: "list{{$string}, {$string}, {$string}, {$string}, {$cut}, ...}",
         );
+    }
+
+    public function stopsItemsWhenOutputReachesMaxLengthExactly(): void
+    {
+        // list{ and 13 digits, then 40 items of 10 digits, each with ", ": 500 bytes before the last item.
+        $items = [1_000_000_000_000, ...array_fill(0, 40, 1_000_000_000), 7];
+
+        Assert::same(formatValue($items), 'list{1000000000000, ' . str_repeat('1000000000, ', 40) . '...}');
+    }
+
+    public function countsQuoteAsTwoBytesOfWhatIsLeft(): void
+    {
+        // array{, the key and ": " leave 4 bytes of 500: one of the quotings escapes a quote, so 2 quotes fit.
+        $key = str_repeat('a', 488);
+
+        Assert::same(formatValue([$key => "''''"]), "array{{$key}: '\\'\\''...}");
+    }
+
+    public function showsNothingOfValueAfterKeyThatUsesUpMaxLength(): void
+    {
+        $key = str_repeat('a', 600);
+
+        Assert::same(formatValue([$key => 'x']), "array{{$key}: ''...}");
     }
 
     public function keepsLongKeyAndValueWithinMaxLength(): void

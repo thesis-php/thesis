@@ -29,6 +29,15 @@
                 // Without the table every event resolves its listeners again and gets the same ones: only slower, which
                 // no test sees.
                 "Thesis\\Dispatcher::dispatch",
+                // A character that double quotes escape shows as itself, so it has no escape of its own to swap with.
+                "Thesis\\Formatter\\Internal\\StringFormatter::format",
+            ],
+        },
+        "DecrementInteger": {
+            "ignore": [
+                // The mask only clears the length prefix: its lowest bit is shifted out, and the bit after the prefix
+                // is 0 in a well-formed character.
+                "Thesis\\Formatter\\Internal\\StringFormatter::codePoint",
             ],
         },
         "IncrementInteger": {
@@ -36,12 +45,20 @@
                 // The levels of a fiber without a call: 1 differs from 0 only in E_ERROR, which PHP never passes to a
                 // handler of the application.
                 "Thesis\\Exceptionally\\Internal\\ErrorHandler::__invoke",
+                // More bytes than the characters may take are split for nothing: only slower.
+                "Thesis\\Formatter\\Internal\\StringFormatter::head",
             ],
         },
         "PregMatchRemoveCaret": {
             "ignore": [
                 // The lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway.
                 "Thesis\\SourceLocation\\Location::of",
+            ],
+        },
+        "UnwrapSubstr": {
+            "ignore": [
+                // The whole string is split for nothing: only slower.
+                "Thesis\\Formatter\\Internal\\StringFormatter::head",
             ],
         },
     },

@@ -56,14 +56,13 @@ final class ValueFormatter
     private static function single(mixed $value): string
     {
         return match (true) {
-            $value === null => 'null',
             \is_bool($value) => $value ? 'true' : 'false',
             \is_int($value) => (string) $value,
             \is_float($value) => var_export($value, return: true),
             $value instanceof \UnitEnum => className($value::class) . '::' . $value->name,
             $value instanceof \Closure => formatFunction($value),
             \is_object($value) => className($value::class),
-            default => get_debug_type($value), // a resource, open or closed
+            default => get_debug_type($value), // null, a resource, open or closed
         };
     }
 
@@ -117,7 +116,7 @@ final class ValueFormatter
         return StringFormatter::format(
             string: $string,
             maxCharacters: self::MAX_STRING_CHARACTERS,
-            maxLength: max(0, $maxLength),
+            maxLength: $maxLength,
         );
     }
 }
