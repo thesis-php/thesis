@@ -52,7 +52,7 @@ final class GroupImpl implements Group
      * Implementation of `Thesis\Async\group()` and of the functions that run on a group.
      *
      * @template T
-     * @param callable(Group): T $body
+     * @param callable(self): T $body
      * @param non-empty-string $function the public function that creates the group, for the trace: `__FUNCTION__`
      * @param ?non-empty-string $name
      * @return T
@@ -136,6 +136,21 @@ final class GroupImpl implements Group
     public function daemon(callable $task, ?string $name = null): Task
     {
         return $this->start($this->daemonsScope, $task, $name);
+    }
+
+    /**
+     * A task that the library runs in $wrapper: to catch the outcome of $task ({@see Tracer::settled()}),
+     * or to call $task on each item (a worker of `each()` and `map()`). The trace gets $task, the code of the user.
+     *
+     * @template T
+     * @param callable(): T $wrapper
+     * @param callable(never): mixed $task
+     * @param ?non-empty-string $name
+     * @return Task<T>
+     */
+    public function spawnWrapped(callable $wrapper, callable $task, ?string $name): Task
+    {
+        return $this->start($this->tasksScope, $wrapper, $name, $task);
     }
 
     public function cancelTasks(): void
@@ -223,9 +238,10 @@ final class GroupImpl implements Group
      * @template T
      * @param callable(): T $task
      * @param ?non-empty-string $name
+     * @param ?callable(never): mixed $traced what the trace gets as the task, if not $task itself
      * @return Task<T>
      */
-    private function start(Scope $parent, callable $task, ?string $name): Task
+    private function start(Scope $parent, callable $task, ?string $name, ?callable $traced = null): Task
     {
         if ($this->closed) {
             throw new \LogicException('The group is closed: a task can only be started until group() returns.');
@@ -237,7 +253,7 @@ final class GroupImpl implements Group
         $values = Context::capture();
         /** @var TaskImpl<T> */
         $handle = new TaskImpl($scope);
-        Scope::$tracer?->taskCreated($scope, $this->bodyScope, $daemon, $name, $task);
+        Scope::$tracer?->taskCreated($scope, $this->bodyScope, $daemon, $name, $traced ?? $task);
 
         if ($daemon) {
             ++$this->daemons;

@@ -256,6 +256,40 @@ final class TraceTest
         Assert::same($created->task, $task);
     }
 
+    public function givesTaskOfUserNotItsWrapperToObserver(): void
+    {
+        $task = static fn() => null;
+        $log = self::record(static function () use ($task) {
+            all(['all' => $task]);
+            allSettled(['allSettled' => $task]);
+            some(1, ['some' => $task]);
+            race(['race' => $task]);
+        });
+
+        $tasks = array_values(array_map(
+            static fn(TaskCreated $event) => $event->task,
+            array_filter($log->events, static fn(Event $event) => $event instanceof TaskCreated),
+        ));
+
+        Assert::same($tasks, [$task, $task, $task, $task]);
+    }
+
+    public function givesCallableOfItemsAsTaskOfWorker(): void
+    {
+        $fn = static fn(int $item) => delay(sec($item));
+        $log = self::record(static function () use ($fn) {
+            each([1, 1], concurrency: 2, fn: $fn);
+            map([1], concurrency: 1, fn: $fn);
+        });
+
+        $tasks = array_values(array_map(
+            static fn(TaskCreated $event) => $event->task,
+            array_filter($log->events, static fn(Event $event) => $event instanceof TaskCreated),
+        ));
+
+        Assert::same($tasks, [$fn, $fn, $fn]);
+    }
+
     public function namesTasksAndDaemonsAsSpawned(): void
     {
         $log = self::record(static fn() => group(static function (Group $group) {

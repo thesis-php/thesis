@@ -337,11 +337,11 @@ function all(array $tasks): array
  */
 function allSettled(array $tasks): array
 {
-    return GroupImpl::run(static function (Group $group) use ($tasks) {
+    return GroupImpl::run(static function (GroupImpl $group) use ($tasks) {
         $handles = [];
 
         foreach ($tasks as $key => $task) {
-            $handles[$key] = $group->spawn(static function () use ($task) {
+            $handles[$key] = $group->spawnWrapped(static function () use ($task) {
                 // A result is boxed: it may itself be a \Throwable.
                 try {
                     $value = $task();
@@ -356,7 +356,7 @@ function allSettled(array $tasks): array
                 Scope::$tracer?->settled(Scope::current(), $value, null);
 
                 return [$value];
-            }, Internal\taskName($key));
+            }, $task, Internal\taskName($key));
         }
 
         $errors = [];
@@ -436,13 +436,14 @@ function race(array $tasks): mixed
  */
 function each(iterable $items, int $concurrency, callable $fn): void
 {
-    GroupImpl::run(static function (Group $group) use ($items, $concurrency, $fn) {
+    GroupImpl::run(static function (GroupImpl $group) use ($items, $concurrency, $fn) {
         // Not $fn(...) itself: Workers passes the key too, and an internal function rejects an extra argument.
         Workers::start(
             group: $group,
             items: $items,
             concurrency: $concurrency,
             fn: static fn(mixed $item) => $fn($item),
+            traced: $fn,
         );
     }, function: __FUNCTION__);
 }
@@ -463,7 +464,7 @@ function map(iterable $items, int $concurrency, callable $fn): array
 {
     $results = [];
 
-    GroupImpl::run(static function (Group $group) use ($items, $concurrency, $fn, &$results) {
+    GroupImpl::run(static function (GroupImpl $group) use ($items, $concurrency, $fn, &$results) {
         Workers::start(
             group: $group,
             items: $items,
@@ -476,6 +477,7 @@ function map(iterable $items, int $concurrency, callable $fn): array
                 $results[$key] = null;
                 $results[$key] = $fn($item);
             },
+            traced: $fn,
         );
     }, function: __FUNCTION__);
 

@@ -172,6 +172,9 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   `allSettled()`, `some()` and `race()` run each task in a wrapper that catches its outcome: the wrapper hands it
   to `Tracer::settled()`, and `Ended` of the task reports it instead of what the wrapper returns (`null`, a box).
   A new wrapper of a task does the same.
+  `TaskCreated::$task` is always the code of the user, never a closure of the library: a wrapper and a worker
+  of `each()`/`map()` (its `$fn`, called on each item) are spawned by `GroupImpl::spawnWrapped()` with the callable
+  of the user. So its type is `callable(never): mixed`: to show, not to call.
   The function is passed as `__FUNCTION__`, never as a literal: `'Thesis\Async\group'` is the interface `Group`
   to Rector (it rewrites it to `group::class`) and to PHPStan, class names being case-insensitive. A new way to create a scope,
   to wait or to cancel adds its event, and `TraceChecker` (whole traces on the generated programs) checks it.

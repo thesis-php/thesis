@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 use Thesis\Async\Cancelled;
-use Thesis\Async\Group;
 use Thesis\Async\Lock;
 
 /**
@@ -94,9 +93,9 @@ function some(string $function, int $count, array $tasks): array
     $failure = null;
     $failures = 0;
 
-    GroupImpl::run(static function (Group $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
+    GroupImpl::run(static function (GroupImpl $group) use ($count, $tasks, $tolerated, &$results, &$failure, &$failures) {
         foreach ($tasks as $key => $task) {
-            $group->spawn(static function () use (
+            $group->spawnWrapped(static function () use (
                 $key,
                 $task,
                 $group,
@@ -143,7 +142,7 @@ function some(string $function, int $count, array $tasks): array
                 if (\count($results) === $count) {
                     $group->cancelTasks();
                 }
-            }, taskName($key));
+            }, $task, taskName($key));
         }
     }, function: 'Thesis\Async\\' . $function);
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Thesis\Async\Group;
 use Thesis\Async\LocalMutex;
 use function Thesis\Async\synchronized;
 
@@ -49,22 +48,30 @@ final class Workers
      * @param iterable<TKey, TValue> $items
      * @param positive-int $concurrency
      * @param \Closure(TValue, TKey): mixed $fn
+     * @param callable(TValue): mixed $traced the callable of the user that $fn calls: the task of a worker in the trace
      */
-    public static function start(Group $group, iterable $items, int $concurrency, \Closure $fn): void
-    {
-        new self(group: $group, items: $items, concurrency: $concurrency, fn: $fn)->spawn();
+    public static function start(
+        GroupImpl $group,
+        iterable $items,
+        int $concurrency,
+        \Closure $fn,
+        callable $traced,
+    ): void {
+        new self(group: $group, items: $items, concurrency: $concurrency, fn: $fn, traced: $traced)->spawn();
     }
 
     /**
      * @param iterable<K, T> $items
      * @param positive-int $concurrency
      * @param \Closure(T, K): mixed $fn
+     * @param callable(T): mixed $traced
      */
     private function __construct(
-        private readonly Group $group,
+        private readonly GroupImpl $group,
         iterable $items,
         private readonly int $concurrency,
         private readonly \Closure $fn,
+        private readonly mixed $traced,
     ) {
         $this->items = (static fn() => yield from $items)();
         $this->mutex = \is_array($items) ? null : new LocalMutex();
@@ -73,7 +80,7 @@ final class Workers
     private function spawn(): void
     {
         ++$this->workers;
-        $this->group->spawn($this->work(...));
+        $this->group->spawnWrapped($this->work(...), $this->traced, name: null);
     }
 
     private function work(): void

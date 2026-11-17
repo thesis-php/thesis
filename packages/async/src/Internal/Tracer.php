@@ -141,7 +141,7 @@ final class Tracer
 
     /**
      * @param ?non-empty-string $name
-     * @param callable(): mixed $task
+     * @param callable(never): mixed $task
      */
     public function taskCreated(Scope $scope, Scope $body, bool $daemon, ?string $name, callable $task): void
     {
