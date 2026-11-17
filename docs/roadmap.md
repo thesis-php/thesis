@@ -152,3 +152,13 @@ grow from what `async` already has and amphp lacks, so they come first.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
 5. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
+6. Waits outside a group: should thesis/async forbid them? In `{main}` a wait runs the event loop, so Revolt throws
+   out of it (`UncaughtThrowable` of a foreign callback, "Event loop terminated"), and a value handed over
+   by `resume()` is lost (the known gap of `ContinuationImpl::park()`); the body of `group()` runs in the calling
+   fiber, so this is true inside a group in `{main}` too. In the root scope, in any fiber, a wait has no cancellation,
+   no deadline and no trace events (`BlockingDetector` and `LongWaitDetector` do not see it). An idea: the body
+   of `group()` called in `{main}` runs in a fiber of its own, so that only `join()` waits in `{main}`, and `suspend()`
+   in the root scope throws `LogicException` telling to wrap the code in `group()`. The price: thesis code called
+   from `Amp\async()` or a Revolt callback stops working, the callable of `virtualTime()` and the tests
+   of testo-plugin need a group, `ScopedValue`s are carried into the fiber and `synchronized()` held around
+   `group()` is not reentrant inside it.
