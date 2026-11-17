@@ -12,7 +12,7 @@ DRIVER ?=
 ifneq ($(DRIVER),)
 export REVOLT_DRIVER := Revolt\EventLoop\Driver\$(DRIVER)Driver
 endif
-PATHS = $(if $(P),packages/$(P),bin/monorepo monorepo.php tools packages)
+PATHS = $(if $(P),packages/$(P))
 
 # Container
 
