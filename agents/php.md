@@ -38,6 +38,9 @@ is not here: the tools fix the code anyway.
 - Prefer language features and standard library APIs of the target PHP over older equivalents and userland packages:
   first-class callables (`f(...)`) instead of wrapper closures, a variadic parameter (`...$args`) instead of
   `func_get_args()`, `Uri\WhatWg\Url` instead of `parse_url()` or a URL library.
+- A byte of a string is changed by `substr_replace()`, not by `$s[$i] = $s[$i] ^ $mask`: `long_to_shorthand_operator`
+  of the fixer makes it `^=`, which fails at runtime on a string offset. Delete this rule once the fixer leaves
+  offsets alone (PHP-CS-Fixer/PHP-CS-Fixer#9760).
 
 ### Reading
 
