@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Thesis\Monorepo\FixerSkip;
+use Thesis\Monorepo\InfectionSkip;
 use Thesis\Monorepo\Manifest;
+use Thesis\Time\Internal\IsoInterval;
 
 return new Manifest(
     description: 'Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.',
@@ -24,6 +26,12 @@ return new Manifest(
         new FixerSkip(
             paths: ['polyfill/TimeException.php'],
             reason: 'final_class has no exceptions, and Time\TimeException of PHP 8.6 is not final.',
+        ),
+        new InfectionSkip(
+            mutator: 'GreaterThan',
+            class: IsoInterval::class,
+            method: 'longestToken',
+            reason: 'No two rules match a token of the same length: they differ in the first byte, or COMBINED_PERIOD has a hyphen where PERIOD cannot.',
         ),
     ],
     dist: ['polyfill'],

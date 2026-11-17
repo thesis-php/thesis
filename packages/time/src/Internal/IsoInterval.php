@@ -160,11 +160,7 @@ final class IsoInterval
                 ++$position;
             }
 
-            if ($position >= $length) {
-                return false;
-            }
-
-            // A longer number leaves a digit where the designator should be.
+            // A longer number leaves a digit where the designator should be, a missing one (P, PT) nothing.
             $digits = strspn($token, '0123456789', $position, self::MAX_NUMBER_DIGITS);
             $number = (int) substr($token, $position, $digits);
             \assert($number >= 0);
@@ -211,25 +207,20 @@ final class IsoInterval
      */
     private function scanCombinedPeriod(string $token): bool
     {
-        $this->years = self::digits($token, 1, 4);
-        $this->months = self::digits($token, 6, 2);
-        $this->days = self::digits($token, 9, 2);
-        $this->hours = self::digits($token, 12, 2);
-        $this->minutes = self::digits($token, 15, 2);
-        $this->seconds = self::digits($token, 18, 2);
+        /**
+         * @var array{
+         *     non-negative-int,
+         *     non-negative-int,
+         *     non-negative-int,
+         *     non-negative-int,
+         *     non-negative-int,
+         *     non-negative-int,
+         * } $numbers the token matches the format
+         */
+        $numbers = sscanf($token, 'P%4d-%2d-%2dT%2d:%2d:%2d');
+        [$this->years, $this->months, $this->days, $this->hours, $this->minutes, $this->seconds] = $numbers;
         $this->hasPeriod = true;
 
         return true;
-    }
-
-    /**
-     * @return non-negative-int
-     */
-    private static function digits(string $token, int $offset, int $length): int
-    {
-        $number = (int) substr($token, $offset, $length);
-        \assert($number >= 0);
-
-        return $number;
     }
 }

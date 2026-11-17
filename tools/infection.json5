@@ -40,6 +40,13 @@
                 "Thesis\\Formatter\\Internal\\StringFormatter::codePoint",
             ],
         },
+        "GreaterThan": {
+            "ignore": [
+                // No two rules match a token of the same length: they differ in the first byte, or COMBINED_PERIOD has
+                // a hyphen where PERIOD cannot.
+                "Thesis\\Time\\Internal\\IsoInterval::longestToken",
+            ],
+        },
         "IncrementInteger": {
             "ignore": [
                 // The levels of a fiber without a call: 1 differs from 0 only in E_ERROR, which PHP never passes to a
