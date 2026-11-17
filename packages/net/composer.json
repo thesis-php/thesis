@@ -29,7 +29,7 @@
         }
     ],
     "require": {
-        "php": "^8.5",
+        "php": "^8.6",
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",

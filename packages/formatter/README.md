@@ -19,7 +19,7 @@ throw new \ValueError(\sprintf('%s must be positive, got %s.', formatParameter($
 composer require thesis/formatter
 ```
 
-Requires 64-bit PHP 8.5+. No extensions.
+Requires 64-bit PHP 8.6+. No extensions.
 
 ## Values
 

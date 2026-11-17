@@ -19,7 +19,8 @@ return RectorConfig
     ->withRootFiles()
     ->withParallel()
     ->withCache(__DIR__ . '/var/rector')
-    ->withPhpSets()
+    // Not up to the PHP of composer.json: the syntax of PHP 8.6 waits until every analyzer parses it (agents/php.md).
+    ->withPhpSets(php85: true)
     ->withRules([
         SortCallLikeNamedArgsRector::class,
         SortAttributeNamedArgsRector::class,

@@ -322,11 +322,16 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
  */
 function shift(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
 {
-    $microseconds = $time->getTimestamp() * MICROSECONDS_PER_SECOND + $time->getMicrosecond() + toUs($duration);
-    // A timestamp is floored, and the microseconds are counted up from it, before 1970 too.
-    $seconds = divide($microseconds, MICROSECONDS_PER_SECOND, \RoundingMode::NegativeInfinity);
-    $fraction = $microseconds - $seconds * MICROSECONDS_PER_SECOND;
-    \assert($fraction >= 0 && $fraction < MICROSECONDS_PER_SECOND);
+    $microseconds = $time->getTimestamp() * MICROSECONDS_PER_SECOND + (int) $time->format('u') + toUs($duration);
+    $magnitude = abs($microseconds);
+    // Not setMicrosecond(), which is of PHP 8.4. modify() keeps the class of $time, but '@' sets UTC,
+    // and the sign is of the whole number: '@-0.250000' is a quarter of a second before 1970.
+    $timestamp = \sprintf(
+        '@%s%d.%06d',
+        $microseconds < 0 ? '-' : '',
+        intdiv($magnitude, MICROSECONDS_PER_SECOND),
+        $magnitude % MICROSECONDS_PER_SECOND,
+    );
 
-    return $time->setTimestamp($seconds)->setMicrosecond($fraction);
+    return $time->modify($timestamp)->setTimezone($time->getTimezone());
 }

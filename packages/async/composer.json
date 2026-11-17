@@ -27,7 +27,7 @@
         }
     ],
     "require": {
-        "php": "^8.5",
+        "php": "^8.6",
         "php-64bit": "*",
         "revolt/event-loop": "^1.0.9",
         "thesis/dispatcher": "^0.4",

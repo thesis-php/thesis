@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires 64-bit PHP 8.6+.
+
 ## [0.4.0] - 2026-11-17
 
 The package moved to the [Thesis monorepo](https://github.com/thesis-php/thesis).

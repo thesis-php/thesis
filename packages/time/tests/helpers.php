@@ -68,7 +68,9 @@ function describe(mixed $value): string
  */
 function isNative(): bool
 {
-    return new \ReflectionClass(Duration::class)->isInternal();
+    $class = new \ReflectionClass(Duration::class);
+
+    return $class->isInternal();
 }
 
 /**

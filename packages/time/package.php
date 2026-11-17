@@ -6,12 +6,16 @@ use Thesis\Monorepo\FixerSkip;
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.5, PSR-20 clocks.',
+    description: 'Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.3 to 8.5, PSR-20 clocks.',
     licenseSince: 2026,
     version: '0.3',
     keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
     require: [
+        // The polyfill runs where the rest of the monorepo does not: the oldest PHP with security support in 2027.
+        'php' => '^8.3',
         'psr/clock' => '^1.0',
+        // \RoundingMode of PHP 8.4, which the functions take.
+        'symfony/polyfill-php84' => '^1.34',
     ],
     requireDev: [
         'testo/assert' => '^0.1.17',

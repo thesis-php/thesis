@@ -11,7 +11,7 @@ Plugins for [Testo](https://github.com/php-testo/testo) to test code built on th
 composer require --dev thesis/testo-plugin
 ```
 
-Requires 64-bit PHP 8.5+.
+Requires 64-bit PHP 8.6+.
 
 ## Virtual time
 

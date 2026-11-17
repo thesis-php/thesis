@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires 64-bit PHP 8.3+: the polyfill of `Time\Duration` serves PHP 8.3 to 8.5.
+
 ### Fixed
 
 - A function given NAN throws `ValueError` without a warning of PHP 8.5 first.

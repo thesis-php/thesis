@@ -219,7 +219,7 @@ try {
 }
 ```
 
-Durations are `Time\Duration` of PHP 8.6 (a polyfill on 8.5), created with the functions of
+Durations are `Time\Duration` of PHP 8.6, created with the functions of
 [`thesis/time`](https://github.com/thesis-php/time): `ms(300)`, `sec(5)`, `minutes(1.5)`. The unit is in the code, not in a convention.
 
 Nested timeouts do not confuse each other: an inner `timeout()` never reports an outer deadline as its own,

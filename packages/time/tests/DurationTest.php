@@ -12,7 +12,7 @@ use Time\TimeException;
 
 /**
  * Pins the behavior of Time\Duration with values taken from the class of PHP 8.6: the same test passes
- * on PHP 8.5 against the polyfill and on PHP 8.6 against the original.
+ * below PHP 8.6 against the polyfill and on PHP 8.6 against the original.
  */
 #[Test]
 final class DurationTest

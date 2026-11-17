@@ -17,4 +17,6 @@ return Tools
         path: __DIR__ . '/packages/phpstan-extension/src',
         errorTypes: [ErrorType::SHADOW_DEPENDENCY],
     )
+    // thesis/time takes \RoundingMode from it below PHP 8.4, where the analyser runs the class is native.
+    ->ignoreErrorsOnPackage('symfony/polyfill-php84', [ErrorType::UNUSED_DEPENDENCY])
 ;

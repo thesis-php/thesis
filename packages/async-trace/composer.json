@@ -29,7 +29,7 @@
         }
     ],
     "require": {
-        "php": "^8.5",
+        "php": "^8.6",
         "php-64bit": "*",
         "psr/clock": "^1.0",
         "thesis/async": "^0.1",

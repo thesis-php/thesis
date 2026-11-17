@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Time;
 
 use Testo\Assert;
+use Testo\Core\Exception\SkipTest;
 use Testo\Data\DataProvider;
 use Testo\Test;
 use Time\Duration;
@@ -132,6 +133,11 @@ final class FunctionsTest
 
     public function dividesAsRoundOfFloats(): void
     {
+        // @phpstan-ignore smaller.alwaysFalse (PHPStan takes the PHP of the monorepo, the package runs on 8.3)
+        if (\PHP_VERSION_ID < 80400) {
+            throw new SkipTest('round() takes a \RoundingMode since PHP 8.4.');
+        }
+
         foreach (\RoundingMode::cases() as $rounding) {
             for ($dividend = -3500; $dividend <= 3500; $dividend += 250) {
                 Assert::same(

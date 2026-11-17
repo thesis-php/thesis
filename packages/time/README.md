@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases)
 
 Short functions for [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 8.6, a polyfill of it
-for PHP 8.5, and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
+for PHP 8.3 to 8.5, and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
 use function Thesis\Time\{format, ms, sec, toMs, toSecFloat};
@@ -22,7 +22,7 @@ format($timeout);     // 1.5s
 composer require thesis/time
 ```
 
-Requires 64-bit PHP 8.5+. No extensions.
+Requires 64-bit PHP 8.3+. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
 
 ## Why
 
@@ -33,7 +33,7 @@ every function takes and returns `Time\Duration`, so it passes to any other API 
 
 ## Polyfill
 
-On PHP 8.5 the package declares `Time\Duration` and `Time\TimeException`. They behave as the classes of PHP 8.6
+Below PHP 8.6 the package declares `Time\Duration` and `Time\TimeException`. They behave as the classes of PHP 8.6
 down to the exception messages: factories, arithmetic, `compare()`, the `<`, `==` and `<=>` operators,
 ISO 8601 parsing and `serialize()`. A test compares the two on random input.
 

@@ -23,7 +23,7 @@ $user = $users->getOrCompute("user:{$id}", static fn() => $repository->find($id)
 composer require thesis/cache
 ```
 
-Requires 64-bit PHP 8.5+. No extensions.
+Requires 64-bit PHP 8.6+. No extensions.
 
 ## `Cache`
 

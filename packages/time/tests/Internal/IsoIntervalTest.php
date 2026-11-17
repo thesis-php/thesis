@@ -45,6 +45,7 @@ final class IsoIntervalTest
 
         Assert::same(
             actual: [
+                $interval?->hasPeriod,
                 $interval?->years,
                 $interval?->months,
                 $interval?->days,
@@ -52,7 +53,7 @@ final class IsoIntervalTest
                 $interval?->minutes,
                 $interval?->seconds,
             ],
-            expected: [1234, 11, 29, 13, 46, 58],
+            expected: [true, 1234, 11, 29, 13, 46, 58],
         );
     }
 }

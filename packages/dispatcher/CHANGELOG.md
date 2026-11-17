@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BC break:** A second parameter of a listener that does not take `Thesis\Dispatcher` gets it anyway
   and fails. Declare it after a parameter of the dispatcher.
+- Requires 64-bit PHP 8.6+.
 
 ### Removed
 

@@ -12,6 +12,7 @@ parameters:
         - rector.php
         - tally.php
         - testo.php
+        - testo-alone.php
         - tools
         - packages
     tmpDir: var/phpstan

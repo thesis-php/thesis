@@ -1,6 +1,6 @@
 services:
   php:
-    image: ghcr.io/phpyh/php:${PHP_VERSION:-8.5}
+    image: ghcr.io/phpyh/php:${PHP_VERSION:-8.6}
     user: ${DOCKER_USER:-}
     working_dir: /workspace
     environment:

@@ -15,7 +15,7 @@ use Time\Duration;
 /**
  * Differential test of the polyfill against the class of PHP 8.6: applies the same random operations
  * to both and requires identical results and exceptions. Runs on PHP 8.6 only, against a renamed copy
- * of the polyfill (see loadPolyfillCopy()); DurationTest pins the behavior on PHP 8.5.
+ * of the polyfill (see loadPolyfillCopy()); DurationTest pins the behavior below PHP 8.6.
  *
  * To reproduce a failure, run the reported seed alone.
  */

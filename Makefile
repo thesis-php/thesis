@@ -99,6 +99,17 @@ test: var vendor up ## Run tests [P=] [DRIVER=]
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 
+# (A package that runs on an older PHP than the monorepo (thesis/time) is copied to var/alone/<name>, installed there
+# with the newest dependencies its composer.json allows and tested on PHP_VERSION. It requires no monorepo package:
+# Composer would take them from Packagist)
+test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=]
+	$(if $(P),,$(error P= names the package))
+	rm -rf var/alone/$(P)
+	mkdir -p var/alone
+	cp -R packages/$(P) var/alone/$(P)
+	$(RUN) sh -c 'cd var/alone/$(P) && composer update --no-interaction --no-progress && vendor/bin/testo --config=../../../testo-alone.php $(ARGS)'
+.PHONY: test-alone
+
 # (In GitHub Actions Tally annotates the benchmarks and writes the job summary. The summary file of the runner is not
 # in the container: the report goes to var/, and the job appends it)
 bench: var vendor ## Count the benchmarks under Valgrind and compare them with the expected numbers [P=] [DRIVER=]

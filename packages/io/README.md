@@ -17,7 +17,7 @@ codecs work on a `Buffer`, connections move bytes between a `Buffer` and a socke
 composer require thesis/io
 ```
 
-Requires 64-bit PHP 8.5+. No extensions.
+Requires 64-bit PHP 8.6+. No extensions.
 
 ## Usage
 

@@ -22,7 +22,7 @@ observe(new Dispatcher([new NdjsonWriter($file)]), $main);
 composer require thesis/async-trace
 ```
 
-Requires 64-bit PHP 8.5+. No extensions.
+Requires 64-bit PHP 8.6+. No extensions.
 
 ## `NdjsonWriter`
 

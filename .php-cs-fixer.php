@@ -23,6 +23,9 @@ return new Config()
     ->setParallelConfig(ParallelConfigFactory::detect())
     ->setCacheFile(__DIR__ . '/var/php-cs-fixer.cache')
     ->setRiskyAllowed(true)
+    // The fixer parses syntax up to PHP 8.5 and refuses to run on 8.6. The code has no syntax of 8.6 (agents/php.md).
+    // Delete once the fixer supports 8.6.
+    ->setUnsupportedPhpVersionAllowed(true)
     ->registerCustomFixers([new StaticCallChainFixer()])
     ->setRules([
         '@PHP8x4Migration' => true,

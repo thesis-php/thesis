@@ -31,46 +31,46 @@ final class IsoInterval
     private const string SKIPPED = " .,\t/\n";
     private const int MAX_NUMBER_DIGITS = 12;
 
-    public private(set) bool $hasPeriod = false;
+    public bool $hasPeriod = false;
 
     /**
      * A start or an end date.
      */
-    public private(set) bool $hasDate = false;
+    public bool $hasDate = false;
 
-    public private(set) bool $hasRecurrences = false;
-
-    /**
-     * @var non-negative-int
-     */
-    public private(set) int $years = 0;
+    public bool $hasRecurrences = false;
 
     /**
      * @var non-negative-int
      */
-    public private(set) int $months = 0;
+    public int $years = 0;
+
+    /**
+     * @var non-negative-int
+     */
+    public int $months = 0;
 
     /**
      * Weeks are added as 7 days.
      *
      * @var non-negative-int
      */
-    public private(set) int $days = 0;
+    public int $days = 0;
 
     /**
      * @var non-negative-int
      */
-    public private(set) int $hours = 0;
+    public int $hours = 0;
 
     /**
      * @var non-negative-int
      */
-    public private(set) int $minutes = 0;
+    public int $minutes = 0;
 
     /**
      * @var non-negative-int
      */
-    public private(set) int $seconds = 0;
+    public int $seconds = 0;
 
     private function __construct() {}
 

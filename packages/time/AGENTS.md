@@ -1,16 +1,25 @@
 # thesis/time
 
-Functions for `Time\Duration` of PHP 8.6, a polyfill of it for PHP 8.5, and PSR-20 clocks.
+Functions for `Time\Duration` of PHP 8.6, a polyfill of it for PHP 8.3 to 8.5, and PSR-20 clocks.
 The API is described in `README.md`, the class itself in https://wiki.php.net/rfc/duration_class.
 
 ## Invariants that must not be broken
+
+- The package runs on PHP 8.3, while the rest of the monorepo requires 8.6: the polyfill is for those who
+  cannot have 8.6 yet. 8.3 is the oldest PHP with security support through 2027 (8.2 ends with 2026).
+  Its code, the tests included, has no syntax and no API newer than 8.3: no `public private(set)`,
+  no `new X()->call()`, no `DateTime::getMicrosecond()`. The tools do not see it, PHPStan and Rector take
+  the PHP of the monorepo: PHP CS Fixer is kept off `(new X())->call()` by a variable, and
+  `make test-alone P=time` on 8.3 to 8.5 catches the rest. The rules of `agents/php.md` give way to this.
+- `\RoundingMode` of PHP 8.4, which the functions take, comes from `symfony/polyfill-php84` below 8.4.
+  Only the enum is there: `round()` takes it since 8.4, the test that compares `divide()` with it is skipped below.
 
 - The polyfill (`polyfill/`) behaves as the C class (`ext/date/time_duration.c`, `lib/duration.c` and
   `lib/parse_iso_intervals.re` of timelib in php-src) down to the exception classes, messages and previous
   exceptions. When they differ, the C code is right: read it, do not guess.
 - `polyfill/` holds only `Time\Duration` and `Time\TimeException`: the namespace belongs to PHP. Anything else
   the polyfill needs lives in `Thesis\Time\Internal` (`IsoInterval`), so deleting `polyfill/` and `IsoInterval`
-  is all it takes to drop PHP 8.5.
+  is all it takes to require PHP 8.6.
 - `Duration::$signedNanoseconds` is the first declared property: PHP compares objects of one class property
   by property in declaration order, so this is what makes `<`, `==` and `<=>` work as in PHP 8.6.
   `__serialize()` leaves it out, so the serialized form is the one of PHP 8.6.
@@ -61,8 +70,11 @@ The API is described in `README.md`, the class itself in https://wiki.php.net/rf
 
 ## Tests
 
-- `DurationTest` pins the class with values taken from PHP 8.6 and passes against both: run it with
-  `PHP_VERSION=8.5` and `PHP_VERSION=8.6` (`PHP_VERSION=8.6 make test P=time`).
+- `DurationTest` pins the class with values taken from PHP 8.6 and passes against both: `make test P=time`
+  runs it on 8.6, `PHP_VERSION=8.3 make test-alone P=time` installs the package alone and runs it
+  against the polyfill (CI does it on 8.3 to 8.5).
+- Mutation testing runs on 8.6, where the polyfill is not loaded: `IsoInterval` is in `src/` and its tests
+  call it directly, so they kill its mutants without the polyfill.
 - `DurationFuzzTest` runs on PHP 8.6 only: it loads a copy of the polyfill as `Thesis\Time\Polyfill\Duration`
   (`loadPolyfillCopy()`) and compares it with the original on random input. Random pieces rarely form a period,
   so ISO strings are also built from the grammar and then broken. Boundaries that random input does not hit

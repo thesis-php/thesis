@@ -13,7 +13,8 @@ final class ClockTest
     public function wallClockTellsTheCurrentTime(): void
     {
         $before = new \DateTimeImmutable();
-        $now = new WallClock()->now();
+        $clock = new WallClock();
+        $now = $clock->now();
 
         Assert::true($before <= $now && $now <= new \DateTimeImmutable());
         Assert::same($now->getTimezone()->getName(), date_default_timezone_get());
@@ -23,7 +24,9 @@ final class ClockTest
     {
         $timeZone = new \DateTimeZone('Arctic/Longyearbyen');
 
-        Assert::same(new WallClock($timeZone)->now()->getTimezone()->getName(), 'Arctic/Longyearbyen');
+        $clock = new WallClock($timeZone);
+
+        Assert::same($clock->now()->getTimezone()->getName(), 'Arctic/Longyearbyen');
     }
 
     public function frozenClockStandsStill(): void
