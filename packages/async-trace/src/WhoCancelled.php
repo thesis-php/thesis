@@ -13,12 +13,10 @@ use Thesis\Async\Trace\ShieldCreated;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TimeoutCreated;
 use Thesis\AsyncTrace\Internal\Cancellation;
-use Thesis\AsyncTrace\Internal\Seconds;
+use Thesis\AsyncTrace\Internal\Describe;
 use Thesis\AsyncTrace\Internal\TracedScope;
 use Thesis\Dispatcher;
 use Thesis\Dispatcher\Listener;
-use Thesis\SourceLocation\Location;
-use function Thesis\Formatter\formatValue;
 
 /**
  * Tells what has cancelled a scope, which `Cancelled` itself does not: a scope that ends as cancelled
@@ -50,11 +48,8 @@ final class WhoCancelled
     #[Listener]
     public function onGroupCreated(GroupCreated $event): void
     {
-        /** @var non-empty-string $function the short name of a function of thesis/async: `group`, `race` */
-        $function = str_replace('Thesis\Async\\', '', $event->function);
-        $what = $function . self::name($event->name);
         $this->scopes[$event->scope] = new TracedScope(
-            what: self::at($what, $event->location),
+            what: Describe::scope($event),
             parent: $event->parent,
             task: false,
             cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
@@ -64,7 +59,6 @@ final class WhoCancelled
     #[Listener]
     public function onTaskCreated(TaskCreated $event): void
     {
-        $what = ($event->daemon ? 'daemon' : 'task') . self::name($event->name);
         $group = $this->scopes[$event->group] ?? null;
         $cancellation = null;
 
@@ -74,7 +68,7 @@ final class WhoCancelled
         }
 
         $this->scopes[$event->scope] = new TracedScope(
-            what: self::at($what, $event->location),
+            what: Describe::scope($event),
             parent: $event->group,
             task: true,
             cancellation: $cancellation,
@@ -84,9 +78,8 @@ final class WhoCancelled
     #[Listener]
     public function onTimeoutCreated(TimeoutCreated $event): void
     {
-        $what = 'timeout ' . Seconds::format($event->duration) . 's';
         $this->scopes[$event->scope] = new TracedScope(
-            what: self::at($what, $event->location),
+            what: Describe::scope($event),
             parent: $event->parent,
             task: false,
             cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
@@ -97,7 +90,7 @@ final class WhoCancelled
     public function onShieldCreated(ShieldCreated $event): void
     {
         $this->scopes[$event->scope] = new TracedScope(
-            what: self::at('shield', $event->location),
+            what: Describe::scope($event),
             parent: $event->parent,
             task: false,
             cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
@@ -186,7 +179,7 @@ final class WhoCancelled
             CancelCause::Handle => self::call('Thesis\Async\Task::cancel', $event) . ' in ' . $by,
             CancelCause::CancelTasks => self::call('Thesis\Async\Group::cancelTasks', $event) . ' in ' . $by,
             CancelCause::Failure => 'the failure of ' . ($event->by === null ? 'the event loop' : $by)
-                . ($event->error === null ? '' : ': ' . self::error($event->error)),
+                . ($event->error === null ? '' : ': ' . Describe::error($event->error)),
             CancelCause::Deadline => 'the deadline of ' . $by,
             CancelCause::DaemonsAfterTasks => 'the end of the tasks of ' . $by,
         };
@@ -212,28 +205,5 @@ final class WhoCancelled
     private static function call(string $callee, ScopeCancelled $event): string
     {
         return $event->caller === null ? $callee . '()' : (string) $event->caller;
-    }
-
-    /**
-     * @return non-empty-string
-     */
-    private static function error(\Throwable $error): string
-    {
-        return $error::class . ' ' . formatValue($error->getMessage())
-            . ' at ' . $error->getFile() . ':' . $error->getLine();
-    }
-
-    private static function name(?string $name): string
-    {
-        return $name === null ? '' : ' ' . formatValue($name);
-    }
-
-    /**
-     * @param non-empty-string $what
-     * @return non-empty-string
-     */
-    private static function at(string $what, ?Location $location): string
-    {
-        return $location === null ? $what : $what . ' at ' . $location;
     }
 }

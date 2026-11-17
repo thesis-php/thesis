@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/async-trace)](https://github.com/thesis-php/async-trace/releases)
 
 Tools around the trace of [thesis/async](https://github.com/thesis-php/async): its events written as NDJSON,
-one line per event, and as lines of text for tests, and who has cancelled a scope.
+one line per event, and as lines of text for tests, who has cancelled a scope, and code that blocks the others.
 
 ```php
 use Thesis\Dispatcher;
@@ -110,6 +110,34 @@ It forgets a scope when the scope ends, fit for a process that lives long. A lis
 inside a listener of `observe()`, with the same rules: it must not throw or suspend the fiber. A report is dispatched
 at once, before the listeners that stand after `WhoCancelled` get the `Ended` that has caused it: put a writer
 of the events (`NdjsonWriter`, `TextLog`) before it to keep the end before the report.
+
+## `BlockingDetector`
+
+Code that runs without a wait holds every other task: a synchronous call to a database, a long loop, a blocking
+`file_get_contents()`. `BlockingDetector` reports each run longer than its threshold as `Blocked`, with the waits
+around it, to the same dispatcher as the events:
+
+```php
+use Thesis\AsyncTrace\Blocked;
+use Thesis\AsyncTrace\BlockingDetector;
+use function Thesis\Time\ms;
+
+$print = static function (Blocked $report) {
+    fwrite(STDERR, $report . "\n");
+};
+observe(new Dispatcher([...listenersOf(new BlockingDetector(threshold: ms(50))), $print]), $main);
+// #2 task 'work' at /app/src/main.php:8 has run 0.12s without a wait: from Thesis\Async\delay()
+// at /app/src/main.php:9 to Thesis\Async\Channel::receive() at /app/src/main.php:14
+```
+
+A run begins when a task starts or a wait is over, and ends at the next wait of any scope, at the join of a group
+or at the end of a task: `from` and `to` of the report say which. The report has `scope`, `what`, `at`
+(the beginning of the run) and `duration` too. The time is that of the events: under `VirtualTime\run()`
+code takes no time, and a test makes a run long by `VirtualTime\advance()`.
+
+Not seen: a run that never ends (an endless loop), code after the join of a group up to its next wait,
+code outside the scope tree. It listens to the waits, so each costs a backtrace: a tool for debugging,
+not for every request in production.
 
 ## The format, version 1
 

@@ -75,6 +75,13 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   is kept until its group ends to name it in the reason. The error comes from `ScopeCancelled::$error`: the body
   of a group ends after the cancellation by its failure. Rejected: keeping every ended scope that may be a `by`,
   it grows forever in a server.
+- `BlockingDetector` takes the time of the events, not a clock of its own: `Instant::now()` is `hrtime()`
+  outside virtual time, and under it `VirtualTime\advance()` is CPU work without a wait, which a test needs.
+  Rejected: an injected monotonic clock, a second time that a test would have to move along with the virtual one.
+- A run of `BlockingDetector` ends at `Joining` too: the join of a group waits for its tasks without `suspend()`,
+  so no `Suspended` comes, and the run of the body would last until another fiber starts. Trap: a run that begins
+  while another is open has lost its end to a wait outside the tree (in the root scope): it is dropped,
+  not reported with a wrong end.
 - Not yet: following a chain of causes, such as a task failed by the `TaskCancelled` of a task it awaited,
   cancelled in its turn. The first cause covers the deadlines, the calls and the failures.
 - An error is its class, message, file and line, without the previous ones and the trace:

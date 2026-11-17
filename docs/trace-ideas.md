@@ -65,11 +65,8 @@ of the losses: the program never slows down for its observer.
   until it is asked for, fit for production. The price: the names and the locations live only in the tracer
   (a decision, so that a task without an observation does not pay memory for them), so without an observation
   there are none. A choice to make explicitly: walk the tree, the events, or both.
-- **A detector of blocking code.** A run is of the event loop, not of a scope: one fiber runs at a time, from
-  `Resumed` or `TaskStarted` to the next `Suspended` of any scope (a `timeout()` or a `shield()` waits in the fiber
-  of its task) or the `Ended` of the task. A run longer than a threshold is blocking code, the most common bug
-  of async PHP, and is reported between the callers of the two waits around it. It reads a monotonic clock of its own,
-  injected for the tests: on virtual time a run costs nothing. A run that never ends is not seen, that is the dump.
+- **A detector of blocking code**: done, `BlockingDetector` of thesis/async-trace. A run that never ends
+  is not seen, that is the dump.
 - **A watchdog of long waits**: a task in `Suspended` longer than a threshold, reported once with its caller.
   It needs a timer, since a hang brings no event: a raw `EventLoop::repeat()` outside the tree, unreferenced,
   virtual under `VirtualTime\run()` like every timer of the loop.
@@ -109,8 +106,9 @@ of the losses: the program never slows down for its observer.
 ## Order
 
 1. The tools of debugging first, each with the part of the model of the state it needs, instead of a model designed
-   ahead of its users: who has cancelled me (done, `WhoCancelled`), the detector of blocking code, the watchdog
-   of long waits. Done before: the NDJSON record (`NdjsonWriter`) and the text format (`TextLog`).
+   ahead of its users: who has cancelled me (done, `WhoCancelled`), the detector of blocking code
+   (done, `BlockingDetector`), the watchdog of long waits. Done before: the NDJSON record (`NdjsonWriter`)
+   and the text format (`TextLog`).
 2. The export to Perfetto: the course and debugging for a small price.
 3. The model of the state as a public API, out of what the tools have needed.
 4. The dump by a signal, once the choice between the walk of the tree and the events is made.
