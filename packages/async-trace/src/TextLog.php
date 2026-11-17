@@ -16,8 +16,8 @@ use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Async\Trace\TimeoutCreated;
+use Thesis\AsyncTrace\Internal\Seconds;
 use Thesis\Dispatcher\Listener;
-use Time\Duration;
 use function Thesis\Formatter\formatValue;
 
 /**
@@ -75,7 +75,7 @@ final class TextLog
         $this->add(
             event: $event,
             what: 'timeout '
-            . self::seconds($event->duration)
+            . Seconds::format($event->duration)
             . 's in '
             . self::scope($event->parent)
             . self::cancelled($event->cancelled),
@@ -137,22 +137,6 @@ final class TextLog
             : 'threw ' . self::error($event->error));
     }
 
-    /**
-     * The exact decimal of the seconds, without trailing zeros: `0`, `1.5`, `1.000000001`, `-1.5`.
-     *
-     * @return non-empty-string
-     */
-    private static function seconds(Duration $duration): string
-    {
-        $sign = $duration->negative ? '-' : '';
-
-        if ($duration->nanoseconds === 0) {
-            return $sign . $duration->seconds;
-        }
-
-        return $sign . $duration->seconds . '.' . rtrim(\sprintf('%09d', $duration->nanoseconds), '0');
-    }
-
     private static function name(?string $name): string
     {
         return $name === null ? '' : ' ' . formatValue($name);
@@ -185,7 +169,7 @@ final class TextLog
     private function add(Event $event, string $what): void
     {
         $this->origin ??= $event->at;
-        $seconds = self::seconds($event->at->since($this->origin));
+        $seconds = Seconds::format($event->at->since($this->origin));
         $this->lines[] = \sprintf('%s #%d %s', $seconds, $event->scope, $what);
     }
 }

@@ -65,12 +65,17 @@ of the losses: the program never slows down for its observer.
   until it is asked for, fit for production. The price: the names and the locations live only in the tracer
   (a decision, so that a task without an observation does not pay memory for them), so without an observation
   there are none. A choice to make explicitly: walk the tree, the events, or both.
-- **A detector of blocking code.** From `Resumed` to the next `Suspended` or `Ended` of the same scope the fiber runs
-  without giving up control. A run longer than a threshold is blocking code in a task, the most common bug
-  of async PHP, and the events give it almost for free.
-- **A watchdog of long waits**: a task in `Suspended` longer than a threshold, reported with its caller.
-- **Who has cancelled me**: follow `ScopeCancelled::$by` and `$cause` to the first cause, such as "the deadline
-  of `timeout()` at file:line". `Cancelled` itself carries nothing.
+- **A detector of blocking code.** A run is of the event loop, not of a scope: one fiber runs at a time, from
+  `Resumed` or `TaskStarted` to the next `Suspended` of any scope (a `timeout()` or a `shield()` waits in the fiber
+  of its task) or the `Ended` of the task. A run longer than a threshold is blocking code, the most common bug
+  of async PHP, and is reported between the callers of the two waits around it. It reads a monotonic clock of its own,
+  injected for the tests: on virtual time a run costs nothing. A run that never ends is not seen, that is the dump.
+- **A watchdog of long waits**: a task in `Suspended` longer than a threshold, reported once with its caller.
+  It needs a timer, since a hang brings no event: a raw `EventLoop::repeat()` outside the tree, unreferenced,
+  virtual under `VirtualTime\run()` like every timer of the loop.
+- **Who has cancelled me**: done, `WhoCancelled` of thesis/async-trace, to the first cause: the deadline, the call
+  of `Task::cancel()` or `Group::cancelTasks()` (`ScopeCancelled::$caller`), the failure (`ScopeCancelled::$error`).
+  A chain of causes (a task failed by the `TaskCancelled` of another one) is not followed yet.
 
 ### The course and understanding concurrency
 
@@ -103,10 +108,11 @@ of the losses: the program never slows down for its observer.
 
 ## Order
 
-1. The model of the state: the base, `tests/TraceChecker.php` of thesis/async is its beginning.
-   Done: the NDJSON record (`NdjsonWriter` of thesis/async-trace) and the text format (`TextLog`).
+1. The tools of debugging first, each with the part of the model of the state it needs, instead of a model designed
+   ahead of its users: who has cancelled me (done, `WhoCancelled`), the detector of blocking code, the watchdog
+   of long waits. Done before: the NDJSON record (`NdjsonWriter`) and the text format (`TextLog`).
 2. The export to Perfetto: the course and debugging for a small price.
-3. The detector of blocking code, the watchdog of long waits, who has cancelled me.
+3. The model of the state as a public API, out of what the tools have needed.
 4. The dump by a signal, once the choice between the walk of the tree and the events is made.
 5. `testo-plugin`: the trace of a failed test, the invariants.
 6. The live `top` over a socket.
@@ -115,6 +121,8 @@ of the losses: the program never slows down for its observer.
 ## Where it lives
 
 thesis/async keeps only the events, the tools go to thesis/async-trace, with a `bin/` for the reports and `top` later.
+A tool reports to a `Thesis\Dispatcher` of its reports (`Report`, `CancelledBy`): a listener takes the reports
+of its type, under the rules of a listener of `observe()`.
 
 ## To discuss next
 

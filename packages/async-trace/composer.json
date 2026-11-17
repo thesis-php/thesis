@@ -1,13 +1,14 @@
 {
     "name": "thesis/async-trace",
-    "description": "Tools around the trace of thesis/async: its events written as NDJSON, one line per event, and as lines of text for tests.",
+    "description": "Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why.",
     "keywords": [
         "php",
         "async",
         "fibers",
         "tracing",
         "ndjson",
-        "debugging"
+        "debugging",
+        "cancellation"
     ],
     "license": "MIT",
     "type": "library",

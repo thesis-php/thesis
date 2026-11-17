@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/async-trace)](https://github.com/thesis-php/async-trace/releases)
 
 Tools around the trace of [thesis/async](https://github.com/thesis-php/async): its events written as NDJSON,
-one line per event, and as lines of text for tests.
+one line per event, and as lines of text for tests, and who has cancelled a scope.
 
 ```php
 use Thesis\Dispatcher;
@@ -75,6 +75,39 @@ of [thesis/formatter](https://github.com/thesis-php/formatter), an error is the 
 | `Ended` | `returned 42`, `threw RuntimeException` |
 
 A line is for reading and comparing, not parsing: a tool reads the NDJSON.
+
+## `WhoCancelled`
+
+`Cancelled` carries nothing: a task that ends cancelled does not tell by whom. `WhoCancelled` does: each scope
+that ends as cancelled gets a `CancelledBy` report in the dispatcher of reports given to it, with what has cancelled
+the scope and where it is written:
+
+```php
+use Thesis\AsyncTrace\CancelledBy;
+use Thesis\AsyncTrace\WhoCancelled;
+
+$print = static function (CancelledBy $report) {
+    fwrite(STDERR, $report . "\n");
+};
+observe(new Dispatcher(listenersOf(new WhoCancelled(new Dispatcher([$print])))), $main);
+// #3 task 'fetch' at /app/src/main.php:12 is cancelled by the deadline of timeout 2s at /app/src/main.php:10
+```
+
+| Cause | Reason |
+|---|---|
+| `Deadline` | `the deadline of timeout 2s at /app/src/main.php:10` |
+| `Handle` | `Thesis\Async\Task::cancel() at /app/src/main.php:20 in group at /app/src/main.php:8` |
+| `CancelTasks` | `Thesis\Async\Group::cancelTasks() at /app/src/main.php:21 in group at /app/src/main.php:8` |
+| `Failure` | `the failure of task 'fetch' at /app/src/main.php:12: RuntimeException 'boom' at /app/src/Api.php:40` |
+| `DaemonsAfterTasks` | `the end of the tasks of group at /app/src/main.php:8` |
+
+A scope created in a cancelled one (a task spawned after `cancelTasks()`, a group under an expired deadline) gets
+the reason of the cancellation it was created under. The report has the fields too: `scope`, `what`, `at`
+(the moment of the cancellation), `cause`, `by` (the number of the scope that has cancelled) and `reason`.
+
+It listens only to the scopes being created, cancelled and ended, not to the waits, which cost a backtrace each.
+It forgets a scope when the scope ends, fit for a process that lives long. A listener of the reports is called
+inside a listener of `observe()`, with the same rules: it must not throw or suspend the fiber.
 
 ## The format, version 1
 

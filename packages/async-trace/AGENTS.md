@@ -11,6 +11,8 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - A listener only observes (`observe()` of thesis/async): `NdjsonWriter` and `TextLog` never throw (a failed write
   is counted in `$lost`), never suspend (a synchronous `fwrite()`, no thesis/io), and keep nothing of an event but
   the `Instant` of the first one: a value, an error and a task are formatted inside the method of the event.
+  A tool (`WhoCancelled`) keeps only strings, numbers and `Instant`s, and only of live scopes: a process that
+  lives long must not grow with it.
 - The NDJSON is the base every other tool reads, and `README.md` is its specification: a change of the format
   changes the table there in the same commit. A field added or an event added keeps `VERSION`, a field removed
   or one whose meaning changes bumps it.
@@ -18,12 +20,18 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of virtual time. `at` counts from the first event the writer sees, never from the origin of `Instant`
   (unknown, and a rounded-up second on virtual time). The wall clock is read once, for `start` of the header,
   from the injected `ClockInterface`, so a test fixes it.
-- A listener of the events has a method marked `#[Listener]` for every event class of `Thesis\Async\Trace`,
+- A writer of the events (`NdjsonWriter`, `TextLog`) has a method marked `#[Listener]` for every event class
+  of `Thesis\Async\Trace`,
   never one of `Event`: an event added to async in a minor reaches an older async-trace, and the dispatcher
   does not route it to methods of other classes (`takesNoEventOfNewerAsyncItDoesNotKnow`). A new event of async
   gets its method here in the same change: `unheardEvents()` of `tests/helpers.php` reads the `@phpstan-sealed`
-  list of `Event` (PHPStan keeps it complete), and `listensToEveryEventOfAsync` of each listener fails on a class
+  list of `Event` (PHPStan keeps it complete), and `listensToEveryEventOfAsync` of each writer fails on a class
   the dispatcher does not route to it.
+- A tool listens only to the events it needs: `observe()` does not build an event nobody gets, and `Suspended`
+  and `Resumed` cost a backtrace per wait. `WhoCancelled` never listens to the waits (`listensToNoWaitsAndRuns`).
+- A tool reports to a `Thesis\Dispatcher` given to its constructor, a class per finding under the sealed `Report`.
+  A report holds only formatted values, so its listener may keep it. It is dispatched inside a listener
+  of `observe()`, so the rules of that listener are the rules of the listener of the report.
   Rejected: finding the events by the files of `src/Trace/` of async, it guessed classes by the case of a file name,
   and `class_exists()` on `api.php` included it again (composer's PSR-4 uses `include`): a fatal redeclaration.
 - The lines of `TextLog` are a public format too, compared by the tests of its users: a change of a line changes
@@ -54,5 +62,16 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
   of async on async-trace would be a cycle in the split repositories.
 - A location is `{file, line}` of the full path, not `"file:line"` (a reader would split it, and a path may hold
   `:`) and not `Location::$shortFile` (it depends on the root of the project that writes the trace).
+- Reports go to a `Dispatcher`, not to a `callable(Report): void`: a listener takes the reports of its type
+  (`CancelledBy` alone), and the same dispatcher, `#[Listener]` and `listenersOf()` as the trace itself.
+- `WhoCancelled` reports when a scope ends as cancelled, not when it is cancelled: the question is asked when
+  `Cancelled` comes out, and then the scope is known whole. A scope under a shield that never ends gets nothing.
+  The reason is formatted at `ScopeCancelled`, while the scope that has cancelled is alive, and shared by every
+  scope it has reached. Trap: a task that fails ends before its group is cancelled by its failure, so a failed task
+  is kept until its group ends to name it in the reason. The error comes from `ScopeCancelled::$error`: the body
+  of a group ends after the cancellation by its failure. Rejected: keeping every ended scope that may be a `by`,
+  it grows forever in a server.
+- Not yet: following a chain of causes, such as a task failed by the `TaskCancelled` of a task it awaited,
+  cancelled in its turn. The first cause covers the deadlines, the calls and the failures.
 - An error is its class, message, file and line, without the previous ones and the trace:
   a line per event must stay short, and the cause of a cancellation is in `ScopeCancelled`, not in `Cancelled`.

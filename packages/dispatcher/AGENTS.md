@@ -24,6 +24,11 @@ so how to *use* this package belongs in `README.md` or in a skill under `skills/
 - The constructor rejects every listener that would not do its work when called, not only a wrong parameter:
   a generator is rejected, its body would never run. Trap: `?object` is a `ReflectionNamedType` named `object`,
   so a check by name alone takes it for every event; only `mixed` allows `null` and still means every event.
+- Trap, open: a closure written right inside `new Dispatcher([...])` gets its parameter typed `never` by PHPStan
+  from `iterable<callable(never): void>` of the constructor: `static function (Foo $event)` sees `$event` as `never`,
+  and every use of it is reported (`cast.useless`). A closure assigned to a variable first keeps its declared type,
+  as the tests of thesis/async and thesis/async-trace do. A fix belongs in the type of the constructor
+  or in phpstan-extension, it is not made yet.
 
 ## Decisions
 

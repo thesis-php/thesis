@@ -1,0 +1,241 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Thesis\AsyncTrace;
+
+use Thesis\Async\Cancelled;
+use Thesis\Async\Trace\CancelCause;
+use Thesis\Async\Trace\Ended;
+use Thesis\Async\Trace\GroupCreated;
+use Thesis\Async\Trace\ScopeCancelled;
+use Thesis\Async\Trace\ShieldCreated;
+use Thesis\Async\Trace\TaskCreated;
+use Thesis\Async\Trace\TimeoutCreated;
+use Thesis\AsyncTrace\Internal\Cancellation;
+use Thesis\AsyncTrace\Internal\Seconds;
+use Thesis\AsyncTrace\Internal\TracedScope;
+use Thesis\Dispatcher;
+use Thesis\Dispatcher\Listener;
+use Thesis\SourceLocation\Location;
+use function Thesis\Formatter\formatValue;
+
+/**
+ * Tells what has cancelled a scope, which `Cancelled` itself does not: a scope that ends as cancelled
+ * gets a {@see CancelledBy} in $reports, with the deadline, the call of `Task::cancel()` or `Group::cancelTasks()`
+ * and where it is written, or the failure that has cancelled it. A method per event: `listenersOf($whoCancelled)`.
+ *
+ * It listens only to the scopes being created, cancelled and ended, not to the waits: those cost a backtrace each.
+ * It keeps a short description of each live scope and forgets it when the scope ends. A failed task is kept
+ * until its group ends: its failure may cancel the group right after its end.
+ *
+ * @api
+ */
+final class WhoCancelled
+{
+    /**
+     * @var array<positive-int, TracedScope>
+     */
+    private array $scopes = [];
+
+    /**
+     * The descriptions of the failed tasks whose groups have not ended yet.
+     *
+     * @var array<positive-int, non-empty-string>
+     */
+    private array $failed = [];
+
+    public function __construct(
+        private readonly Dispatcher $reports,
+    ) {}
+
+    #[Listener]
+    public function onGroupCreated(GroupCreated $event): void
+    {
+        /** @var non-empty-string $function the short name of a function of thesis/async: `group`, `race` */
+        $function = str_replace('Thesis\Async\\', '', $event->function);
+        $what = $function . self::name($event->name);
+        $this->scopes[$event->scope] = new TracedScope(
+            what: self::at($what, $event->location),
+            parent: $event->parent,
+            task: false,
+            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+        );
+    }
+
+    #[Listener]
+    public function onTaskCreated(TaskCreated $event): void
+    {
+        $what = ($event->daemon ? 'daemon' : 'task') . self::name($event->name);
+        $group = $this->scopes[$event->group] ?? null;
+        $cancellation = null;
+
+        if ($event->cancelled && $group !== null) {
+            $cancellation = ($event->daemon ? $group->daemonsCancellation : $group->tasksCancellation)
+                ?? $group->cancellation;
+        }
+
+        $this->scopes[$event->scope] = new TracedScope(
+            what: self::at($what, $event->location),
+            parent: $event->group,
+            task: true,
+            cancellation: $cancellation,
+        );
+    }
+
+    #[Listener]
+    public function onTimeoutCreated(TimeoutCreated $event): void
+    {
+        $what = 'timeout ' . Seconds::format($event->duration) . 's';
+        $this->scopes[$event->scope] = new TracedScope(
+            what: self::at($what, $event->location),
+            parent: $event->parent,
+            task: false,
+            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+        );
+    }
+
+    #[Listener]
+    public function onShieldCreated(ShieldCreated $event): void
+    {
+        $this->scopes[$event->scope] = new TracedScope(
+            what: self::at('shield', $event->location),
+            parent: $event->parent,
+            task: false,
+            cancellation: $event->cancelled ? $this->cancellationOf($event->parent) : null,
+        );
+    }
+
+    #[Listener]
+    public function onScopeCancelled(ScopeCancelled $event): void
+    {
+        $cancellation = new Cancellation(
+            at: $event->at,
+            cause: $event->cause,
+            by: $event->by,
+            reason: $this->reason($event),
+        );
+        $scope = $this->scopes[$event->scope] ?? null;
+
+        if ($scope !== null && $event->cause === CancelCause::CancelTasks) {
+            $scope->tasksCancellation = $cancellation;
+        } elseif ($scope !== null && $event->cause === CancelCause::DaemonsAfterTasks) {
+            $scope->daemonsCancellation = $cancellation;
+        }
+
+        foreach ($event->reached as $reached) {
+            if (isset($this->scopes[$reached])) {
+                $this->scopes[$reached]->cancellation ??= $cancellation;
+            }
+        }
+    }
+
+    #[Listener]
+    public function onEnded(Ended $event): void
+    {
+        $scope = $this->scopes[$event->scope] ?? null;
+
+        if ($scope === null) {
+            return;
+        }
+
+        unset($this->scopes[$event->scope]);
+
+        foreach ($scope->failedTasks as $task) {
+            unset($this->failed[$task]);
+        }
+
+        $error = $event->error;
+        $cancellation = $scope->cancellation;
+
+        if ($error instanceof Cancelled && $cancellation !== null) {
+            $this->reports->dispatch(new CancelledBy(
+                scope: $event->scope,
+                what: $scope->what,
+                at: $cancellation->at,
+                cause: $cancellation->cause,
+                by: $cancellation->by,
+                reason: $cancellation->reason,
+            ));
+
+            return;
+        }
+
+        $group = $scope->parent === null ? null : $this->scopes[$scope->parent] ?? null;
+
+        if ($error !== null && !$error instanceof Cancelled && $scope->task && $group !== null) {
+            $this->failed[$event->scope] = $scope->what;
+            $group->failedTasks[] = $event->scope;
+        }
+    }
+
+    /**
+     * @param ?positive-int $parent
+     */
+    private function cancellationOf(?int $parent): ?Cancellation
+    {
+        return $parent === null ? null : $this->scopes[$parent]->cancellation ?? null;
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function reason(ScopeCancelled $event): string
+    {
+        $by = $this->describe($event->by);
+
+        return match ($event->cause) {
+            CancelCause::Handle => self::call('Thesis\Async\Task::cancel', $event) . ' in ' . $by,
+            CancelCause::CancelTasks => self::call('Thesis\Async\Group::cancelTasks', $event) . ' in ' . $by,
+            CancelCause::Failure => 'the failure of ' . ($event->by === null ? 'the event loop' : $by)
+                . ($event->error === null ? '' : ': ' . self::error($event->error)),
+            CancelCause::Deadline => 'the deadline of ' . $by,
+            CancelCause::DaemonsAfterTasks => 'the end of the tasks of ' . $by,
+        };
+    }
+
+    /**
+     * @param ?positive-int $id
+     * @return non-empty-string
+     */
+    private function describe(?int $id): string
+    {
+        if ($id === null) {
+            return 'the root scope';
+        }
+
+        return $this->scopes[$id]->what ?? $this->failed[$id] ?? '#' . $id;
+    }
+
+    /**
+     * @param non-empty-string $callee the call of the cause if the event does not know where it is written
+     * @return non-empty-string
+     */
+    private static function call(string $callee, ScopeCancelled $event): string
+    {
+        return $event->caller === null ? $callee . '()' : (string) $event->caller;
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private static function error(\Throwable $error): string
+    {
+        return $error::class . ' ' . formatValue($error->getMessage())
+            . ' at ' . $error->getFile() . ':' . $error->getLine();
+    }
+
+    private static function name(?string $name): string
+    {
+        return $name === null ? '' : ' ' . formatValue($name);
+    }
+
+    /**
+     * @param non-empty-string $what
+     * @return non-empty-string
+     */
+    private static function at(string $what, ?Location $location): string
+    {
+        return $location === null ? $what : $what . ' at ' . $location;
+    }
+}
