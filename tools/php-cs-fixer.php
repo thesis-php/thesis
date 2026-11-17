@@ -62,6 +62,8 @@ return new Config()
                 'trait_import' => 'only_if_meta',
             ],
         ],
+        // An annotation of Infection is a comment: a PHPDoc before a statement reads as a type for PHPStan.
+        'comment_to_phpdoc' => ['ignored_tags' => ['infection-ignore']],
         'concat_space' => ['spacing' => 'one'],
         'date_time_immutable' => true,
         'final_class' => true,

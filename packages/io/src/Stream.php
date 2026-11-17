@@ -115,6 +115,9 @@ final class Stream implements Reader, Writer, Closer
 
                 // Read first, wait only if there is nothing: a regular file or php://memory never has to wait,
                 // and the event loop cannot even watch them.
+                // A failed fread() or fwrite() of a stream of the OS reports its own warning,
+                // which replaces the last error.
+                // @infection-ignore FunctionCallRemoval
                 error_clear_last();
                 $bytes = @fread($stream, min($max, self::MAX_READ));
 
@@ -160,10 +163,14 @@ final class Stream implements Reader, Writer, Closer
 
         if ($this->writers === 0) {
             $stream = $this->stream ?? throw new StreamClosed('The stream is closed.');
+            // the last error is replaced anyway, see read()
+            // @infection-ignore FunctionCallRemoval
             error_clear_last();
             $written = @fwrite($stream, $bytes);
 
             if ($written === \strlen($bytes)) {
+                // Without it the write takes the lock and writes nothing more.
+                // @infection-ignore ReturnRemoval
                 return;
             }
 
@@ -198,14 +205,21 @@ final class Stream implements Reader, Writer, Closer
     private function finishWrite(string $bytes, int $written): void
     {
         $length = \strlen($bytes);
+        // The number of writers only decides whether a write may take the fast path without the lock:
+        // a write that takes the lock instead is slower, with the same bytes in the same order.
+        // @infection-ignore Increment
         ++$this->writers;
 
+        // the number of writers, see above
+        // @infection-ignore Finally_, UnwrapFinally
         try {
             // released by its destructor once the method returns or throws
             $lock = ($this->writeMutex ??= new LocalMutex())->acquire();
 
             while ($written < $length) {
                 $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
+                // the last error is replaced anyway, see read()
+                // @infection-ignore FunctionCallRemoval
                 error_clear_last();
                 $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
 
@@ -216,6 +230,9 @@ final class Stream implements Reader, Writer, Closer
                 if ($sent > 0) {
                     $written += $sent;
                 } elseif (!$this->watcher->writable()) {
+                    // The watcher ends a wait with false only after close(), so the loop would throw the same
+                    // at its start: the throw says it where the wait ends, as in read().
+                    // @infection-ignore Throw_
                     throw new StreamClosed('The stream was closed while writing.');
                 }
             }
@@ -226,6 +243,8 @@ final class Stream implements Reader, Writer, Closer
 
             throw $error;
         } finally {
+            // the number of writers, see above
+            // @infection-ignore Decrement
             --$this->writers;
         }
     }

@@ -117,6 +117,8 @@ final class LocalCache implements Cache, \Countable
             $this->remove($this->leastRecentlyUsed);
         }
 
+        // Frees the memory of the dead nodes of the heap: when and whether it is rebuilt changes no entry.
+        // @infection-ignore DecrementInteger, IncrementInteger, GreaterThan, GreaterThanNegotiation, MethodCallRemoval
         if ($this->expiries->count() > 2 * $this->entriesWithTtl) {
             $this->rebuildExpiries();
         }
@@ -180,6 +182,8 @@ final class LocalCache implements Cache, \Countable
 
         $this->mostRecentlyUsed = $entry;
 
+        // only decides when the heap of expiries is rebuilt, see set()
+        // @infection-ignore NotIdentical, Increment
         if ($entry->expiresAt !== null) {
             ++$this->entriesWithTtl;
         }
@@ -209,6 +213,8 @@ final class LocalCache implements Cache, \Countable
         $entry->newer = null;
         $entry->olderKey = null;
 
+        // only decides when the heap of expiries is rebuilt, see set()
+        // @infection-ignore NotIdentical, Decrement
         if ($entry->expiresAt !== null) {
             --$this->entriesWithTtl;
         }

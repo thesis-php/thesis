@@ -35,9 +35,8 @@ final readonly class Manifest
      * @param list<non-empty-string> $optional packages and extensions of requireDev that src/ uses only when
      *     they are installed, behind a check: composer-dependency-analyser allows them in src/.
      *     Tell the users about them in $suggest
-     * @param list<FixerSkip|InfectionSkip|RectorSkip> $skip files where a rule of a tool does not apply, methods
-     *     where a mutator of Infection does not. PHPStan is not here: its errors are ignored in the code,
-     *     by a phpstan-ignore comment with an identifier and a reason
+     * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan and Infection
+     *     are not here: they are told in the code, by a phpstan-ignore or an infection-ignore comment with a reason
      * @param list<non-empty-string> $dist top-level paths of the package that src/ needs at runtime (a polyfill,
      *     resources). Composer installs only them, src/, composer.json, LICENSE, README.md and skills/
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin

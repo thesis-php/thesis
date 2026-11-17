@@ -137,6 +137,9 @@ final class IsoInterval
                 continue;
             }
 
+            // No two rules match a token of the same length: they differ in the first byte,
+            // or COMBINED_PERIOD has a hyphen where PERIOD cannot.
+            // @infection-ignore GreaterThan
             if (\strlen($matches[0]) > \strlen($longest[1])) {
                 $longest = [$rule, $matches[0]];
             }

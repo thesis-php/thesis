@@ -69,6 +69,8 @@ final class StringFormatter
             }
 
             $shown .= $character;
+            // A character that double quotes escape shows as itself, so it has no escape of its own to swap with.
+            // @infection-ignore Coalesce
             $doubleQuoted .= $escape ?? self::DOUBLE_QUOTED_ESCAPES[$character] ?? $character;
             $length += $characterLength;
             $isEscaped = $isEscaped || $escape !== null;
@@ -85,6 +87,8 @@ final class StringFormatter
      */
     private static function head(string $string, int $maxCharacters): string
     {
+        // More bytes than the characters may take are split for nothing: only slower.
+        // @infection-ignore IncrementInteger, UnwrapSubstr
         return substr($string, 0, 4 * $maxCharacters); // a character takes 4 bytes at most
     }
 
@@ -128,6 +132,9 @@ final class StringFormatter
     private static function codePoint(string $character): int
     {
         $length = \strlen($character);
+        // The mask only clears the length prefix: its lowest bit is shifted out,
+        // and the bit after the prefix is 0 in a well-formed character.
+        // @infection-ignore DecrementInteger
         $codePoint = \ord($character[0]) & (0xFF >> ($length + 1));
 
         for ($i = 1; $i < $length; ++$i) {

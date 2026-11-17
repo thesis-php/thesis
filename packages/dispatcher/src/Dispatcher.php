@@ -48,6 +48,8 @@ final class Dispatcher
      */
     public function dispatch(object $event): void
     {
+        // without the table every event resolves its listeners again and gets the same ones: only slower
+        // @infection-ignore Coalesce
         foreach ($this->listenersByClass[$event::class] ?? $this->resolve($event::class) as $listener) {
             $listener($event, $this);
         }

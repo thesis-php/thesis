@@ -32,6 +32,8 @@ final class ErrorHandler
     public function __invoke(int $level, string $message, string $file, int $line): bool
     {
         // The error may be of any fiber, not of the one that set this copy
+        // 1 differs from 0 only in E_ERROR, which PHP never passes to a handler of the application.
+        // @infection-ignore IncrementInteger
         $levels = $this->levelsOfFibers[\Fiber::getCurrent() ?? $this->main] ?? 0;
         // Per fiber: @ in another fiber does not change it
         $reported = (error_reporting() & $level) !== 0;

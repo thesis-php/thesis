@@ -374,7 +374,8 @@ final class Buffer implements \Countable
 
         $value = $byte & 0x7F;
 
-        for ($shift = 7; $shift < 64; $shift += 7) {
+        // the shift grows by 7 and never equals 64, so < 64 and <= 64 stop at the same step
+        for ($shift = 7; /* @infection-ignore LessThan */ $shift < 64; $shift += 7) {
             $byte = \ord(($this->bytes[++$offset] ?? throw new UnexpectedEof('Unexpected end of varint.'))[0]);
             $value |= ($byte & 0x7F) << $shift;
 
@@ -544,6 +545,8 @@ final class Buffer implements \Countable
     public function writeVarint(int $value): self
     {
         // 0, -1, 1, -2, ... encode to 0, 1, 2, 3, ...: branchless, as in readVarint()
+        // PHP shifts right by 64 and more as by 63: the sign fills every bit.
+        // @infection-ignore IncrementInteger
         return $this->writeUvarint($value << 1 ^ $value >> 63);
     }
 
@@ -664,6 +667,8 @@ final class Buffer implements \Countable
             return;
         }
 
+        // Compaction only frees the memory of the bytes read: the unread bytes are the same with it and without.
+        // @infection-ignore MethodCallRemoval
         $this->compact();
 
         do {
@@ -708,7 +713,11 @@ final class Buffer implements \Countable
             }
 
             // keep a tail for a delimiter split between chunks
+            // A longer tail only searches longer: the delimiter is found anyway.
+            // @infection-ignore Plus, DecrementInteger
             $scanned = max(0, $available - \strlen($delimiter) + 1);
+            // Compaction only frees the memory of the bytes read: the unread bytes are the same with it and without.
+            // @infection-ignore MethodCallRemoval
             $this->compact();
             /** @var positive-int $missing $available < $maxLength here */
             $missing = $maxLength - $available;
@@ -762,7 +771,11 @@ final class Buffer implements \Countable
         if ($this->offset === \strlen($this->bytes)) {
             $this->bytes = '';
             $this->offset = 0;
-        } elseif ($this->offset >= self::COMPACT_THRESHOLD) {
+        } elseif (
+            // the threshold only decides when the memory of the bytes read is freed
+            // @infection-ignore GreaterThanOrEqualTo, GreaterThanOrEqualToNegotiation
+            $this->offset >= self::COMPACT_THRESHOLD
+        ) {
             $this->bytes = substr($this->bytes, $this->offset);
             $this->offset = 0;
         }

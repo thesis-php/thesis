@@ -41,6 +41,8 @@ final class Location
      */
     public static function of(string $file, int $line): self
     {
+        // the lazy (.+?) of /s takes any prefix, so the leftmost match starts at the beginning anyway
+        // @infection-ignore PregMatchRemoveCaret
         if (preg_match("/^(.+?)\\(([1-9]\\d*)\\) : eval\\(\\)'d code/s", $file, $matches) === 1) {
             /** @var non-empty-string $evalFile */
             $evalFile = $matches[1];
