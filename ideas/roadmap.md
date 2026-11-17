@@ -13,9 +13,9 @@ or to the `AGENTS.md` of its package, and a step that is done is deleted from he
 |---|---|---|
 | `amp`, `pipeline` | `async` | — (pipeline operators are generators with `each()`/`map()`) |
 | `sync` | `async` | Cross-process primitives (`PosixSemaphore`, `SharedMemoryParcel`): they belong to `parallel` |
-| `byte-stream` | `io` | zlib streams and an in-memory pipe, with HTTP (phase 5): nobody needs them before |
+| `byte-stream` | `io` | zlib streams and an in-memory pipe, with HTTP (phase 1): nobody needs them before |
 | `parser` | `io` | — (`Buffer::readUntil()`) |
-| `socket` | `net` | UDP, a pool of connections, passing sockets between processes (for `cluster`) |
+| `socket` | `net` | UDP, passing sockets between processes (for `cluster`); pools live in their packages |
 | `dns` | `net` | Check the hosts file and `resolv.conf` |
 | `uri` | `Uri\WhatWg\Url` | — |
 | `cache` | `cache` | A Redis cache, with `redis` |
@@ -61,22 +61,14 @@ What amphp has, then what thesis makes of it.
 
 ## Phases
 
-1. **Foundation gaps.** `net`: a pool of connections, UDP.
-   Integration tests against services in `compose.yaml` (rabbitmq, nats,
-   postgres, memcached, ...) and a convention for a package to declare the service it needs.
-2. **What protocol clients share**, a topic drawn from `amqp`, the reference client of `agents/clients.md`:
-   framing, reconnects with a backoff (`Async\Backoff`), configuration from a DSN,
-   `ConnectionFailed`/`ConnectionClosed`.
-3. **Protocol clients** on `net` and `io`: `nats` (the second client), `rabbitmq-stream`, `memcached`
-   (the first user of the pool), `nsq` (TCP first, lookupd after HTTP), `cassandra`, `mongodb`
-   (check what the old repository has; probably from scratch).
-4. **SQL.** Ideas and a benchmark of the driver: [postgres.md](postgres.md). `postgres` on the wire
-   protocol (pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, `COPY`), designed with norm in mind.
-   Then `pgmq`.
-5. **HTTP.** Ideas for the messages: [http.md](http.md). `http` (messages, headers from the old
-   `thesis/headers`, bodies as `io\Reader`), `http-client` (HTTP/1.1, keep-alive, the pool, CONNECT, cookies),
-   `http-server` (graceful shutdown by `trapSignals()`, router, form parser), HTTP/2 with HPACK
-   (needed by grpc; ALPN is in `net`), then `websocket`.
+The order follows an application to be written on thesis without amphp: an HTTP server with SSE, cookies
+and static files, an HTTP client for checks, postgres with `LISTEN`/`NOTIFY`, password hashing in workers.
+A pool of connections is written in each package that needs it (`agents/clients.md`).
+
+1. **HTTP.** Ideas for the messages: [http.md](http.md). `http` (messages, headers from the old
+   `thesis/headers`, bodies as `io\Reader`, cookies), `http-server` (graceful shutdown by `trapSignals()`,
+   middleware, streamed responses for SSE, static files), `http-client` (HTTP/1.1, keep-alive, its own pool,
+   redirects, CONNECT), then HTTP/2 with HPACK (needed by grpc; ALPN is in `net`), then `websocket`.
    `Content-Encoding` needs zlib streams (decorators of `Reader`/`Writer`, in `io` or `http`). A first version
    found: `deflate_add()` ignores a flush with empty input, so a writer keeps the last bytes to flush them with;
    the output of one `inflate_add()` cannot be limited, so a reader feeds it 8 KiB at a time (deflate expands
@@ -85,11 +77,22 @@ What amphp has, then what thesis makes of it.
    for room *before* it buffers, then buffers the whole write (a cancelled write delivers nothing, writes never
    interleave); `closeWrite($error)` gives the reader `ReadFailed`, so a body cut short does not look complete;
    `close()` by the reader stops the writer.
-6. **Processes.** `process`, then `parallel` (ideas: [parallel.md](parallel.md)), then `cluster`.
-   On top of them: `hot-reload` (`process`, `http-server`, `trapSignals()`) and `cron` (the parser without async
-   and a scheduler on `async`).
-7. **Storage and the rest.** `redis` with a Redis cache, `file`, `mysql`.
-8. **Cleanup.** After 2.0, the replaced repositories (`amp-bridge`, `byte-*`, `endian`, `varint`, `clock`,
+2. **Postgres.** Ideas and a benchmark of the driver: [postgres.md](postgres.md). `postgres` on the wire
+   protocol (its own pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, errors with SQLSTATE, `COPY`),
+   designed with norm in mind. Then `pgmq`.
+3. **Processes.** `process`, then `parallel` (ideas: [parallel.md](parallel.md)).
+4. **`hot-reload`** on `process`, `trapSignals()` and `http-server`, instead of the one on amphp.
+5. **Later**, in no fixed order:
+   - `net`: UDP, passing sockets between processes; check the hosts file and `resolv.conf` of the resolver;
+   - a common pool, once `http-client` and `postgres` have their own;
+   - what protocol clients share, a topic drawn from `amqp` (framing, reconnects with `Async\Backoff`,
+     configuration from a DSN, `ConnectionFailed`/`ConnectionClosed`), and a convention for a package
+     to declare its service in `compose.yaml`;
+   - protocol clients on `net` and `io`: `nats`, `rabbitmq-stream`, `memcached`, `nsq` (TCP first, lookupd after
+     HTTP), `cassandra`, `mongodb` (check what the old repository has; probably from scratch);
+   - `cluster` and `cron` (the parser without async and a scheduler on `async`);
+   - `redis` with a Redis cache, `file`, `mysql`.
+6. **Cleanup.** After 2.0, the replaced repositories (`amp-bridge`, `byte-*`, `endian`, `varint`, `clock`,
    `time-span`, `sync-once`, `package-version`) are marked abandoned on Packagist with their replacement,
    and their README points to the monorepo.
 
@@ -138,9 +141,8 @@ grow from what `async` already has and amphp lacks, so they come first.
 2. Postgres: pure PHP on the wire protocol rather than ext-pgsql or pecl-pq? The benchmark says yes
    ([postgres.md](postgres.md)): typed rows 1.8 times faster than ext-pgsql, pipelining it lacks.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
-4. The pool: a generic resource pool in `async` or a pool of connections in `net`?
-5. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
-6. Waits outside a group: should thesis/async forbid them? In `{main}` a wait runs the event loop, so Revolt throws
+4. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
+5. Waits outside a group: should thesis/async forbid them? In `{main}` a wait runs the event loop, so Revolt throws
    out of it (`UncaughtThrowable` of a foreign callback, "Event loop terminated"), and a value handed over
    by `resume()` is lost (the known gap of `ContinuationImpl::park()`); the body of `group()` runs in the calling
    fiber, so this is true inside a group in `{main}` too. In the root scope, in any fiber, a wait has no cancellation,

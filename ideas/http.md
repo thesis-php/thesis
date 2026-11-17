@@ -1,6 +1,6 @@
 # HTTP messages: ideas
 
-A draft for phase 5 of the roadmap, not a decision. What survives the discussion goes to a topic
+A draft for phase 1 of the roadmap, not a decision. What survives the discussion goes to a topic
 of `agents/` (the messages span `http`, `http-client` and `http-server`), and this file is deleted.
 
 ## One set of messages for both directions

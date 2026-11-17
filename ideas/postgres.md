@@ -1,6 +1,6 @@
 # Postgres: ideas
 
-A draft for phase 4 of the roadmap, not a decision. What survives the discussion goes to the "Decisions"
+A draft for phase 2 of the roadmap, not a decision. What survives the discussion goes to the "Decisions"
 of `packages/postgres/AGENTS.md` (or to a topic of `agents/`, if `sql` shares it with `mysql`),
 and this file is deleted.
 
@@ -229,13 +229,12 @@ into the TLS handshake, which fails. `TlsInfo::$peerCertificate` for SCRAM-SHA-2
 
 Missing:
 
-1. A pool. Roadmap phase 1 has it in `net`, open question 4 asks where it lives, and memcached is planned
-   as its first user. Proposed: inside `Postgres\Client` on `LocalSemaphore` and a list of idle connections,
-   a generic pool once a second user exists.
+1. A pool: inside `Postgres\Client` on `LocalSemaphore` and a list of idle connections, a common pool only
+   once `http-client` has its own too (`agents/clients.md`).
 2. `Buffer` keeps `$bytes` and `$offset` private, the generated decoder needs the raw string and an offset
    (`peek()` per column is the ~45 ns per call we measured). Proposed: the reader of postgres keeps its own
    read string, `Buffer` is for writing. `io` is not changed for one package.
-3. No postgres in `compose.yaml` and no convention for a package to declare its service (phase 1):
+3. No postgres in `compose.yaml` and no convention for a package to declare its service:
    a service with a `pg_isready` healthcheck and `POSTGRES_URI`; tests on the minimum and the newest
    supported PostgreSQL.
 4. No date types: `time` has `Duration` and clocks only, and `interval` is not a `Duration` (months and days
@@ -243,7 +242,7 @@ Missing:
    or our own, `numeric` as a string or `BcMath\Number` (bcmath is an optional extension).
 5. A URI with several hosts (`postgresql://h1:5432,h2:5433/db`) is not parsed by `Uri\WhatWg\Url`;
    `Amqp\Config::fromUri()` splits by commas by hand. A reason for the topic of what clients share
-   (roadmap phase 2), not written yet.
+   ("Later" of the roadmap), not written yet.
 
 Smaller: SASLprep of a password needs `Normalizer` of intl, libpq takes an invalid UTF-8 password as is,
 so we can too without intl.

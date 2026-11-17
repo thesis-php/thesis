@@ -1,6 +1,6 @@
 # Parallel: ideas
 
-A draft for phase 6 of the roadmap, not a decision. What survives the discussion goes to the "Decisions"
+A draft for phase 3 of the roadmap, not a decision. What survives the discussion goes to the "Decisions"
 of `packages/parallel/AGENTS.md`, the requirements on `process` to `packages/process/AGENTS.md`,
 and this file is deleted.
 
