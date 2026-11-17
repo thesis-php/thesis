@@ -90,6 +90,9 @@ final class Location
     }
 
     /**
+     * A short path says that the file is in the project, a full one that it is outside. A project in "/" would
+     * shorten every path, those of the system too, so it has no root: every path stays full.
+     *
      * @return ?non-empty-string with a trailing separator
      */
     private static function projectRoot(): ?string
