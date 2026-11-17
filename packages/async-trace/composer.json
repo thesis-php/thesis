@@ -1,0 +1,51 @@
+{
+    "name": "thesis/async-trace",
+    "description": "Tools around the trace of thesis/async: its events written as NDJSON, one line per event.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "php-64bit": "*",
+        "psr/clock": "^1.0",
+        "thesis/async": "^0.1",
+        "thesis/dispatcher": "^0.3",
+        "thesis/formatter": "^0.2",
+        "thesis/source-location": "^0.1",
+        "thesis/time": "^0.3"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29",
+        "thesis/testo-plugin": "^0.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\AsyncTrace\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\AsyncTrace\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}

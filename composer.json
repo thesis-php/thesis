@@ -52,6 +52,7 @@
     "replace": {
         "thesis/amqp": "2.0.x-dev",
         "thesis/async": "0.1.x-dev",
+        "thesis/async-trace": "0.1.x-dev",
         "thesis/cache": "0.1.x-dev",
         "thesis/dispatcher": "0.3.x-dev",
         "thesis/exceptionally": "0.4.x-dev",
@@ -70,6 +71,7 @@
                 "packages/exceptionally/src/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/src/",
+            "Thesis\\AsyncTrace\\": "packages/async-trace/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Cache\\": "packages/cache/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
@@ -109,6 +111,7 @@
                 "packages/exceptionally/tests/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/tests/",
+            "Thesis\\AsyncTrace\\": "packages/async-trace/tests/",
             "Thesis\\Async\\": "packages/async/tests/",
             "Thesis\\Cache\\": "packages/cache/tests/",
             "Thesis\\Formatter\\": "packages/formatter/tests/",

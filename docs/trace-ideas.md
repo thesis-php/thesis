@@ -104,7 +104,8 @@ of the losses: the program never slows down for its observer.
 
 ## Order
 
-1. The NDJSON record, the public text format, the model of the state: the base, partly in the tests already.
+1. The NDJSON record (done: `NdjsonWriter` of thesis/async-trace), the public text format, the model of the state:
+   the base, partly in the tests already.
 2. The export to Perfetto: the course and debugging for a small price.
 3. The detector of blocking code, the watchdog of long waits, who has cancelled me.
 4. The dump by a signal, once the choice between the walk of the tree and the events is made.
@@ -112,7 +113,10 @@ of the losses: the program never slows down for its observer.
 6. The live `top` over a socket.
 7. The HTML player, the metrics, OpenTelemetry.
 
+## Where it lives
+
+thesis/async keeps only the events, the tools go to thesis/async-trace, with a `bin/` for the reports and `top` later.
+
 ## To discuss next
 
-- Where it lives: thesis/async keeps only the events, the rest goes to a package of its own with a `bin/`
-  for the reports and `top`. Its name, and whether it is one package or a core with exporters.
+- Whether thesis/async-trace stays one package or becomes a core with exporters.

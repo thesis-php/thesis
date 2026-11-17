@@ -11,6 +11,7 @@ return new ApplicationConfig(
     src: [
         __DIR__ . '/packages/amqp/src',
         __DIR__ . '/packages/async/src',
+        __DIR__ . '/packages/async-trace/src',
         __DIR__ . '/packages/cache/src',
         __DIR__ . '/packages/dispatcher/src',
         __DIR__ . '/packages/exceptionally/src',
@@ -31,6 +32,11 @@ return new ApplicationConfig(
             name: 'async',
             location: [__DIR__ . '/packages/async/tests'],
             plugins: require __DIR__ . '/packages/async/testo.plugins.php',
+        ),
+        new SuiteConfig(
+            name: 'async-trace',
+            location: [__DIR__ . '/packages/async-trace/tests'],
+            plugins: require __DIR__ . '/packages/async-trace/testo.plugins.php',
         ),
         new SuiteConfig(
             name: 'cache',
