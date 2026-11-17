@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d4dd6a9d25f6717a523dea654626346d",
+    "content-hash": "1b7565413d62d75dc42bd1561199efbc",
     "packages": [
         {
             "name": "internal/container",
@@ -3611,6 +3611,65 @@
             },
             "time": "2024-03-12T13:22:30+00:00",
             "published-time": "2024-03-12T13:23:38+00:00"
+        },
+        {
+            "name": "phpstan/tally",
+            "version": "1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpstan/tally.git",
+                "reference": "f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/tally/zipball/f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21",
+                "reference": "f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "ext-posix": "*",
+                "infection/infection": "^0.35.10",
+                "php-parallel-lint/php-parallel-lint": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "phpunit/phpunit": "^11.5 || ^12.5",
+                "shipmonk/dead-code-detector": "^1.4"
+            },
+            "bin": [
+                "bin/tally"
+            ],
+            "type": "library",
+            "extra": {
+                "skills": {
+                    "source": "skills"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Tally\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PHP benchmarking framework that doesn't care about wall-clock time or how fast your CPU is.",
+            "keywords": [
+                "benchmark",
+                "codspeed",
+                "performance"
+            ],
+            "support": {
+                "issues": "https://github.com/phpstan/tally/issues",
+                "source": "https://github.com/phpstan/tally/tree/1.0.1"
+            },
+            "time": "2026-11-14T22:36:03+00:00",
+            "published-time": "2026-11-14T22:42:17+00:00"
         },
         {
             "name": "sanmai/di-container",

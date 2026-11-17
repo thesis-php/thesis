@@ -99,6 +99,16 @@ test: var vendor up ## Run tests [P=] [DRIVER=]
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 
+# (In GitHub Actions Tally annotates the benchmarks and writes the job summary. The summary file of the runner is not
+# in the container: the report goes to var/, and the job appends it)
+bench: var vendor ## Count the benchmarks under Valgrind and compare them with the expected numbers [P=] [DRIVER=]
+	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_ACTIONS -e GITHUB_RUN_ID -e GITHUB_REPOSITORY $(if $(GITHUB_ACTIONS),-e GITHUB_WORKSPACE=/workspace -e GITHUB_STEP_SUMMARY=/workspace/var/tally-summary.md) php) vendor/bin/tally run --config=tools/tally.php --output=var/tally $(ARGS) $(if $(P),packages/$(P)/benchmarks)
+.PHONY: bench
+
+bench-accept: var vendor ## Make the results of the last `make bench` the expected numbers [P=]
+	$(RUN) vendor/bin/tally accept --config=tools/tally.php $(ARGS) var/tally $(if $(P),packages/$(P)/benchmarks)
+.PHONY: bench-accept
+
 infect: var vendor ## Run mutation testing [P=]
 	$(RUN) php -d memory_limit=2G vendor/bin/infection --configuration=tools/infection.json5 --show-mutations --threads=max $(if $(P),--test-framework-options=--suite=$(P) packages/$(P)/src/) $(ARGS)
 .PHONY: infect

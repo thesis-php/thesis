@@ -47,6 +47,7 @@ from scratch: it is not a wrapper around amphp and does not depend on it. 64-bit
 - `releases.md`: the release, the tags and the GitHub Releases of the split repositories.
 - `platform.md`: code that depends on the operating system or on the size of `int`.
 - `reviews.md`: reviewing a change, acting on the findings of a review.
+- `benchmarks.md`: a benchmark, a change justified by one (`make bench`).
 
 @agents/php.md
 

@@ -41,6 +41,7 @@ return new Config(
         'composer/semver' => '^3.4',
         'infection/infection' => '^0.35.10',
         'llm/skills' => '^1.17',
+        'phpstan/tally' => '^1.0.1',
         'symfony/console' => '^8.0',
         'symfony/var-dumper' => '^8.0',
         'testo/assert' => '^0.1.17',
@@ -49,6 +50,7 @@ return new Config(
         'testo/testo' => '^0.10.29',
     ],
     autoloadDev: [
+        'Thesis\Async\Benchmarks\\' => 'packages/async/benchmarks/',
         'Thesis\Monorepo\\' => 'tools/monorepo/src/',
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',
         'Thesis\PhpCsFixer\Tests\\' => 'tools/php-cs-fixer/tests/',
