@@ -100,7 +100,7 @@ test: var vendor up ## Run tests [P=] [DRIVER=]
 .PHONY: test
 
 infect: var vendor ## Run mutation testing [P=]
-	$(RUN) vendor/bin/infection --configuration=tools/infection.json5 --show-mutations --threads=max $(if $(P),--filter=packages/$(P)/src --test-framework-options=--suite=$(P)) $(ARGS)
+	$(RUN) php -d memory_limit=2G vendor/bin/infection --configuration=tools/infection.json5 --show-mutations --threads=max $(if $(P),--filter=packages/$(P)/src --test-framework-options=--suite=$(P)) $(ARGS)
 .PHONY: infect
 
 # CI
