@@ -22,10 +22,12 @@ use Revolt\EventLoop\Suspension;
  * from blocking. Every callback given to this driver counts as activity, when it is given, enabled and when it runs;
  * when there has been none during two runs of the pump in a row, nothing can run, and the clock jumps. One is not
  * enough: the pump is a defer, and the defers of a tick run before the callbacks of the streams and signals
- * the inner driver has found ready in it. So only a stream that is to become ready from outside the process
- * may be jumped past, or one written to by code that enters the loop past the callbacks of this driver
- * (a handler of `pcntl_signal()`, a watcher of the native handle, a destructor run by the garbage collector)
- * and queues no microtask. Without a timer there is no pump, and the inner
+ * the inner driver has found ready in it. So a stream that is to become ready from outside the process
+ * may be jumped past. So may one made ready by code that enters the loop past the callbacks of this driver
+ * (a handler of `pcntl_signal()`, a watcher of the native handle, a destructor run by the garbage collector):
+ * a microtask it gives to {@see queue()} is counted, but a fiber it resumes is not (a suspension is the inner
+ * driver's, and so is the queue it resumes through), and neither is a stream it writes to itself
+ * after the inner driver has polled in that tick. Without a timer there is no pump, and the inner
  * driver blocks on the streams and signals for real. When nothing at all is left,
  * Revolt ends the loop: a deadlock fails at once.
  *
@@ -136,8 +138,9 @@ final class VirtualTimeDriver implements Driver
     public function queue(\Closure $closure, mixed ...$args): void
     {
         // A microtask given is work to do, even before it runs, as a callback of counted(). It is the only trace
-        // of code that enters the loop past the callbacks of this driver: a handler of pcntl_signal(),
-        // a watcher of the native handle, a destructor run by the garbage collector.
+        // that code which enters the loop past the callbacks of this driver may leave: a handler of pcntl_signal(),
+        // a watcher of the native handle, a destructor run by the garbage collector. A fiber such code resumes
+        // leaves none: its suspension queues it in the inner driver.
         ++$this->activity;
 
         $this->inner->queue(function (mixed ...$args) use ($closure) {

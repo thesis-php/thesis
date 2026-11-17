@@ -116,8 +116,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
   row: the pump is a defer, and the defers of a tick run before the stream and signal callbacks found ready in it,
   so after one idle pump a stream written to inside the process may still be ready behind it.
   Trap: code may enter the loop past the callbacks of the driver (a handler of `pcntl_signal()` on StreamSelect,
-  a watcher of `getHandle()`, a destructor run by the garbage collector). A microtask it queues is counted
-  (`microtaskQueuedOutsideCallbackOfDriverIsActivity`), a stream it writes to directly may be jumped past.
+  a watcher of `getHandle()`, a destructor run by the garbage collector). A microtask it gives to
+  `EventLoop::queue()` is counted (`microtaskQueuedOutsideCallbackOfDriverIsActivity`). A fiber it resumes is not
+  (`Suspension::resume()` goes to the queue of the inner driver), nor is a stream it writes to after the inner
+  driver has polled in that tick: both may be jumped past. Left so, see "Decisions".
   It keeps counters of pending (enabled, not firing) and referenced timers: no operation scans the timers.
   An outdated entry of its heap is dropped at the top, or by a rebuild once outdated entries outnumber pending timers.
   `virtualTime()` throws `LogicException` in a fiber, and restores the outer clock only after the last tick is
@@ -206,6 +208,15 @@ The model, the API and the guarantees are described in `README.md` — read it f
   Rejected: a `retry(callable, Backoff)`, it would fix the wait and which failures are retried.
   The jitter takes between half and all of a delay ("equal jitter"), not from zero ("full jitter"):
   a reconnect right after a loss is a storm, and a floor keeps the attempts paced.
+- `Internal\VirtualTimeDriver` may jump past a stream made ready by code that enters the loop past its callbacks
+  (the trap above), and it is left so: no package enters the loop that way, and the harm is a wrong time in a test
+  (the reader still runs before the callback of the timer).
+  Rejected: a `stream_select()` probe of the watched streams before a jump. It closes every case, but mirrors
+  the watchers of the inner driver and disagrees with Uv, Ev and Event on what is ready (the buffer of PHP,
+  a descriptor from 1024).
+  Rejected: a `Suspension` that counts `resume()`: one case of three, 7% on every wait.
+  A loop of our own would jump where it is about to block and need neither the pump nor the count.
+  Revisit when a user brings a case or a package of ours enters the loop past the driver.
 
 ## Conventions
 

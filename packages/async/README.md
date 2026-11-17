@@ -878,7 +878,8 @@ The callbacks left for the tick it finishes on return still see its clock.
 Streams and signals stay real, on the driver that `EventLoop\DriverFactory` creates (`REVOLT_DRIVER` chooses it),
 or on one passed as `virtualTime($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,
 so nothing from outside runs on virtual time, and it is dropped with whatever `$fn` leaves in it. They are polled on every tick, and only timers are waited for virtually,
-so a stream that becomes ready from outside the process may be jumped past.
+so a stream that becomes ready from outside the process may be jumped past. So may one made ready by code
+that Revolt does not call: a handler of `pcntl_signal()`, a watcher of `EventLoop::getHandle()`, a destructor run by the garbage collector.
 While `virtualTime()` runs, its clock is the clock of the library, bound by `virtualTime()` itself rather than found through the driver:
 `Instant`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
 Each `virtualTime()` has a clock of its own, so an object that keeps times must not outlive the `virtualTime()` it was used in:
