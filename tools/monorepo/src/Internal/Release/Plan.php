@@ -109,10 +109,7 @@ final class Plan
     {
         $headings = [];
 
-        $packages = array_keys($this->catFile->subtrees($this->commit . ':' . Monorepo::PACKAGES_DIR));
-
-        // A directory named by a number is an int key of the array.
-        foreach (array_map(strval(...), $packages) as $package) {
+        foreach (array_keys($this->catFile->subtrees($this->commit . ':' . Monorepo::PACKAGES_DIR)) as $package) {
             $path = self::path($package) . '/' . self::CHANGELOG;
             $content = $this->catFile->read($this->commit . ':' . $path, 'blob');
 

@@ -140,23 +140,25 @@ final readonly class ReleaseCommandTest
     }
 
     /**
-     * The tag was pushed by an earlier run, the package changed since: the GitHub Release is of the tag.
-     * CI clones the monorepo, so the commit of the tag is not local: nothing reads it.
+     * A later push tagged the version and failed before its GitHub Release, then the job of an older push
+     * is re-run: the GitHub Release is of the tag. CI clones the monorepo, and the commit of the tag
+     * is of a later split, so it is not local: nothing reads it.
      */
-    public static function continuesReleaseAtCommitOfItsTagInClone(): void
+    public static function continuesReleaseAtCommitOfItsTagThatIsNotLocal(): void
     {
         $source = new Repository();
-        $first = $source->commit('Add a', self::package('a', released: ['0.1.0']));
-        $remotes = self::remotes();
-        $split = self::tag($source, $remotes, $first, 'a', 'v0.1.0');
-        $source->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $source->commit('Add a', self::package('a', released: ['0.1.0']));
         $clone = new Repository(cloneOf: $source);
+        $later = $source->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $remotes = self::remotes();
+        $split = self::tag($source, $remotes, $later, 'a', 'v0.1.0');
         $api = new FakeApi(self::SPLITS);
 
         [$code, $output] = self::run($clone, $remotes, $api);
 
         Assert::same($code, Command::SUCCESS, $output);
         Assert::same($api->bodies['POST repos/thesis-php/a/releases']['target_commitish'] ?? null, $split);
+        Assert::false($clone->git->succeeds(['cat-file', '-e', $split]));
     }
 
     /**
@@ -197,6 +199,26 @@ final readonly class ReleaseCommandTest
         Assert::same($remotes->head('a', 'refs/tags/v0.1.10'), null);
     }
 
+    /**
+     * The last tag of a series may be a pre-release: what comes after it is its next pre-release or its stable.
+     */
+    public static function refusesVersionThatDoesNotComeRightAfterLastPreRelease(): void
+    {
+        $repository = new Repository();
+        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0-beta1']));
+        $remotes = self::remotes();
+        self::tag($repository, $remotes, $first, 'a', 'v0.1.0-beta1');
+        $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0-beta1')]);
+
+        [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
+
+        Assert::same($code, Command::FAILURE);
+        Assert::string($output)->contains(
+            'a 0.1.1: it does not come right after v0.1.0-beta1, expected 0.1.0, 0.1.0-beta2, 0.1.0-RC1.',
+        );
+        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), null);
+    }
+
     public static function refusesVersionOfAnotherSeriesAndChangesUnderUnreleased(): void
     {
         $repository = new Repository();
@@ -219,9 +241,7 @@ final readonly class ReleaseCommandTest
         $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
         $remotes = self::remotes();
         self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
-        $repository->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a2', released: ['0.2.0', '0.1.0']),
-        ]);
+        $repository->commit('Break a', self::package('a', series: '0.2', source: 'a2', released: ['0.2.0', '0.1.0']));
 
         [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
 
@@ -484,9 +504,8 @@ final readonly class ReleaseCommandTest
             'packages/a/src/A.php' => 'a2',
             'packages/a/CHANGELOG.md' => self::changelog('0.1.1', '0.1.0'),
         ]);
-        $break = $repository->commit('Break a', [
-            ...self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']),
-        ]);
+        $files = self::package('a', series: '0.2', source: 'a3', released: ['0.2.0', '0.1.1', '0.1.0']);
+        $break = $repository->commit('Break a', $files);
         self::tag($repository, $remotes, $break, 'a', 'v0.2.0');
         $api = new FakeApi(self::SPLITS);
 

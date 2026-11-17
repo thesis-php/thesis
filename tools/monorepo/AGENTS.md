@@ -130,15 +130,21 @@ CI runs it as the job `release` of `.github/workflows/check.yaml`.
 
 Invariants:
 
-- The release knows two things: the tree of the commit (the changelogs and the generated `composer.json`
-  of the packages, read from the objects, never from the working tree or by running PHP of it) and the tags
-  of the split repositories (`git ls-remote` of the packages with a heading, nothing is fetched). Nothing else
-  decides: no other commit of the monorepo, no object of a split repository, no branch of it.
+- The release knows three things: the tree of the commit (the changelogs and the generated `composer.json`
+  of the packages, read from the objects, never from the working tree or by running PHP of it), the tags
+  of the split repositories (`git ls-remote` of the packages with a heading, nothing is fetched) and two answers
+  of GitHub (`Repositories::isSplit()`, `GET releases/tags/<tag>`). Nothing else decides: no other commit
+  of the monorepo, no object of a split repository, no branch of it.
   A new check must fit into that, or it is not added (`agents/releases.md`, "What the release does not check").
-  `continuesReleaseAtCommitOfItsTagInClone` runs in a clone, as CI does: the commit of a tag is not local there.
+- A test that the commit of a tag is not read needs a tag at a split the clone cannot compute: the clone is made
+  first, the tag is of a later commit (`continuesReleaseAtCommitOfItsTagThatIsNotLocal`). A tag at a split
+  of an ancestor is written into the clone by the split of the release itself, and such a test passes
+  on code that reads it.
 - `Plan::of()` decides everything before `Publisher` pushes anything, and returns either the releases,
   dependencies first, or the errors: with one error nothing is released. A `MonorepoException` while deciding
   about one package (GitHub, its `composer.json`) is an error of that package, so the others still report theirs.
+  The other reasons of that package are lost with it. Rejected: collecting them around every call that throws:
+  GitHub failing is transient, nothing is released, and the next run prints the rest.
 - Whether a heading is released is decided by the tag `vX.Y.Z` alone: without a tag of the version it is checked
   and released, with the tag only its GitHub Release is made if it is missing (`GET releases/tags/<tag>`),
   and a tag of the version without `v` is of an older package of the same name.

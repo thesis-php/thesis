@@ -29,7 +29,7 @@ the changelogs in `changelogs.md`, the code in `tools/monorepo/AGENTS.md`.
   - the repository is a split under its own name (`Repositories::isSplit()`): a tag pushed to an older package
     or to a renamed repository cannot be taken back.
 - **All or nothing.** Everything is decided before anything is pushed, and one reason not to release a package
-  releases nothing: the job fails with every reason, and the push that fixes them releases all.
+  releases nothing: the job fails with the reasons of every package, and the push that fixes them releases all.
 - **The steps, per package, dependencies first**: the lightweight tag `vX.Y.Z` at the split of the head,
   pushed to the split repository (the push carries its commits, `main` there is left to the split job),
   then its GitHub Release with `target_commitish` set to that commit (GitHub tags the default branch
@@ -55,7 +55,10 @@ the changelogs in `changelogs.md`, the code in `tools/monorepo/AGENTS.md`.
     a dependency that has only pre-releases, a lower bound that no tag meets.
   - A heading under the top one that was never tagged (its push failed, the next one put a new series on top):
     merge its notes into the top one.
-  - The notes of a tagged version edited later: they are not in the GitHub Release of the tag.
+  - The notes of a GitHub Release against the tag. A GitHub Release that is missing is made with the notes
+    of the commit of the run, whatever the tag has: edited after the tag, or older than it when the job
+    of an older push is re-run after a later push tagged the version. One that exists is never updated.
+    Both are edited by hand on GitHub.
 
 Open:
 
