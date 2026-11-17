@@ -134,6 +134,7 @@ grow from what `async` already has and amphp lacks, so they come first.
 - **Observability of the task tree**: a dump of the live tasks with where each is suspended (as a goroutine dump),
   a task suspended longer than a threshold, a deadlock on `Lock`/`Channel`. Trace context carried by `ScopedValue`
   along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over `http-server`.
+  The tools around `Trace\observe()`: `trace-ideas.md`.
 - **Deadlines across services**: the time left of a cancellation passed on in HTTP and grpc headers
   (`grpc-timeout`) and as `statement_timeout` of postgres.
 - **Resilience** on `async`: a circuit breaker, a bulkhead, hedged requests, a retry policy on `Async\Backoff`,
