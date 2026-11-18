@@ -13,6 +13,11 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   everything inside the statement, so above a loop or an `if` with more in it the comment goes before
   the expression: `/* @infection-ignore LessThan */ $shift < 64`. A misspelt mutator skips nothing,
   Infection only warns, so the mutant still fails the run.
+- `make infect` of several packages runs in parallel: the files of a run (coverage, mutants) are in `/tmp`
+  of its container. Not in one container of `make t`: its `/tmp` is shared.
+  Trap: a `tmpDir` in the config (it was `var`) is shared by every run, and Infection deletes all of it at the end
+  of a run, the coverage of the others too. Every run takes `--threads=max`, so two at once share the cores:
+  a mutant that runs slower than `timeout` counts as killed, check the timeouts of such a run alone.
 - Trap: on x86_64 Xdebug 3.6.0alpha1 of the PHP 8.6 RC7 image dies with signal 11 in the first test
   of the initial run of `make infect`, on every package. It is the per-test coverage that `--coverage-xml`
   turns on: `XDEBUG_MODE=coverage vendor/bin/testo run --coverage --coverage-xml=/tmp/cov --suite=formatter`
