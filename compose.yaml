@@ -7,6 +7,8 @@ services:
       IN_CONTAINER: true
       HISTFILE: /workspace/var/.docker_history
       AMQP_URI: amqp://thesis:thesis@rabbitmq:5672/
+      # Replays the order of a test on virtual time that has failed (thesis/testo-plugin).
+      THESIS_SEED: ${THESIS_SEED:-}
     volumes:
       - .:/workspace
       - ~/.composer/cache:/composer/cache

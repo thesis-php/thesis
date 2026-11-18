@@ -90,7 +90,13 @@ final class GroupTest
 
         Assert::instanceOf($exception, \RuntimeException::class);
         Assert::same($exception->getMessage(), 'task failed');
-        Assert::same($events, ['body cancelled', 'sibling cancelled', 'sibling cleaned up']);
+        // Cancelled at once, the body and the sibling may unwind in any order.
+        $cancelled = \array_slice($events, 0, 2);
+        sort($cancelled);
+        Assert::same(
+            actual: [...$cancelled, ...\array_slice($events, 2)],
+            expected: ['body cancelled', 'sibling cancelled', 'sibling cleaned up'],
+        );
     }
 
     public function firstFailureWins(): void

@@ -10,6 +10,8 @@ use Io\Poll\FailedHandleAddException;
 use Io\Poll\FailedPollWaitException;
 use Io\Poll\InvalidHandleException;
 use Io\Poll\Watcher;
+use Random\Engine\Xoshiro256StarStar;
+use Random\Randomizer;
 use Thesis\Async\Deadlock;
 use Thesis\Async\Pacer;
 use Thesis\SourceLocation\Location;
@@ -168,13 +170,19 @@ final class Loop
      */
     private array $errors = [];
 
+    private readonly ?Randomizer $shuffle;
+
     /**
      * @param ?VirtualClock $clock null for the monotonic clock of the system, `hrtime()`
+     * @param ?int $seed shuffles, by this seed, the fibers ready at the start of a tick, so a test meets the orders
+     *     the kernel and the timing may give; null keeps the order they became ready in
      */
     public function __construct(
         public readonly ?VirtualClock $clock = null,
+        ?int $seed = null,
     ) {
         $this->timers = new \SplMinHeap();
+        $this->shuffle = $seed === null ? null : new Randomizer(new Xoshiro256StarStar($seed));
     }
 
     /**
@@ -534,6 +542,10 @@ final class Loop
         $this->drainMicrotasks();
         $ready = $this->ready;
         $this->ready = [];
+
+        if ($this->shuffle !== null && \count($ready) > 1) {
+            $ready = $this->shuffle->shuffleArray($ready);
+        }
 
         foreach ($ready as $fiber) {
             $this->step($fiber);

@@ -18,7 +18,8 @@ use function Thesis\Time\sec;
 /**
  * Random programs of pipes on virtual time, each seed in a virtualTime() of its own: whether the clock may jump
  * depends on what else is pending and ready, and hand-written tests cover one shape at a time.
- * A seed draws everything up front, so it is the same program on every driver; a broken one is listed with it.
+ * A seed draws everything up front and shuffles the fibers ready in one tick, so it replays the run; a broken one
+ * is listed with it.
  */
 #[Test]
 final class RandomizedVirtualTimeTest
@@ -63,13 +64,14 @@ final class RandomizedVirtualTimeTest
     {
         for ($this->seed = 1; $this->seed <= $count; ++$this->seed) {
             $this->random = new Randomizer(new Mt19937($this->seed));
+            // The seed draws the program and shuffles what is ready in one tick: it replays both.
             virtualTime(function () use ($program) {
                 $program();
 
                 if (!Loop::get()->isIdle) {
                     $this->violate('callbacks are left');
                 }
-            });
+            }, $this->seed);
         }
 
         Assert::same($this->violations, []);

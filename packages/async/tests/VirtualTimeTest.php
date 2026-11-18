@@ -283,6 +283,23 @@ final class VirtualTimeTest
         assertNoCallbacksLeft();
     }
 
+    public function seedShufflesFibersReadyInOneTickAndReplaysTheirOrder(): void
+    {
+        $orders = [];
+
+        foreach ([1, 2, 3, 4, 5, 6, 7, 8, 1] as $seed) {
+            $orders[] = self::orderOfFibersReadyInOneTick($seed);
+        }
+
+        Assert::same($orders[8], $orders[0]);
+        Assert::true(\count(array_unique($orders)) > 1, 'Eight seeds gave one order.');
+    }
+
+    public function withoutSeedFibersRunInOrderTheyBecameReady(): void
+    {
+        Assert::same(self::orderOfFibersReadyInOneTick(seed: null), 'abcd');
+    }
+
     public function runRestoresOuterLoop(): void
     {
         $loop = Loop::get();
@@ -464,6 +481,24 @@ final class VirtualTimeTest
     {
         // A loop nested in the fiber of another one would have that fiber as its host.
         Assert::null(Loop::get()->host);
+    }
+
+    private static function orderOfFibersReadyInOneTick(?int $seed): string
+    {
+        $order = [];
+
+        virtualTime(static function () use (&$order) {
+            group(static function (Group $group) use (&$order) {
+                foreach (['a', 'b', 'c', 'd'] as $name) {
+                    $group->spawn(static function () use ($name, &$order) {
+                        delay(sec(1));
+                        $order[] = $name;
+                    });
+                }
+            });
+        }, $seed);
+
+        return implode('', $order);
     }
 
     /**

@@ -248,7 +248,7 @@ final class AllSettledAndSomeTest
                     throw new \RuntimeException('a');
                 },
                 static function () {
-                    delay(sec(1));
+                    delay(sec(2));
 
                     throw new \RuntimeException('b');
                 },

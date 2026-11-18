@@ -463,6 +463,8 @@ final class ChannelTest
             }
         });
 
+        // Woken in one tick, the receivers may run in any order: what each one got tells the order of arrival.
+        sort($log);
         Assert::same($log, ['a1', 'b2', 'c3']);
     }
 

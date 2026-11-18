@@ -35,7 +35,7 @@ final class SuppressedTest
         $second = new \LogicException('second');
         $third = new \LogicException('third');
 
-        $exception = thrown(static fn() => self::failAtOnce(new \RuntimeException('first'), $second, $third));
+        $exception = thrown(static fn() => self::failOneAfterAnother(new \RuntimeException('first'), $second, $third));
 
         Assert::instanceOf($exception, \RuntimeException::class);
         Assert::same($exception->getMessage(), 'first');
@@ -111,22 +111,17 @@ final class SuppressedTest
 
         $exception = thrown(static function () use ($second) {
             group(static function (Group $group) use ($second) {
-                /** @var Deferred<null> */
-                $go = new Deferred();
-                $group->spawn(static function () use ($go) {
-                    $go->await();
+                $group->spawn(static function () {
+                    delay(sec(1));
 
                     throw new \RuntimeException('first');
                 });
-                $failing = $group->spawn(static function () use ($go, $second) {
-                    $go->await();
+                $failing = $group->spawn(static function () use ($second) {
+                    shield(static fn() => delay(sec(2)));
 
                     throw $second;
                 });
-                $group->spawn(static fn() => $failing->await()); // rethrows $second
-
-                delay(sec(1));
-                $go->complete(null);
+                $group->spawn(static fn() => shield($failing->await(...))); // rethrows $second
             });
         });
 
@@ -230,6 +225,9 @@ final class SuppressedTest
                             try {
                                 never();
                             } catch (Cancelled) {
+                                // After the first: the tasks cancelled at once may unwind in any order.
+                                shield(static fn() => delay(sec(1)));
+
                                 throw $innerSecond = new \LogicException('inner second');
                             }
                         });
@@ -305,25 +303,21 @@ final class SuppressedTest
         Assert::null($reference->get());
     }
 
+    /** The tasks are woken in the same tick, before any has failed: a later failure is not caused by the first. */
     /**
-     * The tasks are woken in the same tick, before any has failed: a later failure is not caused by the first.
+     * Each error a second after the one before, the later ones while the group is already failing: failures
+     * in one tick may come in any order.
      */
-    private static function failAtOnce(\Throwable ...$errors): void
+    private static function failOneAfterAnother(\Throwable ...$errors): void
     {
         group(static function (Group $group) use ($errors) {
-            /** @var Deferred<null> */
-            $go = new Deferred();
-
-            foreach ($errors as $error) {
-                $group->spawn(static function () use ($go, $error) {
-                    $go->await();
+            foreach (array_values($errors) as $i => $error) {
+                $group->spawn(static function () use ($i, $error) {
+                    shield(static fn() => delay(sec($i + 1)));
 
                     throw $error;
                 });
             }
-
-            delay(sec(1));
-            $go->complete(null);
         });
     }
 }

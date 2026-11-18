@@ -618,12 +618,16 @@ function trapSignals(array $signals, callable $fn): mixed
  * another, or used after the call in the outer clock: each clock goes its own way,
  * and such a time may be in the future of the other.
  *
+ * With a $seed, the loop shuffles by it the fibers that are ready in one tick, woken by timers, streams or other
+ * fibers: a test meets the orders that the kernel and the timing of a real run may give, and the seed replays one
+ * of them. Without one, they run in the order they became ready.
+ *
  * @api
  * @template T
  * @param callable(): T $fn
  * @return T
  */
-function virtualTime(callable $fn): mixed
+function virtualTime(callable $fn, ?int $seed = null): mixed
 {
     $previousClock = Scope::$virtualClock;
     // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Rounded up, so that
@@ -633,7 +637,7 @@ function virtualTime(callable $fn): mixed
     $second = toNs(sec(1));
     $start = $now <= PHP_INT_MAX - ($second - 1) ? intdiv($now + $second - 1, $second) * $second : $now;
     $clock = new VirtualClock($start);
-    $loop = new Loop($clock);
+    $loop = new Loop($clock, $seed);
     Scope::$virtualClock = $clock;
 
     try {

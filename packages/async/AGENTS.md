@@ -212,6 +212,9 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   before the wait, is only noted (no byte, no EINTR): while handlers are there, a wait lasts at most `SIGNAL_GAP`
   (100 ms), and `pcntl_signal_dispatch()` follows every wait. The pipe is drained whenever it is ready or a signal
   was caught. The previous handler comes back with the last one gone.
+- With a seed (`virtualTime($fn, $seed)`) the loop shuffles the fibers ready at the start of a tick, the only
+  place where the order of waking is decided; streams are not shuffled apart, their waiters are fibers that go
+  through the ready queue. Without one, the order is that of waking: timers by deadline and creation.
 - On a virtual clock the loop never sleeps for a timer: where it would (nothing ready, `wait(0)` found nothing),
   it jumps the clock to the nearest timer, referenced or not.
 - The timeout of `wait()` is rounded up to whole milliseconds: a timer never fires early, its precision is 1 ms.

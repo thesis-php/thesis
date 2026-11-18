@@ -48,13 +48,11 @@ read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `age
    Done with it, since the tests needed them: the virtual time of stage 4 without the shuffle
    (`virtualTime()` runs a loop of its own and releases it), and of stage 5 everything but the cleanup
    of `Makefile`, `tally.php`, `check.yaml` and the root `AGENTS.md`.
-4. **The shuffle.** The shuffle by a seed of the ready snapshot and of the ready streams; testo-plugin prints
-   the seed of a failed test and takes one from the environment to replay it. `RandomizedVirtualTimeTest`
-   and the conventions of virtual time in `packages/async/AGENTS.md` follow.
-5. **The rest of the cleanup.** `REVOLT_DRIVER`/`DRIVER` from `Makefile`, `tally.php` and `check.yaml`,
-   `revolt` from the keywords of `monorepo.php`; `make sync`. The root `AGENTS.md` (the user agreed): the first
-   line and the drivers in "Commands". `fibers.md`: the rule on the order of callbacks says the shuffle.
-   Run `make bench` against stage 1 again.
+4. Done: `virtualTime($fn, $seed)` shuffles the fibers ready in one tick (not the streams: their waiters go
+   through the same queue), `VirtualTimePlugin` gives every test a random seed, prints it on a failure and takes
+   `THESIS_SEED`. Eight tests that counted on one order were made robust (`fibers.md`).
+5. Done in stage 3, but for the numbers of the benchmarks: instructions and cycles are below those of Revolt
+   in all five, memory is about 16 KiB above in four (a fiber per run of `group()` in `{main}`): the user decides.
 5a. **A pool of fibers** (asked by the user). A new fiber costs about 5.3 µs (its stack), a task resumed
    in a fiber that is alive already 0.14 µs: a fiber whose task has ended takes the next one instead of ending.
    The state per fiber (the scope, `ScopedValue`, the locks of `synchronized()`) is reset between tasks,

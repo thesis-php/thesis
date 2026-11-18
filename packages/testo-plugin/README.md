@@ -13,12 +13,26 @@ composer require --dev thesis/testo-plugin
 
 Requires 64-bit PHP 8.6+.
 
+## The event loop
+
+A wait of [thesis/async](https://github.com/thesis-php/async) outside a run of its event loop throws
+`LogicException`. `EventLoopPlugin` and the `#[EventLoop]` attribute run a test as the body of a `Thesis\Async\group()`,
+on the real clock, so the test itself can wait. They are wired as the ones of virtual time below.
+
 ## Virtual time
 
 `VirtualTimePlugin` and the `#[VirtualTime]` attribute run a test in its own `Thesis\Async\virtualTime()`
 of [thesis/async](https://github.com/thesis-php/async): the clock jumps to the next timer whenever nothing can run,
 so `delay(hours(1))` is over at once and durations can be asserted exactly. How the virtual clock behaves is described
 in the README of thesis/async.
+
+The fibers that are ready in one tick run in an order shuffled by a seed, a random one for every test: a test that
+counts on one order fails sooner or later, as it would on a loaded machine. A test that fails prints its seed,
+and `THESIS_SEED` replays it:
+
+```
+Seed 2242033608576963125: replay with THESIS_SEED=2242033608576963125.
+```
 
 Every test of a suite, with the plugin in `testo.php`:
 

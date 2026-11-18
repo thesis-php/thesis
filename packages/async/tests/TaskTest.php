@@ -189,22 +189,25 @@ final class TaskTest
     {
         $caught = null;
 
-        group(static function (Group $group) use (&$caught) {
-            $handle = $group->spawn(never(...));
-            /** @var Deferred<Task<never>> */
-            $second = new Deferred();
-            // Woken first, it cancels the second awaiter, which has already been woken and not run yet.
-            $group->spawn(static function () use ($handle, $second) {
-                thrown(static fn() => $handle->await());
-                $second->await()->cancel();
-            });
-            $second->complete($group->spawn(static function () use ($handle, &$caught) {
-                $caught = thrown(static fn() => $handle->await());
+        // An order of one tick: without a seed, the awaiters run in the order they were woken.
+        virtualTime(static function () use (&$caught) {
+            group(static function (Group $group) use (&$caught) {
+                $handle = $group->spawn(never(...));
+                /** @var Deferred<Task<never>> */
+                $second = new Deferred();
+                // Woken first, it cancels the second awaiter, which has already been woken and not run yet.
+                $group->spawn(static function () use ($handle, $second) {
+                    thrown(static fn() => $handle->await());
+                    $second->await()->cancel();
+                });
+                $second->complete($group->spawn(static function () use ($handle, &$caught) {
+                    $caught = thrown(static fn() => $handle->await());
 
-                throw $caught;
-            }));
-            delay(sec(1));
-            $handle->cancel();
+                    throw $caught;
+                }));
+                delay(sec(1));
+                $handle->cancel();
+            });
         });
 
         Assert::instanceOf($caught, Cancelled::class);

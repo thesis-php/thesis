@@ -24,6 +24,8 @@ final class EachAndMapTest
             $calls[] = $args;
         });
 
+        // Two at a time: the calls that end in one tick may end in any order.
+        sort($calls);
         Assert::same($calls, [[1], [2], [3]]);
     }
 

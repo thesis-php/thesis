@@ -21,5 +21,8 @@ The model of tasks, scopes and cancellation is in `packages/async/README.md`.
   (PHP 8.6.0RC7): a cycle through the fiber and that object is never freed, even after the caller has dropped
   the value. Suspend without one: `Internal\ContinuationImpl::park()` leaves itself in `Internal\Loop::$parked`
   instead, and `loopGoesAwayWithFiberLeftSuspended` checks it. Worth a report upstream.
-- A test does not rely on the order of the fibers and streams that become ready in one tick: the event loop
-  is to shuffle them by a seed (stage 4 of `ideas/loop.md`).
+- A test does not rely on the order of the fibers that become ready in one tick: on virtual time the loop
+  shuffles them by a seed, random per test (`VirtualTimePlugin`), and a failed test prints its seed for
+  `THESIS_SEED`. What a test asserts is then the set (`sort()` before comparing), or the events are moved
+  to different times (`shield(fn() => delay(sec(1)))` in a cleanup). A test of one particular order of a tick
+  runs it in a `virtualTime()` of its own without a seed, which keeps the order of waking.

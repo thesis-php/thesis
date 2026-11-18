@@ -8,12 +8,17 @@ Plugins for Testo that the tests of thesis packages and of their users need. The
   with itself (`ConflictPolicy::First`): a test gets one `virtualTime()`, whichever way it was asked for.
 - The interceptor is outer to the lifecycle hooks and inner to data providers: the hooks share the test's clock,
   and every data set starts on a fresh one.
+- Every test on virtual time gets a random seed of the order of the fibers ready in one tick, or `THESIS_SEED`
+  for all; a test that has not passed logs its seed to the channel `virtual-time`, so a run that failed once
+  is replayed: `THESIS_SEED=<seed> make test P=<name> ARGS=--filter=<test>`.
+- `EventLoopPlugin` and `#[EventLoop]` register `Internal\EventLoopInterceptor` the same way: the test runs as
+  the body of a `group()` on the real clock, since a wait outside a run of the loop throws `LogicException`.
 - `PhpErrorsPlugin` throws from its own handler, set around the run of the test, not through `exceptionally()`:
   the levels of `exceptionally()` do not reach a fiber started inside it, and the tasks of a test are such fibers.
   It respects `error_reporting()` (`@`), which PHP keeps per fiber. The monorepo applies it to every suite
   through `plugins` of the root `testo.php`, so `PhpErrorsTest` relies on it being there.
-- The package only wires Testo to `Thesis\Async\virtualTime()`: how the virtual clock behaves belongs to
-  thesis/async and is not repeated or patched here.
+- The package only wires Testo to `Thesis\Async\virtualTime()` and `group()`: how the loop and the virtual clock
+  behave belongs to thesis/async and is not repeated or patched here.
 
 ## Decisions
 
