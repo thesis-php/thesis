@@ -29,5 +29,10 @@ Plugins for Testo that the tests of thesis packages and of their users need. The
   and still fits once it grows. Rejected: `testo` (reads as Testo itself or its fork), a feature name like
   `testo-virtual-time` (outgrown by the next plugin), `testo-bridge` (a bridge of Testo brings a library
   into Testo, the other way round).
+- Rejected: `PhpErrorsPlugin` replaced by `ErrorHandlerPlugin(failOnError: true)` of testo/error-handler.
+  It fails the test after it ends, so the test runs on past the warning, and it takes its handler off the stack
+  while the fiber of the test is suspended, when the tasks of the test run: their errors escape it.
+  Testo registers it in every suite by default, inner to ours (`ORDER_CLOSE_TO_TEST`): it forwards an error
+  to our handler first, ours throws, and nothing is left for it to capture.
 - thesis/async requires this package in `requireDev` for its own tests, and this package requires thesis/async:
   a cycle only through dev dependencies, which Composer resolves.
