@@ -9,20 +9,24 @@ use Testo\Data\DataProvider;
 use Testo\Test;
 use Time\Duration;
 use Time\TimeException;
+use const Thesis\Time\Internal\MAX_SECONDS;
 
 /**
  * Pins the behavior of Time\Duration with values taken from the class of PHP 8.6: the same test passes
- * below PHP 8.6 against the polyfill and on PHP 8.6 against the original.
+ * below PHP 8.6 against the polyfill and on PHP 8.6 against the original. The bounds differ on 32-bit PHP,
+ * its values are taken from the class of PHP 8.6 there.
  */
 #[Test]
 final class DurationTest
 {
-    private const string OUT_OF_RANGE = 'Time\TimeException: The maximum representable range is 9_223_372_035 seconds (roughly 292 years)';
-    private const string PARSE_FAILURE = 'Time\TimeException: The ISO 8601 duration string could not be parsed';
-    private const string DAYS_FOUND = 'Time\TimeException: The ISO 8601 duration string may only contain the time (T) aspect';
-    private const string ONLY_PERIOD = 'Time\TimeException: The ISO 8601 duration string may only contain the period (P) aspect';
-    private const string MISSING_PERIOD = 'Time\TimeException: The ISO 8601 duration string is missing the period (P) aspect';
-    private const string INVALID_DATA = 'Exception: Invalid serialization data for Time\Duration object';
+    private const OUT_OF_RANGE = \PHP_INT_SIZE === 4
+        ? 'Time\TimeException: The maximum representable range is 2_147_483_647 seconds (roughly 68 years)'
+        : 'Time\TimeException: The maximum representable range is 9_223_372_035 seconds (roughly 292 years)';
+    private const PARSE_FAILURE = 'Time\TimeException: The ISO 8601 duration string could not be parsed';
+    private const DAYS_FOUND = 'Time\TimeException: The ISO 8601 duration string may only contain the time (T) aspect';
+    private const ONLY_PERIOD = 'Time\TimeException: The ISO 8601 duration string may only contain the period (P) aspect';
+    private const MISSING_PERIOD = 'Time\TimeException: The ISO 8601 duration string is missing the period (P) aspect';
+    private const INVALID_DATA = 'Exception: Invalid serialization data for Time\Duration object';
 
     /**
      * @return iterable<string, array{\Closure(): mixed, string}>
@@ -31,8 +35,6 @@ final class DurationTest
     {
         yield 'seconds' => [static fn() => Duration::fromSeconds(90), '90.000000000'];
         yield 'seconds and nanoseconds' => [static fn() => Duration::fromSeconds(1, 5), '1.000000005'];
-        yield 'max' => [static fn() => Duration::fromSeconds(9_223_372_035, 999_999_999), '9223372035.999999999'];
-        yield 'seconds above max' => [static fn() => Duration::fromSeconds(9_223_372_036), self::OUT_OF_RANGE];
         yield 'negative seconds' => [
             static fn() => Duration::fromSeconds(-1),
             'ValueError: Time\Duration::fromSeconds(): Argument #1 ($seconds) must be greater than or equal to 0',
@@ -46,22 +48,11 @@ final class DurationTest
             'ValueError: Time\Duration::fromSeconds(): Argument #2 ($nanoseconds) must be less than 1_000_000_000',
         ];
         yield 'nanoseconds' => [static fn() => Duration::fromNanoseconds(1_500_000_001), '1.500000001'];
-        yield 'max nanoseconds' => [static fn() => Duration::fromNanoseconds(PHP_INT_MAX), self::OUT_OF_RANGE];
-        yield 'microseconds' => [
-            static fn() => Duration::fromMicroseconds(9_223_372_035_999_999),
-            '9223372035.999999000',
-        ];
-        yield 'microseconds above max' => [
-            static fn() => Duration::fromMicroseconds(9_223_372_036_000_000),
-            self::OUT_OF_RANGE,
-        ];
+        yield 'microseconds' => [static fn() => Duration::fromMicroseconds(1_500_001), '1.500001000'];
         yield 'milliseconds' => [static fn() => Duration::fromMilliseconds(1500), '1.500000000'];
-        yield 'max milliseconds' => [static fn() => Duration::fromMilliseconds(PHP_INT_MAX), self::OUT_OF_RANGE];
-        yield 'minutes' => [static fn() => Duration::fromMinutes(153_722_867), '9223372020.000000000'];
-        yield 'minutes above max' => [static fn() => Duration::fromMinutes(153_722_868), self::OUT_OF_RANGE];
+        yield 'minutes' => [static fn() => Duration::fromMinutes(90), '5400.000000000'];
         yield 'max minutes' => [static fn() => Duration::fromMinutes(PHP_INT_MAX), self::OUT_OF_RANGE];
-        yield 'hours' => [static fn() => Duration::fromHours(2_562_047), '9223369200.000000000'];
-        yield 'hours above max' => [static fn() => Duration::fromHours(2_562_048), self::OUT_OF_RANGE];
+        yield 'hours' => [static fn() => Duration::fromHours(25), '90000.000000000'];
         yield 'max hours' => [static fn() => Duration::fromHours(PHP_INT_MAX), self::OUT_OF_RANGE];
 
         $negative = [
@@ -82,6 +73,48 @@ final class DurationTest
                 ),
             ];
         }
+
+        yield from \PHP_INT_SIZE === 4 ? self::factoriesOf32Bits() : self::factoriesOf64Bits();
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(): mixed, string}>
+     */
+    public static function factoriesOf64Bits(): iterable
+    {
+        yield 'max' => [static fn() => Duration::fromSeconds(9_223_372_035, 999_999_999), '9223372035.999999999'];
+        yield 'seconds above max' => [static fn() => Duration::fromSeconds(9_223_372_036), self::OUT_OF_RANGE];
+        yield 'max nanoseconds' => [static fn() => Duration::fromNanoseconds(PHP_INT_MAX), self::OUT_OF_RANGE];
+        yield 'microseconds to max' => [
+            static fn() => Duration::fromMicroseconds(9_223_372_035_999_999),
+            '9223372035.999999000',
+        ];
+        yield 'microseconds above max' => [
+            static fn() => Duration::fromMicroseconds(9_223_372_036_000_000),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'max milliseconds' => [static fn() => Duration::fromMilliseconds(PHP_INT_MAX), self::OUT_OF_RANGE];
+        yield 'minutes to max' => [static fn() => Duration::fromMinutes(153_722_867), '9223372020.000000000'];
+        yield 'minutes above max' => [static fn() => Duration::fromMinutes(153_722_868), self::OUT_OF_RANGE];
+        yield 'hours to max' => [static fn() => Duration::fromHours(2_562_047), '9223369200.000000000'];
+        yield 'hours above max' => [static fn() => Duration::fromHours(2_562_048), self::OUT_OF_RANGE];
+    }
+
+    /**
+     * Every int of seconds is in the range: it ends at PHP_INT_MAX.
+     *
+     * @return iterable<string, array{\Closure(): mixed, string}>
+     */
+    public static function factoriesOf32Bits(): iterable
+    {
+        yield 'max' => [static fn() => Duration::fromSeconds(PHP_INT_MAX, 999_999_999), '2147483647.999999999'];
+        yield 'max nanoseconds' => [static fn() => Duration::fromNanoseconds(PHP_INT_MAX), '2.147483647'];
+        yield 'max microseconds' => [static fn() => Duration::fromMicroseconds(PHP_INT_MAX), '2147.483647000'];
+        yield 'max milliseconds' => [static fn() => Duration::fromMilliseconds(PHP_INT_MAX), '2147483.647000000'];
+        yield 'minutes to max' => [static fn() => Duration::fromMinutes(35_791_394), '2147483640.000000000'];
+        yield 'minutes above max' => [static fn() => Duration::fromMinutes(35_791_395), self::OUT_OF_RANGE];
+        yield 'hours to max' => [static fn() => Duration::fromHours(596_523), '2147482800.000000000'];
+        yield 'hours above max' => [static fn() => Duration::fromHours(596_524), self::OUT_OF_RANGE];
     }
 
     /**
@@ -107,6 +140,50 @@ final class DurationTest
         yield 'absolute' => [static fn() => signed(5, negative: true)->absolute(), '5.000000000'];
         yield 'add with carry' => [static fn() => signed(1, 600_000_000)->add(signed(0, 600_000_000)), '2.200000000'];
         yield 'add opposite' => [static fn() => signed(1)->add(signed(2, negative: true)), '-1.000000000'];
+        yield 'sub to zero' => [static fn() => signed(1)->sub(signed(1)), '0.000000000'];
+        yield 'sub below zero' => [static fn() => signed(0, 1)->sub(signed(0, 2)), '-0.000000001'];
+        yield 'sub negatives' => [
+            static fn() => signed(1, negative: true)->sub(signed(3, negative: true)),
+            '2.000000000',
+        ];
+        yield 'multiply by zero' => [static fn() => signed(1, negative: true)->multiplyBy(0), '0.000000000'];
+        yield 'multiply negative' => [static fn() => signed(1, negative: true)->multiplyBy(3), '-3.000000000'];
+        yield 'multiply by negative' => [
+            static fn() => signed(1)->multiplyBy(-1),
+            'ValueError: Time\Duration::multiplyBy(): Argument #1 ($factor) must be greater than or equal to 0',
+        ];
+        yield 'divide truncates' => [static fn() => signed(1)->divideBy(3), '0.333333333'];
+        yield 'divide carries the remainder' => [static fn() => signed(5, 5)->divideBy(2), '2.500000002'];
+        yield 'divide negative' => [static fn() => signed(1, negative: true)->divideBy(3), '-0.333333333'];
+        yield 'divide to zero is not negative' => [static fn() => signed(0, 1, true)->divideBy(2), '0.000000000'];
+        yield 'divide by zero' => [static fn() => signed(1)->divideBy(0), 'DivisionByZeroError: Division by zero'];
+        yield 'divide by negative' => [
+            static fn() => signed(1)->divideBy(-1),
+            'ValueError: Time\Duration::divideBy(): Argument #1 ($divisor) must be greater than or equal to 0',
+        ];
+        yield 'compare negatives' => [
+            static fn() => Duration::compare(signed(1, negative: true), signed(2, negative: true)),
+            '1',
+        ];
+        yield 'compare nanoseconds' => [static fn() => Duration::compare(signed(0, 4), signed(0, 5)), '-1'];
+        yield 'compare equal' => [static fn() => Duration::compare(signed(1), Duration::fromMilliseconds(1000)), '0'];
+        yield 'multiply nanoseconds with a carry' => [
+            static fn() => signed(1, 500_000_000)->multiplyBy(4),
+            '6.000000000',
+        ];
+        yield 'divide nanoseconds with a remainder' => [
+            static fn() => signed(999_999, 999_999_999)->divideBy(1_000_000),
+            '0.999999999',
+        ];
+
+        yield from \PHP_INT_SIZE === 4 ? self::arithmeticOf32Bits() : self::arithmeticOf64Bits();
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(): mixed, string}>
+     */
+    public static function arithmeticOf64Bits(): iterable
+    {
         yield 'add to zero' => [
             static fn() => signed(9_223_372_035, 999_999_999, true)->add(signed(9_223_372_035, 999_999_999)),
             '0.000000000',
@@ -115,18 +192,10 @@ final class DurationTest
             static fn() => signed(9_223_372_035, 999_999_999)->add(Duration::fromNanoseconds(1)),
             self::OUT_OF_RANGE,
         ];
-        yield 'sub to zero' => [static fn() => signed(1)->sub(signed(1)), '0.000000000'];
-        yield 'sub below zero' => [static fn() => signed(0, 1)->sub(signed(0, 2)), '-0.000000001'];
-        yield 'sub negatives' => [
-            static fn() => signed(1, negative: true)->sub(signed(3, negative: true)),
-            '2.000000000',
-        ];
         yield 'sub below min' => [
             static fn() => signed(9_223_372_035, negative: true)->sub(signed(1)),
             self::OUT_OF_RANGE,
         ];
-        yield 'multiply by zero' => [static fn() => signed(1, negative: true)->multiplyBy(0), '0.000000000'];
-        yield 'multiply negative' => [static fn() => signed(1, negative: true)->multiplyBy(3), '-3.000000000'];
         yield 'multiply to max' => [static fn() => signed(3_074_457_345)->multiplyBy(3), '9223372035.000000000'];
         yield 'multiply nanoseconds' => [
             static fn() => signed(0, 999_999_999)->multiplyBy(9_223_372_035),
@@ -156,30 +225,77 @@ final class DurationTest
             static fn() => signed(4_294_967_297)->multiplyBy(4_294_967_296),
             'Time\TimeException: Failed to create a Time\Duration: Integer Overflow',
         ];
-        yield 'multiply by negative' => [
-            static fn() => signed(1)->multiplyBy(-1),
-            'ValueError: Time\Duration::multiplyBy(): Argument #1 ($factor) must be greater than or equal to 0',
-        ];
-        yield 'divide truncates' => [static fn() => signed(1)->divideBy(3), '0.333333333'];
-        yield 'divide carries the remainder' => [static fn() => signed(5, 5)->divideBy(2), '2.500000002'];
-        yield 'divide negative' => [static fn() => signed(1, negative: true)->divideBy(3), '-0.333333333'];
-        yield 'divide to zero is not negative' => [static fn() => signed(0, 1, true)->divideBy(2), '0.000000000'];
         yield 'divide max' => [static fn() => signed(9_223_372_035, 999_999_999)->divideBy(7), '1317624576.571428571'];
         yield 'divide max by a larger number' => [
             static fn() => signed(9_223_372_035, 999_999_999)->divideBy(9_223_372_036),
             '0.999999999',
         ];
-        yield 'divide by zero' => [static fn() => signed(1)->divideBy(0), 'DivisionByZeroError: Division by zero'];
-        yield 'divide by negative' => [
-            static fn() => signed(1)->divideBy(-1),
-            'ValueError: Time\Duration::divideBy(): Argument #1 ($divisor) must be greater than or equal to 0',
+        yield 'multiply a nanosecond by max' => [
+            static fn() => signed(0, 1)->multiplyBy(PHP_INT_MAX),
+            self::OUT_OF_RANGE,
         ];
-        yield 'compare negatives' => [
-            static fn() => Duration::compare(signed(1, negative: true), signed(2, negative: true)),
-            '1',
+        yield 'compare extremes' => [
+            static fn() => Duration::compare(signed(9_223_372_035, negative: true), signed(9_223_372_034, 1, true)),
+            '-1',
         ];
-        yield 'compare nanoseconds' => [static fn() => Duration::compare(signed(0, 4), signed(0, 5)), '-1'];
-        yield 'compare equal' => [static fn() => Duration::compare(signed(1), Duration::fromMilliseconds(1000)), '0'];
+    }
+
+    /**
+     * No "Integer Overflow": the seconds and the factor are below 2^31, their product below 2^62.
+     *
+     * @return iterable<string, array{\Closure(): mixed, string}>
+     */
+    public static function arithmeticOf32Bits(): iterable
+    {
+        yield 'add to zero' => [
+            static fn() => signed(PHP_INT_MAX, 999_999_999, true)->add(signed(PHP_INT_MAX, 999_999_999)),
+            '0.000000000',
+        ];
+        yield 'add above max' => [
+            static fn() => signed(PHP_INT_MAX, 999_999_999)->add(Duration::fromNanoseconds(1)),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'add max to max' => [static fn() => signed(PHP_INT_MAX)->add(signed(PHP_INT_MAX)), self::OUT_OF_RANGE];
+        yield 'add with carry to max' => [
+            static fn() => signed(PHP_INT_MAX - 1, 600_000_000)->add(signed(0, 400_000_000)),
+            '2147483647.000000000',
+        ];
+        yield 'sub below min' => [
+            static fn() => signed(PHP_INT_MAX, negative: true)->sub(signed(1)),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'sub min from max' => [
+            static fn() => signed(PHP_INT_MAX)->sub(signed(PHP_INT_MAX, negative: true)),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'multiply to max' => [static fn() => signed(715_827_882)->multiplyBy(3), '2147483646.000000000'];
+        yield 'multiply nanoseconds' => [
+            static fn() => signed(0, 999_999_999)->multiplyBy(PHP_INT_MAX),
+            '2147483644.852516353',
+        ];
+        yield 'multiply a nanosecond by max' => [static fn() => signed(0, 1)->multiplyBy(PHP_INT_MAX), '2.147483647'];
+        yield 'multiply above max' => [
+            static fn() => signed(PHP_INT_MAX, 999_999_999)->multiplyBy(1_999_999_999),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'multiply by max' => [static fn() => signed(3)->multiplyBy(PHP_INT_MAX), self::OUT_OF_RANGE];
+        yield 'multiply above max by carry' => [
+            static fn() => signed(1, 1)->multiplyBy(PHP_INT_MAX - 1),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'divide max' => [static fn() => signed(PHP_INT_MAX, 999_999_999)->divideBy(7), '306783378.285714285'];
+        yield 'divide max by max' => [
+            static fn() => signed(PHP_INT_MAX, 999_999_999)->divideBy(PHP_INT_MAX),
+            '1.000000000',
+        ];
+        yield 'divide below max by max' => [
+            static fn() => signed(PHP_INT_MAX - 1, 999_999_999)->divideBy(PHP_INT_MAX),
+            '0.999999999',
+        ];
+        yield 'compare extremes' => [
+            static fn() => Duration::compare(signed(PHP_INT_MAX, negative: true), signed(PHP_INT_MAX - 1, 1, true)),
+            '-1',
+        ];
     }
 
     public function comparesWithOperators(): void
@@ -200,6 +316,8 @@ final class DurationTest
         Assert::equals($one, Duration::fromMilliseconds(1000));
         Assert::notEquals($one, $tiny);
         Assert::true($one >= Duration::fromMilliseconds(1000));
+        Assert::true(signed(MAX_SECONDS, negative: true) < signed(MAX_SECONDS - 1, 999_999_999, true));
+        Assert::true(signed(MAX_SECONDS - 1, 999_999_999) < signed(MAX_SECONDS));
     }
 
     public function hasExtensibleException(): void
@@ -229,11 +347,10 @@ final class DurationTest
             'P0DT1H1M1S' => '3661.000000000',
             'P0000-00-00T00:00:01' => '1.000000000',
             'P0000-00-00T01:02:03' => '3723.000000000',
-            'PT9223372035S' => '9223372035.000000000',
-            'PT2562047H2835S' => '9223372035.000000000',
-            'PT2562047H2836S' => self::OUT_OF_RANGE,
             'PT153722868M' => self::OUT_OF_RANGE,
             'PT999999999999H' => self::OUT_OF_RANGE,
+            'PT999999999999S' => self::OUT_OF_RANGE,
+            'P999999999999W' => self::DAYS_FOUND,
             ' PT1S' => '1.000000000',
             "PT1S\n" => '1.000000000',
             "PT1S\t " => '1.000000000',
@@ -276,6 +393,18 @@ final class DurationTest
             "PT1S\rPT1S" => self::PARSE_FAILURE,
         ];
 
+        $cases += \PHP_INT_SIZE === 4 ? [
+            'PT2147483647S' => '2147483647.000000000',
+            'PT2147483648S' => self::OUT_OF_RANGE,
+            'PT596523H847S' => '2147483647.000000000',
+            'PT596523H848S' => self::OUT_OF_RANGE,
+            'PT9223372035S' => self::OUT_OF_RANGE,
+        ] : [
+            'PT9223372035S' => '9223372035.000000000',
+            'PT2562047H2835S' => '9223372035.000000000',
+            'PT2562047H2836S' => self::OUT_OF_RANGE,
+        ];
+
         foreach ($cases as $string => $expected) {
             yield json_encode($string, JSON_THROW_ON_ERROR) => [
                 static fn() => Duration::fromIso8601DurationString($string),
@@ -301,17 +430,18 @@ final class DurationTest
             var_export($data('i:1', 'i:2', 'b:1'), true),
         ];
         yield 'unserialize' => [static fn() => unserialize($data('i:1', 'i:2', 'b:1')), '-1.000000002'];
-        yield 'unserialize max' => [
-            static fn() => unserialize($data('i:9223372035', 'i:999999999', 'b:0')),
-            '9223372035.999999999',
-        ];
         yield 'unserialize in another order' => [
             static fn() => unserialize('O:13:"Time\Duration":3:{s:11:"nanoseconds";i:2;s:7:"seconds";i:1;s:8:"negative";b:0;}'),
             '1.000000002',
         ];
+        yield 'unserialize max' => [
+            static fn() => unserialize($data(\sprintf('i:%d', MAX_SECONDS), 'i:999999999', 'b:0')),
+            \sprintf('%d.999999999', MAX_SECONDS),
+        ];
+        // On 32-bit PHP the number is a float above PHP_INT_MAX, which the int property rejects.
         yield 'unserialize above max' => [
-            static fn() => unserialize($data('i:9223372036', 'i:0', 'b:0')),
-            self::INVALID_DATA . ' < Time\TimeException',
+            static fn() => unserialize($data(\PHP_INT_SIZE === 4 ? 'i:2147483648' : 'i:9223372036', 'i:0', 'b:0')),
+            self::INVALID_DATA . (\PHP_INT_SIZE === 4 ? ' < TypeError' : ' < Time\TimeException'),
         ];
         yield 'unserialize negative zero' => [
             static fn() => unserialize($data('i:0', 'i:0', 'b:1')),

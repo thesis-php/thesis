@@ -92,6 +92,6 @@ the whole monorepo is for the final check.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.
 - `testo-plugin`: Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures. Requires: async.
-- `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.3 to 8.5, PSR-20 clocks.
+- `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.2 to 8.5, 64-bit and 32-bit, PSR-20 clocks.
 
 <!-- packages:end -->

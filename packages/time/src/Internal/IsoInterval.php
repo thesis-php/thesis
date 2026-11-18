@@ -13,23 +13,23 @@ namespace Thesis\Time\Internal;
  */
 final class IsoInterval
 {
-    private const string MONTH = '(?:0[1-9]|1[0-2])';
-    private const string MONTH_OR_ZERO = '(?:0[0-9]|1[0-2])';
-    private const string DAY = '(?:0[1-9]|[12][0-9]|3[01])';
-    private const string DAY_OR_ZERO = '(?:0[0-9]|[12][0-9]|3[01])';
-    private const string HOUR = '(?:[01][0-9]|2[0-4])';
-    private const string MINUTE = '[0-5][0-9]';
-    private const string RECURRENCES = '/R[0-9]+/A';
-    private const string DATE_TIME = '/[0-9]{4}' . self::MONTH . self::DAY
+    private const MONTH = '(?:0[1-9]|1[0-2])';
+    private const MONTH_OR_ZERO = '(?:0[0-9]|1[0-2])';
+    private const DAY = '(?:0[1-9]|[12][0-9]|3[01])';
+    private const DAY_OR_ZERO = '(?:0[0-9]|[12][0-9]|3[01])';
+    private const HOUR = '(?:[01][0-9]|2[0-4])';
+    private const MINUTE = '[0-5][0-9]';
+    private const RECURRENCES = '/R[0-9]+/A';
+    private const DATE_TIME = '/[0-9]{4}' . self::MONTH . self::DAY
         . 'T' . self::HOUR . self::MINUTE . self::MINUTE . 'Z'
         . '|[0-9]{4}-' . self::MONTH . '-' . self::DAY
         . 'T' . self::HOUR . ':' . self::MINUTE . ':' . self::MINUTE . 'Z/A';
-    private const string PERIOD = '/P(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+W)?(?:[0-9]+D)?'
+    private const PERIOD = '/P(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+W)?(?:[0-9]+D)?'
         . '(?:T(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+S)?)?/A';
-    private const string COMBINED_PERIOD = '/P[0-9]{4}-' . self::MONTH_OR_ZERO . '-' . self::DAY_OR_ZERO
+    private const COMBINED_PERIOD = '/P[0-9]{4}-' . self::MONTH_OR_ZERO . '-' . self::DAY_OR_ZERO
         . 'T' . self::HOUR . ':' . self::MINUTE . ':' . self::MINUTE . '/A';
-    private const string SKIPPED = " .,\t/\n";
-    private const int MAX_NUMBER_DIGITS = 12;
+    private const SKIPPED = " .,\t/\n";
+    private const MAX_NUMBER_DIGITS = 12;
 
     public bool $hasPeriod = false;
 
@@ -41,36 +41,36 @@ final class IsoInterval
     public bool $hasRecurrences = false;
 
     /**
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $years = 0;
+    public int|float $years = 0;
 
     /**
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $months = 0;
+    public int|float $months = 0;
 
     /**
      * Weeks are added as 7 days.
      *
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $days = 0;
+    public int|float $days = 0;
 
     /**
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $hours = 0;
+    public int|float $hours = 0;
 
     /**
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $minutes = 0;
+    public int|float $minutes = 0;
 
     /**
-     * @var non-negative-int
+     * @var non-negative-int|float
      */
-    public int $seconds = 0;
+    public int|float $seconds = 0;
 
     private function __construct() {}
 
@@ -165,8 +165,7 @@ final class IsoInterval
 
             // A longer number leaves a digit where the designator should be, a missing one (P, PT) nothing.
             $digits = strspn($token, '0123456789', $position, self::MAX_NUMBER_DIGITS);
-            $number = (int) substr($token, $position, $digits);
-            \assert($number >= 0);
+            $number = self::number(substr($token, $position, $digits));
             $position += $digits;
 
             switch ($token[$position] ?? '') {
@@ -203,6 +202,22 @@ final class IsoInterval
         $this->hasPeriod = true;
 
         return true;
+    }
+
+    /**
+     * Timelib reads up to 12 digits into int64. Above PHP_INT_MAX, on 32-bit PHP, the number stays a float:
+     * exact below 2^53, and far above the range of a duration.
+     *
+     * @return non-negative-int|float
+     */
+    private static function number(string $digits): int|float
+    {
+        // Mutation testing runs on 64-bit PHP, where 12 digits never pass PHP_INT_MAX: the 32-bit tests cover it.
+        // @infection-ignore CastFloat
+        $number = (float) $digits;
+
+        // @infection-ignore GreaterThan
+        return $number > PHP_INT_MAX ? $number : (int) $digits;
     }
 
     /**

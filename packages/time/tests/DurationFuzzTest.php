@@ -14,24 +14,28 @@ use Time\Duration;
 
 /**
  * Differential test of the polyfill against the class of PHP 8.6: applies the same random operations
- * to both and requires identical results and exceptions. Runs on PHP 8.6 only, against a renamed copy
- * of the polyfill (see loadPolyfillCopy()); DurationTest pins the behavior below PHP 8.6.
+ * to both and requires identical results and exceptions. Runs on PHP 8.6 only, 64-bit and 32-bit, against
+ * a renamed copy of the polyfill (see loadPolyfillCopy()); DurationTest pins the behavior below PHP 8.6.
  *
  * To reproduce a failure, run the reported seed alone.
  */
 #[Test]
 final class DurationFuzzTest
 {
-    private const int CASES_PER_SEED = 2000;
-    private const array ISO_PIECES = [
+    private const CASES_PER_SEED = 2000;
+    private const ISO_PIECES = [
         'P', 'T', 'R', 'Y', 'M', 'W', 'D', 'H', 'S', 'Z', '0', '1', '2', '5', '9', '00', '12', '24', '59', '3600',
         '999999999999', '9999999999999', '-', ':', ' ', '.', ',', '/', "\t", "\n", "\r", "\v", "\0", 'x',
         '2008', 'P0000-00-00T', 'T00:00:00', '20080101T000000Z', '2008-01-01T00:00:00Z', 'R5', 'PT', 'P1D',
     ];
-    private const array EDGE_INTS = [
+    private const EDGE_INTS = [
         0, 1, 2, 3, 7, 999, 1000, 999_999_999, 1_000_000_000, 1_000_000_001, 1_999_999_999, 2_000_000_001,
         3_074_457_345, 4_611_686_018, 9_223_372_035, 9_223_372_036, 4_611_686_018_427_387_904, PHP_INT_MAX - 1,
         PHP_INT_MAX,
+    ];
+    private const EDGE_INTS_OF_32_BITS = [
+        0, 1, 2, 3, 7, 999, 1000, 999_999_999, 1_000_000_000, 1_000_000_001, 1_999_999_999, 2_000_000_001,
+        715_827_882, 1_073_741_823, 1_073_741_824, PHP_INT_MAX - 1, PHP_INT_MAX,
     ];
 
     /**
@@ -156,7 +160,8 @@ final class DurationFuzzTest
                 1 => (string) $random->getInt(1, 99),
                 2 => '999999999999',
                 3 => '9999999999999',
-                default => (string) $random->getInt(0, 9_223_372_036),
+                // Up to a second above the range, on 32-bit PHP to its end, the end of int.
+                default => (string) $random->getInt(0, \PHP_INT_SIZE === 4 ? PHP_INT_MAX : 9_223_372_036),
             };
 
             return $number . $designator;
@@ -190,7 +195,9 @@ final class DurationFuzzTest
         return match ($random->getInt(0, 3)) {
             0 => $random->getInt(0, 2000),
             1 => $random->getInt(0, PHP_INT_MAX),
-            default => self::EDGE_INTS[$random->getInt(0, \count(self::EDGE_INTS) - 1)],
+            default => \PHP_INT_SIZE === 4
+                ? self::EDGE_INTS_OF_32_BITS[$random->getInt(0, \count(self::EDGE_INTS_OF_32_BITS) - 1)]
+                : self::EDGE_INTS[$random->getInt(0, \count(self::EDGE_INTS) - 1)],
         };
     }
 

@@ -7,16 +7,19 @@ namespace Thesis\Time;
 use Time\Duration;
 use Time\TimeException;
 use function Thesis\Time\Internal\decimal;
-use function Thesis\Time\Internal\divide;
-use function Thesis\Time\Internal\fromNanoseconds;
-use function Thesis\Time\Internal\fromUnits;
-use function Thesis\Time\Internal\outOfRange;
-use const Thesis\Time\Internal\MAX_SECONDS;
+use function Thesis\Time\Internal\fromFloat;
+use function Thesis\Time\Internal\fromFractions;
+use function Thesis\Time\Internal\fromMultiples;
+use function Thesis\Time\Internal\fromParts;
+use function Thesis\Time\Internal\rounded;
+use function Thesis\Time\Internal\timestamp;
+use function Thesis\Time\Internal\toFractions;
+use function Thesis\Time\Internal\toMultiples;
+use function Thesis\Time\Internal\whole;
 use const Thesis\Time\Internal\MICROSECONDS_PER_SECOND;
-use const Thesis\Time\Internal\NANOSECONDS_PER_HOUR;
+use const Thesis\Time\Internal\MILLISECONDS_PER_SECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MICROSECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MILLISECOND;
-use const Thesis\Time\Internal\NANOSECONDS_PER_MINUTE;
 use const Thesis\Time\Internal\NANOSECONDS_PER_SECOND;
 use const Thesis\Time\Internal\SECONDS_PER_HOUR;
 use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
@@ -29,7 +32,7 @@ use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
  */
 function ns(int $nanoseconds): Duration
 {
-    return fromNanoseconds($nanoseconds);
+    return fromFractions($nanoseconds, NANOSECONDS_PER_SECOND);
 }
 
 /**
@@ -40,7 +43,7 @@ function ns(int $nanoseconds): Duration
  */
 function us(int|float $microseconds): Duration
 {
-    return fromUnits($microseconds, NANOSECONDS_PER_MICROSECOND);
+    return fromFractions($microseconds, MICROSECONDS_PER_SECOND);
 }
 
 /**
@@ -51,7 +54,7 @@ function us(int|float $microseconds): Duration
  */
 function ms(int|float $milliseconds): Duration
 {
-    return fromUnits($milliseconds, NANOSECONDS_PER_MILLISECOND);
+    return fromFractions($milliseconds, MILLISECONDS_PER_SECOND);
 }
 
 /**
@@ -62,7 +65,7 @@ function ms(int|float $milliseconds): Duration
  */
 function sec(int|float $seconds): Duration
 {
-    return fromUnits($seconds, NANOSECONDS_PER_SECOND);
+    return fromMultiples($seconds, 1);
 }
 
 /**
@@ -73,7 +76,7 @@ function sec(int|float $seconds): Duration
  */
 function minutes(int|float $minutes): Duration
 {
-    return fromUnits($minutes, NANOSECONDS_PER_MINUTE);
+    return fromMultiples($minutes, SECONDS_PER_MINUTE);
 }
 
 /**
@@ -84,7 +87,7 @@ function minutes(int|float $minutes): Duration
  */
 function hours(int|float $hours): Duration
 {
-    return fromUnits($hours, NANOSECONDS_PER_HOUR);
+    return fromMultiples($hours, SECONDS_PER_HOUR);
 }
 
 /**
@@ -111,45 +114,52 @@ function duration(
 }
 
 /**
- * Exact: every Duration fits in int nanoseconds.
+ * Exact: on 64-bit PHP every Duration fits in int nanoseconds.
  *
  * @api
+ * @throws TimeException on 32-bit PHP, above PHP_INT_MAX nanoseconds (2.1 seconds)
  */
 function toNs(Duration $duration): int
 {
-    $nanoseconds = $duration->seconds * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
-
-    return $duration->negative ? -$nanoseconds : $nanoseconds;
+    return rounded(
+        quotient: $duration->seconds * NANOSECONDS_PER_SECOND + $duration->nanoseconds,
+        half: null,
+        negative: $duration->negative,
+        rounding: \RoundingMode::TowardsZero,
+    );
 }
 
 /**
  * Whole microseconds.
  *
  * @api
+ * @throws TimeException on 32-bit PHP, above PHP_INT_MAX microseconds (35 minutes)
  */
 function toUs(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
 {
-    return divide(toNs($duration), NANOSECONDS_PER_MICROSECOND, $rounding);
+    return toFractions($duration, MICROSECONDS_PER_SECOND, $rounding);
 }
 
 /**
  * Whole milliseconds.
  *
  * @api
+ * @throws TimeException on 32-bit PHP, above PHP_INT_MAX milliseconds (24 days)
  */
 function toMs(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
 {
-    return divide(toNs($duration), NANOSECONDS_PER_MILLISECOND, $rounding);
+    return toFractions($duration, MILLISECONDS_PER_SECOND, $rounding);
 }
 
 /**
  * Whole seconds, see toSecFloat() for a fraction.
  *
  * @api
+ * @throws TimeException on 32-bit PHP, if the longest duration is rounded away from zero
  */
 function toSec(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
 {
-    return divide(toNs($duration), NANOSECONDS_PER_SECOND, $rounding);
+    return toMultiples($duration, 1, $rounding);
 }
 
 /**
@@ -159,7 +169,7 @@ function toSec(Duration $duration, \RoundingMode $rounding = \RoundingMode::Towa
  */
 function toMinutes(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
 {
-    return divide(toNs($duration), NANOSECONDS_PER_MINUTE, $rounding);
+    return toMultiples($duration, SECONDS_PER_MINUTE, $rounding);
 }
 
 /**
@@ -169,7 +179,7 @@ function toMinutes(Duration $duration, \RoundingMode $rounding = \RoundingMode::
  */
 function toHours(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
 {
-    return divide(toNs($duration), NANOSECONDS_PER_HOUR, $rounding);
+    return toMultiples($duration, SECONDS_PER_HOUR, $rounding);
 }
 
 /**
@@ -247,7 +257,10 @@ function longest(Duration $duration, Duration ...$durations): Duration
 function multiply(Duration $duration, int|float $factor): Duration
 {
     if (\is_float($factor) || $factor === PHP_INT_MIN) {
-        return fromUnits(toNs($duration) * $factor, 1);
+        // Exact on 64-bit PHP, on 32-bit PHP a float, exact as well: the product is a multiple of 2^9 below 2^61.
+        $nanoseconds = $duration->seconds * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
+
+        return fromFloat(($duration->negative ? -$nanoseconds : $nanoseconds) * $factor, 1);
     }
 
     return $factor >= 0 ? $duration->multiplyBy($factor) : $duration->multiplyBy(-$factor)->negate();
@@ -268,15 +281,22 @@ function format(Duration $duration): string
         return $sign . match (true) {
             $nanoseconds === 0 => '0s',
             $nanoseconds < NANOSECONDS_PER_MICROSECOND => $nanoseconds . 'ns',
-            $nanoseconds < NANOSECONDS_PER_MILLISECOND => decimal($nanoseconds, NANOSECONDS_PER_MICROSECOND) . 'µs',
-            default => decimal($nanoseconds, NANOSECONDS_PER_MILLISECOND) . 'ms',
+            $nanoseconds < NANOSECONDS_PER_MILLISECOND => decimal(
+                whole: intdiv($nanoseconds, NANOSECONDS_PER_MICROSECOND),
+                fraction: $nanoseconds % NANOSECONDS_PER_MICROSECOND,
+                unit: NANOSECONDS_PER_MICROSECOND,
+            ) . 'µs',
+            default => decimal(
+                whole: intdiv($nanoseconds, NANOSECONDS_PER_MILLISECOND),
+                fraction: $nanoseconds % NANOSECONDS_PER_MILLISECOND,
+                unit: NANOSECONDS_PER_MILLISECOND,
+            ) . 'ms',
         };
     }
 
     $hours = intdiv($duration->seconds, SECONDS_PER_HOUR);
     $minutes = intdiv($duration->seconds % SECONDS_PER_HOUR, SECONDS_PER_MINUTE);
-    $nanoseconds = $duration->seconds % SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
-    $seconds = decimal($nanoseconds, NANOSECONDS_PER_SECOND);
+    $seconds = decimal($duration->seconds % SECONDS_PER_MINUTE, $duration->nanoseconds, NANOSECONDS_PER_SECOND);
 
     return $sign . match (true) {
         $hours > 0 => "{$hours}h{$minutes}m{$seconds}s",
@@ -294,23 +314,20 @@ function format(Duration $duration): string
  */
 function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
 {
-    $seconds = $to->getTimestamp() - $from->getTimestamp();
+    // A float on 32-bit PHP beyond int, in the range or not: fromParts() takes either.
+    $seconds = timestamp($to) - timestamp($from);
+    $microseconds = (int) $to->format('u') - (int) $from->format('u');
 
-    // Far beyond the range of Duration, and the multiplication below would overflow.
-    if ($seconds > MAX_SECONDS + 1 || $seconds < -(MAX_SECONDS + 1)) {
-        throw outOfRange();
+    // The parts take the sign of the whole: -1.25 seconds are -1 second and -250_000 microseconds.
+    if ($seconds > 0 && $microseconds < 0) {
+        --$seconds;
+        $microseconds += MICROSECONDS_PER_SECOND;
+    } elseif ($seconds < 0 && $microseconds > 0) {
+        ++$seconds;
+        $microseconds -= MICROSECONDS_PER_SECOND;
     }
 
-    // In microseconds, a second over the range can still come back into it, and nothing overflows.
-    $microseconds = $seconds * MICROSECONDS_PER_SECOND + (int) $to->format('u') - (int) $from->format('u');
-
-    $maxMicroseconds = MAX_SECONDS * MICROSECONDS_PER_SECOND + MICROSECONDS_PER_SECOND - 1;
-
-    if ($microseconds > $maxMicroseconds || $microseconds < -$maxMicroseconds) {
-        throw outOfRange();
-    }
-
-    return fromNanoseconds($microseconds * NANOSECONDS_PER_MICROSECOND);
+    return fromParts($seconds, $microseconds * NANOSECONDS_PER_MICROSECOND);
 }
 
 /**
@@ -322,16 +339,26 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
  */
 function shift(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
 {
-    $microseconds = $time->getTimestamp() * MICROSECONDS_PER_SECOND + (int) $time->format('u') + toUs($duration);
-    $magnitude = abs($microseconds);
+    $sign = $duration->negative ? -1 : 1;
+    // A float on 32-bit PHP beyond int: DateTimeImmutable takes timestamps of int64.
+    $seconds = timestamp($time) + $sign * $duration->seconds;
+    $microseconds = (int) $time->format('u') + $sign * intdiv($duration->nanoseconds, NANOSECONDS_PER_MICROSECOND);
+
+    if ($microseconds < 0) {
+        --$seconds;
+        $microseconds += MICROSECONDS_PER_SECOND;
+    } elseif ($microseconds >= MICROSECONDS_PER_SECOND) {
+        ++$seconds;
+        $microseconds -= MICROSECONDS_PER_SECOND;
+    }
+
     // Not setMicrosecond(), which is of PHP 8.4. modify() keeps the class of $time, but '@' sets UTC,
     // and the sign is of the whole number: '@-0.250000' is a quarter of a second before 1970.
-    $timestamp = \sprintf(
-        '@%s%d.%06d',
-        $microseconds < 0 ? '-' : '',
-        intdiv($magnitude, MICROSECONDS_PER_SECOND),
-        $magnitude % MICROSECONDS_PER_SECOND,
-    );
+    if ($seconds < 0 && $microseconds > 0) {
+        $timestamp = \sprintf('@-%s.%06d', whole(-($seconds + 1)), MICROSECONDS_PER_SECOND - $microseconds);
+    } else {
+        $timestamp = \sprintf('@%s.%06d', whole($seconds), $microseconds);
+    }
 
     return $time->modify($timestamp)->setTimezone($time->getTimezone());
 }

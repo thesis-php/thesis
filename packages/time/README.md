@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases)
 
 Short functions for [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 8.6, a polyfill of it
-for PHP 8.3 to 8.5, and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
+for PHP 8.2 to 8.5, and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
 use function Thesis\Time\{format, ms, sec, toMs, toSecFloat};
@@ -22,7 +22,7 @@ format($timeout);     // 1.5s
 composer require thesis/time
 ```
 
-Requires 64-bit PHP 8.3+. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
+Requires PHP 8.2+, 64-bit or 32-bit. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
 
 ## Why
 
@@ -58,22 +58,24 @@ hours(0.25);
 duration(minutes: 1, sec: 30); // the sum of the parts
 ```
 
-A value out of the range of `Time\Duration` (about ±292 years) throws `Time\TimeException`, `NAN` and `INF`
-throw `\ValueError`.
+A value out of the range of `Time\Duration` (about ±292 years, ±68 years on 32-bit PHP) throws `Time\TimeException`,
+`NAN` and `INF` throw `\ValueError`.
 
 ## Converting
 
 ```php
 use function Thesis\Time\{toHours, toMinutes, toMs, toNs, toSec, toSecFloat, toUs};
 
-toNs($duration);  // exact: every duration fits in int nanoseconds
+toNs($duration);  // exact: on 64-bit PHP every duration fits in int nanoseconds
 toMs($duration);  // whole milliseconds, the fraction is dropped
 toSec($ttl, RoundingMode::PositiveInfinity); // whole seconds, rounded up
 toSecFloat($timeout); // for APIs that take float seconds, like the timers of Revolt
 ```
 
 `toUs()`, `toMs()`, `toSec()`, `toMinutes()` and `toHours()` round with a `\RoundingMode`, `TowardsZero` by default
-as in Go, Java and Rust. A timeout is usually rounded up, so that it never expires early.
+as in Go, Java and Rust. A timeout is usually rounded up, so that it never expires early. On 32-bit PHP a result
+above `PHP_INT_MAX` throws `Time\TimeException`: an int holds 2.1 seconds of nanoseconds, 35 minutes of microseconds
+and 24 days of milliseconds.
 
 ## The rest
 

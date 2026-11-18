@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Requires 64-bit PHP 8.3+: the polyfill of `Time\Duration` serves PHP 8.3 to 8.5.
+- Requires PHP 8.2+, 64-bit or 32-bit: the polyfill of `Time\Duration` serves PHP 8.2 to 8.5 and has the range
+  of the class on 32-bit PHP, the conversions throw `Time\TimeException` for a result above `PHP_INT_MAX`.
 
 ### Fixed
 

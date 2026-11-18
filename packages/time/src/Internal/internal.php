@@ -11,36 +11,61 @@ const NANOSECONDS_PER_MICROSECOND = 1000;
 const NANOSECONDS_PER_MILLISECOND = 1000 * NANOSECONDS_PER_MICROSECOND;
 const NANOSECONDS_PER_SECOND = 1000 * NANOSECONDS_PER_MILLISECOND;
 const MICROSECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MICROSECOND;
+const MILLISECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MILLISECOND;
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
-const NANOSECONDS_PER_MINUTE = SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND;
-const NANOSECONDS_PER_HOUR = SECONDS_PER_HOUR * NANOSECONDS_PER_SECOND;
 
 /**
- * The longest `Time\Duration` in whole seconds, as the class has it: PHP_INT_MAX nanoseconds less a part of a second.
+ * The longest `Time\Duration` in whole seconds, as the class has it: PHP_INT_MAX nanoseconds less a part of a second,
+ * on 32-bit PHP the int $seconds.
  *
  * @internal
  */
-const MAX_SECONDS = 9_223_372_035;
+const MAX_SECONDS = \PHP_INT_SIZE === 4 ? PHP_INT_MAX : 9_223_372_035;
 
 /**
- * Every Duration fits in int nanoseconds: its range ends at 9_223_372_035.999999999 seconds, below PHP_INT_MAX.
+ * A value in units of 1 / $perSecond of a second: nanoseconds, microseconds, milliseconds.
  *
  * @internal
- * @param positive-int $nanosecondsPerUnit
+ * @param positive-int $perSecond a divisor of a billion
+ * @throws TimeException out of the range of Duration
  */
-function fromUnits(int|float $value, int $nanosecondsPerUnit): Duration
+function fromFractions(int|float $value, int $perSecond): Duration
 {
-    if (\is_int($value)) {
-        $limit = intdiv(PHP_INT_MAX, $nanosecondsPerUnit);
+    $nanosecondsPerUnit = intdiv(NANOSECONDS_PER_SECOND, $perSecond);
 
-        if ($value > $limit || $value < -$limit) {
-            throw outOfRange();
-        }
-
-        return fromNanoseconds($value * $nanosecondsPerUnit);
+    if (\is_float($value)) {
+        return fromFloat($value, $nanosecondsPerUnit);
     }
 
+    return fromParts(intdiv($value, $perSecond), $value % $perSecond * $nanosecondsPerUnit);
+}
+
+/**
+ * A value in units of $secondsPerUnit seconds: seconds, minutes, hours.
+ *
+ * @internal
+ * @param positive-int $secondsPerUnit
+ * @throws TimeException out of the range of Duration
+ */
+function fromMultiples(int|float $value, int $secondsPerUnit): Duration
+{
+    if (\is_float($value)) {
+        // A float on 32-bit PHP, of the same value: the multiplication rounds the same.
+        return fromFloat($value, $secondsPerUnit * NANOSECONDS_PER_SECOND);
+    }
+
+    return fromParts($value * $secondsPerUnit, 0);
+}
+
+/**
+ * Rounded to the nearest nanosecond, half away from zero.
+ *
+ * @internal
+ * @throws TimeException out of the range of Duration
+ */
+function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
+{
     if (!is_finite($value)) {
         // var_export(): PHP 8.5 warns when %s coerces NAN to a string.
         throw new \ValueError(\sprintf('A duration must be finite, %s given', var_export($value, return: true)));
@@ -48,60 +73,150 @@ function fromUnits(int|float $value, int $nanosecondsPerUnit): Duration
 
     $nanoseconds = round($value * $nanosecondsPerUnit);
 
-    // 2^63: PHP_INT_MAX is not representable as a float, and -2^63 would overflow when negated.
-    if ($nanoseconds >= 2.0 ** 63 || $nanoseconds <= -(2.0 ** 63)) {
+    // A finite value times the unit may overflow to INF, and fmod() of INF is NAN.
+    if (!is_finite($nanoseconds)) {
         throw outOfRange();
     }
 
-    return fromNanoseconds((int) $nanoseconds);
+    $magnitude = abs($nanoseconds);
+    // fmod() is exact. Above 2^62 nanoseconds a float is a multiple of 1024, an odd number of seconds is not:
+    // the subtraction is off by up to 512 nanoseconds, so the quotient is rounded, not truncated.
+    $fraction = fmod($magnitude, NANOSECONDS_PER_SECOND);
+    $seconds = round(($magnitude - $fraction) / NANOSECONDS_PER_SECOND);
+
+    // Before the cast: a float beyond int does not convert.
+    if ($seconds > MAX_SECONDS) {
+        throw outOfRange();
+    }
+
+    $duration = Duration::fromSeconds((int) $seconds, (int) $fraction);
+
+    return $nanoseconds < 0 ? $duration->negate() : $duration;
 }
 
 /**
  * @internal
+ * @param int|float $seconds a float is an int that overflowed in the arithmetic of the caller: a whole number,
+ *     exact on 32-bit PHP, where a step back may return it into the range
+ * @param int $nanoseconds of the sign of $seconds, less than a second
+ * @throws TimeException out of the range of Duration
  */
-function fromNanoseconds(int $nanoseconds): Duration
+function fromParts(int|float $seconds, int $nanoseconds): Duration
 {
-    if ($nanoseconds >= 0) {
-        return Duration::fromNanoseconds($nanoseconds);
-    }
+    $negative = $seconds < 0 || $nanoseconds < 0;
+    // -PHP_INT_MIN is a float too.
+    $magnitude = $negative ? -$seconds : $seconds;
 
-    if ($nanoseconds === PHP_INT_MIN) {
+    // Before the cast: a float beyond int does not convert.
+    if ($magnitude > MAX_SECONDS) {
         throw outOfRange();
     }
 
-    return Duration::fromNanoseconds(-$nanoseconds)->negate();
+    $duration = Duration::fromSeconds((int) $magnitude, abs($nanoseconds));
+
+    return $negative ? $duration->negate() : $duration;
 }
 
 /**
- * Integer division with the given rounding, exact in the whole int range.
+ * The duration in whole units of 1 / $perSecond of a second: nanoseconds, microseconds, milliseconds.
  *
  * @internal
- * @param positive-int $divisor
+ * @param positive-int $perSecond a divisor of a billion
+ * @throws TimeException if the result does not fit in int, as on 32-bit PHP
  */
-function divide(int $dividend, int $divisor, \RoundingMode $rounding): int
+function toFractions(Duration $duration, int $perSecond, \RoundingMode $rounding): int
 {
-    $quotient = intdiv($dividend, $divisor);
-    $remainder = abs($dividend % $divisor);
+    $nanosecondsPerUnit = intdiv(NANOSECONDS_PER_SECOND, $perSecond);
+    $remainder = $duration->nanoseconds % $nanosecondsPerUnit;
 
-    if ($remainder === 0) {
-        return $quotient;
+    return rounded(
+        quotient: $duration->seconds * $perSecond + intdiv($duration->nanoseconds, $nanosecondsPerUnit),
+        // Less than 2 billion: fits in int on 32-bit PHP too.
+        half: $remainder === 0 ? null : $remainder * 2 <=> $nanosecondsPerUnit,
+        negative: $duration->negative,
+        rounding: $rounding,
+    );
+}
+
+/**
+ * The duration in whole units of $secondsPerUnit seconds: seconds, minutes, hours.
+ *
+ * @internal
+ * @param positive-int $secondsPerUnit
+ * @throws TimeException if the result does not fit in int, as on 32-bit PHP
+ */
+function toMultiples(Duration $duration, int $secondsPerUnit, \RoundingMode $rounding): int
+{
+    $remainder = [$duration->seconds % $secondsPerUnit, $duration->nanoseconds];
+    $half = [intdiv($secondsPerUnit, 2), $secondsPerUnit % 2 * intdiv(NANOSECONDS_PER_SECOND, 2)];
+
+    return rounded(
+        quotient: intdiv($duration->seconds, $secondsPerUnit),
+        half: $remainder === [0, 0] ? null : $remainder <=> $half,
+        negative: $duration->negative,
+        rounding: $rounding,
+    );
+}
+
+/**
+ * The seconds of a Unix timestamp. Not getTimestamp(): on 32-bit PHP it throws outside of 1901 to 2038.
+ *
+ * @internal
+ * @return int|float a float beyond int, on 32-bit PHP: exact below 2^53
+ */
+function timestamp(\DateTimeInterface $time): int|float
+{
+    $seconds = $time->format('U');
+    // Mutation testing runs on 64-bit PHP, where every timestamp fits in int: the 32-bit tests cover it.
+    // @infection-ignore CastFloat
+    $float = (float) $seconds;
+
+    // @infection-ignore GreaterThan, LessThan, LogicalOr
+    return $float > PHP_INT_MAX || $float < PHP_INT_MIN ? $float : (int) $seconds;
+}
+
+/**
+ * A whole number for a string: %s of a float has the 14 digits of the precision setting.
+ *
+ * @internal
+ */
+function whole(int|float $number): string
+{
+    return \is_float($number) ? \sprintf('%.0f', $number) : (string) $number;
+}
+
+/**
+ * The magnitude of a quotient, rounded toward zero, rounded by the remainder of the division and signed.
+ *
+ * @internal
+ * @param int|float $quotient a float is an int that overflowed in the arithmetic of the caller
+ * @param ?int $half how the remainder compares with a half of the divisor, null if nothing remains
+ * @throws TimeException if the result does not fit in int
+ */
+function rounded(int|float $quotient, ?int $half, bool $negative, \RoundingMode $rounding): int
+{
+    if (\is_float($quotient)) {
+        throw notInt();
     }
 
-    $awayFromZero = $dividend < 0 ? $quotient - 1 : $quotient + 1;
-
-    // $remainder < $divisor - $remainder is 2 * $remainder < $divisor without an overflow.
-    $half = $remainder <=> $divisor - $remainder;
-
-    return match ($rounding) {
-        \RoundingMode::TowardsZero => $quotient,
-        \RoundingMode::AwayFromZero => $awayFromZero,
-        \RoundingMode::PositiveInfinity => $dividend > 0 ? $awayFromZero : $quotient,
-        \RoundingMode::NegativeInfinity => $dividend < 0 ? $awayFromZero : $quotient,
-        \RoundingMode::HalfAwayFromZero => $half >= 0 ? $awayFromZero : $quotient,
-        \RoundingMode::HalfTowardsZero => $half > 0 ? $awayFromZero : $quotient,
-        \RoundingMode::HalfEven => $half > 0 || ($half === 0 && $quotient % 2 !== 0) ? $awayFromZero : $quotient,
-        \RoundingMode::HalfOdd => $half > 0 || ($half === 0 && $quotient % 2 === 0) ? $awayFromZero : $quotient,
+    $awayFromZero = $half !== null && match ($rounding) {
+        \RoundingMode::TowardsZero => false,
+        \RoundingMode::AwayFromZero => true,
+        \RoundingMode::PositiveInfinity => !$negative,
+        \RoundingMode::NegativeInfinity => $negative,
+        \RoundingMode::HalfAwayFromZero => $half >= 0,
+        \RoundingMode::HalfTowardsZero => $half > 0,
+        \RoundingMode::HalfEven => $half > 0 || ($half === 0 && $quotient % 2 !== 0),
+        \RoundingMode::HalfOdd => $half > 0 || ($half === 0 && $quotient % 2 === 0),
     };
+
+    if ($awayFromZero && $quotient === PHP_INT_MAX) {
+        throw notInt();
+    }
+
+    $magnitude = $awayFromZero ? $quotient + 1 : $quotient;
+
+    return $negative ? -$magnitude : $magnitude;
 }
 
 /**
@@ -111,19 +226,29 @@ function divide(int $dividend, int $divisor, \RoundingMode $rounding): int
  */
 function outOfRange(): TimeException
 {
-    return new TimeException('The maximum representable range is 9_223_372_035 seconds (roughly 292 years)');
+    return new TimeException(\PHP_INT_SIZE === 4
+        ? 'The maximum representable range is 2_147_483_647 seconds (roughly 68 years)'
+        : 'The maximum representable range is 9_223_372_035 seconds (roughly 292 years)');
+}
+
+/**
+ * Only on 32-bit PHP: on 64-bit PHP every duration fits in int nanoseconds.
+ *
+ * @internal
+ */
+function notInt(): TimeException
+{
+    return new TimeException('The duration in this unit does not fit in int');
 }
 
 /**
  * @internal
- * @param non-negative-int $value
+ * @param non-negative-int $whole
+ * @param non-negative-int $fraction less than $unit
  * @param positive-int $unit a power of 10
  */
-function decimal(int $value, int $unit): string
+function decimal(int $whole, int $fraction, int $unit): string
 {
-    $whole = intdiv($value, $unit);
-    $fraction = $value % $unit;
-
     if ($fraction === 0) {
         return (string) $whole;
     }

@@ -7,30 +7,40 @@ namespace Time;
 use Thesis\Time\Internal\IsoInterval;
 
 /**
- * Polyfill of the PHP 8.6 class (https://wiki.php.net/rfc/duration_class) for PHP 8.3 to 8.5, loaded by
+ * Polyfill of the PHP 8.6 class (https://wiki.php.net/rfc/duration_class) for PHP 8.2 to 8.5, loaded by
  * src/polyfill.php only when the class does not exist. It follows the C implementation
  * (ext/date/time_duration.c and lib/duration.c of timelib) down to the exception messages.
  */
 final readonly class Duration
 {
-    private const int MAX_SECONDS = 9_223_372_035;
-    private const int NANOSECONDS_PER_SECOND = 1_000_000_000;
-    private const int SECONDS_PER_MINUTE = 60;
-    private const int SECONDS_PER_HOUR = 60 * self::SECONDS_PER_MINUTE;
-    private const string OUT_OF_RANGE = 'The maximum representable range is 9_223_372_035 seconds (roughly 292 years)';
-    private const string PARSE_FAILURE = 'The ISO 8601 duration string could not be parsed';
-    private const string MISSING_PERIOD = 'The ISO 8601 duration string is missing the period (P) aspect';
-    private const string ONLY_PERIOD_ALLOWED = 'The ISO 8601 duration string may only contain the period (P) aspect';
-    private const string DAYS_FOUND = 'The ISO 8601 duration string may only contain the time (T) aspect';
+    /**
+     * On 32-bit PHP the range is that of the int $seconds.
+     */
+    private const MAX_SECONDS = \PHP_INT_SIZE === 4 ? PHP_INT_MAX : 9_223_372_035;
+    private const NANOSECONDS_PER_SECOND = 1_000_000_000;
+    private const SECONDS_PER_MINUTE = 60;
+    private const SECONDS_PER_HOUR = 60 * self::SECONDS_PER_MINUTE;
+    private const OUT_OF_RANGE = \PHP_INT_SIZE === 4
+        ? 'The maximum representable range is 2_147_483_647 seconds (roughly 68 years)'
+        : 'The maximum representable range is 9_223_372_035 seconds (roughly 292 years)';
+    private const PARSE_FAILURE = 'The ISO 8601 duration string could not be parsed';
+    private const MISSING_PERIOD = 'The ISO 8601 duration string is missing the period (P) aspect';
+    private const ONLY_PERIOD_ALLOWED = 'The ISO 8601 duration string may only contain the period (P) aspect';
+    private const DAYS_FOUND = 'The ISO 8601 duration string may only contain the time (T) aspect';
 
     /**
      * Declared first on purpose: PHP compares two objects of one class property by property in the order
-     * of declaration, so `<`, `<=>` and `==` decide by this signed value, like the comparison handler of the C class.
+     * of declaration, so `<`, `<=>` and `==` decide by the signed seconds, then by the signed nanoseconds,
+     * like the comparison handler of the C class. Not one int of nanoseconds: on 32-bit PHP it does not fit.
      */
+    private int $signedSeconds;
+
     private int $signedNanoseconds;
 
     /**
-     * @var int<0, 9223372035>
+     * Up to 9_223_372_035, on 32-bit PHP up to PHP_INT_MAX.
+     *
+     * @var non-negative-int
      */
     public int $seconds;
 
@@ -41,17 +51,20 @@ final readonly class Duration
 
     public bool $negative;
 
-    private function __construct(int $seconds, int $nanoseconds, bool $negative)
+    /**
+     * @param int|float $seconds a float is an int that overflowed in the arithmetic of the caller, above the range
+     */
+    private function __construct(int|float $seconds, int $nanoseconds, bool $negative)
     {
-        if ($seconds > self::MAX_SECONDS) {
+        if (\is_float($seconds) || $seconds > self::MAX_SECONDS) {
             throw new TimeException(self::OUT_OF_RANGE);
         }
 
         \assert($seconds >= 0 && $nanoseconds >= 0 && $nanoseconds < self::NANOSECONDS_PER_SECOND);
 
         $negative = $negative && ($seconds !== 0 || $nanoseconds !== 0);
-        $magnitude = $seconds * self::NANOSECONDS_PER_SECOND + $nanoseconds;
-        $this->signedNanoseconds = $negative ? -$magnitude : $magnitude;
+        $this->signedSeconds = $negative ? -$seconds : $seconds;
+        $this->signedNanoseconds = $negative ? -$nanoseconds : $nanoseconds;
         $this->seconds = $seconds;
         $this->nanoseconds = $nanoseconds;
         $this->negative = $negative;
@@ -119,10 +132,6 @@ final readonly class Duration
             throw self::negativeArgument('fromMinutes', 1, 'minutes');
         }
 
-        if ($minutes > intdiv(self::MAX_SECONDS, self::SECONDS_PER_MINUTE)) {
-            throw new TimeException(self::OUT_OF_RANGE);
-        }
-
         return new self($minutes * self::SECONDS_PER_MINUTE, 0, false);
     }
 
@@ -130,10 +139,6 @@ final readonly class Duration
     {
         if ($hours < 0) {
             throw self::negativeArgument('fromHours', 1, 'hours');
-        }
-
-        if ($hours > intdiv(self::MAX_SECONDS, self::SECONDS_PER_HOUR)) {
-            throw new TimeException(self::OUT_OF_RANGE);
         }
 
         return new self($hours * self::SECONDS_PER_HOUR, 0, false);
@@ -172,7 +177,7 @@ final readonly class Duration
 
     public static function compare(self $a, self $b): int
     {
-        return $a->signedNanoseconds <=> $b->signedNanoseconds;
+        return [$a->signedSeconds, $a->signedNanoseconds] <=> [$b->signedSeconds, $b->signedNanoseconds];
     }
 
     /**
@@ -220,8 +225,8 @@ final readonly class Duration
             throw self::invalidSerializationData(new TimeException(self::OUT_OF_RANGE));
         }
 
-        $magnitude = $seconds * self::NANOSECONDS_PER_SECOND + $nanoseconds;
-        $this->signedNanoseconds = $this->negative ? -$magnitude : $magnitude;
+        $this->signedSeconds = $this->negative ? -$seconds : $seconds;
+        $this->signedNanoseconds = $this->negative ? -$nanoseconds : $nanoseconds;
     }
 
     /**
@@ -282,24 +287,10 @@ final readonly class Duration
             throw self::negativeArgument('multiplyBy', 1, 'factor');
         }
 
-        if ($factor === 0) {
-            return new self(0, 0, false);
-        }
-
-        $extraSeconds = $this->nanoseconds * intdiv($factor, self::NANOSECONDS_PER_SECOND);
-        $nanoseconds = $this->nanoseconds * ($factor % self::NANOSECONDS_PER_SECOND);
-        $extraSeconds += intdiv($nanoseconds, self::NANOSECONDS_PER_SECOND);
-        $nanoseconds %= self::NANOSECONDS_PER_SECOND;
+        [$extraSeconds, $nanoseconds] = self::multiplyNanoseconds($this->nanoseconds, $factor);
 
         if (self::exceedsUint64($this->seconds, $factor, $extraSeconds)) {
             throw new TimeException('Failed to create a Time\Duration: Integer Overflow');
-        }
-
-        if (
-            $extraSeconds > self::MAX_SECONDS
-            || $this->seconds > intdiv(self::MAX_SECONDS - $extraSeconds, $factor)
-        ) {
-            throw new TimeException(self::OUT_OF_RANGE);
         }
 
         return new self($this->seconds * $factor + $extraSeconds, $nanoseconds, $this->negative);
@@ -317,10 +308,7 @@ final readonly class Duration
 
         return new self(
             seconds: intdiv($this->seconds, $divisor),
-            nanoseconds: intdiv(
-                $this->nanoseconds + $this->seconds % $divisor * self::NANOSECONDS_PER_SECOND,
-                $divisor,
-            ),
+            nanoseconds: self::divideRemainder($this->seconds % $divisor, $this->nanoseconds, $divisor),
             negative: $this->negative,
         );
     }
@@ -363,16 +351,110 @@ final readonly class Duration
     }
 
     /**
+     * $nanoseconds * $factor as whole seconds and the nanoseconds left. The product itself overflows int
+     * on 32-bit PHP, so it is the sum of the doublings of $nanoseconds for the bits of $factor.
+     *
+     * @param non-negative-int $factor
+     * @return array{non-negative-int, int<0, 999999999>} the seconds are less than $factor
+     */
+    private static function multiplyNanoseconds(int $nanoseconds, int $factor): array
+    {
+        $product = [0, 0];
+        $doubling = [0, $nanoseconds];
+
+        for (; $factor > 0; $factor >>= 1) {
+            if (($factor & 1) === 1) {
+                $product = self::sum($product, $doubling);
+            }
+
+            $doubling = self::sum($doubling, $doubling);
+        }
+
+        /** @var array{non-negative-int, int<0, 999999999>} */
+        return $product;
+    }
+
+    /**
+     * ($seconds * 1_000_000_000 + $nanoseconds) / $divisor, rounded down. The dividend overflows int
+     * on 32-bit PHP, so it is divided in binary: the multiples $divisor * 2^i are subtracted from the largest.
+     *
+     * @param positive-int $divisor greater than $seconds, so the quotient is less than a second
+     * @return int<0, 999999999>
+     */
+    private static function divideRemainder(int $seconds, int $nanoseconds, int $divisor): int
+    {
+        $rest = [$seconds, $nanoseconds];
+        $multiples = [];
+
+        for ($multiple = self::split($divisor); $multiple <= $rest; $multiple = self::sum($multiple, $multiple)) {
+            $multiples[] = $multiple;
+        }
+
+        $quotient = 0;
+
+        foreach (array_reverse($multiples, preserve_keys: true) as $power => $multiple) {
+            if ($multiple <= $rest) {
+                $rest = self::difference($rest, $multiple);
+                $quotient += 1 << $power;
+            }
+        }
+
+        /** @var int<0, 999999999> */
+        return $quotient;
+    }
+
+    /**
+     * @return array{int, int} the seconds and the nanoseconds
+     */
+    private static function split(int $nanoseconds): array
+    {
+        return [intdiv($nanoseconds, self::NANOSECONDS_PER_SECOND), $nanoseconds % self::NANOSECONDS_PER_SECOND];
+    }
+
+    /**
+     * @param array{int, int} $first seconds and nanoseconds
+     * @param array{int, int} $second seconds and nanoseconds
+     * @return array{int, int}
+     */
+    private static function sum(array $first, array $second): array
+    {
+        $nanoseconds = $first[1] + $second[1];
+
+        if ($nanoseconds >= self::NANOSECONDS_PER_SECOND) {
+            return [$first[0] + $second[0] + 1, $nanoseconds - self::NANOSECONDS_PER_SECOND];
+        }
+
+        return [$first[0] + $second[0], $nanoseconds];
+    }
+
+    /**
+     * @param array{int, int} $first seconds and nanoseconds, not less than $second
+     * @param array{int, int} $second seconds and nanoseconds
+     * @return array{int, int}
+     */
+    private static function difference(array $first, array $second): array
+    {
+        $nanoseconds = $first[1] - $second[1];
+
+        if ($nanoseconds < 0) {
+            return [$first[0] - $second[0] - 1, $nanoseconds + self::NANOSECONDS_PER_SECOND];
+        }
+
+        return [$first[0] - $second[0], $nanoseconds];
+    }
+
+    /**
      * Whether $seconds * $factor + $addend > 2^64 - 1, without leaving int64: 2^64 - 1 = 2 * PHP_INT_MAX + 1.
      *
      * @param non-negative-int $seconds
-     * @param positive-int $factor
+     * @param non-negative-int $factor
      * @param non-negative-int $addend less than $factor
      */
     private static function exceedsUint64(int $seconds, int $factor, int $addend): bool
     {
-        // $seconds is below 2^34, so the product of a factor of 1 or 2 stays far from the limit.
-        if ($factor <= 2) {
+        // On 32-bit PHP both are below 2^31, and the product is below 2^62. On 64-bit PHP $seconds is below 2^34,
+        // so the product of a factor of 1 or 2 stays far from the limit.
+        if (\PHP_INT_SIZE === 4 || $factor <= 2) {
             return false;
         }
 

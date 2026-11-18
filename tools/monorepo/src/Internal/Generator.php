@@ -141,6 +141,22 @@ final class Generator
             ));
         }
 
+        $platform = $config->platform;
+
+        foreach ($manifest->withoutPlatform as $name) {
+            if (!isset($platform[$name])) {
+                throw new MonorepoException(\sprintf(
+                    '%s/%s: withoutPlatform has %s, which is not in the platform of %s, remove it.',
+                    $package->path,
+                    Monorepo::MANIFEST,
+                    $name,
+                    Monorepo::CONFIG,
+                ));
+            }
+
+            unset($platform[$name]);
+        }
+
         $composer = [
             'name' => $package->name,
             'description' => $manifest->description,
@@ -150,7 +166,7 @@ final class Generator
             'authors' => $config->authors,
             'require' => self::sortRequire([
                 'php' => $config->php,
-                ...$config->platform,
+                ...$platform,
                 ...$this->versioned($package, $manifest->require),
             ]),
             'require-dev' => self::sortRequire($this->versioned($package, $manifest->requireDev)),

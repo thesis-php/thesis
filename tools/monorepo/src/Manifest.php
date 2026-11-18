@@ -25,6 +25,8 @@ final readonly class Manifest
      *     (^0.Y below 1.0, ^X.0 above). A constraint within that range raises the lower bound: '^0.1.5'.
      *     php defaults to the constraint of monorepo.php
      * @param array<non-empty-string, non-empty-string> $requireDev the same, for the tests
+     * @param list<non-empty-string> $withoutPlatform platform requirements of monorepo.php that the package
+     *     does not have: 'php-64bit' for a package that runs on 32-bit PHP too
      * @param bool $rootEntry the entry point of the package is named after it and lives in the root namespace:
      *     the class Thesis\<PascalCaseDir> in src/<PascalCaseDir>.php or the function Thesis\<camelCaseDir>()
      *     in src/api.php. The psr-4 prefix of src/ and tests/ is then Thesis\, the rest of them is
@@ -56,6 +58,7 @@ final readonly class Manifest
         public array $keywords = [],
         public array $require = [],
         public array $requireDev = [],
+        public array $withoutPlatform = [],
         public bool $rootEntry = false,
         public array $files = [],
         public array $devFiles = [],

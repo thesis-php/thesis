@@ -43,6 +43,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   before anything is written. CI runs `make sync` and fails on any change in git.
 - `Requirements` resolves the constraints of external dependencies, php and `Config::$platform` with composer/semver
   and throws with every conflict at once.
+  `Manifest::$withoutPlatform` drops a requirement of `Config::$platform` from the composer.json of one package
+  only, the root keeps it: one vendor serves the whole monorepo. `sync` throws on a name that is not in the platform.
 - Conventions (dependency direction, references between packages, `@api`/`@internal`, namespaces, `AGENTS.md`)
   are not checked: a check is added when a real problem shows up, not in advance, and preferably by running
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.

@@ -7,6 +7,10 @@ Read before writing code that depends on the operating system or on the size of 
 - Every package is 64-bit only: `platform` of `monorepo.php` (`php-64bit`) is required by every package,
   a manifest does not repeat it. Code relies on 64-bit `int` (nanoseconds, `pack('J')`) without checking
   `PHP_INT_SIZE`.
+- The exception is `thesis/time`: a polyfill of `Time\Duration`, which PHP 8.6 has on 32-bit too.
+  Its manifest drops `php-64bit` (`withoutPlatform`), its tests run on i386
+  (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`), how its code stays exact there is in its `AGENTS.md`.
+  Another package joins only for the same reason: a user of 32-bit PHP needs it without the rest of the monorepo.
 - Windows is not supported, and nothing is guaranteed to work there. The code is written for Unix only:
   no `PHP_OS_FAMILY` checks, no Windows branches, no Windows paths. `net` keeps Unix sockets, `socketPair()`
   on `STREAM_PF_UNIX` and the DNS configuration from `/etc/resolv.conf`. `process`, `parallel` and `cluster`
