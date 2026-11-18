@@ -13,6 +13,7 @@ use function Thesis\Time\Internal\fromMultiples;
 use function Thesis\Time\Internal\fromParts;
 use function Thesis\Time\Internal\rounded;
 use function Thesis\Time\Internal\timestamp;
+use function Thesis\Time\Internal\toFloatFractions;
 use function Thesis\Time\Internal\toFractions;
 use function Thesis\Time\Internal\toMultiples;
 use function Thesis\Time\Internal\whole;
@@ -135,7 +136,7 @@ function toNs(Duration $duration): int
  * @api
  * @throws TimeException on 32-bit PHP, above PHP_INT_MAX microseconds (35 minutes)
  */
-function toUs(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
+function toUs(Duration $duration, \RoundingMode $rounding): int
 {
     return toFractions($duration, MICROSECONDS_PER_SECOND, $rounding);
 }
@@ -146,7 +147,7 @@ function toUs(Duration $duration, \RoundingMode $rounding = \RoundingMode::Towar
  * @api
  * @throws TimeException on 32-bit PHP, above PHP_INT_MAX milliseconds (24 days)
  */
-function toMs(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
+function toMs(Duration $duration, \RoundingMode $rounding): int
 {
     return toFractions($duration, MILLISECONDS_PER_SECOND, $rounding);
 }
@@ -157,7 +158,7 @@ function toMs(Duration $duration, \RoundingMode $rounding = \RoundingMode::Towar
  * @api
  * @throws TimeException on 32-bit PHP, if the longest duration is rounded away from zero
  */
-function toSec(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
+function toSec(Duration $duration, \RoundingMode $rounding): int
 {
     return toMultiples($duration, 1, $rounding);
 }
@@ -167,7 +168,7 @@ function toSec(Duration $duration, \RoundingMode $rounding = \RoundingMode::Towa
  *
  * @api
  */
-function toMinutes(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
+function toMinutes(Duration $duration, \RoundingMode $rounding): int
 {
     return toMultiples($duration, SECONDS_PER_MINUTE, $rounding);
 }
@@ -177,21 +178,59 @@ function toMinutes(Duration $duration, \RoundingMode $rounding = \RoundingMode::
  *
  * @api
  */
-function toHours(Duration $duration, \RoundingMode $rounding = \RoundingMode::TowardsZero): int
+function toHours(Duration $duration, \RoundingMode $rounding): int
 {
     return toMultiples($duration, SECONDS_PER_HOUR, $rounding);
 }
 
 /**
- * For APIs that take float seconds, like the timers of Revolt.
+ * Microseconds with a fraction.
+ *
+ * @api
+ */
+function toUsFloat(Duration $duration): float
+{
+    return toFloatFractions($duration, MICROSECONDS_PER_SECOND);
+}
+
+/**
+ * Milliseconds with a fraction.
+ *
+ * @api
+ */
+function toMsFloat(Duration $duration): float
+{
+    return toFloatFractions($duration, MILLISECONDS_PER_SECOND);
+}
+
+/**
+ * Seconds with a fraction, for APIs that take float seconds, like the timers of Revolt.
  *
  * @api
  */
 function toSecFloat(Duration $duration): float
 {
-    $seconds = $duration->seconds + $duration->nanoseconds / NANOSECONDS_PER_SECOND;
+    return toFloatFractions($duration, 1);
+}
 
-    return $duration->negative ? -$seconds : $seconds;
+/**
+ * Minutes with a fraction.
+ *
+ * @api
+ */
+function toMinutesFloat(Duration $duration): float
+{
+    return toSecFloat($duration) / SECONDS_PER_MINUTE;
+}
+
+/**
+ * Hours with a fraction.
+ *
+ * @api
+ */
+function toHoursFloat(Duration $duration): float
+{
+    return toSecFloat($duration) / SECONDS_PER_HOUR;
 }
 
 /**

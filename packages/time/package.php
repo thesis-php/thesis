@@ -8,10 +8,10 @@ use Thesis\Monorepo\Manifest;
 use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
-    description: 'Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.2 to 8.5, 64-bit and 32-bit, '
+    description: 'Polyfill of Time\Duration of PHP 8.6 for PHP 8.2 to 8.5, 64-bit and 32-bit, functions for it, '
         . 'PSR-20 clocks.',
     licenseSince: 2026,
-    version: '0.3',
+    version: '0.4',
     keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
     require: [
         // The polyfill runs where the rest of the monorepo does not: PHP 8.2 of Debian 12, the main 32-bit system.

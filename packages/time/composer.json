@@ -1,6 +1,6 @@
 {
     "name": "thesis/time",
-    "description": "Functions for Time\\Duration of PHP 8.6 and a polyfill of it for PHP 8.2 to 8.5, 64-bit and 32-bit, PSR-20 clocks.",
+    "description": "Polyfill of Time\\Duration of PHP 8.6 for PHP 8.2 to 8.5, 64-bit and 32-bit, functions for it, PSR-20 clocks.",
     "keywords": [
         "php",
         "time",
@@ -57,7 +57,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.3.x-dev"
+            "dev-main": "0.4.x-dev"
         }
     }
 }

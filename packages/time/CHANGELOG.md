@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `toUsFloat()`, `toMsFloat()`, `toMinutesFloat()` and `toHoursFloat()`, like `toSecFloat()`.
+
+### Changed
+
+- **BC break:** `toUs()`, `toMs()`, `toSec()`, `toMinutes()` and `toHours()` require a `\RoundingMode`.
+  Pass `\RoundingMode::TowardsZero` to keep the old result.
+
 ## [0.3.1] - 2026-11-18
 
 ### Changed

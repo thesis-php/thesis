@@ -1,6 +1,6 @@
 # thesis/time
 
-Functions for `Time\Duration` of PHP 8.6, a polyfill of it for PHP 8.2 to 8.5, and PSR-20 clocks,
+A polyfill of `Time\Duration` of PHP 8.6 for PHP 8.2 to 8.5, functions for it and PSR-20 clocks,
 on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.php.net/rfc/duration_class.
 
 ## Invariants that must not be broken
@@ -62,17 +62,29 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   (the old `thesis/time-span`).
 - Short names as in Go: `ns()` to `hours()` create, `to*()` convert. A full unit is plural, it takes an amount
   (`minutes(1.5)`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, maybe with a loss.
+- The functions take a negative value, unlike the factories of the class: a duration is negative anyway
+  after `sub()`, `negate()` or `between()`, and `shift($now, sec(-30))` beats `sec(30)->negate()`.
+  A caller that needs a positive duration (a timeout) checks it with `isPositive()`.
 - No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
   is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
   The check is `isZero()`.
 - No function named after a built-in (`min()`, `max()`): imported, it shadows the built-in in the whole file
   and ignores extra arguments. Hence `minutes()`, `shortest()` and `longest()`.
-- The integer conversions take a `\RoundingMode`, `TowardsZero` by default as in Go, Java and Rust. The only
-  float conversion is `toSecFloat()`, the unit of float APIs (Revolt).
+- The integer conversions require a `\RoundingMode`, with no default. Their main use is a timeout, a TTL
+  or an interval for an API of whole units, which must round up: a fraction dropped makes it expire early,
+  and `0` is "no limit" in curl, Postgres, AMQP heartbeats. Elapsed time rounds toward zero. One default
+  hides the choice, and the consumers that round inside (`Io\Poll::wait()`, Go netpoll, tokio) are what
+  the caller of `toMs()` is. Rejected: `TowardsZero` by default (the getters of Go, Java, Rust): no caller
+  in the monorepo used it. Rejected: a function per direction: `\RoundingMode` already names them.
+  A default can be added later without a break.
+- Every unit has a float conversion of its own (`toMsFloat()`), named apart from the int one. Rejected:
+  a float from `toMs($duration)` without a `\RoundingMode` and an int with it (as `toMilliseconds($precision)`
+  of `thesis/time-span`): a forgotten mode is no longer an `ArgumentCountError` but a float that `sprintf('%d')`,
+  `(int)` and a coercive int parameter truncate silently, and the type of the result depends on an argument.
 - No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
   a duration (the `Time\Instant` RFC).
 - `between()` and `shift()` work on timestamps: elapsed time does not stretch with DST. `shift()` drops
-  nanoseconds toward zero, like `toUs()`, and takes the time first, as `multiply()` takes the duration first.
+  nanoseconds toward zero and takes the time first, as `multiply()` takes the duration first.
   Rejected: `after()`/`before()`, which break that order, `plus()`/`minus()`, two functions for one operation,
   and `fromInterval(\DateInterval)`, whose day is a calendar day.
 - `WallClock` and `FrozenClock` live here: a clock and a duration go together (`$clock->advance(sec(30))`),

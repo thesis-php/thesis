@@ -35,7 +35,7 @@
     "require-dev": {
         "testo/assert": "^0.1.17",
         "testo/test": "^0.1.8",
-        "thesis/time": "^0.3"
+        "thesis/time": "^0.4"
     },
     "autoload": {
         "psr-4": {

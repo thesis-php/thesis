@@ -27,7 +27,7 @@
     "require": {
         "php": "^8.6",
         "thesis/async": "^0.1",
-        "thesis/time": "^0.3"
+        "thesis/time": "^0.4"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",

@@ -3,17 +3,17 @@
 [![PHP Version Requirement](https://img.shields.io/packagist/dependency-v/thesis/time/php)](https://packagist.org/packages/thesis/time)
 [![GitHub Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases)
 
-Short functions for [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 8.6, a polyfill of it
-for PHP 8.2 to 8.5, and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
+A polyfill of [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 8.6 for PHP 8.2 to 8.5,
+short functions for it and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
 use function Thesis\Time\{format, ms, sec, toMs, toSecFloat};
 
 $timeout = sec(1.5);
 
-toMs($timeout);       // 1500
+toMs($timeout, RoundingMode::PositiveInfinity); // 1500
 toSecFloat($timeout); // 1.5
-format($timeout);     // 1.5s
+format($timeout); // 1.5s
 ```
 
 ## Installation
@@ -24,23 +24,50 @@ composer require thesis/time
 
 Requires PHP 8.2.2+, 64-bit or 32-bit. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
 
-## Why
+## Time\Duration polyfill
 
-`Time\Duration` is elapsed time with nanosecond precision: a timeout, a delay, a TTL. The class is minimal on purpose:
-its factories take only non-negative ints, and nothing converts it back to a number. The functions here fill the gaps
-and take and return `Time\Duration` itself, so it passes to any other API as is.
+`Time\Duration` is elapsed time with nanosecond precision: a timeout, a delay, a TTL. On PHP 8.2 to 8.5
+the package declares `Time\Duration` and `Time\TimeException`, on PHP 8.6 the built-in classes work, so code written
+for 8.6 runs on 8.2 as is. Here are the essentials, [the RFC](https://wiki.php.net/rfc/duration_class) describes
+the whole class.
 
-## Polyfill
+```php
+use Time\Duration;
 
-Below PHP 8.6 the package declares `Time\Duration` and `Time\TimeException`, which behave as in PHP 8.6
-down to the exception messages, compared with the original on random input. What differs: `var_dump()`
-and an `(array)` cast show two more private properties, reflection sees `__serialize()`, and a wrong call fails
-as with a userland method (extra arguments are ignored, `null` for an int is a `TypeError` in coercive mode too).
+$ttl = Duration::fromMinutes(5);
+$timeout = Duration::fromSeconds(1, nanoseconds: 500_000_000);
+$delay = Duration::fromIso8601DurationString('PT1M30S');
 
-## Creating
+$ttl->add($timeout);
+$ttl->sub($timeout);
+$timeout->multiplyBy(3);
+$timeout->divideBy(2);
+$timeout->negate();
+$timeout->absolute();
 
-Each function takes a negative value, and all but `ns()` a float, rounded to the nearest nanosecond,
-half away from zero.
+Duration::compare($ttl, $timeout); // 1
+$timeout < $ttl; // true
+
+$timeout->seconds; // 1
+$timeout->nanoseconds; // 500000000
+$timeout->negative; // false
+```
+
+The factories are `fromNanoseconds()`, `fromMicroseconds()`, `fromMilliseconds()`, `fromSeconds()`, `fromMinutes()`
+and `fromHours()`. The class is minimal on purpose: the factories take only non-negative ints, and nothing converts
+a duration back to a number. The [functions](#functions) fill these gaps.
+
+A duration spans about ±292 years, ±68 years on 32-bit PHP. A value out of range throws `Time\TimeException`.
+
+The polyfill behaves as the class of PHP 8.6 down to the exception messages, compared with the original
+on random input.
+
+## Functions
+
+### Creating
+
+Unlike the factories of the class, the functions take a negative value, and all but `ns()` a float,
+rounded to the nearest nanosecond, half away from zero.
 
 ```php
 use function Thesis\Time\{duration, hours, minutes, ms, ns, sec, us};
@@ -55,25 +82,49 @@ hours(0.25);
 duration(minutes: 1, sec: 30); // the sum of the parts
 ```
 
-A value out of the range of `Time\Duration` (about ±292 years, ±68 years on 32-bit PHP) throws `Time\TimeException`,
-`NAN` and `INF` throw `\ValueError`.
+A value out of range throws `Time\TimeException`, `NAN` and `INF` throw `\ValueError`.
 
-## Converting
+### Converting to int
 
 ```php
-use function Thesis\Time\{toHours, toMinutes, toMs, toNs, toSec, toSecFloat, toUs};
+use function Thesis\Time\{sec, toHours, toMinutes, toMs, toNs, toSec, toUs};
 
-toNs($duration);  // exact: on 64-bit PHP every duration fits in int nanoseconds
-toMs($duration);  // whole milliseconds, the fraction is dropped
-toSec($ttl, RoundingMode::PositiveInfinity); // whole seconds, rounded up
-toSecFloat($timeout); // for APIs that take float seconds, like the timers of Revolt
+$duration = sec(90.5);
+
+toNs($duration);                                    // 90500000000
+toUs($duration, RoundingMode::TowardsZero);         // 90500000
+toMs($duration, RoundingMode::TowardsZero);         // 90500
+toSec($duration, RoundingMode::TowardsZero);        // 90
+toSec($duration, RoundingMode::PositiveInfinity);   // 91
+toMinutes($duration, RoundingMode::TowardsZero);    // 1
+toHours($duration, RoundingMode::PositiveInfinity); // 1
 ```
 
-The integer conversions round with a `\RoundingMode`, `TowardsZero` by default as in Go, Java and Rust:
-round a timeout up, so that it never expires early. On 32-bit PHP a result above `PHP_INT_MAX` throws
-`Time\TimeException`: an int holds 2.1 seconds of nanoseconds, 35 minutes of microseconds, 24 days of milliseconds.
+`toNs()` is exact. The others take a `\RoundingMode` and have no default: the right one depends on what the number
+means. Round a timeout, a TTL or an interval up with `PositiveInfinity`, so that it never expires early and never
+becomes the `0` that many APIs take as "no limit". Drop the fraction of elapsed time with `TowardsZero`.
 
-## The rest
+On 64-bit PHP every duration fits in an int of any unit, nanoseconds too. On 32-bit PHP an int holds 2.1 seconds
+of nanoseconds, 35 minutes of microseconds, 24 days of milliseconds, and a larger result throws `Time\TimeException`.
+The float conversions never throw.
+
+### Converting to float
+
+```php
+use function Thesis\Time\{sec, toHoursFloat, toMinutesFloat, toMsFloat, toSecFloat, toUsFloat};
+
+$duration = sec(90.5);
+
+toUsFloat($duration);      // 90500000.0
+toMsFloat($duration);      // 90500.0
+toSecFloat($duration);     // 90.5
+toMinutesFloat($duration); // 1.5083333333333333
+toHoursFloat($duration);   // 0.025138888888888888
+```
+
+For APIs that take float seconds, like the timers of Revolt, and for metrics and logs.
+
+### Checking, comparing, multiplying, formatting
 
 ```php
 use function Thesis\Time\{format, isNegative, isPositive, isZero, longest, multiply, shortest};
@@ -85,14 +136,14 @@ isNegative($duration);
 shortest($a, $b, $c);
 longest($a, $b, $c);
 
-multiply($delay, 2);   // exact
+multiply($delay, 2); // exact
 multiply($delay, 1.5); // rounded to the nearest nanosecond
 multiply($delay, -1);
 
 format(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s, like Duration.String() of Go
 ```
 
-## Points in time
+### Points in time
 
 `between()` and `shift()` count elapsed time between timestamps, so a change of the UTC offset (DST) does not count.
 `shift()` drops the nanoseconds below a microsecond, which `DateTimeImmutable` cannot hold.
@@ -105,15 +156,16 @@ $retainedSince = shift($clock->now(), $retention->negate());
 $elapsed = between($startedAt, $clock->now());
 ```
 
-## Clocks
+## [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks
 
-`WallClock` and `FrozenClock` implement `Psr\Clock\ClockInterface`.
+`WallClock` and `FrozenClock` implement
+[`Psr\Clock\ClockInterface`](https://www.php-fig.org/psr/psr-20/#21-clockinterface).
 
 ```php
 use Thesis\Time\{FrozenClock, WallClock};
 use function Thesis\Time\sec;
 
-$clock = new WallClock();                             // the system time in the default time zone
+$clock = new WallClock(); // the system time in the default time zone
 $clock = new WallClock(new DateTimeZone('UTC'));
 
 $clock = new FrozenClock(new DateTimeImmutable('2026-01-01 00:00:00 UTC')); // for tests
@@ -121,7 +173,4 @@ $clock->advance(sec(30));
 $clock->now = new DateTimeImmutable('2027-01-01 00:00:00 UTC');
 ```
 
-## Durations themselves
-
-The class itself adds, subtracts and compares: `$a->add($b)`, `$a->sub($b)`, `$a->negate()`, `$a->absolute()`,
-`Duration::compare($a, $b)`, `$a < $b`.
+`FrozenClock` moves only when told: by `advance()` or by assigning `$clock->now`.

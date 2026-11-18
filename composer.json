@@ -84,7 +84,7 @@
         "thesis/phpstan-extension": "0.1.x-dev",
         "thesis/source-location": "0.1.x-dev",
         "thesis/testo-plugin": "0.1.x-dev",
-        "thesis/time": "0.3.x-dev"
+        "thesis/time": "0.4.x-dev"
     },
     "autoload": {
         "psr-4": {

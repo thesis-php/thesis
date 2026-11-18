@@ -289,7 +289,9 @@ use function Thesis\Time\toMs;
 $remaining = remaining();
 
 if ($remaining !== null) {
-    $connection->execute(sprintf('SET statement_timeout = %d', toMs($remaining, \RoundingMode::PositiveInfinity)));
+    // 0 turns statement_timeout off: a deadline that has passed leaves 1 ms.
+    $timeout = max(1, toMs($remaining, \RoundingMode::PositiveInfinity));
+    $connection->execute(sprintf('SET statement_timeout = %d', $timeout));
 }
 ```
 

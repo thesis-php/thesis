@@ -168,6 +168,19 @@ function toFractions(Duration $duration, int $perSecond, \RoundingMode $rounding
 }
 
 /**
+ * The duration in units of 1 / $perSecond of a second with a fraction: microseconds, milliseconds, seconds.
+ *
+ * @internal
+ * @param positive-int $perSecond a divisor of a billion
+ */
+function toFloatFractions(Duration $duration, int $perSecond): float
+{
+    $units = $duration->seconds * $perSecond + $duration->nanoseconds / intdiv(NANOSECONDS_PER_SECOND, $perSecond);
+
+    return $duration->negative ? -$units : $units;
+}
+
+/**
  * The duration in whole units of $secondsPerUnit seconds: seconds, minutes, hours.
  *
  * @internal

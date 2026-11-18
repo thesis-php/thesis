@@ -59,22 +59,30 @@ final class FunctionsTest
         yield 'duration of mixed signs' => [static fn() => duration(minutes: 1, sec: -90), '-30.000000000'];
         yield 'empty duration' => [static fn() => duration(), '0.000000000'];
         yield 'toNs' => [static fn() => toNs(sec(1.5)), '1500000000'];
-        yield 'toUs' => [static fn() => toUs(ns(1999)), '1'];
-        yield 'toMs' => [static fn() => toMs(us(1999)), '1'];
+        yield 'toUs' => [static fn() => toUs(ns(1999), \RoundingMode::TowardsZero), '1'];
+        yield 'toMs' => [static fn() => toMs(us(1999), \RoundingMode::TowardsZero), '1'];
         yield 'toMs rounded up' => [static fn() => toMs(us(1001), \RoundingMode::PositiveInfinity), '2'];
-        yield 'toSec' => [static fn() => toSec(ms(-1999)), '-1'];
+        yield 'toSec' => [static fn() => toSec(ms(-1999), \RoundingMode::TowardsZero), '-1'];
         yield 'toSec rounded down' => [static fn() => toSec(ms(-1001), \RoundingMode::NegativeInfinity), '-2'];
         yield 'toSec of a half to even' => [static fn() => toSec(ms(2500), \RoundingMode::HalfEven), '2'];
-        yield 'toMinutes' => [static fn() => toMinutes(sec(119)), '1'];
+        yield 'toMinutes' => [static fn() => toMinutes(sec(119), \RoundingMode::TowardsZero), '1'];
         yield 'toMinutes of a half to even' => [static fn() => toMinutes(sec(-90), \RoundingMode::HalfEven), '-2'];
         yield 'toMinutes above a half' => [
             static fn() => toMinutes(Duration::fromSeconds(30, 1), \RoundingMode::HalfTowardsZero),
             '1',
         ];
-        yield 'toHours' => [static fn() => toHours(minutes(-119)), '-1'];
+        yield 'toHours' => [static fn() => toHours(minutes(-119), \RoundingMode::TowardsZero), '-1'];
         yield 'toHours of a half' => [static fn() => toHours(minutes(30), \RoundingMode::HalfOdd), '1'];
+        yield 'toUsFloat' => [static fn() => toUsFloat(ns(1500)), '1.5'];
+        yield 'negative toUsFloat' => [static fn() => toUsFloat(sec(-1)->sub(ns(1))), '-1000000.001'];
+        yield 'toMsFloat' => [static fn() => toMsFloat(us(1500)), '1.5'];
+        yield 'negative toMsFloat' => [static fn() => toMsFloat(ns(-1)), '-1.0E-6'];
         yield 'toSecFloat' => [static fn() => toSecFloat(ms(1500)), '1.5'];
         yield 'negative toSecFloat' => [static fn() => toSecFloat(ns(-1)), '-1.0E-9'];
+        yield 'toMinutesFloat' => [static fn() => toMinutesFloat(sec(90)), '1.5'];
+        yield 'negative toMinutesFloat' => [static fn() => toMinutesFloat(sec(-90)), '-1.5'];
+        yield 'toHoursFloat' => [static fn() => toHoursFloat(minutes(90)), '1.5'];
+        yield 'negative toHoursFloat' => [static fn() => toHoursFloat(minutes(-90)), '-1.5'];
         yield 'isZero' => [static fn() => [isZero(ns(0)), isZero(ns(1)), isZero(ns(-1))], '[true, false, false]'];
         yield 'isNegative' => [
             static fn() => [isNegative(ns(0)), isNegative(ns(1)), isNegative(ns(-1))],
@@ -153,19 +161,25 @@ final class FunctionsTest
         // PHP_INT_MIN would fit, but the magnitude is rounded first.
         yield 'toNs of min int' => [static fn() => toNs(ns(PHP_INT_MIN)), self::NOT_INT];
         yield 'toNs of max int below zero' => [static fn() => toNs(ns(-PHP_INT_MAX)), '-2147483647'];
-        yield 'toUs to max int' => [static fn() => toUs(Duration::fromSeconds(2147, 483_647_999)), '2147483647'];
+        yield 'toUs to max int' => [
+            static fn() => toUs(Duration::fromSeconds(2147, 483_647_999), \RoundingMode::TowardsZero),
+            '2147483647',
+        ];
         yield 'toUs rounded above max int' => [
             static fn() => toUs(Duration::fromSeconds(2147, 483_647_001), \RoundingMode::PositiveInfinity),
             self::NOT_INT,
         ];
-        yield 'toMs to max int' => [static fn() => toMs(sec(2_147_483)), '2147483000'];
-        yield 'toMs above max int' => [static fn() => toMs(sec(2_147_484)), self::NOT_INT];
-        yield 'toSec of max' => [static fn() => toSec(Duration::fromSeconds(PHP_INT_MAX, 999_999_999)), '2147483647'];
+        yield 'toMs to max int' => [static fn() => toMs(sec(2_147_483), \RoundingMode::TowardsZero), '2147483000'];
+        yield 'toMs above max int' => [static fn() => toMs(sec(2_147_484), \RoundingMode::TowardsZero), self::NOT_INT];
+        yield 'toSec of max' => [
+            static fn() => toSec(Duration::fromSeconds(PHP_INT_MAX, 999_999_999), \RoundingMode::TowardsZero),
+            '2147483647',
+        ];
         yield 'toSec of max rounded up' => [
             static fn() => toSec(Duration::fromSeconds(PHP_INT_MAX, 1), \RoundingMode::AwayFromZero),
             self::NOT_INT,
         ];
-        yield 'toHours of max' => [static fn() => toHours(sec(PHP_INT_MAX)), '596523'];
+        yield 'toHours of max' => [static fn() => toHours(sec(PHP_INT_MAX), \RoundingMode::TowardsZero), '596523'];
         yield 'multiply by min int' => [static fn() => multiply(ns(1), PHP_INT_MIN), '-2.147483648'];
         yield 'multiply max by 2' => [static fn() => multiply(sec(PHP_INT_MAX), 2), self::OUT_OF_RANGE];
     }
