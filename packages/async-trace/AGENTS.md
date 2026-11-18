@@ -112,8 +112,8 @@ lives here. The format is described in `README.md`.
   of its own and blocks the outer one, whose timer would neither fire nor measure the inner waits.
   The timers of the loop never fire early, so a due timer reports without checking again. A wait that ends exactly
   at the threshold is reported or not by the order of the fibers of one tick.
-  Rejected: a timer per wait, a timer created and cancelled on every wait. Rejected: a repeating timer of a fixed
-  period, a report late by up to the period and a wake-up of the loop while nothing waits long.
+  Rejected: a repeating timer of a fixed period, a report late by up to the period and a wake-up of the loop
+  while nothing waits long.
 - Not yet: following a chain of causes, such as a task failed by the `TaskCancelled` of a task it awaited,
   cancelled in its turn. The first cause covers the deadlines, the calls and the failures.
 - An error is its class, message, file and line, without the previous ones and the trace:

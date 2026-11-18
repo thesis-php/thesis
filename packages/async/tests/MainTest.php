@@ -68,18 +68,20 @@ final class MainTest
     {
         $output = inMain(<<<'PHP'
             $value = new Thesis\Async\ScopedValue('default');
-            $value->with('of main', static fn() => Thesis\Async\timeout(Thesis\Time\sec(100), static fn() => Thesis\Async\group(
-                static function (Thesis\Async\Group $group) use ($value) {
-                    $task = $group->spawn(static function () use ($value) {
-                        Thesis\Async\onCancel(static function () use ($value) {
-                            echo $value->get(), ', ', Thesis\Async\remaining() === null ? 'no deadline' : 'a deadline';
-                        });
-                        Thesis\Async\delay(Thesis\Time\sec(5));
+            $body = static function (Thesis\Async\Group $group) use ($value) {
+                $task = $group->spawn(static function () use ($value) {
+                    Thesis\Async\onCancel(static function () use ($value) {
+                        echo $value->get(), ', ', Thesis\Async\remaining() === null ? 'no deadline' : 'a deadline';
                     });
-                    Thesis\Async\delay(Thesis\Time\ms(1));
-                    $task->cancel();
-                },
-            )));
+                    Thesis\Async\delay(Thesis\Time\sec(5));
+                });
+                Thesis\Async\delay(Thesis\Time\ms(1));
+                $task->cancel();
+            };
+            $value->with('of main', static fn() => Thesis\Async\timeout(
+                Thesis\Time\sec(100),
+                static fn() => Thesis\Async\group($body),
+            ));
             PHP);
 
         Assert::same($output, 'default, no deadline');
