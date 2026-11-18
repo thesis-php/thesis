@@ -10,6 +10,8 @@ return new Manifest(
     version: '2.0',
     keywords: ['php', 'async', 'fibers', 'amqp', 'amqp-client', 'rabbitmq', 'message-queue'],
     require: [
+        // uint32 frame-max (0xFF_FF_FF_FF), uint64 delivery tags and body sizes, toNs() of 30 seconds.
+        'php-64bit' => '*',
         'ext-filter' => '*',
         'ext-uri' => '*',
         'thesis/async' => '*',

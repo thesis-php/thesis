@@ -13,6 +13,8 @@ return new Manifest(
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop'],
     require: [
+        // Time is int nanoseconds of hrtime() (Instant, timers), on 32-bit hrtime() is a float.
+        'php-64bit' => '*',
         'thesis/dispatcher' => '*',
         'thesis/source-location' => '*',
         'thesis/time' => '*',

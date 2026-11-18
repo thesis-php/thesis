@@ -8,7 +8,7 @@ or changing the public API of a package that others use. How the generator works
 ### Manifests and generated files
 
 - `packages/<name>/package.php` returns a `Thesis\Monorepo\Manifest` and is the only place to declare a package's
-  description and dependencies. `monorepo.php` is the root config: PHP constraint, `platform`, authors, tools
+  description and dependencies. `monorepo.php` is the root config: PHP constraint, authors, tools
   and composer plugins of the root.
 - Generated from the manifests and `monorepo.php` by `make sync`, never edited by hand:
   - `packages/<name>/composer.json` and the root `composer.json`,

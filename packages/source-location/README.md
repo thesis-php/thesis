@@ -24,7 +24,7 @@ final class Container
 composer require thesis/source-location
 ```
 
-Requires 64-bit PHP 8.6+. No extensions.
+Requires PHP 8.6+. No extensions.
 
 ## Location
 

@@ -167,65 +167,19 @@ final readonly class GeneratorTest
         ]);
     }
 
-    public static function requiresPlatformOfConfigInEveryComposerJson(): void
+    public static function requiresPlatformOfAPackageInItsComposerJsonAndTheRoot(): void
     {
         $fixture = new Fixture()
-            ->file('monorepo.php', <<<'PHP'
-                <?php
-
-                return new Thesis\Monorepo\Config(
-                    php: '^8.5',
-                    description: 'Fixture.',
-                    copyrightHolder: 'Fixture',
-                    licenseSince: 2026,
-                    platform: ['php-64bit' => '*'],
-                );
-                PHP)
-            ->package('bytes', "require: ['ext-bcmath' => '*']")
+            ->package('bytes', "require: ['php-64bit' => '*']")
+            ->package('time')
         ;
 
         $files = Generator::generate($fixture->load());
 
         $require = static fn(string $path) => Json::decode($files[$path] ?? '', $path)['require'] ?? null;
-        $expected = ['php' => '^8.5', 'php-64bit' => '*', 'ext-bcmath' => '*'];
-        Assert::same($require('packages/bytes/composer.json'), $expected);
-        Assert::same($require('composer.json'), $expected);
-    }
-
-    public static function dropsPlatformThePackageDoesNotHave(): void
-    {
-        $fixture = new Fixture()
-            ->file('monorepo.php', <<<'PHP'
-                <?php
-
-                return new Thesis\Monorepo\Config(
-                    php: '^8.5',
-                    description: 'Fixture.',
-                    copyrightHolder: 'Fixture',
-                    licenseSince: 2026,
-                    platform: ['php-64bit' => '*', 'ext-bcmath' => '*'],
-                );
-                PHP)
-            ->package('time', "withoutPlatform: ['php-64bit']")
-        ;
-
-        $files = Generator::generate($fixture->load());
-
-        $require = static fn(string $path) => Json::decode($files[$path] ?? '', $path)['require'] ?? null;
-        Assert::same($require('packages/time/composer.json'), ['php' => '^8.5', 'ext-bcmath' => '*']);
-        Assert::same($require('composer.json'), ['php' => '^8.5', 'php-64bit' => '*', 'ext-bcmath' => '*']);
-    }
-
-    public static function rejectsPlatformThatConfigDoesNotHave(): void
-    {
-        $fixture = new Fixture()->package('time', "withoutPlatform: ['php-64bit']");
-
-        Expect::exception(MonorepoException::class)->withMessage(
-            'packages/time/package.php: withoutPlatform has php-64bit, which is not in the platform of monorepo.php, '
-            . 'remove it.',
-        );
-
-        Generator::generate($fixture->load());
+        Assert::same($require('packages/bytes/composer.json'), ['php' => '^8.5', 'php-64bit' => '*']);
+        Assert::same($require('packages/time/composer.json'), ['php' => '^8.5']);
+        Assert::same($require('composer.json'), ['php' => '^8.5', 'php-64bit' => '*']);
     }
 
     public static function writesCatalogBetweenMarkers(): void

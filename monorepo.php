@@ -31,9 +31,6 @@ return new Config(
         ['name' => 'Valentin Udaltsov', 'email' => 'udaltsov.valentin@gmail.com'],
         ['name' => 'Contributors', 'homepage' => 'https://github.com/thesis-php/thesis/graphs/contributors'],
     ],
-    platform: [
-        'php-64bit' => '*',
-    ],
     requireDev: [
         'ext-tokenizer' => '*',
         'ext-zlib' => '*',

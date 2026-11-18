@@ -11,6 +11,8 @@ return new Manifest(
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'io', 'non-blocking-io', 'streams', 'buffer', 'binary'],
     require: [
+        // int64 and uint64 of Buffer are a native int (pack('J')), uint32 fits in int only on 64-bit.
+        'php-64bit' => '*',
         'thesis/async' => '*',
         'thesis/time' => '*',
     ],

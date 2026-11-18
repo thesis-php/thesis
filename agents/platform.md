@@ -1,16 +1,18 @@
-# Platform: 64-bit Unix
+# Platform: Unix, 64-bit where needed
 
 Read before writing code that depends on the operating system or on the size of `int`.
 
 ## Rules
 
-- Every package is 64-bit only: `platform` of `monorepo.php` (`php-64bit`) is required by every package,
-  a manifest does not repeat it. Code relies on 64-bit `int` (nanoseconds, `pack('J')`) without checking
-  `PHP_INT_SIZE`.
-- The exception is `thesis/time`: a polyfill of `Time\Duration`, which PHP 8.6 has on 32-bit too.
-  Its manifest drops `php-64bit` (`withoutPlatform`), its tests run on i386
-  (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`), how its code stays exact there is in its `AGENTS.md`.
-  Another package joins only for the same reason: a user of 32-bit PHP needs it without the rest of the monorepo.
+- `php-64bit` is required only by a package whose own code relies on 64-bit `int`: `int` nanoseconds (`toNs()`,
+  `Instant`, timers), `pack('J')`, a constant above 2^31 (`0xFF_FF_FF_FF`). Now: `amqp`, `async`, `async-trace`,
+  `io`, `net`. Its manifest has `'php-64bit' => '*'` in `require` with a comment on what needs it, even when
+  a dependency already has it: the dependency may change, the code does not. Such code does not check `PHP_INT_SIZE`.
+  A package that gets 64-bit only through a dependency (`cache`, `testo-plugin`) does not repeat it.
+- A package without it (`dispatcher`, `exceptionally`, `formatter`, `phpstan-extension`, `source-location`, `time`)
+  is not guaranteed on 32-bit: only `thesis/time` is tested there (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`),
+  how its code stays exact is in its `AGENTS.md`. A change that makes such a package rely on 64-bit `int`
+  adds `php-64bit` to its manifest and drops "64-bit or 32-bit" from its `README.md`, if there is one.
 - Windows is not supported, and nothing is guaranteed to work there. The code is written for Unix only:
   no `PHP_OS_FAMILY` checks, no Windows branches, no Windows paths. `net` keeps Unix sockets, `socketPair()`
   on `STREAM_PF_UNIX` and the DNS configuration from `/etc/resolv.conf`. `process`, `parallel` and `cluster`
@@ -23,6 +25,10 @@ Read before writing code that depends on the operating system or on the size of 
 - A user who needs Windows opens an issue, and the decision is revisited here.
 
 ## Decisions
+
+- Rejected: `php-64bit` for every package from `monorepo.php`, with an opt-out for `time`: it forbade 32-bit PHP
+  to packages that have nothing 64-bit in them (`formatter`, `source-location`), and the requirement did not say
+  which code needs it.
 
 - Why no Windows: there `select()` sees only sockets (a pipe or a file is always ready, only the uv driver
   can watch one), so stdio cannot be non-blocking and a child process needs its stdio proxied over sockets

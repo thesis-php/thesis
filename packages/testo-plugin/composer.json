@@ -28,7 +28,6 @@
     ],
     "require": {
         "php": "^8.6",
-        "php-64bit": "*",
         "internal/container": "^1.1",
         "testo/testo": "^0.10.29",
         "thesis/async": "^0.1"

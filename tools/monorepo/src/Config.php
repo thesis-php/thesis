@@ -20,8 +20,6 @@ final readonly class Config
      * @param list<non-empty-string> $keywords of the monorepo itself, in the root composer.json and the topics
      *     of its repository on GitHub, the same rules as in Manifest
      * @param list<array{name: string, email?: string, homepage?: string}> $authors authors of every package
-     * @param array<non-empty-string, non-empty-string> $platform platform packages every package requires
-     *     besides php (php-64bit, ext-*)
      * @param array<non-empty-string, non-empty-string> $require dependencies of the root itself, not of a package
      * @param array<non-empty-string, non-empty-string> $requireDev tools of the root, not of a package
      * @param array<non-empty-string, non-empty-string> $autoloadDev psr-4 prefix => directory,
@@ -35,7 +33,6 @@ final readonly class Config
         public int $licenseSince,
         public array $keywords = [],
         public array $authors = [],
-        public array $platform = [],
         public array $require = [],
         public array $requireDev = [],
         public array $autoloadDev = [],

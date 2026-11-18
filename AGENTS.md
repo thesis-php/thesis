@@ -2,7 +2,7 @@
 
 An ecosystem of asynchronous PHP on an event loop of its own (`Io\Poll` of PHP 8.6, in thesis/async). It rethinks
 amphp, Revolt and the older thesis packages from scratch: it is not a wrapper around them and does not depend
-on them. 64-bit Unix only (`platform.md`).
+on them. Unix only, 64-bit where a package needs it (`platform.md`).
 
 ## Layout
 

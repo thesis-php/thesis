@@ -41,10 +41,10 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
 - No validator and no `check` command: a second source of truth. An error is whatever keeps `sync` from
   generating the files, thrown as `MonorepoException` (one line per problem, with a path and what to do)
   before anything is written. CI runs `make sync` and fails on any change in git.
-- `Requirements` resolves the constraints of external dependencies, php and `Config::$platform` with composer/semver
-  and throws with every conflict at once.
-  `Manifest::$withoutPlatform` drops a requirement of `Config::$platform` from the composer.json of one package
-  only, the root keeps it: one vendor serves the whole monorepo. `sync` throws on a name that is not in the platform.
+- `Requirements` resolves the constraints of external dependencies and php with composer/semver
+  and throws with every conflict at once. A platform requirement (`php-64bit`, `ext-*`) is one of them:
+  declared in `require` of a manifest, it goes to the root too, one vendor serves the whole monorepo.
+  There is no platform of every package in `Config` (`agents/platform.md`).
 - Conventions (dependency direction, references between packages, `@api`/`@internal`, namespaces, `AGENTS.md`)
   are not checked: a check is added when a real problem shows up, not in advance, and preferably by running
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.

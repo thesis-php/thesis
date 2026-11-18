@@ -18,7 +18,7 @@ $content = exceptionally(static fn() => file_get_contents('/path/to/file'));
 composer require thesis/exceptionally
 ```
 
-Requires 64-bit PHP 8.6+. No extensions.
+Requires PHP 8.6+. No extensions.
 
 ## Why
 

@@ -10,7 +10,6 @@ use Thesis\Cache\Internal\Expiries;
 use Thesis\Cache\Internal\Expiry;
 use Time\Duration;
 use Time\TimeException;
-use function Thesis\Time\toNs;
 
 /**
  * In-process {@see Cache}: values are kept as they are, not serialized, so an object is shared with whoever
@@ -146,7 +145,7 @@ final class LocalCache implements Cache, \Countable
      */
     private static function expiresAt(Instant $now, Duration $ttl): null|Instant|false
     {
-        if (toNs($ttl) <= 0) {
+        if ($ttl->negative || ($ttl->seconds === 0 && $ttl->nanoseconds === 0)) {
             return false;
         }
 

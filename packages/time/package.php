@@ -27,8 +27,6 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
-    // The polyfill is for every PHP that has no Time\Duration, 32-bit too, as the class of PHP 8.6 is.
-    withoutPlatform: ['php-64bit'],
     skip: [
         new FixerSkip(
             paths: ['polyfill/TimeException.php'],

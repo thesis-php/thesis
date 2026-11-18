@@ -11,6 +11,8 @@ return new Manifest(
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'networking', 'sockets', 'tcp', 'unix-socket', 'tls', 'dns'],
     require: [
+        // The uint32 TTL of a DNS record fits in int only on 64-bit.
+        'php-64bit' => '*',
         'ext-filter' => '*',
         'ext-openssl' => '*',
         'thesis/async' => '*',

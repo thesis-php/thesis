@@ -6,7 +6,7 @@
 
 An ecosystem of asynchronous PHP on an event loop of its own, on `Io\Poll` of PHP 8.6:
 structured concurrency for fibers, non-blocking I/O, TCP, TLS and DNS, an AMQP client and the tools around them.
-64-bit Unix only.
+Unix only, the packages with I/O and time in `int` nanoseconds require 64-bit PHP.
 
 This is the development monorepo. Every package in `packages/` is published as `thesis/<name>`
 from a read-only repository of its own, so issues and pull requests go here.

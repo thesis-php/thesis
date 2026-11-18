@@ -20,13 +20,11 @@ final readonly class Manifest
      *     in the commit that starts a series: a break below 1.0, a new minor above (agents/versions.md)
      * @param list<non-empty-string> $keywords composer keywords, also the topics of the split repository on GitHub,
      *     so each is a topic: lowercase letters, digits and hyphens, at most 50 characters, at most 20 of them
-     * @param array<non-empty-string, non-empty-string> $require packages and platform requirements.
+     * @param array<non-empty-string, non-empty-string> $require packages and platform requirements (php-64bit, ext-*).
      *     A monorepo package is required as 'thesis/<dir>' => '*', the range of its series is written instead
      *     (^0.Y below 1.0, ^X.0 above). A constraint within that range raises the lower bound: '^0.1.5'.
      *     php defaults to the constraint of monorepo.php
      * @param array<non-empty-string, non-empty-string> $requireDev the same, for the tests
-     * @param list<non-empty-string> $withoutPlatform platform requirements of monorepo.php that the package
-     *     does not have: 'php-64bit' for a package that runs on 32-bit PHP too
      * @param bool $rootEntry the entry point of the package is named after it and lives in the root namespace:
      *     the class Thesis\<PascalCaseDir> in src/<PascalCaseDir>.php or the function Thesis\<camelCaseDir>()
      *     in src/api.php. The psr-4 prefix of src/ and tests/ is then Thesis\, the rest of them is
@@ -58,7 +56,6 @@ final readonly class Manifest
         public array $keywords = [],
         public array $require = [],
         public array $requireDev = [],
-        public array $withoutPlatform = [],
         public bool $rootEntry = false,
         public array $files = [],
         public array $devFiles = [],

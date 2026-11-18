@@ -11,6 +11,8 @@ return new Manifest(
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'tracing', 'ndjson', 'debugging', 'cancellation', 'blocking', 'watchdog'],
     require: [
+        // Durations and times of the trace are int nanoseconds (toNs()), on 32-bit only up to 2.1 seconds.
+        'php-64bit' => '*',
         'psr/clock' => '^1.0',
         'thesis/async' => '*',
         'thesis/dispatcher' => '*',

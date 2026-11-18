@@ -34,8 +34,8 @@ The API is described in `README.md`, the class itself in https://wiki.php.net/rf
 - The messages of the polyfill name `Time\Duration` literally, not with `__METHOD__` or `self::class`:
   `DurationFuzzTest` loads a renamed copy, and the messages must still match.
 - `Time\TimeException` is not final, as in PHP 8.6: the manifest excludes the file from PHP CS Fixer (`final_class`).
-- The package runs on 32-bit PHP, as `Time\Duration` of PHP 8.6 does there: the manifest drops `php-64bit`
-  (`withoutPlatform`), the rest of the monorepo is 64-bit only (`agents/platform.md`). On 32-bit the class ends
+- The package runs on 32-bit PHP, as `Time\Duration` of PHP 8.6 does there: the manifest does not require
+  `php-64bit` (`agents/platform.md`). On 32-bit the class ends
   at `PHP_INT_MAX` seconds (`2_147_483_647 seconds (roughly 68 years)`) and never throws "Integer Overflow":
   the factor and the seconds are below 2^31. The branches on `PHP_INT_SIZE` are the ternaries of `MAX_SECONDS`
   and the messages, and `exceedsUint64()`, whose formula takes PHP_INT_MAX for 2^63 - 1. The rest of the code
