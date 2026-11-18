@@ -37,3 +37,7 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Infection could skip only a whole method or a line found by its text in every class, and `sync` had to find
   the method and the line to fail on a stale skip. An annotation of Infection 0.35.10 names the mutators
   of one statement, sits next to the reason, and leaves with the code.
+- Rejected: moving the files of the other tools from `var` to `/tmp` of the container, like those of Infection.
+  Infection keeps there only the files of one run and deletes them at its end. The caches of PHPStan, Rector
+  and PHP CS Fixer (`var/phpstan`, `var/rector`, `var/php-cs-fixer.cache`) live between runs, and `/tmp` dies
+  with the container of `--rm`: every run would start cold. Parallel runs only overwrite each other's cache.
