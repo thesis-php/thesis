@@ -121,7 +121,7 @@
             "packages/source-location/src/api.php",
             "packages/time/src/Internal/internal.php",
             "packages/time/src/api.php",
-            "packages/time/src/polyfill.php"
+            "packages/time/polyfill/load.php"
         ]
     },
     "autoload-dev": {

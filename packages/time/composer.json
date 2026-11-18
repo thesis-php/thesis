@@ -44,7 +44,7 @@
         "files": [
             "src/Internal/internal.php",
             "src/api.php",
-            "src/polyfill.php"
+            "polyfill/load.php"
         ]
     },
     "autoload-dev": {

@@ -27,8 +27,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - `polyfill/` behaves as the C class (`ext/date/time_duration.c`, `lib/duration.c`, `lib/parse_iso_intervals.re`
   of timelib in php-src) down to the exception classes, messages and previous exceptions. When they differ,
   the C code is right: read it, do not guess.
-- `polyfill/` holds only `Time\Duration` and `Time\TimeException`: the namespace belongs to PHP. The rest lives
-  in `Thesis\Time\Internal` (`IsoInterval`), so requiring 8.6 is deleting `polyfill/` and `IsoInterval`.
+- `polyfill/` holds only `Time\Duration`, `Time\TimeException` and `load.php`, which loads them:
+  the namespace belongs to PHP. The rest lives in `Thesis\Time\Internal` (`IsoInterval`).
 - `$signedSeconds` and `$signedNanoseconds` are declared first: PHP compares objects property by property
   in declaration order, which makes `<`, `==` and `<=>` work as in 8.6. Two ints, since int nanoseconds
   do not fit on 32-bit. `__serialize()` leaves them out.
@@ -90,8 +90,11 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - `WallClock` and `FrozenClock` live here: a clock and a duration go together (`$clock->advance(sec(30))`),
   and `psr/clock` is an interface only. `FrozenClock` moves only when told: an implicit tick makes tests
   depend on the order of calls.
-- The polyfill is loaded eagerly by `src/polyfill.php` behind `class_exists()`: Composer has no conditional
-  autoload, and a PSR-4 entry for `Time\` would claim a namespace of PHP.
+- The polyfill is loaded eagerly by `polyfill/load.php` behind `class_exists()`. Rejected: a `classmap`
+  of `polyfill/`, as the stubs of `symfony/polyfill-*`. At runtime 8.6 never reaches it, but PHPStan of a user
+  on 8.6 finds `Time\Duration` in the classmap and takes the polyfill for the class of PHP (its private
+  constructor, its methods), even behind `if (\PHP_VERSION_ID < 80600)`. A PSR-4 entry for `Time\` would
+  also claim a namespace of PHP.
 - The ISO 8601 parser replicates the scanner of timelib: `\DateInterval` drops the start, the end
   and the recurrences, which the class rejects with messages of their own.
 - Accepted: on 32-bit a timestamp beyond ±2^53 seconds (year ±285 million) is a float off by a second

@@ -7,7 +7,7 @@ namespace Time;
 use Thesis\Time\Internal\IsoInterval;
 
 /**
- * Polyfill of the class of PHP 8.6 (https://wiki.php.net/rfc/duration_class), loaded by src/polyfill.php.
+ * Polyfill of the class of PHP 8.6 (https://wiki.php.net/rfc/duration_class), loaded by polyfill/load.php.
  * It follows ext/date/time_duration.c and lib/duration.c of timelib down to the exception messages.
  */
 final readonly class Duration
