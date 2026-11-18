@@ -74,8 +74,8 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
             $this->taken = 0;
         }
 
-        // The caller sleeps once and does not wait again: Revolt's timers are float seconds,
-        // and a wake-up a hair early would loop on a delay too small to move the clock.
+        // The caller sleeps once and does not wait again: a timer of another event loop may wake a hair early,
+        // and a loop on a delay too small to move the clock would never end.
         // A cancelled delay() throws before the token is taken.
         $tokenAt = $this->tokenAt($this->taken - $this->burst + 1);
 

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Trace;
 
+use Thesis\Async\Internal\Callback;
+use Thesis\Async\Internal\Loop;
 use Thesis\Async\Internal\Tracer;
 use Thesis\Dispatcher;
+use Time\Duration;
+use function Thesis\Time\toNs;
 
 /**
  * Dispatches the events of the whole scope tree to $dispatcher while $fn runs, of every fiber: run it in {main}
@@ -36,4 +40,26 @@ function observe(Dispatcher $dispatcher, callable $fn): mixed
     } finally {
         $tracer->detach($dispatcher);
     }
+}
+
+/**
+ * Calls $callback once $delay has passed, outside the scope tree: for a tool that reports what does not happen
+ * (a wait that lasts too long), which no event of a trace can tell. The timer does not keep the program alive,
+ * and under `virtualTime()` it is virtual, like every timer of the event loop.
+ *
+ * $callback runs in the event loop between the fibers, in no scope: it must not wait, and a throw goes to the loop,
+ * which throws it into the wait of the group that runs it in {main}.
+ *
+ * @api
+ * @param callable(): void $callback
+ * @return \Closure(): void cancel, idempotent: it is never called after this
+ */
+function watchdog(Duration $delay, callable $callback): \Closure
+{
+    $loop = Loop::get();
+    $timer = $loop->delay(toNs($delay), new Callback($callback(...)), referenced: false);
+
+    return static function () use ($loop, $timer) {
+        $loop->cancel($timer);
+    };
 }

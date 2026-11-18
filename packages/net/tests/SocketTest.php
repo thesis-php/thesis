@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
@@ -16,6 +15,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -75,7 +75,8 @@ final class SocketTest
         $progress = new \stdClass();
         $progress->reads = 0;
         $progress->readsWhenTicked = null;
-        EventLoop::defer(static function () use ($progress) {
+        // A callback of the loop: it runs if the loop has ticked.
+        watchdog(sec(0), static function () use ($progress) {
             $progress->readsWhenTicked = $progress->reads;
         });
 
@@ -226,7 +227,8 @@ final class SocketTest
         $progress = new \stdClass();
         $progress->writes = 0;
         $progress->writesWhenTicked = null;
-        EventLoop::defer(static function () use ($progress) {
+        // A callback of the loop: it runs if the loop has ticked.
+        watchdog(sec(0), static function () use ($progress) {
             $progress->writesWhenTicked = $progress->writes;
         });
 

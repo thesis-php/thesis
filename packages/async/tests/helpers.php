@@ -3,24 +3,26 @@
 declare(strict_types=1);
 
 /**
- * Helpers shared by the tests. Every test runs in {main}: the library drives the Revolt loop from there itself.
- * Every test runs on virtual time (VirtualTimePlugin in testoPlugins of package.php): durations are exact,
- * and CPU work takes none.
+ * Helpers shared by the tests. Every test runs on virtual time (VirtualTimePlugin in testoPlugins of package.php),
+ * in the fiber of its event loop and in the root scope: durations are exact, and CPU work takes none.
  */
 
 namespace Thesis\Async\Tests;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
 use Thesis\Async\Instant;
+use Thesis\Async\Internal\Callback;
+use Thesis\Async\Internal\Loop;
+use Time\Duration;
 use function Thesis\Async\suspend;
+use function Thesis\Time\toNs;
 use function Thesis\Time\toSecFloat;
 
 /**
  * A wait that only a cancellation ends. It registers nothing, so it does not keep the loop alive:
- * if the cancellation never comes, Revolt ends the loop with "Event loop terminated without resuming".
+ * if the cancellation never comes, the loop throws Deadlock into the wait.
  */
 function never(): never
 {
@@ -102,11 +104,29 @@ function secondsSince(Instant $start): float
 }
 
 /**
- * No timer, defer or watcher registered by the library outlives the wait it was registered for.
+ * Calls $callback from the event loop after $delay, outside any fiber: a callback of the loop itself, such as
+ * a timer of a library on the loop would have. It keeps the loop alive, unless $referenced is false.
+ *
+ * @param callable(): void $callback
+ * @return \Closure(): void cancels the call
+ */
+function later(Duration $delay, callable $callback, bool $referenced = true): \Closure
+{
+    $loop = Loop::get();
+    $timer = $loop->delay(toNs($delay), new Callback($callback(...)), $referenced);
+
+    return static function () use ($loop, $timer) {
+        $loop->cancel($timer);
+    };
+}
+
+/**
+ * No timer, deferred wake, stream wait, signal handler or microtask registered by the library outlives the wait
+ * it was registered for.
  */
 function assertNoCallbacksLeft(): void
 {
-    Assert::same(EventLoop::getIdentifiers(), []);
+    Assert::true(Loop::get()->isIdle, 'Something is left in the event loop.');
 }
 
 /**

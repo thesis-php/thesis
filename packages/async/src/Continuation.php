@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop\Suspension;
-
 /**
  * What is left of one suspended wait: resuming it delivers a value or an error to exactly that wait.
  * Obtained from {@see suspend()}, the way Kotlin's `suspendCancellableCoroutine` hands out a continuation.
  *
- * It is one-shot. Unlike {@see Suspension}, which is shared by all waits of a fiber, late {@see resume()}
- * and {@see throw()} calls are ignored instead of waking an unrelated wait: a timer and a cancellation
+ * It is one-shot: late {@see resume()} and {@see throw()} calls are ignored instead of waking an unrelated wait: a timer and a cancellation
  * may race for the same continuation, and whoever is first wins.
  * It may also be resumed before the fiber is parked, in which case the wait returns immediately.
  *

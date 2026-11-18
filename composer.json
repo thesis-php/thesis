@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on Revolt: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, AMQP. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, AMQP. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -9,7 +9,6 @@
         "asynchronous",
         "fibers",
         "event-loop",
-        "revolt",
         "structured-concurrency",
         "concurrency",
         "non-blocking-io",
@@ -43,7 +42,6 @@
         "internal/container": "^1.1",
         "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
-        "revolt/event-loop": "^1.0.9",
         "symfony/polyfill-php84": "^1.34",
         "testo/testo": "^0.10.29"
     },
@@ -55,7 +53,6 @@
         "ext-sockets": "*",
         "ext-tokenizer": "*",
         "ext-zlib": "*",
-        "amphp/amp": "^3",
         "composer/semver": "^3.4",
         "ergebnis/composer-normalize": "^2.57",
         "friendsofphp/php-cs-fixer": "^3.95.30",

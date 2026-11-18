@@ -16,8 +16,8 @@ use Thesis\Async\Internal\Context;
  * {@see shield()} does not hide values: it only hides cancellation.
  *
  * The object itself is the key, compared by identity: create one per kind of value, as a constant or a static property.
- * There is no set(): a value never outlives its with(), even in a fiber that is reused,
- * since tasks and event loop callbacks that never suspend run one after another in the same Revolt fiber.
+ * There is no set(): a value never outlives its with(), so code that runs later in the same fiber
+ * never sees it.
  *
  * Outside of any with(), {@see get()} returns the default. A bound value is returned as is, even if it is null:
  * `with(null, ...)` hides an inherited value from the code inside when the default is not null.

@@ -246,12 +246,11 @@ final class ScopedValueTest
         Assert::same($observed, 'bound');
     }
 
-    public function valueDoesNotLeakIntoLaterTaskInReusedFiber(): void
+    public function valueDoesNotLeakIntoLaterTask(): void
     {
         /** @var ScopedValue<?string> */
         $value = new ScopedValue();
 
-        // Tasks that never suspend run one after another in the same Revolt fiber.
         $observed = group(static function (Group $group) use ($value) {
             $bound = $value->with('bound', static fn() => $group->spawn($value->get(...)));
             $unbound = $group->spawn($value->get(...));
@@ -301,30 +300,6 @@ final class ScopedValueTest
             'b unbound' => null,
             'main' => 'main',
         ]);
-    }
-
-    public function bindingInTaskDoesNotLeakIntoNextTaskInSameFiber(): void
-    {
-        /** @var ScopedValue<?string> */
-        $value = new ScopedValue();
-        $first = null;
-        $second = null;
-        $seen = 'not run';
-
-        group(static function (Group $group) use ($value, &$first, &$second, &$seen) {
-            // Neither task suspends, so Revolt runs both in the same fiber.
-            $group->spawn(static function () use ($value, &$first) {
-                $first = \Fiber::getCurrent();
-                $value->with('first', static fn() => null);
-            });
-            $group->spawn(static function () use ($value, &$second, &$seen) {
-                $second = \Fiber::getCurrent();
-                $seen = $value->get();
-            });
-        });
-
-        Assert::same($first, $second);
-        Assert::null($seen);
     }
 
     public function valueGoesAwayWithFiber(): void

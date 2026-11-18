@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Cancelled;
+use Thesis\Async\Group;
 use function Thesis\Async\checkpoint;
+use function Thesis\Async\group;
 use function Thesis\Async\Tests\thrown;
 
 #[Test]
@@ -19,18 +20,18 @@ final class ContinuationImplTest
     {
         /** @var ContinuationImpl<null> */
         $continuation = new ContinuationImpl();
-        EventLoop::queue(static function () use ($continuation) {
-            $continuation->park(); // parked in another fiber
-        });
-        checkpoint(); // one tick: the queued fiber parks first
-
         Expect::exception(\LogicException::class)->withMessage('Continuation is already parked.');
 
-        try {
-            $continuation->park();
-        } finally {
-            $continuation->resume(); // let the other fiber finish
-        }
+        group(static function (Group $group) use ($continuation) {
+            $group->spawn($continuation->park(...)); // parked in another fiber
+            checkpoint(); // one tick: the task parks first
+
+            try {
+                $continuation->park();
+            } finally {
+                $continuation->resume(); // let the task finish
+            }
+        });
     }
 
     public function interruptMakesParkThrowCancelled(): void

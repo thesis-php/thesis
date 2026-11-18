@@ -7,11 +7,6 @@ COMPOSER ?= $(RUN) composer
 
 # (P=<name> narrows the quality tools and the tests to packages/<name>)
 P ?=
-# (DRIVER=StreamSelect|Uv|Ev|Event runs the tests on that Revolt driver, by default DriverFactory chooses)
-DRIVER ?=
-ifneq ($(DRIVER),)
-export REVOLT_DRIVER := Revolt\EventLoop\Driver\$(DRIVER)Driver
-endif
 PATHS = $(if $(P),packages/$(P))
 
 # Container
@@ -93,9 +88,7 @@ deps-analyze: vendor ## Check for unused and shadow dependencies
 	$(RUN) vendor/bin/composer-dependency-analyser $(ARGS)
 .PHONY: deps-analyze
 
-# (Fails when REVOLT_DRIVER is lost on the way to the container: the tests would pass on another driver)
-test: var vendor up ## Run tests [P=] [DRIVER=]
-	$(RUN) php -r 'require "vendor/autoload.php"; $$driver = Revolt\EventLoop::getDriver()::class; echo "Revolt driver: $$driver\n"; exit(\in_array(getenv("REVOLT_DRIVER"), [false, "", $$driver], true) ? 0 : 1);'
+test: var vendor up ## Run tests [P=]
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 
@@ -112,7 +105,7 @@ test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=]
 
 # (In GitHub Actions Tally annotates the benchmarks and writes the job summary. The summary file of the runner is not
 # in the container: the report goes to var/, and the job appends it)
-bench: var vendor ## Count the benchmarks under Valgrind and compare them with the expected numbers [P=] [DRIVER=]
+bench: var vendor ## Count the benchmarks under Valgrind and compare them with the expected numbers [P=]
 	$(if $(IN_CONTAINER),,$(DOCKER_COMPOSE) run --rm -e GITHUB_ACTIONS -e GITHUB_RUN_ID -e GITHUB_REPOSITORY $(if $(GITHUB_ACTIONS),-e GITHUB_WORKSPACE=/workspace -e GITHUB_STEP_SUMMARY=/workspace/var/tally-summary.md) php) vendor/bin/tally run --output=var/tally $(ARGS) $(if $(P),packages/$(P)/benchmarks)
 .PHONY: bench
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
 use Thesis\Async\Instant;
 use Thesis\Async\Trace\CancelCause;
 use Thesis\Async\Trace\Ended;
@@ -392,18 +391,12 @@ final class Tracer
     }
 
     /**
-     * This library and the event loop: a task runs in a callback of Revolt, called from its own code.
+     * This library, the event loop among it: a task runs in a fiber that the loop starts.
      *
      * @return non-empty-list<non-empty-string>
      */
     private static function libraries(): array
     {
-        /** @var non-empty-list<non-empty-string> $libraries */
-        static $libraries = [
-            \dirname(__DIR__),
-            \dirname((string) new \ReflectionClass(EventLoop::class)->getFileName()),
-        ];
-
-        return $libraries;
+        return [\dirname(__DIR__)];
     }
 }

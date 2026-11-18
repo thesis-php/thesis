@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Internal\Scope;
@@ -79,7 +78,7 @@ final class TraceTest
 
         Assert::same(\array_slice($log->lines, -2), [
             '0 #2 threw Cancelled',
-            '0 #1 threw Error',
+            '0 #1 threw Deadlock',
         ]);
     }
 
@@ -92,7 +91,7 @@ final class TraceTest
             $group->spawn(static fn() => shield($never->await(...)));
         })));
 
-        Assert::same(\array_slice($log->lines, -1), ['0 #1 threw Error']);
+        Assert::same(\array_slice($log->lines, -1), ['0 #1 threw Deadlock']);
 
         // lets the orphaned task finish
         $never->complete();
@@ -153,7 +152,9 @@ final class TraceTest
             $group->spawn(checkpoint(...));
         }));
 
-        Assert::same($log->lines[4] ?? null, '0 #2 suspended in Thesis\Async\group');
+        // The stack of the task has only the library: its trace goes on past the event loop,
+        // to the call that runs the loop.
+        Assert::same($log->lines[4] ?? null, '0 #2 suspended in Thesis\Async\virtualTime');
     }
 
     public function listenerThrowingAtEndOfTaskDoesNotLeaveGroupWaitingForIt(): void
@@ -164,15 +165,16 @@ final class TraceTest
             }
         };
 
-        $exception = thrown(static fn() => observe(
+        // The task has woken the join before it threw: the error goes to the loop, and out of the run.
+        $exception = thrown(static fn() => virtualTime(static fn(): null => observe(
             dispatcher: new Dispatcher([$listener]),
             fn: static fn() => group(static function (Group $group) {
                 $group->spawn(static fn() => null);
             }),
-        ));
+        )));
 
-        Assert::instanceOf($exception, UncaughtThrowable::class);
-        Assert::same($exception->getPrevious()?->getMessage(), 'listener');
+        Assert::instanceOf($exception, \RuntimeException::class);
+        Assert::same($exception->getMessage(), 'listener');
     }
 
     public function tracesCancellationByHandle(): void

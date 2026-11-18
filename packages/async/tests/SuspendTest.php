@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
-use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
@@ -21,7 +20,7 @@ final class SuspendTest
     public function returnsValueResumedLater(): void
     {
         $value = suspend(static function (Continuation $continuation) {
-            EventLoop::delay(1, static function () use ($continuation) {
+            later(sec(1), static function () use ($continuation) {
                 $continuation->resume('later');
             });
         });
@@ -52,7 +51,7 @@ final class SuspendTest
         Expect::exception(\RuntimeException::class)->withMessage('source failed');
 
         suspend(static function (Continuation $continuation) {
-            EventLoop::defer(static function () use ($continuation) {
+            later(sec(0), static function () use ($continuation) {
                 $continuation->throw(new \RuntimeException('source failed'));
             });
         });
@@ -136,7 +135,7 @@ final class SuspendTest
         $calls = 0;
 
         suspend(static function (Continuation $continuation) use (&$calls) {
-            EventLoop::defer(static function () use ($continuation) {
+            later(sec(0), static function () use ($continuation) {
                 $continuation->resume();
             });
 
@@ -182,14 +181,14 @@ final class SuspendTest
         Assert::same($calls, 1);
     }
 
-    public function callsUnregisterWhenEventLoopThrowsInMain(): void
+    public function callsUnregisterWhenEventLoopThrowsIntoWait(): void
     {
         $calls = 0;
 
         $exception = thrown(static function () use (&$calls) {
             suspend(static function (Continuation $_) use (&$calls) {
-                // In {main}, the wait runs the event loop, so this throws out of the wait.
-                EventLoop::defer(static function () {
+                // The loop throws it into the wait of its own fiber, that of the test: this one.
+                later(sec(0), static function () {
                     throw new \RuntimeException('foreign');
                 });
 
@@ -199,7 +198,8 @@ final class SuspendTest
             });
         });
 
-        Assert::instanceOf($exception, UncaughtThrowable::class);
+        Assert::instanceOf($exception, \RuntimeException::class);
+        Assert::same($exception->getMessage(), 'foreign');
         Assert::same($calls, 1);
         assertNoCallbacksLeft();
     }
@@ -283,15 +283,9 @@ final class SuspendTest
     {
         thrown(static function () {
             timeout(sec(1), static function () {
-                suspend(static function (Continuation $continuation) {
-                    $timer = EventLoop::delay(10_000, static function () use ($continuation) {
-                        $continuation->resume();
-                    });
-
-                    return static function () use ($timer) {
-                        EventLoop::cancel($timer);
-                    };
-                });
+                suspend(static fn(Continuation $continuation) => later(sec(10_000), static function () use ($continuation) {
+                    $continuation->resume();
+                }));
             });
         });
 

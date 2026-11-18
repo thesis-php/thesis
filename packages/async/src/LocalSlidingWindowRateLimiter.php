@@ -79,8 +79,8 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         $leavesAt = \is_int($leavesAt) ? $leavesAt : PHP_INT_MAX;
         $now = Scope::now();
 
-        // Sleeps once and does not sleep again: Revolt's timers are float seconds, and a wake-up a hair early
-        // would loop on a delay too small to move the clock. A cancelled delay() throws before the call is counted.
+        // Sleeps once and does not sleep again: a timer of another event loop may wake a hair early,
+        // and a loop on a delay too small to move the clock would never end. A cancelled delay() throws before the call is counted.
         if ($leavesAt > $now) {
             delay(ns(min($leavesAt - $now, Scope::LONGEST_DURATION)));
         }

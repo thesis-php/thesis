@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\reaches;
 use function Thesis\Async\Tests\thrown;
@@ -170,7 +170,7 @@ final class ChannelTest
     {
         /** @var Channel<string> */
         $channel = new Channel(1);
-        EventLoop::delay(1, static function () use ($channel) {
+        later(sec(1), static function () use ($channel) {
             $channel->trySend('value');
         });
 
@@ -594,8 +594,8 @@ final class ChannelTest
         /** @var Channel<string> */
         $channel = new Channel(0);
 
-        // Both callbacks run in the same tick, the send first: the value wins over the deadline.
-        EventLoop::delay(1, static function () use ($channel) {
+        // Both timers fire in the same tick, the send first: the value wins over the deadline.
+        later(sec(1), static function () use ($channel) {
             Assert::same($channel->trySend('value'), SendResult::Sent);
         });
 

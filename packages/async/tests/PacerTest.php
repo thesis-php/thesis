@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Internal\Loop;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Time\sec;
@@ -132,7 +133,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
         // Another caller of the shared pacer, in the next tick before the yield below returns: it fills that tick.
-        EventLoop::defer(static function () use ($pacer) {
+        later(sec(0), static function () use ($pacer) {
             $pacer->pace();
             $pacer->pace();
         });
@@ -141,15 +142,12 @@ final class PacerTest
         Assert::true(self::yields($pacer->pace(...)));
     }
 
-    public function countsAgainAfterItsTickIsDroppedWithDriver(): void
+    public function callsInNestedLoopDoNotCountInTickOfOuterOne(): void
     {
         $pacer = new Pacer(perTick: 2);
-        // The defer that resets the count is left in the loop of the run, and the run drops it.
-        virtualTime(static function () use ($pacer) {
-            $pacer->pace();
-        });
         $pacer->pace();
-        $pacer->pace();
+        // The nested loop runs its first tick: it may have the number of the tick of the outer one.
+        virtualTime($pacer->pace(...));
 
         Assert::false(self::yields($pacer->pace(...)));
     }
@@ -161,17 +159,9 @@ final class PacerTest
      */
     private static function yields(callable $fn): bool
     {
-        $ticked = false;
-        $callbackId = EventLoop::defer(static function () use (&$ticked) {
-            $ticked = true;
-        });
+        $tick = Loop::get()->tick;
+        $fn();
 
-        try {
-            $fn();
-        } finally {
-            EventLoop::cancel($callbackId);
-        }
-
-        return $ticked;
+        return Loop::get()->tick !== $tick;
     }
 }

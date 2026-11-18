@@ -20,15 +20,17 @@ final class StdioTest
         $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
         $code = <<<PHP
             require '{$autoload}';
-            \$in = Thesis\\Io\\stdin();
-            try {
-                while (true) {
-                    \$bytes = \$in->read(65536);
-                    Thesis\\Io\\stdout()->write(strtoupper(\$bytes));
-                    Thesis\\Io\\stderr()->write((string) strlen(\$bytes) . "\\n");
+            Thesis\\Async\\group(static function () {
+                \$in = Thesis\\Io\\stdin();
+                try {
+                    while (true) {
+                        \$bytes = \$in->read(65536);
+                        Thesis\\Io\\stdout()->write(strtoupper(\$bytes));
+                        Thesis\\Io\\stderr()->write((string) strlen(\$bytes) . "\\n");
+                    }
+                } catch (Thesis\\Io\\UnexpectedEof) {
                 }
-            } catch (Thesis\\Io\\UnexpectedEof) {
-            }
+            });
             PHP;
         $process = proc_open(
             command: [PHP_BINARY, '-r', $code],
@@ -86,13 +88,15 @@ final class StdioTest
         $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
         $code = <<<PHP
             require '{$autoload}';
-            Thesis\\Io\\stdout()->write("used\\n");
-            \$child = proc_open(
-                [PHP_BINARY, '-r', 'echo stream_get_meta_data(STDOUT)["blocked"] ? "blocking" : "non-blocking";'],
-                [1 => STDOUT],
-                \$pipes,
-            );
-            proc_close(\$child);
+            Thesis\\Async\\group(static function () {
+                Thesis\\Io\\stdout()->write("used\\n");
+                \$child = proc_open(
+                    [PHP_BINARY, '-r', 'echo stream_get_meta_data(STDOUT)["blocked"] ? "blocking" : "non-blocking";'],
+                    [1 => STDOUT],
+                    \$pipes,
+                );
+                proc_close(\$child);
+            });
             PHP;
         $process = proc_open(
             command: [PHP_BINARY, '-r', $code],
@@ -115,11 +119,13 @@ final class StdioTest
         $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
         $code = <<<PHP
             require '{$autoload}';
-            Thesis\\Async\\timeoutOr(
-                Thesis\\Time\\ms(100),
-                static fn() => Thesis\\Io\\stdout()->write(str_repeat('x', 10_000_000)),
-            );
-            fwrite(STDERR, 'alive');
+            Thesis\\Async\\group(static function () {
+                Thesis\\Async\\timeoutOr(
+                    Thesis\\Time\\ms(100),
+                    static fn() => Thesis\\Io\\stdout()->write(str_repeat('x', 10_000_000)),
+                );
+                fwrite(STDERR, 'alive');
+            });
             PHP;
         $process = proc_open(
             command: [PHP_BINARY, '-r', $code],
@@ -141,12 +147,14 @@ final class StdioTest
         $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
         $code = <<<PHP
             require '{$autoload}';
-            Thesis\\Async\\timeoutOr(
-                Thesis\\Time\\ms(100),
-                static fn() => Thesis\\Io\\stdout()->write(str_repeat('x', 10_000_000)),
-            );
-            fwrite(STDERR, "cancelled\\n");
-            Thesis\\Io\\stdout()->write('after');
+            Thesis\\Async\\group(static function () {
+                Thesis\\Async\\timeoutOr(
+                    Thesis\\Time\\ms(100),
+                    static fn() => Thesis\\Io\\stdout()->write(str_repeat('x', 10_000_000)),
+                );
+                fwrite(STDERR, "cancelled\\n");
+                Thesis\\Io\\stdout()->write('after');
+            });
             PHP;
         $process = proc_open(
             command: [PHP_BINARY, '-r', $code],
@@ -212,7 +220,7 @@ final class StdioTest
     }
 
     /**
-     * Runs $code in a child on the driver of the tests and returns what it writes to the pipe $output.
+     * Runs $code in a child and returns what it writes to the pipe $output.
      * The other pipes are neither written nor read, so a read of the child waits and a write fills its pipe.
      *
      * @param array<int, list<string>> $descriptors

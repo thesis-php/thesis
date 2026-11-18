@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
@@ -20,7 +20,7 @@ final class DeferredTest
     {
         /** @var Deferred<string> */
         $deferred = new Deferred();
-        EventLoop::delay(1, static function () use ($deferred) {
+        later(sec(1), static function () use ($deferred) {
             $deferred->complete('value');
         });
 

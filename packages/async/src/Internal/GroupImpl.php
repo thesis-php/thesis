@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
-use Revolt\EventLoop\UncaughtThrowable;
 use Thesis\Async\Cancelled;
+use Thesis\Async\Deadlock;
 use Thesis\Async\Group;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
@@ -59,6 +58,12 @@ final class GroupImpl implements Group
      */
     public static function run(callable $body, string $function, ?string $name = null): mixed
     {
+        // Outside a run of the event loop nothing could resume a wait: the loop runs here, in {main} or in a fiber
+        // of another scheduler (Testo runs a test so), and the group in a fiber of its own until it ends.
+        if (Loop::get()->main === null) {
+            return Loop::get()->run(static fn() => self::run($body, $function, $name));
+        }
+
         $parent = Scope::current();
         $bodyScope = new Scope($parent);
         $tasksScope = new Scope($bodyScope);
@@ -181,20 +186,21 @@ final class GroupImpl implements Group
      *
      * Tasks may start new tasks while the group is joining; they are waited for too.
      *
-     * In {main}, the wait runs the event loop, and Revolt throws out of it in two cases. A foreign callback
-     * has thrown ({@see UncaughtThrowable}): that is a failure, the tasks are cancelled and still joined.
-     * Or the loop has run dry while the tasks are waiting: a deadlock. Failing the group cancels the tasks, and
-     * a cancellable wait unwinds. But if the loop runs dry while the group is already cancelled (on the second
-     * round at the latest), no cancellation can help any more: a task waits under a shield for something
-     * that never comes. Then the join gives up and rethrows Revolt's error, which lists the stuck fibers.
-     * The stuck tasks are orphaned, but the alternative is to hang forever. The body scope is closed anyway,
-     * and so is the group: a stuck task that wakes up later cannot start new ones.
+     * In the fiber that the event loop runs (a group called in {main}, the code of `virtualTime()`), the loop
+     * throws two kinds of errors into the wait. An error has escaped to the loop (an `onCancel()` callback has
+     * thrown): that is a failure, the tasks are cancelled and still joined. Or nothing can wake the waiting
+     * fibers: a {@see Deadlock}. Failing the group cancels the tasks, and a cancellable wait unwinds. But if
+     * the loop deadlocks while the group is already cancelled (on the second round at the latest), no
+     * cancellation can help any more: a task waits under a shield for something that never comes. Then the join
+     * gives up and rethrows the deadlock, which lists the stuck fibers. The stuck tasks are orphaned, but the
+     * alternative is to hang forever. The body scope is closed anyway, and so is the group: a stuck task that
+     * wakes up later cannot start new ones.
      *
-     * @throws \Error if the event loop has run dry in {main} and cancelling the tasks has not helped
+     * @throws Deadlock if nothing can wake the tasks and cancelling them has not helped
      */
     private function join(): void
     {
-        /** the loop that ran dry on an earlier round: it is not a failure of its own when the join gives up */
+        /** the deadlock of an earlier round: it is not a failure of its own when the join gives up */
         $dry = null;
 
         try {
@@ -206,18 +212,18 @@ final class GroupImpl implements Group
                 try {
                     ($this->joiner = new ContinuationImpl())->park();
                 } catch (\Throwable $error) {
-                    // Its {main} suspension has been abandoned by Revolt: the next round parks a fresh continuation,
+                    // The loop has thrown into the wait: the next round parks a fresh continuation,
                     // and a task finishing after a give-up has nothing to resume.
                     $this->joiner = null;
 
-                    if ($error instanceof UncaughtThrowable) {
+                    if (!$error instanceof Deadlock) {
                         $this->fail($error, by: null);
 
                         continue;
                     }
 
                     if ($this->bodyScope->isCancelled) {
-                        // Revolt's error replaces the group's failure: it is not lost, unless it is the same deadlock.
+                        // The deadlock replaces the group's failure: it is not lost, unless it is the same deadlock.
                         if ($this->error !== null && $this->error !== $dry) {
                             Suppressed::add($error, $this->error);
                         }
@@ -261,7 +267,7 @@ final class GroupImpl implements Group
             ++$this->tasks;
         }
 
-        EventLoop::queue(function () use ($task, $scope, $handle, $daemon, $values) {
+        Loop::get()->start(function () use ($task, $scope, $handle, $daemon, $values) {
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();

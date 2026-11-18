@@ -7,7 +7,6 @@ services:
       IN_CONTAINER: true
       HISTFILE: /workspace/var/.docker_history
       AMQP_URI: amqp://thesis:thesis@rabbitmq:5672/
-      REVOLT_DRIVER: ${REVOLT_DRIVER:-}
     volumes:
       - .:/workspace
       - ~/.composer/cache:/composer/cache

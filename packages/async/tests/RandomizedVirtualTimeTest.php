@@ -6,10 +6,11 @@ namespace Thesis\Async;
 
 use Random\Engine\Mt19937;
 use Random\Randomizer;
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Internal\Loop;
 use Thesis\Dispatcher;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Time\sec;
@@ -65,7 +66,7 @@ final class RandomizedVirtualTimeTest
             virtualTime(function () use ($program) {
                 $program();
 
-                if (EventLoop::getIdentifiers() !== []) {
+                if (!Loop::get()->isIdle) {
                     $this->violate('callbacks are left');
                 }
             });
@@ -174,10 +175,9 @@ final class RandomizedVirtualTimeTest
                 $writerDelay = $plan['writerDelay'];
 
                 if ($plan['raw']) {
-                    $timer = EventLoop::delay($writerDelay, static function () use ($write, $pipe, $writer) {
+                    later(sec($writerDelay), static function () use ($write, $pipe, $writer) {
                         $write($pipe, $writer);
-                    });
-                    EventLoop::unreference($timer);
+                    }, referenced: false);
                     // The raw timer does not keep the loop alive: this task does, until it fires.
                     $group->spawn(static fn() => delay(sec($writerDelay)));
                 } else {

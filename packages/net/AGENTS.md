@@ -9,10 +9,10 @@ The API and the guarantees are in `README.md` — read it first.
 - No method takes a timeout or a cancellation: every wait goes through a `StreamWatcher` of thesis/async.
   Only DNS has timeouts of its own (`timeoutOr()` per server), because the protocol defines them.
 - A wait on a stream goes through the `StreamWatcher` of its owner, and `close()` calls `StreamWatcher::close()`
-  before `fclose()`: a Revolt watcher of a closed stream is an error, and the waiting fiber would never wake up.
+  before `fclose()`: the kernel drops a closed descriptor, and the waiting fiber would never wake up.
   After any wait, re-read `$this->stream`: it may have been closed meanwhile, even if the wait returned true.
 - Read first, wait only on an empty read, never the other way round. TLS keeps decrypted bytes inside OpenSSL
-  where the uv/ev drivers cannot see them, so waiting for readability first would hang with data pending.
+  where the event loop cannot see them, so waiting for readability first would hang with data pending.
   The PHP read buffer is off (`stream_set_read_buffer(0)`) for the same reason and so that `enableTls()` finds
   no plaintext bytes read ahead.
 - Every stream gets a context of its own (`stream_context_create()`): without one PHP uses the default context,
@@ -64,8 +64,6 @@ The API and the guarantees are in `README.md` — read it first.
   DNS and certificates know only the ASCII form, so the TLS peer name must be that form too.
 - `connect()` tries IPv6 first and has no connect timeout of its own: Happy Eyeballs makes a dead family cost 250 ms,
   not a timeout per address, and the caller bounds the whole call with `timeout()`.
-  A test of the delay keeps a margin below 250 ms: libuv counts a timer from the time cached at the start
-  of the loop iteration, so on Uv it fires early by as much as the iteration has run.
 - `listen()` leaves `IPV6_V6ONLY` to the OS: `::` is dual-stack on Linux by default, which is what a server wants.
   `noDelay` is on by default, and the backlog is 511, as in nginx.
 - Happy Eyeballs is a group of attempts reporting to a `Channel` sized for all of them, so no attempt waits to report;

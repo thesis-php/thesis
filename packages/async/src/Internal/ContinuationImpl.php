@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
-use Revolt\EventLoop\Suspension;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
 use Thesis\Async\Deadlock;
@@ -33,12 +31,7 @@ final class ContinuationImpl implements Continuation, Waiter
     private bool $interrupted = false;
 
     /**
-     * @var ?Suspension<null>
-     */
-    private ?Suspension $suspension = null;
-
-    /**
-     * The fiber parked on {@see Loop::$current}, and the loop that resumes it.
+     * The fiber parked here, and the loop that resumes it.
      *
      * @var ?\Fiber<mixed, mixed, mixed, mixed>
      */
@@ -95,12 +88,15 @@ final class ContinuationImpl implements Continuation, Waiter
     /**
      * Uncancellable wait. Use `Thesis\Async\suspend()` for a cancellable one.
      *
-     * Known gap, won't fix: in {main}, Revolt resumes the suspension from a deferred callback, and if a foreign
-     * callback throws first, it throws UncaughtThrowable out of the suspension instead. A {@see resume()} that has
-     * returned true is lost then, although its caller considers the value handed over (a channel value,
-     * a semaphore permit). Keeping it would mean rethrowing Revolt's error elsewhere, which is not local.
+     * The fiber is suspended, and {@see Loop} resumes the fiber that has returned to it once the continuation
+     * fires: that one may be an outer fiber, which runs this one inside and passes the suspensions through
+     * (Testo runs a test so). The continuation is left in {@see Loop::$parked}, not passed as the value of
+     * `Fiber::suspend()`: a fiber suspended with an object is never collected in a cycle (`agents/fibers.md`).
+     * Outside a run of the loop, and where the loop runs (in {main}, or in the fiber of an outer loop),
+     * nothing could resume it, so a wait there is refused.
      *
      * @return T
+     * @throws \LogicException outside a run of the loop: only code in its fibers can wait
      */
     public function park(): mixed
     {
@@ -108,26 +104,17 @@ final class ContinuationImpl implements Continuation, Waiter
             throw new \LogicException('Continuation is already parked.');
         }
 
-        $loop = Loop::$current;
+        if ($this->state === self::PENDING) {
+            $loop = Loop::get();
+            $fiber = \Fiber::getCurrent();
 
-        if ($this->state === self::PENDING && $loop !== null) {
-            $fiber = \Fiber::getCurrent()
-                ?? throw new \LogicException('A wait in {main} cannot be resumed: wrap the code in group().');
-            $this->state = self::PARKED;
-            $this->fiber = $fiber;
-            $this->loop = $loop;
-
-            if ($fiber === $loop->main) {
-                $loop->mainWait = $this;
+            if ($loop->main === null || $fiber === $loop->host) {
+                throw new \LogicException('A wait outside the event loop cannot be resumed: wrap the code in group().');
             }
 
-            \Fiber::suspend();
-        } elseif ($this->state === self::PENDING) {
             $this->state = self::PARKED;
-            /** @var Suspension<null> */
-            $suspension = EventLoop::getSuspension();
-            $this->suspension = $suspension;
-            $suspension->suspend();
+            Loop::$parked = $this;
+            \Fiber::suspend();
         }
 
         if ($this->interrupted) {
@@ -143,6 +130,22 @@ final class ContinuationImpl implements Continuation, Waiter
     }
 
     /**
+     * {@see Loop} has found the continuation parked by $fiber, the fiber it has resumed: it resumes the same one.
+     *
+     * @param \Fiber<mixed, mixed, mixed, mixed> $fiber
+     */
+    public function suspended(Loop $loop, \Fiber $fiber): void
+    {
+        if ($this->state === self::PARKED) {
+            $this->fiber = $fiber;
+            $this->loop = $loop;
+        } else {
+            // Fired by the code that has passed the suspension through.
+            $loop->resume($fiber);
+        }
+    }
+
+    /**
      * @param ?T $value
      */
     private function fire(mixed $value, ?\Throwable $error, bool $interrupted): bool
@@ -151,17 +154,14 @@ final class ContinuationImpl implements Continuation, Waiter
             return false;
         }
 
-        $suspension = $this->suspension;
         $fiber = $this->fiber;
         $loop = $this->loop;
         $this->state = self::FIRED;
-        $this->suspension = null;
         $this->fiber = null;
         $this->loop = null;
         $this->value = $value;
         $this->error = $error;
         $this->interrupted = $interrupted;
-        $suspension?->resume();
 
         if ($fiber !== null) {
             $loop?->resume($fiber);

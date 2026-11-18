@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Deadlock;
+use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
+use Thesis\Async\Internal\Loop;
 use Thesis\Async\Trace\Joining;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
@@ -171,51 +173,40 @@ final class LongWaitDetectorTest
         Assert::same(toNs($report->duration), 5_000_000_000);
     }
 
-    public function waitsOnUnreferencedTimerOnlyWhileSomethingWaits(): void
+    public function timerKeepsNothingFromDeadlock(): void
     {
-        $before = EventLoop::getIdentifiers();
-        /** @var list<string> $referenced */
-        $referenced = [];
-        /** @var list<string> $unreferenced */
-        $unreferenced = [];
-        self::reports(static function () use ($before, &$referenced, &$unreferenced) {
-            group(static function (Group $group) use ($before, &$referenced, &$unreferenced) {
-                $group->spawn(static fn() => delay(sec(1)), name: 'sleeper');
-                $group->spawn(static function () use ($before, &$referenced, &$unreferenced) {
-                    delay(ms(500));
+        $start = Instant::now();
+        $deadlock = null;
 
-                    foreach (array_diff(EventLoop::getIdentifiers(), $before) as $id) {
-                        if (EventLoop::isReferenced($id)) {
-                            $referenced[] = $id;
-                        } else {
-                            $unreferenced[] = $id;
-                        }
-                    }
+        // Only the timer of the detector, due when the task has waited 5s, could wake anything.
+        $reports = self::reports(static function () use (&$deadlock) {
+            try {
+                group(static function (Group $group) {
+                    $group->spawn(static fn() => new Deferred()->await());
                 });
-            });
+            } catch (Deadlock $exception) {
+                $deadlock = $exception;
+            }
         });
 
-        // The timer of the sleeper and the one of the detector, due when the sleeper has waited 5s.
-        Assert::same(\count($referenced), 1);
-        Assert::same(\count($unreferenced), 1);
-        Assert::same(EventLoop::getIdentifiers(), $before);
+        Assert::instanceOf($deadlock, Deadlock::class);
+        Assert::same([$reports, toNs(Instant::now()->since($start))], [[], 0]);
     }
 
     public function dropsTimerOnceNothingWaits(): void
     {
-        $before = EventLoop::getIdentifiers();
-        /** @var ?list<string> $left */
-        $left = null;
-        self::reports(static function () use ($before, &$left) {
-            group(static function (Group $group) use ($before, &$left) {
-                $group->spawn(static function () use ($before, &$left) {
+        /** @var ?bool $idle */
+        $idle = null;
+        self::reports(static function () use (&$idle) {
+            group(static function (Group $group) use (&$idle) {
+                $group->spawn(static function () use (&$idle) {
                     delay(sec(1));
-                    $left = array_values(array_diff(EventLoop::getIdentifiers(), $before));
+                    $idle = Loop::get()->isIdle;
                 });
             });
         });
 
-        Assert::same($left, []);
+        Assert::true($idle);
     }
 
     public function listensToNoCancellationsNorRuns(): void

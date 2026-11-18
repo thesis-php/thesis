@@ -6,15 +6,18 @@ namespace Thesis\Async\Internal;
 
 use Io\Poll\Context;
 use Io\Poll\Event;
+use Io\Poll\FailedHandleAddException;
 use Io\Poll\FailedPollWaitException;
 use Io\Poll\InvalidHandleException;
+use Io\Poll\Watcher;
 use Thesis\Async\Deadlock;
 use Thesis\Async\Pacer;
 use Thesis\SourceLocation\Location;
 use function Thesis\Time\ns;
 
 /**
- * The scheduler of fibers on `Io\Poll`. It runs only in {main}, and the code it runs only in fibers.
+ * The scheduler of fibers on `Io\Poll`. It runs in {main}, or in the fiber that runs an outer loop (a nested
+ * `virtualTime()`, which blocks the outer one meanwhile), and the code it runs only in fibers of its own.
  *
  * It knows five things: the ready fibers, the timers, the streams, the signals and the microtasks. A wait hands
  * it a {@see Waiter}, which it wakes once the event has come; a woken {@see ContinuationImpl} puts its fiber
@@ -26,6 +29,8 @@ use function Thesis\Time\ns;
  * not at all if something is ready, until the nearest timer, or without a timeout. On a virtual clock the loop
  * never sleeps for a timer: where it would, it jumps the clock to the timer.
  *
+ * A loop that is dropped is released first ({@see release()}): what a fiber left in it holds could keep it.
+ *
  * A run ends when its fiber ends. If nothing is ready, and no referenced timer, no stream and no signal is
  * waited for while the fiber waits, it waits forever: the loop throws {@see Deadlock} into its wait.
  *
@@ -34,12 +39,28 @@ use function Thesis\Time\ns;
 final class Loop
 {
     /**
-     * The loop of the run in progress: the one {@see ContinuationImpl::park()} gives its fiber to.
+     * The longest wait of the kernel while signals are handled: the delay of a signal that comes in the gap
+     * before the wait, see {@see poll()}.
      */
-    public static ?self $current = null;
+    private const int SIGNAL_GAP = 100 * 1_000_000;
 
     /**
-     * Starts at 1 with the first tick: a counter of calls per tick compares it ({@see Pacer}).
+     * The loop of the run in progress, or the one of the process: see {@see get()}.
+     */
+    private static ?self $current = null;
+
+    /**
+     * The wait that the fiber just suspended has parked in: {@see ContinuationImpl::park()} leaves it here,
+     * the loop takes it once the fiber it has resumed returns to it.
+     *
+     * @var ?ContinuationImpl<mixed>
+     */
+    public static ?ContinuationImpl $parked = null;
+
+    /**
+     * The number of the current tick, unique among the ticks of every loop: a counter of calls per tick
+     * compares it ({@see Pacer}), and a nested loop ({@see run()} in a fiber) must not share the numbers
+     * of the outer one.
      */
     public private(set) int $tick = 0;
 
@@ -51,12 +72,19 @@ final class Loop
     public private(set) ?\Fiber $main = null;
 
     /**
-     * The wait the fiber of {@see run()} is parked in, set by {@see ContinuationImpl::park()}:
-     * an error that has escaped to the loop, and a deadlock, are thrown there.
+     * The fiber that {@see run()} was called in, null for {main}: the scheduler runs in it, so it cannot wait.
+     *
+     * @var ?\Fiber<mixed, mixed, mixed, mixed>
+     */
+    public private(set) ?\Fiber $host = null;
+
+    /**
+     * The wait the fiber of {@see run()} is parked in: an error that has escaped to the loop,
+     * and a deadlock, are thrown there.
      *
      * @var ?ContinuationImpl<mixed>
      */
-    public ?ContinuationImpl $mainWait = null;
+    private ?ContinuationImpl $mainWait = null;
 
     /**
      * @var list<\Fiber<mixed, mixed, mixed, mixed>>
@@ -69,7 +97,7 @@ final class Loop
     private array $microtasks = [];
 
     /**
-     * @var list<Waiter> woken at the start of the next tick
+     * @var array<int, Waiter> woken at the start of the next tick, by spl_object_id()
      */
     private array $deferred = [];
 
@@ -119,11 +147,6 @@ final class Loop
      */
     private array $caughtSignals = [];
 
-    /**
-     * Set by the handler of a signal: tells a wait cut short by a signal (EINTR) from a failure.
-     */
-    private bool $signalled = false;
-
     private ?bool $previousAsyncSignals = null;
 
     /**
@@ -154,6 +177,26 @@ final class Loop
         $this->timers = new \SplMinHeap();
     }
 
+    /**
+     * The loop that runs now, or the one of the process, created on first use: a wait parks on it,
+     * and `group()` called in {main} runs it.
+     */
+    public static function get(): self
+    {
+        return self::$current ??= new self();
+    }
+
+    /**
+     * Nothing is waited for or queued: no pending timer, stream wait, signal handler, deferred wake or microtask.
+     */
+    public bool $isIdle {
+        get => $this->pendingTimers === 0
+            && $this->streamWaits === 0
+            && $this->signalHandlers === []
+            && $this->deferred === []
+            && $this->microtasks === [];
+    }
+
     public function now(): int
     {
         // @phpstan-ignore return.type (hrtime() returns a float only on 32-bit PHP, which no package supports)
@@ -161,19 +204,15 @@ final class Loop
     }
 
     /**
-     * Runs $fn in a fiber, and the loop until the fiber ends.
+     * Runs $fn in a fiber, and the loop until the fiber ends. While it runs, it is the loop of {@see get()}.
      *
      * @template T
      * @param \Closure(): T $fn
      * @return T
-     * @throws \LogicException in a fiber, or if the loop is running
+     * @throws \LogicException if the loop is running
      */
     public function run(\Closure $fn): mixed
     {
-        if (\Fiber::getCurrent() !== null) {
-            throw new \LogicException('The event loop runs only in {main}, not in a fiber.');
-        }
-
         if ($this->main !== null) {
             throw new \LogicException('The event loop is already running: it cannot run again inside.');
         }
@@ -182,6 +221,7 @@ final class Loop
         self::$current = $this;
         $main = new \Fiber($fn);
         $this->main = $main;
+        $this->host = \Fiber::getCurrent();
         $this->fibers[spl_object_id($main)] = $main;
         $this->ready[] = $main;
         $error = null;
@@ -202,6 +242,7 @@ final class Loop
             $error = array_shift($this->errors);
         } finally {
             $this->main = null;
+            $this->host = null;
             $this->mainWait = null;
             self::$current = $previous;
         }
@@ -218,6 +259,51 @@ final class Loop
 
         /** @var T */
         return $result;
+    }
+
+    /**
+     * Drops what a run has left: the fibers, the timers, the streams with the descriptor of the kernel,
+     * the handlers of the signals. A fiber of a closure bound to an object that holds the wait of the fiber,
+     * such as a task of the user, is a cycle that the collector of PHP 8.6 never frees (php/php-src#25540),
+     * and its wait holds the loop: the loop alone goes away with it then, not its descriptors.
+     *
+     * @throws \LogicException if the loop is running
+     */
+    public function release(): void
+    {
+        if ($this->main !== null) {
+            throw new \LogicException('The event loop is running: it cannot be released.');
+        }
+
+        foreach ($this->signalHandlers as $signal => $_) {
+            /** @var callable|int $previous */
+            $previous = $this->previousSignalHandlers[$signal] ?? SIG_DFL;
+            pcntl_signal($signal, $previous);
+        }
+
+        $this->signalHandlers = [];
+        $this->previousSignalHandlers = [];
+        $this->closeSignalPipe();
+
+        foreach ($this->streams as $watched) {
+            if ($watched->watcher?->isActive() === true) {
+                $watched->watcher->remove();
+            }
+        }
+
+        $this->streams = [];
+        $this->changedStreams = [];
+        $this->streamWaits = 0;
+        $this->context = null;
+        $this->timers = new \SplMinHeap();
+        $this->pendingTimers = 0;
+        $this->referencedTimers = 0;
+        $this->outdatedTimers = 0;
+        $this->ready = [];
+        $this->microtasks = [];
+        $this->deferred = [];
+        $this->fibers = [];
+        $this->errors = [];
     }
 
     /**
@@ -259,7 +345,15 @@ final class Loop
      */
     public function defer(Waiter $waiter): void
     {
-        $this->deferred[] = $waiter;
+        $this->deferred[spl_object_id($waiter)] = $waiter;
+    }
+
+    /**
+     * A no-op for a waiter that has been woken or was not deferred.
+     */
+    public function undefer(Waiter $waiter): void
+    {
+        unset($this->deferred[spl_object_id($waiter)]);
     }
 
     /**
@@ -294,6 +388,14 @@ final class Loop
 
         $timer->waiter = null;
         $this->leave($timer);
+
+        // The timer of a timeout is cancelled while it is the nearest one, mostly: gone at once, it is not outdated.
+        if ($this->timers->top()[2] === $timer) {
+            $this->timers->extract();
+
+            return;
+        }
+
         ++$this->outdatedTimers;
         $this->compact();
     }
@@ -399,9 +501,22 @@ final class Loop
         }
     }
 
+    /**
+     * @return ?ContinuationImpl<mixed>
+     */
+    private static function takeParked(): ?ContinuationImpl
+    {
+        $parked = self::$parked;
+        self::$parked = null;
+
+        return $parked;
+    }
+
     private function tick(): void
     {
-        ++$this->tick;
+        /** @var int */
+        static $ticks = 0;
+        $this->tick = ++$ticks;
 
         if ($this->deferred !== []) {
             $deferred = $this->deferred;
@@ -449,11 +564,24 @@ final class Loop
      */
     private function runFiber(\Fiber $fiber): void
     {
+        // Left by a fiber of the user that has parked and returned to the user, not to the loop.
+        self::$parked = null;
+
         try {
             if ($fiber->isStarted()) {
                 $fiber->resume();
             } else {
                 $fiber->start();
+            }
+
+            $wait = self::takeParked();
+
+            if ($wait !== null) {
+                if ($fiber === $this->main) {
+                    $this->mainWait = $wait;
+                }
+
+                $wait->suspended($this, $fiber);
             }
         } catch (\Throwable $error) {
             if ($fiber === $this->main) {
@@ -652,24 +780,24 @@ final class Loop
         if ($this->streamWaits === 0 && $this->signalStream === null) {
             if ($timeout !== null && $timeout > 0) {
                 // Nothing to watch: a sleep until the timer.
-                $this->context()->wait(ns(min($timeout, Scope::LONGEST_DURATION)));
+                $this->waitForEvents($timeout);
             }
 
             return false;
         }
 
-        $this->signalled = false;
+        if ($this->signalHandlers !== []) {
+            // A signal that comes after the last check of the engine, right before the wait, is only noted:
+            // its handler runs at the next check, so no byte is in the pipe, and the wait is not cut short.
+            // PHP has no way to close the gap (no signalfd, no pselect), so such a wait is cut short by time.
+            $timeout = min($timeout ?? self::SIGNAL_GAP, self::SIGNAL_GAP);
+        }
 
-        try {
-            // A cap on the events would leave the rest for the next tick, and level-triggered watchers keep them,
-            // but nothing asks for one: every ready stream is woken in the tick it is found ready.
-            $watchers = $this->context()->wait($timeout === null ? null : ns(min($timeout, Scope::LONGEST_DURATION)));
-        } catch (FailedPollWaitException $exception) {
-            /**
-             * The handler of a signal has run: the wait is cut short (EINTR), its signal is in the pipe.
-             * @phpstan-ignore ternary.alwaysFalse (the handler of a signal sets it during the wait)
-             */
-            $watchers = $this->signalled ? [] : throw $exception;
+        $watchers = $this->waitForEvents($timeout);
+
+        if ($this->signalHandlers !== []) {
+            // Runs the handlers of the signals noted in the gap.
+            pcntl_signal_dispatch();
         }
 
         $signalled = false;
@@ -701,6 +829,23 @@ final class Loop
         }
 
         return $watchers !== [];
+    }
+
+    /**
+     * A wait of the kernel. A signal cuts it short (EINTR), whoever handles it, the loop, the user, or nobody
+     * (SIGCONT after SIGSTOP): that is no failure, only a wait with no events.
+     *
+     * @return list<Watcher>
+     */
+    private function waitForEvents(?int $timeout): array
+    {
+        try {
+            // A cap on the events would leave the rest for the next tick, and level-triggered watchers keep them,
+            // but nothing asks for one: every ready stream is woken in the tick it is found ready.
+            return $this->context()->wait($timeout === null ? null : ns(min($timeout, Scope::LONGEST_DURATION)));
+        } catch (FailedPollWaitException $exception) {
+            return $exception->getCode() === FailedPollWaitException::ERROR_INTERRUPTED ? [] : throw $exception;
+        }
     }
 
     private function wakeAll(WatchedStream $watched, bool $write): void
@@ -752,11 +897,14 @@ final class Loop
 
             $watcher = $watched->watcher;
 
+            if ($watcher !== null && !$watcher->isActive()) {
+                // Its descriptor is closed: the kernel has dropped it, and a new watch finds the stream closed.
+                $watched->watcher = null;
+                $watcher = null;
+            }
+
             if ($events === []) {
-                // Closed by its owner, the stream is no longer watched by the kernel: nothing to remove.
-                if ($watcher?->isActive() === true) {
-                    $watcher->remove();
-                }
+                $watcher?->remove();
 
                 unset($this->streams[$key]);
 
@@ -779,8 +927,9 @@ final class Loop
         try {
             // A stream without a descriptor warns, and throws the exception that tells it.
             $watched->watcher = @$this->context()->add(new \StreamPollHandle($watched->stream), $events, $watched);
-        } catch (InvalidHandleException|\TypeError) {
-            // Closed, or without a descriptor: it never blocks, a read or a write tells what is wrong with it.
+        } catch (InvalidHandleException|FailedHandleAddException|\TypeError) {
+            // Closed, without a descriptor, or one that the kernel does not watch (a file, /dev/null, php://temp):
+            // it never blocks, a read or a write tells what is wrong with it.
             $this->wakeAll($watched, write: false);
             $this->wakeAll($watched, write: true);
         }
@@ -793,8 +942,17 @@ final class Loop
 
     private function openSignalPipe(): void
     {
-        /** @var array{resource, resource} $pipe */
-        $pipe = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
+        error_clear_last();
+        /** @var array{resource, resource}|false $pipe */
+        $pipe = @stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
+
+        if ($pipe === false) {
+            throw new \RuntimeException(\sprintf(
+                'Failed to open the self-pipe of the signals: %s.',
+                error_get_last()['message'] ?? 'unknown error',
+            ));
+        }
+
         stream_set_blocking($pipe[0], false);
         stream_set_blocking($pipe[1], false);
         $this->signalPipe = $pipe;
@@ -830,7 +988,6 @@ final class Loop
     private function catchSignal(int $signal): void
     {
         $this->caughtSignals[$signal] = $signal;
-        $this->signalled = true;
 
         if ($this->signalPipe !== null) {
             // A full pipe already ends the wait: the byte is not needed then.

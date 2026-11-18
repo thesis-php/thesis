@@ -4,22 +4,17 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Amp\Cancellation;
-use Amp\CancelledException;
-use Revolt\EventLoop;
 use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\Expired;
 use Thesis\Async\Internal\GroupImpl;
+use Thesis\Async\Internal\Loop;
 use Thesis\Async\Internal\Scope;
-use Thesis\Async\Internal\ScopeCancellation;
 use Thesis\Async\Internal\SignalTrapImpl;
 use Thesis\Async\Internal\Suppressed;
 use Thesis\Async\Internal\VirtualClock;
-use Thesis\Async\Internal\VirtualTimeDriver;
 use Thesis\Async\Internal\Workers;
 use Time\Duration;
 use function Thesis\Async\Internal\fiberKey;
-use function Thesis\Async\Internal\releaseFibers;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -31,7 +26,7 @@ use function Thesis\Time\toNs;
  * (timer, stream watcher, wait queue). It may return $unregister, a closure that undoes the registration.
  * $unregister is always called once the wait is over, whatever ended it,
  * so it must be harmless for a source that has already fired. Anything but a closure is ignored:
- * not even a callable string is called, since a Revolt callback id may be one ("dl", "die").
+ * not even a callable string is called, since an id of a callback may be one ("dl", "die").
  *
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
@@ -66,7 +61,7 @@ function suspend(callable $register): mixed
         $scope->unsubscribe($continuation);
 
         // Anything else means there is nothing to undo: $register returned nothing,
-        // or it is an arrow function that returned the bool of Continuation::resume() or a Revolt callback id.
+        // or it is an arrow function that returned the bool of Continuation::resume() or an id of a callback.
         if ($unregister instanceof \Closure) {
             $unregister();
         }
@@ -89,13 +84,13 @@ function suspend(callable $register): mixed
 function checkpoint(): void
 {
     suspend(static function (Continuation $continuation) {
-        // Not EventLoop::queue(): microtasks run before timers, so a loop of them would starve the deadline.
-        $callbackId = EventLoop::defer(static function () use ($continuation) {
-            $continuation->resume();
-        });
+        \assert($continuation instanceof ContinuationImpl);
+        // To the next tick, not to the microtasks: they run before the timers, a loop of them would starve a deadline.
+        $loop = Loop::get();
+        $loop->defer($continuation);
 
-        return static function () use ($callbackId) {
-            EventLoop::cancel($callbackId);
+        return static function () use ($loop, $continuation) {
+            $loop->undefer($continuation);
         };
     });
 }
@@ -116,11 +111,12 @@ function isCancelled(): bool
 
 /**
  * Calls $callback once the current scope is cancelled, by its owner or through an ancestor;
- * if it already is, soon. For code that is not cancelled through {@see suspend()}: an `Amp\Cancellation`,
+ * if it already is, soon. For code that is not cancelled through {@see suspend()}: a cancellation token of another library,
  * a request to abort a query on the server.
  *
  * It only observes the cancellation and cannot cause one. $callback runs from the event loop's microtask queue,
- * never inside the code that cancels, and in the root scope: it must not throw. If the scope is cancelled,
+ * never inside the code that cancels, in the root scope and outside a fiber: it cannot wait and must not throw.
+ * A throw goes to the event loop, which throws it into the wait of the group that runs it in {main}: a failure. If the scope is cancelled,
  * it is called exactly once and always before the code of the scope ends: if the queue has not reached it by then,
  * the code leaving the scope calls it itself. It is never called after the returned function is called,
  * even if the cancellation has already happened.
@@ -164,16 +160,15 @@ function remaining(): ?Duration
  */
 function delay(Duration $duration): void
 {
-    // Revolt rejects a negative delay.
-    $seconds = max(0, toNs($duration)) / 1e9;
+    $nanoseconds = toNs($duration);
 
-    suspend(static function (Continuation $continuation) use ($seconds) {
-        $timer = EventLoop::delay($seconds, static function () use ($continuation) {
-            $continuation->resume();
-        });
+    suspend(static function (Continuation $continuation) use ($nanoseconds) {
+        \assert($continuation instanceof ContinuationImpl);
+        $loop = Loop::get();
+        $timer = $loop->delay($nanoseconds, $continuation);
 
-        return static function () use ($timer) {
-            EventLoop::cancel($timer);
+        return static function () use ($loop, $timer) {
+            $loop->cancel($timer);
         };
     });
 }
@@ -510,7 +505,7 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
     static $held = new \WeakMap();
 
     // Only the inner map is kept in a variable, not the fiber's key: see fiberKey().
-    // An emptied map stays for a reused Revolt fiber and goes away with the fiber.
+    // An emptied map stays for the next call in the fiber and goes away with it.
     $locks = $held[fiberKey()] ?? null;
 
     if ($locks === null) {
@@ -572,16 +567,16 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
 
 /**
  * Waits for one of the signals and returns the one received: SIGINT or SIGTERM for a graceful shutdown.
- * Cancellable like any other wait. Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ * Cancellable like any other wait. Needs ext-pcntl.
  *
- * The handlers exist only while it waits: a signal that comes before (Revolt installs them at the next tick
- * of the loop) or after gets the default action, so a second Ctrl+C kills the process even if the shutdown hangs.
+ * The handlers exist only while it waits: a signal that comes before or after gets the default action,
+ * so a second Ctrl+C kills the process even if the shutdown hangs.
  * To keep handling a signal, such as SIGHUP to reload, use {@see trapSignals()}.
  *
  * @api
  * @param positive-int $signal
  * @param positive-int ...$signals
- * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+ * @throws \LogicException without ext-pcntl
  */
 function awaitSignal(int $signal, int ...$signals): int
 {
@@ -591,11 +586,10 @@ function awaitSignal(int $signal, int ...$signals): int
 /**
  * Catches the signals while $fn runs, instead of their default action, and $fn receives them from the trap:
  * SIGHUP to reload, SIGUSR1 to reopen logs. A signal that comes during a reload waits in the trap.
- * Needs a driver that supports signals (ext-pcntl, ext-ev or ext-uv).
+ * Needs ext-pcntl.
  *
- * Outside $fn a signal gets the default action. Revolt installs the handlers at the next tick of the loop,
- * so trapSignals() waits for it before calling $fn: it is a cancellation point, and $fn does not run
- * in a cancelled scope.
+ * Outside $fn a signal gets the default action. Like a wait, it throws {@see Cancelled} without calling $fn
+ * if the scope is cancelled.
  *
  * @api
  * @template T
@@ -603,7 +597,7 @@ function awaitSignal(int $signal, int ...$signals): int
  * @param callable(SignalTrap): T $fn
  * @return T
  * @throws Cancelled if the scope is cancelled before $fn runs
- * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+ * @throws \LogicException without ext-pcntl
  */
 function trapSignals(array $signals, callable $fn): mixed
 {
@@ -611,101 +605,26 @@ function trapSignals(array $signals, callable $fn): mixed
 }
 
 /**
- * Runs an amphp operation so that it is cancelled together with the current scope.
+ * Runs $fn on a virtual clock, in a fiber of an event loop of its own whose timers follow the clock. The clock starts
+ * at the current {@see Instant::now()} rounded up to a whole second, so a time captured before the call stays valid
+ * in it. The clock jumps to the next timer whenever nothing can run: `delay(hours(1))` is over at once, timers
+ * fire exactly in the order of their deadlines, and a deadlock fails at once instead of hanging. CPU work takes
+ * no time: see {@see burnCpu()}. {@see Instant::now()} and deadlines follow the clock.
  *
- * $fn receives a {@see Cancellation} requested while the current scope is cancelled
- * (inside {@see shield()} an outer cancellation does not request it). It is bound to the current scope: do not keep it
- * beyond $fn. If $fn throws {@see CancelledException} while the scope is cancelled, {@see Cancelled} is thrown instead,
- * as from any other wait. Otherwise the exception is the operation's own (say, a `TimeoutCancellation` passed
- * alongside), and it is rethrown as is.
- *
- * Like {@see suspend()}, it throws {@see Cancelled} right away if the scope is already cancelled.
- *
- * @api
- * @template T
- * @param callable(Cancellation): T $fn
- * @return T
- * @throws Cancelled
- */
-function ampCancellable(callable $fn): mixed
-{
-    $scope = Scope::current();
-    $scope->throwIfCancelled();
-
-    try {
-        return $fn(new ScopeCancellation($scope));
-    } catch (CancelledException $exception) {
-        if ($scope->isCancelled) {
-            throw Cancelled::create();
-        }
-
-        throw $exception;
-    }
-}
-
-/**
- * Runs $fn on a virtual clock and on a fresh Revolt driver whose timers follow it. The clock starts at the current
- * {@see Instant::now()} rounded up to a whole second, so a time captured before the call stays valid in it.
- * The clock jumps to the next timer whenever nothing can run: `delay(hours(1))` is over at once, timers fire exactly
- * in the order of their deadlines, and a deadlock fails at once instead of hanging. CPU work takes no time:
- * see {@see burnCpu()}. {@see Instant::now()} and deadlines follow the clock, whatever the driver
- * is decorated with meanwhile.
- *
- * Streams and signals stay real: they are left to $driver, by default the one `EventLoop\DriverFactory` creates
- * (`REVOLT_DRIVER` chooses it). $driver must be fresh and is owned by this call: it is not the current driver
- * and has no callbacks, so nothing from outside runs on virtual time, and it is dropped with whatever is left in it.
- * Must be called in {main}. Afterwards the previous driver and clock are restored, and whatever $fn
- * leaves in the loop is dropped together with the driver. Calls nest: an inner one has a clock of its own.
- * An object that keeps times, such as a rate limiter, must not be shared between two calls that run one after another,
- * or used after the call in the outer clock: each clock goes its own way,
+ * Streams and signals stay real. $fn runs in the root scope, as in {main}: nothing outside cancels it.
+ * Whatever $fn leaves in the loop is dropped with it, and the previous clock is restored afterwards.
+ * Calls nest: an inner one has a clock and a loop of its own, and blocks the outer loop until it returns.
+ * An object that keeps times, such as a rate limiter, must not be shared between two calls that run one after
+ * another, or used after the call in the outer clock: each clock goes its own way,
  * and such a time may be in the future of the other.
  *
  * @api
  * @template T
  * @param callable(): T $fn
- * @param ?EventLoop\Driver $driver the driver of streams and signals, decorated with virtual timers
  * @return T
- * @throws \LogicException outside of {main}, or if $driver is the current one, is running or has callbacks
  */
-function virtualTime(callable $fn, ?EventLoop\Driver $driver = null): mixed
+function virtualTime(callable $fn): mixed
 {
-    // In a fiber, the driver it runs on cannot be stopped from inside: virtualTime() would spin forever.
-    if (\Fiber::getCurrent() !== null) {
-        throw new \LogicException('virtualTime() must be called in {main}, not in a fiber.');
-    }
-
-    if ($driver === null) {
-        $driver = new EventLoop\DriverFactory()->create();
-    } elseif ($driver === EventLoop::getDriver() || $driver->isRunning() || $driver->getIdentifiers() !== []) {
-        throw new \LogicException(
-            message: 'virtualTime() needs a fresh driver: not the current one, not running and with no callbacks.',
-        );
-    }
-
-    // After a wait in {main}, the loop fiber stays suspended in the middle of a tick, and Revolt refuses
-    // to swap a running driver: let it finish the tick and stop. A callback left for a later tick stays there.
-    // A callback that throws interrupts the tick, and Revolt throws out of run() with the driver still running:
-    // finish the tick anyway, then rethrow the first error.
-    $stop = static function (EventLoop\Driver $driver) {
-        $error = null;
-
-        while ($driver->isRunning()) {
-            $driver->stop();
-
-            try {
-                $driver->run();
-            } catch (\Throwable $exception) {
-                $error ??= $exception;
-            }
-        }
-
-        if ($error !== null) {
-            throw $error;
-        }
-    };
-
-    $previousDriver = EventLoop::getDriver();
-    $stop($previousDriver);
     $previousClock = Scope::$virtualClock;
     // Not zero: a time captured outside, a deadline or a rate limiter, stays in the past. Rounded up, so that
     // the clock does not go back, to a whole second, so that the times of a dump read well. Not rounded
@@ -714,21 +633,15 @@ function virtualTime(callable $fn, ?EventLoop\Driver $driver = null): mixed
     $second = toNs(sec(1));
     $start = $now <= PHP_INT_MAX - ($second - 1) ? intdiv($now + $second - 1, $second) * $second : $now;
     $clock = new VirtualClock($start);
-    EventLoop::setDriver(new VirtualTimeDriver($clock, $driver));
+    $loop = new Loop($clock);
     Scope::$virtualClock = $clock;
 
     try {
-        return $fn();
+        return $loop->run($fn(...));
     } finally {
-        try {
-            // The current one, not the one created above: $fn may have decorated it.
-            // Still on this clock: the callbacks of the last tick are of this run.
-            $stop(EventLoop::getDriver());
-        } finally {
-            Scope::$virtualClock = $previousClock;
-            EventLoop::setDriver($previousDriver);
-            releaseFibers($driver);
-        }
+        // What is left in the loop is dropped with it.
+        $loop->release();
+        Scope::$virtualClock = $previousClock;
     }
 }
 

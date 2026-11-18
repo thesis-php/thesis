@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop\Driver;
-use Revolt\EventLoop\Internal\AbstractDriver;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Lock;
 
@@ -27,33 +25,6 @@ function fiberKey(): object
     static $main = new \stdClass();
 
     return \Fiber::getCurrent() ?? $main;
-}
-
-/**
- * Replaces the suspended fibers of a driver that `Thesis\Async\virtualTime()` drops with fibers that never ran.
- * Since php/php-src#24134 the cycle collector does not free an object that holds a suspended fiber of a closure
- * bound to it (php/php-src#25540): every Revolt driver that has run stayed alive, with its file descriptors.
- * Delete once a release of PHP has the fix.
- *
- * @internal
- */
-function releaseFibers(Driver $driver): void
-{
-    if (!$driver instanceof AbstractDriver) {
-        return;
-    }
-
-    /** @var \Closure(AbstractDriver): void */
-    static $release = \Closure::bind(
-        static function (AbstractDriver $driver) {
-            $driver->fiber = new \Fiber(static function () {});
-            $driver->callbackFiber = new \Fiber(static function () {});
-        },
-        null,
-        AbstractDriver::class,
-    );
-
-    $release($driver);
 }
 
 /**

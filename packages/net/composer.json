@@ -40,10 +40,10 @@
     "require-dev": {
         "ext-intl": "*",
         "ext-sockets": "*",
-        "revolt/event-loop": "^1.0.9",
         "testo/assert": "^0.1.17",
         "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29"
+        "testo/testo": "^0.10.29",
+        "thesis/testo-plugin": "^0.1"
     },
     "suggest": {
         "ext-intl": "To resolve internationalized host names (Пример.test)",

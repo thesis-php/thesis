@@ -11,7 +11,7 @@ use function Thesis\Time\ns;
 use function Thesis\Time\toNs;
 
 /**
- * A point on the monotonic clock of the library: the clock of deadlines and Revolt's timers,
+ * A point on the monotonic clock of the library: the clock of deadlines and of the timers of the event loop,
  * which `virtualTime()` replaces. For measuring and for a time kept ahead, such as the expiry of a cached entry:
  * code that keeps times takes them from here, not from `hrtime()`, or virtual time does not move them.
  *

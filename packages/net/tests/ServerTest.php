@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
@@ -12,7 +11,9 @@ use Thesis\Async\Group;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ServerTest
@@ -121,7 +122,8 @@ final class ServerTest
         $progress = new \stdClass();
         $progress->accepted = [];
         $progress->acceptedWhenTicked = null;
-        EventLoop::defer(static function () use ($progress) {
+        // A callback of the loop: it runs if the loop has ticked.
+        watchdog(sec(0), static function () use ($progress) {
             $progress->acceptedWhenTicked = \count($progress->accepted);
         });
 

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
-use Revolt\EventLoop\UncaughtThrowable;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Internal\Scope;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\elapsed;
+use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
@@ -645,17 +644,15 @@ final class GroupTest
                         $events[] = 'task cleaned up';
                     }
                 });
-                // In {main}, the join runs the event loop, so this throws out of the join.
-                EventLoop::defer(static function () {
+                // The loop throws it into the wait of its own fiber, that of the test: the join.
+                later(sec(0), static function () {
                     throw new \RuntimeException('foreign');
                 });
             });
         });
 
-        Assert::instanceOf($exception, UncaughtThrowable::class);
-        $foreign = $exception->getPrevious();
-        Assert::instanceOf($foreign, \RuntimeException::class);
-        Assert::same($foreign->getMessage(), 'foreign');
+        Assert::instanceOf($exception, \RuntimeException::class);
+        Assert::same($exception->getMessage(), 'foreign');
         Assert::same($events, ['task cancelled', 'task cleaned up']);
         assertNoCallbacksLeft();
     }
@@ -670,7 +667,7 @@ final class GroupTest
                     try {
                         never();
                     } finally {
-                        EventLoop::defer(static function () {
+                        later(sec(0), static function () {
                             throw new \RuntimeException('foreign');
                         });
                         shield(static fn() => delay(sec(1)));
@@ -706,11 +703,7 @@ final class GroupTest
             });
         });
 
-        Assert::instanceOf($exception, \Error::class);
-        Assert
-            ::string($exception->getMessage())
-            ->startsWith('Event loop terminated without resuming the current suspension')
-        ;
+        Assert::instanceOf($exception, Deadlock::class);
         Assert::same($events, ['task cancelled']);
     }
 
@@ -728,11 +721,7 @@ final class GroupTest
             });
         });
 
-        Assert::instanceOf($exception, \Error::class);
-        Assert
-            ::string($exception->getMessage())
-            ->startsWith('Event loop terminated without resuming the current suspension')
-        ;
+        Assert::instanceOf($exception, Deadlock::class);
         Assert::same(self::children($root), []);
         /** @var Group $escaped */
         Assert::instanceOf(thrown(static fn() => $escaped->spawn(static fn() => null)), \LogicException::class);

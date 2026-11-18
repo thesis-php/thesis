@@ -36,7 +36,7 @@ The API and the design decisions are described in `README.md` — read it first.
   never makes them wait, and they must not hold the event loop. The pacer yields before the operation,
   so a cancelled one has done nothing.
 - `Stream` reads first and waits only on an empty read, never the other way round: a regular file or php://memory
-  never has to wait, and the event loop cannot watch them at all (the uv driver rejects a file). Its PHP read buffer
+  never has to wait, and the event loop cannot watch them at all (`Io\Poll` rejects a file). Its PHP read buffer
   is off for the same reason. The rest of its discipline (the `StreamWatcher` closed before `fclose()`,
   the write mutex taken only by writes that wait) is that of `Socket` of thesis/net:
   a fix of one is checked against the other.
@@ -44,10 +44,8 @@ The API and the design decisions are described in `README.md` — read it first.
   to the open file description, shared with the shell, the jobs of the same terminal, the children that inherit it
   and the next commands of a pipeline, and they would get `EAGAIN` while it is on (or `echo` of our own process
   would drop output). A call is made only once `stream_select()` with a zero timeout says it will not block,
-  a write passes at most `PIPE_BUF` (4096) bytes, and the waits go through a `StreamWatcher`.
-  Under `UvDriver` stdio is never watched: `uv_poll_init()` sets `O_NONBLOCK` and libuv never clears it,
-  so a wait there is `StreamWatcher::delay()` of 10 ms and the select again. Ev and Event leave the mode alone.
-  The `StdioTest` checks of the mode run the child on the driver of the tests, so CI checks every driver.
+  a write passes at most `PIPE_BUF` (4096) bytes, and the waits go through a `StreamWatcher`
+  (`Io\Poll` leaves the mode alone, unlike the uv driver of Revolt, which set `O_NONBLOCK` for good).
   Toggling the mode around each call was rejected: a neighbour blocked on the same full pipe wakes with us
   and sees the flag (half of its writes failed in a measurement).
 - stdio streams are over duplicates (`php://stdout` dups the descriptor in the CLI), so `close()` leaves `STDOUT` open.
@@ -57,7 +55,7 @@ The API and the design decisions are described in `README.md` — read it first.
 
 - io may wait through thesis/async: stdio and streams of processes need it, and putting them elsewhere
   would split the streams of the ecosystem over packages. Rejected: an io without an event loop for synchronous users
-  of `Buffer` (a protobuf codec in FPM); async, time and revolt are pure PHP and cost them only files in `vendor/`.
+  of `Buffer` (a protobuf codec in FPM); async and time are pure PHP and cost them only files in `vendor/`.
 - `Stream` is non-blocking, not a blocking adapter beside a non-blocking one: in a fiber a blocking read holds
   every other task. Sockets stay in thesis/net: TLS, addresses and half-close are theirs.
 - No zlib streams and no in-memory pipe until HTTP needs them (`Content-Encoding`, a request body that the parser
@@ -68,9 +66,6 @@ The API and the design decisions are described in `README.md` — read it first.
   Rejected: constants (`const STDOUT = new Stream(...)`):
   a constant initializer cannot call `fopen()` for a duplicate, it runs when its file loads (for every process
   that loads it), and constants are not autoloaded.
-- Rejected for stdio under uv: one long-lived watcher per descriptor, since `O_NONBLOCK` stays on after
-  the first wait anyway, and restoring the mode after a wait, since it is on during the wait (toggling).
-  Polling costs up to 10 ms of latency and a wakeup per 10 ms while a wait lasts, on uv only.
 - Rejected for stdio: a descriptor non-blocking for the whole run, restored at shutdown (amphp, Node.js):
   others sharing it fail meanwhile. Reopening it for a description of our own (as libuv does for a terminal):
   `/proc/self/fd/N` reopens a pipe only on Linux, a file gets an offset of its own, a socket cannot be reopened.

@@ -119,7 +119,7 @@ final class DnsResolverTest
 
         Assert::same($addresses, ['10.0.0.1']);
         Assert::same(\array_slice($queries, 0, 2), ['udp big.test AAAA', 'udp big.test A']);
-        // Both families connect over TCP at once, and the driver decides whose connection is ready first (EvDriver).
+        // Both families connect over TCP at once, and the kernel decides whose connection is ready first.
         $tcp = \array_slice($queries, 2);
         sort($tcp);
         Assert::same($tcp, ['tcp big.test A', 'tcp big.test AAAA']);

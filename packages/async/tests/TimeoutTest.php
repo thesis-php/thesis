@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Async\Internal\Loop;
 use Time\Duration;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
@@ -45,17 +45,17 @@ final class TimeoutTest
     public function expiredDeadlineThrowsOnFirstWait(): void
     {
         foreach ([0.0, -1.0] as $seconds) {
-            $callbacks = null;
+            $idle = null;
 
-            $exception = thrown(static function () use ($seconds, &$callbacks) {
-                timeout(sec($seconds), static function () use (&$callbacks) {
+            $exception = thrown(static function () use ($seconds, &$idle) {
+                timeout(sec($seconds), static function () use (&$idle) {
                     // Inside the body, not after it: a timer cancelled in finally would pass the check after.
-                    $callbacks = EventLoop::getIdentifiers();
+                    $idle = Loop::get()->isIdle;
                     never();
                 });
             });
 
-            Assert::same($callbacks, []);
+            Assert::true($idle);
             Assert::instanceOf($exception, TimedOut::class);
             Assert::equals($exception->timeout, sec($seconds));
             assertNoCallbacksLeft();

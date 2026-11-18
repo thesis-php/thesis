@@ -7,8 +7,7 @@
         "fibers",
         "structured-concurrency",
         "cancellation",
-        "event-loop",
-        "revolt"
+        "event-loop"
     ],
     "license": "MIT",
     "type": "library",
@@ -29,7 +28,6 @@
     "require": {
         "php": "^8.6",
         "php-64bit": "*",
-        "revolt/event-loop": "^1.0.9",
         "thesis/dispatcher": "^0.4",
         "thesis/source-location": "^0.1",
         "thesis/time": "^0.3"
@@ -37,18 +35,14 @@
     "require-dev": {
         "ext-pcntl": "*",
         "ext-posix": "*",
-        "amphp/amp": "^3",
         "testo/assert": "^0.1.17",
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29",
         "thesis/testo-plugin": "^0.1"
     },
-    "conflict": {
-        "amphp/amp": "<3"
-    },
     "suggest": {
-        "ext-pcntl": "To use awaitSignal() and trapSignals() with the default event loop driver (ext-ev and ext-uv handle signals too)"
+        "ext-pcntl": "To use awaitSignal() and trapSignals()"
     },
     "autoload": {
         "psr-4": {

@@ -263,10 +263,7 @@ final class SuppressedTest
             });
         });
 
-        Assert
-            ::string($exception->getMessage())
-            ->startsWith('Event loop terminated without resuming the current suspension')
-        ;
+        Assert::instanceOf($exception, Deadlock::class);
         Assert::same(suppressed($exception), [$failure]);
 
         // let the orphaned task finish
@@ -285,10 +282,7 @@ final class SuppressedTest
             });
         });
 
-        Assert
-            ::string($exception->getMessage())
-            ->startsWith('Event loop terminated without resuming the current suspension')
-        ;
+        Assert::instanceOf($exception, Deadlock::class);
         Assert::same(suppressed($exception), []);
 
         $never->complete();

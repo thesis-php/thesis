@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Cancelled;
@@ -25,6 +24,7 @@ use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
@@ -215,10 +215,11 @@ final class CancellationTrackerTest
 
     public function namesRootScopeThatHasCancelled(): void
     {
+        // A callback of the event loop: outside the fibers, in the root scope.
         $line = __LINE__ + 4;
         $reports = self::reports(static fn() => group(static function (Group $group) {
             $task = $group->spawn(static fn() => delay(sec(5)));
-            EventLoop::delay(1, static function () use ($task) {
+            watchdog(sec(1), static function () use ($task) {
                 $task->cancel();
             });
         }));

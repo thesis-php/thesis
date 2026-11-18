@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Cancelled;
@@ -241,22 +240,15 @@ final class ScopeTest
         $scope->onCancel(static function () use (&$second) {
             $second = true;
         });
-        $errors = [];
-        $previous = EventLoop::getErrorHandler();
-        EventLoop::setErrorHandler(static function (\Throwable $error) use (&$errors) {
-            $errors[] = $error->getMessage();
-        });
-
-        try {
+        // The loop throws it into the wait of the fiber it runs: the one of the test.
+        $exception = thrown(static function () use ($scope) {
             $scope->cancel(CancelCause::Handle, by: null);
             $scope->close();
             checkpoint();
-        } finally {
-            EventLoop::setErrorHandler($previous);
-        }
+        });
 
         Assert::true($second);
-        Assert::same($errors, ['callback failed']);
+        Assert::same($exception->getMessage(), 'callback failed');
     }
 
     public function callbacksDoNotAccumulateInLongLivedScope(): void

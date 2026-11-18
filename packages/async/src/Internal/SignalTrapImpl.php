@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Continuation;
 use Thesis\Async\SignalTrap;
-use function Thesis\Async\checkpoint;
 use function Thesis\Async\suspend;
 
 /**
@@ -37,29 +35,30 @@ final class SignalTrapImpl implements SignalTrap
      * @param callable(SignalTrap): T $fn
      * @return T
      * @throws Cancelled if the scope is cancelled before $fn runs
-     * @throws EventLoop\UnsupportedFeatureException if the driver does not support signals
+     * @throws \LogicException without ext-pcntl
      */
     public static function trap(array $signals, callable $fn): mixed
     {
+        if (!\function_exists('pcntl_signal')) {
+            throw new \LogicException('Signals need ext-pcntl.');
+        }
+
+        Scope::current()->throwIfCancelled();
         $trap = new self();
-        $callback = static function (string $callbackId, int $signal) use ($trap) {
-            $trap->catch($signal);
-        };
-        $callbackIds = [];
+        $handler = $trap->catch(...);
+        $loop = Loop::get();
+        // A repeated number would get two handlers, and one signal would be received twice.
+        $signals = array_unique($signals);
 
         try {
-            // A repeated number would get two handlers, and one signal would be received twice.
-            foreach (array_unique($signals) as $signal) {
-                $callbackIds[] = EventLoop::onSignal($signal, $callback);
+            foreach ($signals as $signal) {
+                $loop->onSignal($signal, $handler);
             }
-
-            // Revolt installs the handlers at the next tick: until then, a signal would get its default action.
-            checkpoint();
 
             return $fn($trap);
         } finally {
-            foreach ($callbackIds as $callbackId) {
-                EventLoop::cancel($callbackId);
+            foreach ($signals as $signal) {
+                $loop->offSignal($signal, $handler);
             }
 
             $trap->release();

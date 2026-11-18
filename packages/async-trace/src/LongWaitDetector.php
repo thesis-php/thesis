@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace;
 
-use Revolt\EventLoop;
 use Thesis\Async\Instant;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\GroupCreated;
@@ -18,6 +17,7 @@ use Thesis\AsyncTrace\Internal\Wait;
 use Thesis\Dispatcher;
 use Thesis\Dispatcher\Subscriber;
 use Time\Duration;
+use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ns;
 use function Thesis\Time\toNs;
 
@@ -53,7 +53,10 @@ final class LongWaitDetector implements Subscriber
      */
     private array $waits = [];
 
-    private ?string $timer = null;
+    /**
+     * @var ?\Closure(): void cancels the timer
+     */
+    private ?\Closure $timer = null;
 
     /**
      * @param Duration $threshold a wait that lasts so long is reported: one that ends exactly then may be or not,
@@ -120,14 +123,16 @@ final class LongWaitDetector implements Subscriber
         unset($this->scopes[$event->scope]);
     }
 
-    private function arm(Wait $wait, Dispatcher $dispatcher): string
+    /**
+     * @return \Closure(): void
+     */
+    private function arm(Wait $wait, Dispatcher $dispatcher): \Closure
     {
         $left = max(0, $this->threshold - toNs(Instant::now()->since($wait->at)));
-        $timer = EventLoop::delay($left / 1e9, function () use ($dispatcher) {
+
+        return watchdog(ns($left), function () use ($dispatcher) {
             $this->report($dispatcher);
         });
-
-        return EventLoop::unreference($timer);
     }
 
     /**
@@ -161,7 +166,7 @@ final class LongWaitDetector implements Subscriber
     private function disarmIfNothingWaits(): void
     {
         if ($this->waits === [] && $this->timer !== null) {
-            EventLoop::cancel($this->timer);
+            ($this->timer)();
             $this->timer = null;
         }
     }

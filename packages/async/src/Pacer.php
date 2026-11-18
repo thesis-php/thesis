@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
+use Thesis\Async\Internal\Loop;
 
 /**
  * Fairness for an operation that may complete without a wait: a read that finds bytes, an accept that finds
@@ -23,9 +23,9 @@ final class Pacer
     private int $count = 0;
 
     /**
-     * Counts the resets of {@see $count}: a yield that has seen none, has lost its tick with the event loop driver.
+     * The tick of the event loop that {@see $count} counts the calls of.
      */
-    private int $resets = 0;
+    private int $tick = 0;
 
     /**
      * @param positive-int $perTick calls without a yield: enough to drain a burst without a wait for each,
@@ -43,28 +43,29 @@ final class Pacer
      */
     public function pace(): void
     {
+        $this->countTick();
+
         if ($this->count >= $this->perTick) {
-            $resets = $this->resets;
             checkpoint();
-
-            // The defer of the tick has reset the count before the yield returns, and since then other callers
-            // of a shared pacer may have counted their calls in the new tick: a reset here would erase them.
-            // Unless the defer was dropped with its driver (the end of `virtualTime()`, a new driver):
-            // then nothing would ever reset the count again.
-            if ($this->resets === $resets) {
-                $this->count = 0;
-            }
-        }
-
-        if ($this->count === 0) {
-            EventLoop::defer(function () {
-                $this->count = 0;
-                // Only compared with the count seen before a yield: a decrement is a change too.
-                // @infection-ignore Increment
-                ++$this->resets;
-            });
+            // Other callers of a shared pacer may have counted their calls in the new tick before this one:
+            // the count is of the tick, not of this caller, and starts anew only if nobody has counted yet.
+            $this->countTick();
         }
 
         ++$this->count;
+    }
+
+    /**
+     * Starts the count anew in a new tick. The numbers of ticks are unique among all the loops, so a pacer
+     * shared by nested ones (`stdout()` of thesis/io in `virtualTime()`) counts the calls of each tick apart.
+     */
+    private function countTick(): void
+    {
+        $tick = Loop::get()->tick;
+
+        if ($this->tick !== $tick) {
+            $this->tick = $tick;
+            $this->count = 0;
+        }
     }
 }

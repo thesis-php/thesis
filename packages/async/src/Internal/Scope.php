@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
-use Revolt\EventLoop;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Trace\CancelCause;
 
@@ -22,7 +21,7 @@ use Thesis\Async\Trace\CancelCause;
  *
  * @internal
  */
-final class Scope
+final class Scope implements Waiter
 {
     /**
      * The longest `Time\Duration` in nanoseconds: a little less than PHP_INT_MAX, the saturated deadline.
@@ -206,7 +205,7 @@ final class Scope
     }
 
     /**
-     * Queues $callback through `EventLoop::queue()` once this scope is cancelled, by its owner or through an ancestor.
+     * Queues $callback to the microtasks of {@see Loop} once this scope is cancelled, by its owner or through an ancestor.
      * If it already is, $callback is queued right away. Never synchronously: user code does not run inside
      * {@see cancel()}. If the queue has not reached it when the code of the scope ends, {@see endCallbacks()} calls it:
      * a callback of a cancelled scope is always called before the scope ends, and never after.
@@ -243,7 +242,7 @@ final class Scope
         $this->callbacks[$id] = $fire;
 
         if ($this->isCancelled) {
-            EventLoop::queue($fire);
+            Loop::get()->queue($fire);
         }
 
         // A stored $fire is alive, so its id is not reused while it is stored, and it is removed once it is called:
@@ -293,7 +292,7 @@ final class Scope
                     } catch (\Throwable $error) {
                         // As if it had been thrown from the queue: to the event loop,
                         // not to whoever ends the scope.
-                        EventLoop::queue(static function () use ($error) {
+                        Loop::get()->queue(static function () use ($error) {
                             throw $error;
                         });
                     }
@@ -303,7 +302,16 @@ final class Scope
     }
 
     /**
-     * Monotonic, in nanoseconds: the clock Revolt's timers run on. The only clock of the library:
+     * The timer of the deadline of `Thesis\Async\timeout()`, the scope itself: no closure per timeout.
+     */
+    #[\Override]
+    public function wake(): void
+    {
+        $this->cancel(CancelCause::Deadline, by: $this);
+    }
+
+    /**
+     * Monotonic, in nanoseconds: the clock the timers of {@see Loop} run on. The only clock of the library:
      * `Thesis\Async\Instant` too. Within `Thesis\Async\virtualTime()`, {@see $virtualClock} instead.
      * Not on the hot path of a wait: only a deadline, {@see remaining()} and the rate limiters read the clock.
      */
@@ -335,8 +343,12 @@ final class Scope
         }
 
         // They stay stored until called: endCallbacks() calls those the queue has not reached yet.
-        foreach ($this->callbacks as $fire) {
-            EventLoop::queue($fire);
+        if ($this->callbacks !== []) {
+            $loop = Loop::get();
+
+            foreach ($this->callbacks as $fire) {
+                $loop->queue($fire);
+            }
         }
 
         foreach ($this->children as $child) {
@@ -358,7 +370,7 @@ const ROOT_SCOPE = new Scope();
 
 /**
  * Current scope of every fiber that has entered one, keyed by {@see fiberKey()}. Bound by {@see Scope::run()},
- * which restores the previous one, so nothing leaks into the next callback of a reused Revolt fiber.
+ * which restores the previous one, so nothing leaks into the next code that runs in the fiber.
  *
  * Read in every wait through {@see Scope::current()}, so it is a single WeakMap lookup. Revolt's FiberLocal
  * makes two (fiber → storage, then instance → value) and wraps the value in an array: ~0.9 µs (~8%) more per wait.

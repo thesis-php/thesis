@@ -34,13 +34,18 @@ final class LoopTest
         Assert::same($exception->getMessage(), 'failed');
     }
 
-    public function runIsRefusedInFiber(): void
+    public function runInFiberRunsToEndBeforeReturning(): void
     {
         $loop = self::loop();
-        $fiber = new \Fiber(static fn() => thrown(static fn() => $loop->run(static fn() => null)));
+        $fiber = new \Fiber(static fn() => $loop->run(static function () use ($loop) {
+            self::yield($loop);
+
+            return 'done';
+        }));
         $fiber->start();
 
-        Assert::instanceOf($fiber->getReturn(), \LogicException::class);
+        Assert::true($fiber->isTerminated());
+        Assert::same($fiber->getReturn(), 'done');
     }
 
     public function runIsRefusedWhileRunning(): void
@@ -71,7 +76,7 @@ final class LoopTest
         });
 
         Assert::instanceOf($exception, \LogicException::class);
-        Assert::same($exception->getMessage(), 'A wait in {main} cannot be resumed: wrap the code in group().');
+        Assert::same($exception->getMessage(), 'A wait outside the event loop cannot be resumed: wrap the code in group().');
     }
 
     public function fibersReadyAtStartOfTickRunInOrderAndWhatTheyWakeWaitsForNextTick(): void
@@ -80,15 +85,17 @@ final class LoopTest
         $log = [];
 
         $loop->run(static function () use ($loop, &$log) {
+            // The numbers of ticks are unique among all the loops: the first one of this loop is not 1.
+            $first = $loop->tick;
             $a = new ContinuationImpl();
             $b = new ContinuationImpl();
-            $loop->start(static function () use ($loop, $a, &$log) {
+            $loop->start(static function () use ($loop, $first, $a, &$log) {
                 $a->park();
-                $log[] = 'a ' . $loop->tick;
+                $log[] = 'a ' . ($loop->tick - $first + 1);
             });
-            $loop->start(static function () use ($loop, $a, $b, &$log) {
+            $loop->start(static function () use ($loop, $first, $a, $b, &$log) {
                 $b->park();
-                $log[] = 'b ' . $loop->tick;
+                $log[] = 'b ' . ($loop->tick - $first + 1);
                 $a->resume();
             });
             self::yield($loop);
@@ -248,6 +255,87 @@ final class LoopTest
             Assert::same($pending, 1);
             Assert::true($outdated < 64, 'The heap has kept the cancelled timers.');
             $loop->cancel($kept);
+        });
+    }
+
+    public function cancelledNearestTimerLeavesHeapAtOnce(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            $nearest = $loop->delay(toNs(sec(1)), new ContinuationImpl());
+            $next = $loop->delay(toNs(sec(2)), new ContinuationImpl());
+            $loop->cancel($nearest);
+
+            Assert::same([self::heaped($loop), self::timers($loop)], [1, [1, 1, 0]]);
+            $loop->cancel($next);
+        });
+    }
+
+    // A nearer timer stays pending in the tests of the rebuild: a cancelled timer at the top leaves at once.
+
+    public function heapIsRebuiltOnceOutdatedEntriesAreManyAndMost(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            $nearest = $loop->delay(toNs(sec(1)), new ContinuationImpl());
+            $timers = self::delays($loop, 100);
+            array_map($loop->cancel(...), \array_slice($timers, 0, 64));
+
+            Assert::same(self::heaped($loop), 37);
+
+            array_map($loop->cancel(...), [...\array_slice($timers, 64), ...self::delays($loop, 28)]);
+
+            Assert::same(self::heaped($loop), 1);
+            $loop->cancel($nearest);
+        });
+    }
+
+    public function heapIsKeptWhileOutdatedEntriesAreFew(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            $nearest = $loop->delay(toNs(sec(1)), new ContinuationImpl());
+            array_map($loop->cancel(...), self::delays($loop, 63));
+
+            Assert::same(self::heaped($loop), 64);
+            $loop->cancel($nearest);
+        });
+    }
+
+    public function heapIsKeptWhileOutdatedEntriesAreNoMoreThanPendingTimers(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            $nearest = $loop->delay(toNs(sec(1)), new ContinuationImpl());
+            $timers = self::delays($loop, 128);
+            array_map($loop->cancel(...), \array_slice($timers, 0, 64));
+
+            Assert::same(self::heaped($loop), 129);
+
+            array_map($loop->cancel(...), [$nearest, ...\array_slice($timers, 64)]);
+        });
+    }
+
+    public function outdatedEntriesDroppedAtTopAreNoLongerCounted(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            $wait = new ContinuationImpl();
+            $loop->delay(toNs(sec(1)), $wait);
+            array_map($loop->cancel(...), self::delays($loop, 10, seconds: 1));
+            $timers = self::delays($loop, 60, seconds: 10);
+
+            // The tick drops the outdated entries behind the timer it fires: counted still, they would make
+            // the cancelled ones most of the heap. Last first, so that none is the nearest timer until the last.
+            $wait->park();
+            array_map($loop->cancel(...), array_reverse($timers));
+
+            Assert::same(self::heaped($loop), 59);
         });
     }
 
@@ -502,6 +590,51 @@ final class LoopTest
         Assert::same(self::streams($loop), [[], 0]);
     }
 
+    public function streamThatKernelCannotWatchIsReadyAtOnce(): void
+    {
+        $loop = self::loop();
+
+        foreach (['php://temp', '/dev/null', 'data://text/plain,x'] as $file) {
+            $stream = fopen($file, 'r');
+            \assert($stream !== false);
+
+            $ready = $loop->run(static function () use ($loop, $stream) {
+                $continuation = new ContinuationImpl();
+                $loop->watch($stream, $continuation, write: false);
+
+                return $continuation->park();
+            });
+
+            Assert::true($ready, $file);
+        }
+    }
+
+    public function streamClosedAndWatchedAgainInTickItWasWokenIsReadyAtOnce(): void
+    {
+        [$reader, $writer] = self::pair();
+        $loop = self::loop();
+
+        $ready = $loop->run(static function () use ($loop, $reader, $writer) {
+            fwrite($writer, 'ping');
+            $first = new ContinuationImpl();
+            $loop->watch($reader, $first, write: false);
+            $first->park();
+            fclose($reader);
+            $second = new ContinuationImpl();
+            $loop->watch($reader, $second, write: false);
+            // Keeps the loop alive: without the fix, the second wait would hang until it.
+            $guard = $loop->delay(toNs(sec(5)), $second);
+
+            try {
+                return [$second->park(), $loop->now()];
+            } finally {
+                $loop->cancel($guard);
+            }
+        });
+
+        Assert::same($ready, [true, 0]);
+    }
+
     public function streamClosedWhileWatchedIsForgottenOnceItsWaitsEnd(): void
     {
         [$reader] = self::pair();
@@ -601,6 +734,72 @@ final class LoopTest
         Assert::same($received, [SIGUSR1]);
     }
 
+    public function signalOfOtherHandlerDoesNotFailWait(): void
+    {
+        $loop = new Loop();
+        $received = [];
+        // A handler of the user, not of the loop: the wait is cut short all the same (EINTR).
+        pcntl_signal(SIGUSR1, static function (int $signal) use (&$received) {
+            $received[] = $signal;
+        });
+        $async = pcntl_async_signals(true);
+
+        try {
+            foreach ([false, true] as $watchStream) {
+                $loop->run(static function () use ($loop, $watchStream) {
+                    [$reader] = self::pair();
+
+                    if ($watchStream) {
+                        $loop->watch($reader, new ContinuationImpl(), write: false);
+                    }
+
+                    $process = proc_open(
+                        command: ['sh', '-c', 'sleep 0.05; kill -USR1 ' . getmypid()],
+                        descriptor_spec: [],
+                        pipes: $pipes,
+                    );
+                    \assert($process !== false);
+                    $timer = new ContinuationImpl();
+                    $loop->delay(toNs(ms(300)), $timer);
+                    $timer->park();
+                    proc_close($process);
+                    fclose($reader);
+                });
+            }
+        } finally {
+            pcntl_async_signals($async);
+            pcntl_signal(SIGUSR1, SIG_DFL);
+        }
+
+        Assert::same($received, [SIGUSR1, SIGUSR1]);
+    }
+
+    public function signalWhoseHandlerHasNotRunBeforeWaitIsNotLost(): void
+    {
+        $loop = new Loop();
+
+        $signal = $loop->run(static function () use ($loop) {
+            $continuation = new ContinuationImpl();
+            $handler = static function (int $signal) use ($continuation) {
+                $continuation->resume($signal);
+            };
+            $loop->onSignal(SIGUSR1, $handler);
+            // A signal that comes after the last check of the engine for one, right before the wait,
+            // is only noted: its handler has not run, so nothing is in the pipe, and the wait is not cut short.
+            pcntl_async_signals(false);
+            posix_kill(posix_getpid(), SIGUSR1);
+            pcntl_async_signals(true);
+
+            try {
+                return $continuation->park();
+            } finally {
+                $loop->offSignal(SIGUSR1, $handler);
+            }
+        });
+
+        Assert::same($signal, SIGUSR1);
+    }
+
     public function previousHandlerOfSignalComesBackWhenLastHandlerIsGone(): void
     {
         $previous = static function () {};
@@ -681,6 +880,35 @@ final class LoopTest
         Assert::null($reference->get());
     }
 
+    public function loopLeftWithFiberOfBoundClosureReleasesWhatItHolds(): void
+    {
+        [$reader] = self::pair();
+        $loop = self::loop();
+        $loop->run(static function () use ($loop, $reader) {
+            // A fiber of a closure bound to an object that holds its wait: the cycle collector of PHP 8.6
+            // never frees such a cycle (php/php-src#25540), and the wait holds the loop.
+            $task = new class {
+                /**
+                 * @var ?ContinuationImpl<mixed>
+                 */
+                public ?ContinuationImpl $wait = null;
+
+                public function body(): void
+                {
+                    $this->wait = new ContinuationImpl();
+                    $this->wait->park();
+                }
+            };
+            $loop->start($task->body(...));
+            $loop->watch($reader, new ContinuationImpl(), write: false);
+            self::yield($loop);
+        });
+        $loop->release();
+
+        Assert::same([self::streams($loop), self::heaped($loop)], [[[], 0], 0]);
+        Assert::null((fn() => $this->context)->call($loop));
+    }
+
     private static function loop(): Loop
     {
         return new Loop(new VirtualClock(0));
@@ -704,6 +932,30 @@ final class LoopTest
     {
         /** @var array{int, int, int} */
         return (fn() => [$this->pendingTimers, $this->referencedTimers, $this->outdatedTimers])->call($loop);
+    }
+
+    /**
+     * @param positive-int $count
+     * @return list<Timer>
+     */
+    private static function delays(Loop $loop, int $count, int $seconds = 3600): array
+    {
+        $timers = [];
+
+        for ($i = 0; $i < $count; ++$i) {
+            $timers[] = $loop->delay(toNs(sec($seconds)), new ContinuationImpl());
+        }
+
+        return $timers;
+    }
+
+    /**
+     * How many entries the heap of the timers holds, outdated ones included.
+     */
+    private static function heaped(Loop $loop): int
+    {
+        /** @var int<0, max> */
+        return (fn() => $this->timers->count())->call($loop);
     }
 
     /**

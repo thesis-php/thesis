@@ -11,9 +11,8 @@ return new Manifest(
     description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
     licenseSince: 2026,
     version: '0.1',
-    keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop', 'revolt'],
+    keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop'],
     require: [
-        'revolt/event-loop' => '^1.0.9',
         'thesis/dispatcher' => '*',
         'thesis/source-location' => '*',
         'thesis/time' => '*',
@@ -21,7 +20,6 @@ return new Manifest(
     requireDev: [
         'ext-pcntl' => '*',
         'ext-posix' => '*',
-        'amphp/amp' => '^3',
         'testo/assert' => '^0.1.17',
         'testo/data' => '^0.1.10',
         'testo/test' => '^0.1.8',
@@ -29,14 +27,10 @@ return new Manifest(
         'thesis/testo-plugin' => '*',
     ],
     suggest: [
-        'ext-pcntl' => 'To use awaitSignal() and trapSignals() with the default event loop driver (ext-ev and ext-uv handle signals too)',
+        'ext-pcntl' => 'To use awaitSignal() and trapSignals()',
     ],
-    conflict: [
-        'amphp/amp' => '<3',
-    ],
-    // The amphp bridge: amphp/amp comes with the amphp library it is used with,
-    // and its classes are loaded only when ampCancellable() is called. ext-pcntl is needed only by the signals.
-    optional: ['amphp/amp', 'ext-pcntl'],
+    // Only the signals need ext-pcntl.
+    optional: ['ext-pcntl'],
     skip: [
         new RectorSkip(
             rule: ClassPropertyAssignToConstructorPromotionRector::class,

@@ -1,7 +1,8 @@
 # Thesis
 
-An ecosystem of asynchronous PHP built on `revolt/event-loop` alone. It rethinks amphp and the older thesis packages
-from scratch: it is not a wrapper around amphp and does not depend on it. 64-bit Unix only (`platform.md`).
+An ecosystem of asynchronous PHP on an event loop of its own (`Io\Poll` of PHP 8.6, in thesis/async). It rethinks
+amphp, Revolt and the older thesis packages from scratch: it is not a wrapper around them and does not depend
+on them. 64-bit Unix only (`platform.md`).
 
 ## Layout
 
@@ -63,8 +64,7 @@ the whole monorepo is for the final check.
 - `make test` starts the services of `compose.yaml` (RabbitMQ) first (`make up`), `make down` stops them.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
-  so commit the generated files. Everything runs on PHP 8.6. CI runs the tests on every Revolt driver:
-  `StreamSelect`, `Uv`, `Ev`, `Event` (`DRIVER=Ev make test`). `thesis/time` requires PHP 8.3 and is also
+  so commit the generated files. Everything runs on PHP 8.6. `thesis/time` requires PHP 8.3 and is also
   tested alone on 8.3 to 8.5 (`PHP_VERSION=8.3 make test-alone P=time`)
 
 ## Git
@@ -91,7 +91,7 @@ the whole monorepo is for the final check.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.
-- `testo-plugin`: Testo plugins for thesis packages: tests on the virtual time of thesis/async, PHP errors as failures. Requires: async.
+- `testo-plugin`: Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures. Requires: async.
 - `time`: Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.3 to 8.5, PSR-20 clocks.
 
 <!-- packages:end -->

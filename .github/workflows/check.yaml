@@ -22,18 +22,11 @@ jobs:
       # Generated files and the lock are checked by regenerating them: sync is the only source of truth.
       - run: make sync
       - run: git diff --exit-code
-      # The checks of `make check` except the tests: they run in the test job, on every driver.
+      # The checks of `make check` except the tests: they run in the test job.
       - run: make fixer-check rector-check phpstan deps-analyze
 
-  # The Revolt drivers differ in signals, closed streams and the order of callbacks: the code runs on each.
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        driver: [StreamSelect, Uv, Ev, Event]
-    env:
-      DRIVER: ${{ matrix.driver }}
     steps:
       - uses: actions/checkout@v6
       - run: make test

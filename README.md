@@ -4,7 +4,7 @@
 [![PHP](https://img.shields.io/badge/php-8.6%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-An ecosystem of asynchronous PHP built on [revolt/event-loop](https://github.com/revoltphp/event-loop) alone:
+An ecosystem of asynchronous PHP on an event loop of its own, on `Io\Poll` of PHP 8.6:
 structured concurrency for fibers, non-blocking I/O, TCP, TLS and DNS, an AMQP client and the tools around them.
 64-bit Unix only.
 
@@ -28,7 +28,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 | [thesis/net](packages/net) | Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. |
 | [thesis/phpstan-extension](packages/phpstan-extension) | PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them. |
 | [thesis/source-location](packages/source-location) | Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved. |
-| [thesis/testo-plugin](packages/testo-plugin) | Testo plugins for thesis packages: tests on the virtual time of thesis/async, PHP errors as failures. |
+| [thesis/testo-plugin](packages/testo-plugin) | Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures. |
 | [thesis/time](packages/time) | Functions for Time\Duration of PHP 8.6 and a polyfill of it for PHP 8.3 to 8.5, PSR-20 clocks. |
 
 <!-- packages:end -->

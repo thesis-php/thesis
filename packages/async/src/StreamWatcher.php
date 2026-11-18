@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
-use Revolt\EventLoop;
+use Thesis\Async\Internal\ContinuationImpl;
+use Thesis\Async\Internal\Loop;
 use Time\Duration;
-use function Thesis\Time\toSecFloat;
+use function Thesis\Time\toNs;
 
 /**
  * The waits on one stream, owned by whoever owns the stream, so that closing it can end them.
  *
- * Every wait goes through {@see suspend()}: it is cancelled by the task tree and leaves no Revolt callback behind.
- * Call {@see close()} before closing the stream: a Revolt watcher of a closed stream is an error,
- * and a fiber waiting for it would never wake up. close() ends every wait with false, and every later one
+ * Every wait goes through {@see suspend()}: it is cancelled by the task tree and leaves nothing in the event loop
+ * behind. Call {@see close()} before closing the stream: the kernel forgets a closed stream, and a fiber
+ * waiting for it would never wake up. close() ends every wait with false, and every later one
  * returns false at once, so the fibers waiting for the stream learn that it is gone.
  *
- * Any number of fibers may wait at once, for the same readiness too: each wait has a watcher of its own.
+ * Any number of fibers may wait at once, for the same readiness too: each of them is woken.
  *
  * @api
  */
@@ -25,7 +26,7 @@ final class StreamWatcher
     public private(set) bool $isClosed = false;
 
     /**
-     * @var array<string, Continuation<bool>> by Revolt callback id
+     * @var array<int, array{ContinuationImpl<bool>, \Closure(): void}> each wait and what undoes it, by spl_object_id()
      */
     private array $waits = [];
 
@@ -45,9 +46,7 @@ final class StreamWatcher
      */
     public function readable(): bool
     {
-        $stream = $this->stream;
-
-        return $this->wait(static fn(\Closure $callback) => EventLoop::onReadable($stream, $callback));
+        return $this->watch(write: false);
     }
 
     /**
@@ -58,9 +57,7 @@ final class StreamWatcher
      */
     public function writable(): bool
     {
-        $stream = $this->stream;
-
-        return $this->wait(static fn(\Closure $callback) => EventLoop::onWritable($stream, $callback));
+        return $this->watch(write: true);
     }
 
     /**
@@ -72,14 +69,19 @@ final class StreamWatcher
      */
     public function delay(Duration $duration): bool
     {
-        // Revolt rejects a negative delay.
-        $seconds = max(0.0, toSecFloat($duration));
+        $nanoseconds = toNs($duration);
 
-        return $this->wait(static fn(\Closure $callback) => EventLoop::delay($seconds, $callback));
+        return $this->wait(static function (Loop $loop, ContinuationImpl $continuation) use ($nanoseconds) {
+            $timer = $loop->delay($nanoseconds, $continuation);
+
+            return static function () use ($loop, $timer) {
+                $loop->cancel($timer);
+            };
+        });
     }
 
     /**
-     * Ends every wait with false and cancels its watcher; every later wait returns false at once.
+     * Ends every wait with false and forgets it in the event loop; every later wait returns false at once.
      * Call it before closing the stream. Idempotent.
      */
     public function close(): void
@@ -88,16 +90,29 @@ final class StreamWatcher
         $waits = $this->waits;
         $this->waits = [];
 
-        foreach ($waits as $callbackId => $continuation) {
-            EventLoop::cancel($callbackId);
+        foreach ($waits as [$continuation, $undo]) {
+            $undo();
             $continuation->resume(false);
         }
     }
 
+    private function watch(bool $write): bool
+    {
+        $stream = $this->stream;
+
+        return $this->wait(static function (Loop $loop, ContinuationImpl $continuation) use ($stream, $write) {
+            $loop->watch($stream, $continuation, $write);
+
+            return static function () use ($loop, $stream, $continuation, $write) {
+                $loop->unwatch($stream, $continuation, $write);
+            };
+        });
+    }
+
     /**
-     * @param \Closure(\Closure(): void): string $watch
+     * @param \Closure(Loop, ContinuationImpl<bool>): (\Closure(): void) $register returns what undoes it
      */
-    private function wait(\Closure $watch): bool
+    private function wait(\Closure $register): bool
     {
         // Like a receive() from a closed channel: no wait, so no cancellation check either.
         if ($this->isClosed) {
@@ -105,16 +120,15 @@ final class StreamWatcher
         }
 
         /** @var bool */
-        return suspend(function (Continuation $continuation) use ($watch) {
-            /** @var Continuation<bool> $continuation */
-            $callbackId = $watch(static function () use ($continuation) {
-                $continuation->resume(true);
-            });
-            $this->waits[$callbackId] = $continuation;
+        return suspend(function (Continuation $continuation) use ($register) {
+            /** @var ContinuationImpl<bool> $continuation */
+            $undo = $register(Loop::get(), $continuation);
+            $id = spl_object_id($continuation);
+            $this->waits[$id] = [$continuation, $undo];
 
-            return function () use ($callbackId) {
-                EventLoop::cancel($callbackId);
-                unset($this->waits[$callbackId]);
+            return function () use ($id, $undo) {
+                $undo();
+                unset($this->waits[$id]);
             };
         });
     }
