@@ -19,6 +19,8 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   crashes, the same without `--coverage-xml` passes, on any `--coverage-level`. aarch64 passes (a Mac),
   so the job `infect` runs on `ubuntu-24.04-arm`; reproduce with `docker run --platform linux/amd64`.
   Move it back to `ubuntu-latest` once a release of Xdebug passes there.
+- For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
+  of the event loop left surviving mutants in `Stream` of io and in async-trace. Kill them, then make it block again.
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,

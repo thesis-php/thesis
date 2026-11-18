@@ -7,6 +7,7 @@ namespace Thesis\Net;
 use Thesis\Async\Group;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Buffer;
+use Thesis\Io\WriteFailed;
 use Thesis\Net\Internal\Dns\Message;
 use function Thesis\Async\delay;
 use function Thesis\Time\ms;
@@ -145,6 +146,8 @@ final class FakeDns
                 $socket->write($byte);
                 delay(ms(1));
             }
+        } catch (WriteFailed) {
+            // A query cancelled while the answer comes byte by byte closes its socket, the next byte is reset.
         } finally {
             $socket->close();
         }
