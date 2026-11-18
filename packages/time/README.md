@@ -123,7 +123,7 @@ toMinutesFloat($duration); // 1.5083333333333333
 toHoursFloat($duration);   // 0.025138888888888888
 ```
 
-For APIs that take float seconds, like the timers of Revolt, and for metrics and logs.
+For APIs that take float seconds, like the timeout of `stream_socket_client()`, and for metrics and logs.
 The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
 in the last place off above.
 

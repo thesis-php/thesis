@@ -205,7 +205,7 @@ function toMsFloat(Duration $duration): float
 }
 
 /**
- * Seconds with a fraction, for APIs that take float seconds, like the timers of Revolt.
+ * Seconds with a fraction, for APIs that take float seconds, like the timeout of `stream_socket_client()`.
  *
  * @api
  */
