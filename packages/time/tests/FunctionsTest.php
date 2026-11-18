@@ -83,6 +83,16 @@ final class FunctionsTest
         yield 'negative toMinutesFloat' => [static fn() => toMinutesFloat(sec(-90)), '-1.5'];
         yield 'toHoursFloat' => [static fn() => toHoursFloat(minutes(90)), '1.5'];
         yield 'negative toHoursFloat' => [static fn() => toHoursFloat(minutes(-90)), '-1.5'];
+        // A float of seconds divided by 60 rounds twice: 0.009000000000000001 and 0.020999999999999998.
+        yield 'toMinutesFloat rounds once' => [static fn() => toMinutesFloat(minutes(0.009)), '0.009'];
+        yield 'toHoursFloat rounds once' => [static fn() => toHoursFloat(hours(0.021)), '0.021'];
+        yield 'toSecFloat rounds once' => [static fn() => toSecFloat(sec(1.118)), '1.118'];
+        // Above 2^53 nanoseconds the whole units stay exact.
+        yield 'toSecFloat above 2^53 ns' => [
+            static fn() => toSecFloat(Duration::fromSeconds(10_000_000, 500_000_001)),
+            '10000000.500000002',
+        ];
+        yield 'toHoursFloat above 2^53 ns' => [static fn() => toHoursFloat(minutes(200_000.5)), '3333.3416666666667'];
         yield 'isZero' => [static fn() => [isZero(ns(0)), isZero(ns(1)), isZero(ns(-1))], '[true, false, false]'];
         yield 'isNegative' => [
             static fn() => [isNegative(ns(0)), isNegative(ns(1)), isNegative(ns(-1))],
@@ -180,6 +190,16 @@ final class FunctionsTest
             self::NOT_INT,
         ];
         yield 'toHours of max' => [static fn() => toHours(sec(PHP_INT_MAX), \RoundingMode::TowardsZero), '596523'];
+        // The float conversions never throw: the products wider than int are floats.
+        yield 'toUsFloat of max' => [
+            static fn() => toUsFloat(Duration::fromSeconds(PHP_INT_MAX, 999_999_999)),
+            '2147483648000000.0',
+        ];
+        yield 'toMsFloat above max int' => [static fn() => toMsFloat(sec(2_147_484)), '2147484000.0'];
+        yield 'toMinutesFloat of max' => [
+            static fn() => toMinutesFloat(Duration::fromSeconds(PHP_INT_MAX, 999_999_999)),
+            '35791394.13333333',
+        ];
         yield 'multiply by min int' => [static fn() => multiply(ns(1), PHP_INT_MIN), '-2.147483648'];
         yield 'multiply max by 2' => [static fn() => multiply(sec(PHP_INT_MAX), 2), self::OUT_OF_RANGE];
     }

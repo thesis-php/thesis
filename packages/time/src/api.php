@@ -14,6 +14,7 @@ use function Thesis\Time\Internal\fromParts;
 use function Thesis\Time\Internal\rounded;
 use function Thesis\Time\Internal\timestamp;
 use function Thesis\Time\Internal\toFloatFractions;
+use function Thesis\Time\Internal\toFloatMultiples;
 use function Thesis\Time\Internal\toFractions;
 use function Thesis\Time\Internal\toMultiples;
 use function Thesis\Time\Internal\whole;
@@ -220,7 +221,7 @@ function toSecFloat(Duration $duration): float
  */
 function toMinutesFloat(Duration $duration): float
 {
-    return toSecFloat($duration) / SECONDS_PER_MINUTE;
+    return toFloatMultiples($duration, SECONDS_PER_MINUTE);
 }
 
 /**
@@ -230,7 +231,7 @@ function toMinutesFloat(Duration $duration): float
  */
 function toHoursFloat(Duration $duration): float
 {
-    return toSecFloat($duration) / SECONDS_PER_HOUR;
+    return toFloatMultiples($duration, SECONDS_PER_HOUR);
 }
 
 /**

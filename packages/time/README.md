@@ -101,8 +101,9 @@ toHours($duration, RoundingMode::PositiveInfinity); // 1
 ```
 
 `toNs()` is exact. The others take a `\RoundingMode` and have no default: the right one depends on what the number
-means. Round a timeout, a TTL or an interval up with `PositiveInfinity`, so that it never expires early and never
-becomes the `0` that many APIs take as "no limit". Drop the fraction of elapsed time with `TowardsZero`.
+means. Round a timeout, a TTL or an interval up with `PositiveInfinity`, so that it never expires early and a positive
+one never becomes the `0` that many APIs take as "no limit". A deadline that has passed still gives `0` or less:
+take `max(1, ...)` or check it with `isPositive()` first. Drop the fraction of elapsed time with `TowardsZero`.
 
 On 64-bit PHP every duration fits in an int of any unit, nanoseconds too. On 32-bit PHP an int holds 2.1 seconds
 of nanoseconds, 35 minutes of microseconds, 24 days of milliseconds, and a larger result throws `Time\TimeException`.
@@ -123,6 +124,8 @@ toHoursFloat($duration);   // 0.025138888888888888
 ```
 
 For APIs that take float seconds, like the timers of Revolt, and for metrics and logs.
+The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
+in the last place off above.
 
 ### Checking, comparing, multiplying, formatting
 

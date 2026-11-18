@@ -175,7 +175,51 @@ function toFractions(Duration $duration, int $perSecond, \RoundingMode $rounding
  */
 function toFloatFractions(Duration $duration, int $perSecond): float
 {
-    $units = $duration->seconds * $perSecond + $duration->nanoseconds / intdiv(NANOSECONDS_PER_SECOND, $perSecond);
+    $nanosecondsPerUnit = intdiv(NANOSECONDS_PER_SECOND, $perSecond);
+
+    return toFloatUnits(
+        duration: $duration,
+        nanosecondsPerUnit: $nanosecondsPerUnit,
+        wholeUnits: $duration->seconds * $perSecond + intdiv($duration->nanoseconds, $nanosecondsPerUnit),
+        remainderNanoseconds: $duration->nanoseconds % $nanosecondsPerUnit,
+    );
+}
+
+/**
+ * The duration in units of $secondsPerUnit seconds with a fraction: minutes, hours.
+ *
+ * @internal
+ * @param positive-int $secondsPerUnit
+ */
+function toFloatMultiples(Duration $duration, int $secondsPerUnit): float
+{
+    return toFloatUnits(
+        duration: $duration,
+        nanosecondsPerUnit: $secondsPerUnit * NANOSECONDS_PER_SECOND,
+        wholeUnits: intdiv($duration->seconds, $secondsPerUnit),
+        remainderNanoseconds: $duration->seconds % $secondsPerUnit * NANOSECONDS_PER_SECOND + $duration->nanoseconds,
+    );
+}
+
+/**
+ * The nearest float to the duration in units of $nanosecondsPerUnit, given also as whole units and a remainder.
+ * The products wider than int on 32-bit PHP are floats, exact below 2^53.
+ *
+ * @internal
+ */
+function toFloatUnits(
+    Duration $duration,
+    int|float $nanosecondsPerUnit,
+    int|float $wholeUnits,
+    int|float $remainderNanoseconds,
+): float {
+    $nanoseconds = $duration->seconds * (float) NANOSECONDS_PER_SECOND + $duration->nanoseconds;
+
+    // Below 2^53 (104 days) a float holds the nanoseconds exactly, and one division rounds to the nearest float.
+    // Above, they are rounded, so the whole units stay exact and only the fraction adds a rounding.
+    $units = $nanoseconds < 2.0 ** 53
+        ? $nanoseconds / $nanosecondsPerUnit
+        : $wholeUnits + $remainderNanoseconds / $nanosecondsPerUnit;
 
     return $duration->negative ? -$units : $units;
 }

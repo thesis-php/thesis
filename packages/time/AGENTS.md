@@ -81,6 +81,11 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   a float from `toMs($duration)` without a `\RoundingMode` and an int with it (as `toMilliseconds($precision)`
   of `thesis/time-span`): a forgotten mode is no longer an `ArgumentCountError` but a float that `sprintf('%d')`,
   `(int)` and a coercive int parameter truncate silently, and the type of the result depends on an argument.
+- A float conversion divides the nanoseconds once: dividing a float of seconds by 60 rounds twice and was
+  off by a unit in the last place for a quarter of the durations with a fraction (`toMinutesFloat(minutes(0.009))`
+  gave `0.009000000000000001`). Above 2^53 nanoseconds (104 days) a float no longer holds them, so the whole units
+  stay exact and only the fraction is divided: rarely an ulp off (above 2^53 µs, 285 years, for `toUsFloat()`).
+  Rejected: the nearest float there too, it needs integer arithmetic wider than 64 bits for durations nobody has.
 - No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
   a duration (the `Time\Instant` RFC).
 - `between()` and `shift()` work on timestamps: elapsed time does not stretch with DST. `shift()` drops
