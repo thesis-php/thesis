@@ -15,6 +15,9 @@ With ext-sockets, a failed connection says why (refused, unreachable).
 
 ## Usage
 
+Code that waits runs in the event loop of [thesis/async](https://github.com/thesis-php/async): a program starts it
+with `Thesis\Async\group()`, and a wait outside it throws `LogicException`. The examples leave it out.
+
 ### Connecting
 
 ```php

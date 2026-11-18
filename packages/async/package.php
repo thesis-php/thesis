@@ -8,7 +8,7 @@ use Thesis\Monorepo\RectorSkip;
 use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
-    description: 'Structured concurrency for PHP fibers: cancellation is a property of the task tree.',
+    description: 'Structured concurrency for PHP fibers on an event loop of its own: cancellation is a property of the task tree.',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop'],

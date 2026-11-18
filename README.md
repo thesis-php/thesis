@@ -18,7 +18,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 | Package | Description |
 |---|---|
 | [thesis/amqp](packages/amqp) | AMQP 0.9.1 client for RabbitMQ: publisher confirms, consumers as iterators, reconnects. |
-| [thesis/async](packages/async) | Structured concurrency for PHP fibers: cancellation is a property of the task tree. |
+| [thesis/async](packages/async) | Structured concurrency for PHP fibers on an event loop of its own: cancellation is a property of the task tree. |
 | [thesis/async-trace](packages/async-trace) | Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long. |
 | [thesis/cache](packages/cache) | Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex. |
 | [thesis/dispatcher](packages/dispatcher) | Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. |

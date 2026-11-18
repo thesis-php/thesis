@@ -58,9 +58,8 @@ read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `age
    The state per fiber (the scope, `ScopedValue`, the locks of `synchronized()`) is reset between tasks,
    `bindingInTaskDoesNotLeakIntoNextTaskInSameFiber` of `ScopedValueTest` comes back, a `SpawnBench`
    of short tasks shows the gain.
-6. **Docs and releases.** The README of async ("How it works", virtual time, signals, no amphp),
-   the READMEs of io and net where they name drivers, the changelogs of every changed package
-   by `changelogs.md`, the versions by `versions.md`.
+6. Done: the READMEs of async, io, net, cache, amqp and testo-plugin, the changelogs of async and testo-plugin.
+   No package was released, so the versions stay (`versions.md`).
 
 ## Questions for the stages
 

@@ -21,6 +21,9 @@ Requires 64-bit PHP 8.6+. No extensions.
 
 ## Usage
 
+Code that waits runs in the event loop of [thesis/async](https://github.com/thesis-php/async): a program starts it
+with `Thesis\Async\group()`, and a wait outside it throws `LogicException`. The examples leave it out.
+
 ### Encoding
 
 ```php
@@ -149,8 +152,7 @@ that inherit it, so these streams never change it: they read and write only once
 the call will not block, and wait through the event loop otherwise. `echo` and the processes that share
 the descriptor keep working: an `echo` while a write of `stdout()` waits for room blocks as usual and may land
 in the middle of that write. A write cancelled after a part leaves `stdout()` open, the next one goes on
-after the half: there are no messages to break. The uv driver makes every descriptor it watches non-blocking,
-so on it these streams do not watch: a wait checks the descriptor every 10 ms.
+after the half: there are no messages to break.
 
 ## Supported types
 

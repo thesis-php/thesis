@@ -13,6 +13,9 @@ composer require thesis/amqp
 
 ## Usage
 
+Code that waits runs in the event loop of [thesis/async](https://github.com/thesis-php/async): a program starts it
+with `Thesis\Async\group()`, and a wait outside it throws `LogicException`. The examples leave it out.
+
 ### Connecting
 
 `Client` is passive until `run()`, as every long-lived client of thesis: `run()` connects and performs the handshake

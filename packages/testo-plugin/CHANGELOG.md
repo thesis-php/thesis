@@ -9,5 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Testo plugins for thesis packages: tests on the virtual time of thesis/async.
+- Testo plugins for thesis packages: tests on the virtual time of thesis/async, with a random seed of the order
+  of a tick that a failed test prints and `THESIS_SEED` replays.
+- `EventLoopPlugin`: a test runs in the event loop of thesis/async, on the real clock.
 - `PhpErrorsPlugin`: a PHP error that a test does not suppress fails the test as `ErrorException`.

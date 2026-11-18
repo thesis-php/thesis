@@ -194,8 +194,8 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   `Deadlock` (`@api`, an `\Error`) is thrown into its wait, with the place of every suspended fiber.
 - Timers are a heap with lazy deletion: a cancel nulls the waiter, and the heap is rebuilt once outdated entries
   outnumber the pending ones (at least 64). A cancelled timer at the top leaves at once: the timer of a timeout
-  is mostly the nearest one, and so a timeout costs no rebuilds (`TimeoutBench`). Expirations saturate at `PHP_INT_MAX`, the timeout of a wait is capped at
-  `Scope::LONGEST_DURATION`. An unreferenced timer fires but keeps nothing from a deadlock (`Trace\watchdog()`).
+  is mostly the nearest one, and so a timeout costs no rebuilds (`TimeoutBench`). Expirations saturate
+  at `PHP_INT_MAX`, the timeout of a wait is capped at `Scope::LONGEST_DURATION`. An unreferenced timer fires but keeps nothing from a deadlock (`Trace\watchdog()`).
 - `Io\Poll` takes a stream once per context (`HandleAlreadyWatchedException`), so the readers and the writers
   of a stream share one `WatchedStream`, and its watcher is brought up to date lazily, right before a wait:
   a fiber that waits again in the tick it was woken costs no call to the kernel. Empty events are a `TypeError`,

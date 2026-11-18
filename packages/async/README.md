@@ -1,6 +1,6 @@
 # Thesis Async
 
-Structured concurrency for PHP fibers on top of [Revolt](https://revolt.run): cancellation is a property of the task tree, not a function parameter.
+Structured concurrency for PHP fibers on an event loop of its own, on `Io\Poll` of PHP 8.6: cancellation is a property of the task tree, not a function parameter.
 
 > **Experimental.** The API is unstable.
 
@@ -13,7 +13,7 @@ composer require thesis/async
 Windows is not supported: the package triggers `E_USER_WARNING` when it is loaded there, and nothing is guaranteed
 to work. Need it? [Open an issue](https://github.com/thesis-php/thesis/issues).
 
-The amphp bridge, [`ampCancellable()`](#amphp-ampcancellable), needs `amphp/amp` v3, which is not installed with the package.
+Signals need ext-pcntl, which the package only suggests.
 
 ## The problem
 
@@ -174,10 +174,12 @@ instead of `TaskCancelled`: the awaiter ends as cancelled, so a `timeout()` arou
 If an outer cancellation cuts a task short, `group()` throws `Cancelled` even if the body never awaited that task:
 a group never pretends that its work is done.
 
-Called from `{main}`, `group()` runs the event loop itself while it joins, and Revolt may throw out of it.
-If a foreign event loop callback throws, that is a failure of the group: the tasks are cancelled and joined,
-and the `UncaughtThrowable` is rethrown (unless an earlier failure takes precedence). If the loop runs dry
-while tasks are waiting, it is a deadlock: the tasks are cancelled, and once they have unwound, Revolt's error is rethrown.
+Called from `{main}`, `group()` runs the event loop itself while its body and the join run. Any other wait
+in `{main}` throws `LogicException`: wrap the code in `group()`. If an error escapes to the event loop
+(an `onCancel()` callback has thrown), that is a failure of the group: the tasks are cancelled and joined,
+and the error is rethrown (unless an earlier failure takes precedence). If nothing can wake the waiting tasks,
+it is a deadlock: the tasks are cancelled, and once they have unwound, `Deadlock` is rethrown with the place
+of every suspended fiber.
 
 ### Failures that were not rethrown: `suppressed()`
 
@@ -429,9 +431,11 @@ The two differ in when a signal gets its default action, which for most signals 
 `trapSignals()` handles them until it returns, so a SIGHUP that comes during `reload()` waits in the trap.
 Like the OS, a trap keeps at most one pending signal per number: ten SIGHUPs during a reload ask for one more.
 
-Revolt installs the handlers at the next tick of the event loop: `trapSignals()` waits for it before calling
-its callable, so a signal sent from inside it is caught. Both are waits like any other: cancellable,
-and they keep the event loop running. They need a driver that supports signals: ext-pcntl, ext-ev or ext-uv.
+`trapSignals()` installs the handlers before it calls its callable, so a signal sent from inside it is caught.
+Both are waits like any other: cancellable, and they keep the event loop running. They need ext-pcntl
+(`LogicException` without it). PHP cannot wait for a signal and a stream at once without a gap: a signal that comes
+right before the event loop waits for the kernel is handled at the latest 100 ms later, the longest wait
+while a handler is installed.
 
 ### CPU-bound loops: `checkpoint()`
 
@@ -816,35 +820,10 @@ $handle = static fn() => $next($request);
 return $requestId->isBound() ? $handle() : $requestId->with(generateId(), $handle);
 ```
 
-### amphp: `ampCancellable()`
-
-amphp libraries wait through `EventLoop::getSuspension()` directly, so a scope cannot interrupt them by itself.
-They take an `Amp\Cancellation` instead, and `ampCancellable()` gives them one tied to the current scope.
-It needs `amphp/amp` v3 (any amphp library brings it); the rest of the package does not load it.
-
-```php
-use Amp\Cancellation;
-use function Thesis\Async\ampCancellable;
-use function Thesis\Async\timeout;
-use function Thesis\Time\sec;
-
-$response = timeout(sec(5), static fn() => ampCancellable(
-    static fn(Cancellation $cancellation) => $httpClient->request($request, $cancellation),
-));
-```
-
-If the operation fails with `CancelledException` while the current scope is cancelled, `ampCancellable()` throws `Cancelled`,
-as any other wait would, and `timeout()` reports `TimedOut`. A `CancelledException` of the operation's own
-(a `TimeoutCancellation` passed alongside, for example) is rethrown as is.
-The cancellation is bound to the current scope: do not keep it beyond the callable.
-
-The cancellation costs nothing until amphp subscribes to it. A subscription removed by amphp is never called,
-even if the cancellation has already happened, so it cannot wake a fiber that has moved on to another wait.
-
 ### Tests on virtual time: `virtualTime()`
 
 Code with long deadlines is hard to test on real time: a heartbeat every 30 seconds, a backoff up to a minute.
-`virtualTime()` runs a callable on a virtual clock and a Revolt driver whose timers follow it. The clock starts at the current `Instant::now()`
+`virtualTime()` runs a callable on a virtual clock, in an event loop of its own whose timers follow it. The clock starts at the current `Instant::now()`
 rounded up to a whole second, so a time captured before `virtualTime()` (a deadline, a rate limiter) stays valid in it, and stands still
 while code runs; when nothing can run, it jumps to the nearest timer. So an hour of waiting is over at once,
 timers fire exactly in the order of their deadlines, and durations can be asserted exactly:
@@ -871,23 +850,25 @@ CPU work takes no time on this clock: `burnCpu($duration)` moves it forward with
 as busy code would (a negative `$duration` throws `\ValueError`). Outside `virtualTime()` it spins on the real clock,
 so the same code blocks the loop for real.
 A deadline passes then, but its timer fires only at the next suspension, as after a loop that blocked the event loop.
-A deadlock fails at once instead of hanging: there is no timer to jump to, and Revolt ends the loop.
-`virtualTime()` swaps the driver of the event loop, so it must be called in `{main}`: in a fiber it throws `LogicException`.
-The callbacks left for the tick it finishes on return still see its clock.
+A deadlock fails at once instead of hanging: there is no timer to jump to, and `Deadlock` is thrown.
+`$fn` runs in the root scope, as in `{main}`: nothing outside cancels it. Calls nest: called in a task,
+`virtualTime()` blocks the fiber of that task, and the outer loop with it, until it returns.
+Whatever `$fn` leaves in its loop (a task of a daemon, a timer) is dropped with it.
 
-Streams and signals stay real, on the driver that `EventLoop\DriverFactory` creates (`REVOLT_DRIVER` chooses it),
-or on one passed as `virtualTime($fn, $driver)`. It must be fresh: not the current driver and with no callbacks,
-so nothing from outside runs on virtual time, and it is dropped with whatever `$fn` leaves in it. They are polled on every tick, and only timers are waited for virtually,
-so a stream that becomes ready from outside the process may be jumped past. So may one made ready by code
-that Revolt does not call: a handler of `pcntl_signal()`, a watcher of `EventLoop::getHandle()`, a destructor run by the garbage collector.
-While `virtualTime()` runs, its clock is the clock of the library, bound by `virtualTime()` itself rather than found through the driver:
-`Instant`, deadlines, `remaining()` and the rate limiters follow it even if the driver is decorated meanwhile.
+Streams and signals stay real. The kernel is asked about the streams without waiting, and only timers are waited for
+virtually, so a stream that becomes ready from outside the process may be jumped past.
 Each `virtualTime()` has a clock of its own, so an object that keeps times must not outlive the `virtualTime()` it was used in:
 a rate limiter shared by two `virtualTime()` calls one after another, or used again outside, may see a time from the future of its clock.
 
+The fibers that become ready in one tick (woken by the same timer, a channel, a group that failed) run in the order
+they were woken. On a loaded machine, the order of the streams and the timers is up to the kernel and the timing:
+`virtualTime($fn, $seed)` shuffles the fibers of a tick by the seed, so a test meets other orders, and the same seed
+replays one.
+
 For [Testo](https://github.com/php-testo/testo),
 [thesis/testo-plugin](https://github.com/thesis-php/testo-plugin) runs tests this way: its `VirtualTimePlugin` runs
-every test of a suite in its own `virtualTime()`, and the `#[VirtualTime]` attribute does the same for a class or a test. The tests of this library run on it.
+every test of a suite in its own `virtualTime()` with a random seed, which a failed test prints, and the `#[VirtualTime]`
+attribute does the same for a class or a test. The tests of this library run on it.
 
 ### What the tree does: `Trace\observe()`
 
@@ -936,7 +917,7 @@ Observations nest: each dispatcher gets the events until its own call returns.
 
 A `StreamWatcher` owns the waits on one stream: `readable()` and `writable()` suspend until a read or a write
 would not block, and are cancelled by the task tree as any wait. The owner of the stream calls `close()` before closing it:
-a Revolt watcher of a closed stream is an error, and a fiber waiting for it would never wake up.
+the kernel forgets a closed stream, and a fiber waiting for it would never wake up.
 `close()` ends every wait with `false`, and every later wait returns `false` at once, so the waiting fibers learn
 that the stream is gone:
 
@@ -1035,28 +1016,47 @@ and a seeded `Random\Randomizer` makes the jitter repeatable in tests.
 Every wait in the library goes through a single function. Build queues, locks and I/O on it and they are cancellable for free:
 
 ```php
-use Revolt\EventLoop;
 use Thesis\Async\Continuation;
 use function Thesis\Async\suspend;
 
-function readable(mixed $stream): void
+final class Gate
 {
-    suspend(static function (Continuation $continuation) use ($stream) {
-        $watcher = EventLoop::onReadable($stream, static function () use ($continuation) {
-            $continuation->resume();
-        });
+    /** @var array<int, Continuation<null>> */
+    private array $waiting = [];
 
-        // Always called once the wait is over: by the event, by cancellation, by anything.
-        return static function () use ($watcher) {
-            EventLoop::cancel($watcher);
-        };
-    });
+    private bool $isOpen = false;
+
+    public function wait(): void
+    {
+        if ($this->isOpen) {
+            return;
+        }
+
+        suspend(function (Continuation $continuation) {
+            $id = spl_object_id($continuation);
+            $this->waiting[$id] = $continuation;
+
+            // Always called once the wait is over: by open(), by cancellation, by anything.
+            return function () use ($id) {
+                unset($this->waiting[$id]);
+            };
+        });
+    }
+
+    public function open(): void
+    {
+        $this->isOpen = true;
+
+        foreach ($this->waiting as $continuation) {
+            $continuation->resume();
+        }
+    }
 }
 ```
 
 Only a closure is taken for `$unregister`: anything else `$register` returns is ignored, so an arrow function may return
-whatever its expression gives (a Revolt callback id is a string, and `"die"` is callable).
-For a stream, take `StreamWatcher` instead of this `readable()`: it also ends the waits once the stream is closed.
+whatever its expression gives (`"die"` is callable). For a stream, take `StreamWatcher`: it waits for the kernel
+and ends the waits once the stream is closed.
 
 `Continuation::resume()` returns `false` if the continuation has already fired. A channel uses it to keep a value that was not delivered.
 `Continuation::throw()` rejects `Cancelled` with `\ValueError`, for the same reason as `Deferred::fail()`:
@@ -1081,6 +1081,12 @@ Five small ideas, each built on the previous one.
 4. **`Group`** starts child fibers in child scopes; `group()` joins them all before returning.
    That join is the structured concurrency guarantee.
 5. **`timeout()`** and **`shield()`** are just child scopes: one is cancelled by a timer, the other does not let outer cancellation in.
+
+Under them is an event loop of its own on `Io\Poll` of PHP 8.6 (epoll, kqueue), with no callbacks of the user:
+a timer, a stream and a cancellation each resume a continuation, which puts its fiber in the ready queue.
+A tick resumes the fibers that were ready when it began, then asks the kernel about the streams, waiting
+until the nearest timer if nothing is ready. What a fiber makes ready runs on the next tick, so fibers that wake
+each other cannot starve the streams and the timers.
 
 `Cancelled` carries nothing, and only the library creates it: its constructor is private, since a `Cancelled` thrown
 by hand where nothing is cancelled would make code end as cancelled that was not. Whoever catches it tells its own cancellation from a foreign one by the state of the tree:
@@ -1154,24 +1160,23 @@ all([user, orders])              orders fails after 50 ms
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |
-| `ampCancellable(callable(Amp\Cancellation): T): T` | run amphp code cancelled with the current scope |
 | `suppressed(\Throwable): list<\Throwable>` | failures a group did not rethrow because an earlier one was |
-| `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed` | exceptions |
+| `Cancelled extends \Error`, `TimedOut`, `TaskCancelled`, `ChannelClosed`, `Deadlock extends \Error` | exceptions |
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
-| `virtualTime(callable(): T, ?Driver): T`, `burnCpu(Duration)` | run on a virtual clock that jumps to the next timer; take a duration without yielding, as busy code would |
+| `virtualTime(callable(): T, ?int $seed = null): T`, `burnCpu(Duration)` | run on a virtual clock that jumps to the next timer; take a duration without yielding, as busy code would |
 | `Trace\observe(Dispatcher, callable(): T): T`, listeners of `Trace\Event` and its classes | the events of the scope tree while a callable runs |
+| `Trace\watchdog(Duration, callable(): void): \Closure(): void` | call back after a delay unless cancelled, without keeping the loop alive |
 
 ## Limitations
 
-- Code that waits through `EventLoop::getSuspension()` directly (for example, amphp libraries) is not cancelled by a scope
-  unless it runs under `ampCancellable()` and is given its cancellation: otherwise it behaves as if shielded until it returns.
-- Callbacks registered directly with `EventLoop::queue()`, `defer()` or `delay()` from inside a task, and fibers created by hand,
-  run in the root scope: the group neither cancels nor joins them.
-- In `{main}`, if the event loop runs dry while a task waits under a shield for something that never comes,
-  cancelling cannot help: `group()` gives up joining and rethrows Revolt's "Event loop terminated" error,
-  which lists the stuck fibers. Those tasks are orphaned; the alternative is to hang forever.
-  Even if the group has already failed with an error of its own, the deadlock error is the one thrown, since the tasks
+- Fibers created by hand (`new \Fiber`) run in the root scope: the group neither cancels nor joins them.
+- In `{main}`, if nothing can wake a task that waits under a shield for something that never comes,
+  cancelling cannot help: `group()` gives up joining and rethrows `Deadlock`, which lists the stuck fibers.
+  Those tasks are orphaned; the alternative is to hang forever.
+  Even if the group has already failed with an error of its own, the deadlock is the one thrown, since the tasks
   were not joined; the group's error is among its `suppressed()` ones.
+- A blocking call (`sleep()`, `file_get_contents()` of a URL, a blocking socket) blocks every fiber:
+  the event loop runs only between waits.
 
 ## Prior art
 

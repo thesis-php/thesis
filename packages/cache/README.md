@@ -27,6 +27,9 @@ Requires 64-bit PHP 8.6+. No extensions.
 
 ## `Cache`
 
+A wait of `AtomicCache` and of the keyed mutex runs in the event loop of [thesis/async](https://github.com/thesis-php/async): a program starts it
+with `Thesis\Async\group()`, and a wait outside it throws `LogicException`. The examples leave it out.
+
 `Cache<V>` has `get($key, $default = null)`, `set($key, $value, ?Duration $ttl = null)` and `delete($key)`.
 A TTL of `null` keeps the entry until it is deleted or evicted, zero or negative deletes it. Any positive TTL
 is accepted, and a read does not prolong it. A key is any string: empty, binary, of any length.

@@ -1,6 +1,6 @@
 {
     "name": "thesis/async",
-    "description": "Structured concurrency for PHP fibers: cancellation is a property of the task tree.",
+    "description": "Structured concurrency for PHP fibers on an event loop of its own: cancellation is a property of the task tree.",
     "keywords": [
         "php",
         "async",
