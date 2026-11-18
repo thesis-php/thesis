@@ -7,12 +7,25 @@ namespace Thesis\Time\Internal;
 use Time\Duration;
 use Time\TimeException;
 
+/** @internal */
 const NANOSECONDS_PER_MICROSECOND = 1000;
+
+/** @internal */
 const NANOSECONDS_PER_MILLISECOND = 1000 * NANOSECONDS_PER_MICROSECOND;
+
+/** @internal */
 const NANOSECONDS_PER_SECOND = 1000 * NANOSECONDS_PER_MILLISECOND;
+
+/** @internal */
 const MICROSECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MICROSECOND;
+
+/** @internal */
 const MILLISECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MILLISECOND;
+
+/** @internal */
 const SECONDS_PER_MINUTE = 60;
+
+/** @internal */
 const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
 
 /**
@@ -71,7 +84,7 @@ function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
         throw new \ValueError(\sprintf('A duration must be finite, %s given', var_export($value, return: true)));
     }
 
-    $nanoseconds = round($value * $nanosecondsPerUnit);
+    $nanoseconds = roundHalfAwayFromZero($value * $nanosecondsPerUnit);
 
     // A finite value times the unit may overflow to INF, and fmod() of INF is NAN.
     if (!is_finite($nanoseconds)) {
@@ -82,7 +95,7 @@ function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
     // fmod() is exact. Above 2^62 nanoseconds a float is a multiple of 1024, an odd number of seconds is not:
     // the subtraction is off by up to 512 nanoseconds, so the quotient is rounded, not truncated.
     $fraction = fmod($magnitude, NANOSECONDS_PER_SECOND);
-    $seconds = round(($magnitude - $fraction) / NANOSECONDS_PER_SECOND);
+    $seconds = roundHalfAwayFromZero(($magnitude - $fraction) / NANOSECONDS_PER_SECOND);
 
     // Before the cast: a float beyond int does not convert.
     if ($seconds > MAX_SECONDS) {
@@ -92,6 +105,22 @@ function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
     $duration = Duration::fromSeconds((int) $seconds, (int) $fraction);
 
     return $nanoseconds < 0 ? $duration->negate() : $duration;
+}
+
+/**
+ * Not round(): before PHP 8.4 it rounds to 15 significant digits first, so 0.49999999999999994 becomes 1,
+ * and returns a value of 1e15 and above with its fraction, which a cast to int then drops.
+ *
+ * @internal
+ */
+function roundHalfAwayFromZero(float $value): float
+{
+    $magnitude = abs($value);
+    $whole = floor($magnitude);
+    // Exact: a float less its floor. A fraction exists only below 2^52, where adding 1 is exact too.
+    $rounded = $magnitude - $whole >= 0.5 ? $whole + 1 : $whole;
+
+    return $value < 0 ? -$rounded : $rounded;
 }
 
 /**
@@ -186,7 +215,7 @@ function whole(int|float $number): string
 }
 
 /**
- * The magnitude of a quotient, rounded toward zero, rounded by the remainder of the division and signed.
+ * A quotient truncated toward zero, rounded by how its remainder compares with a half, then signed.
  *
  * @internal
  * @param int|float $quotient a float is an int that overflowed in the arithmetic of the caller

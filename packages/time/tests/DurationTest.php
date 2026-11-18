@@ -12,9 +12,7 @@ use Time\TimeException;
 use const Thesis\Time\Internal\MAX_SECONDS;
 
 /**
- * Pins the behavior of Time\Duration with values taken from the class of PHP 8.6: the same test passes
- * below PHP 8.6 against the polyfill and on PHP 8.6 against the original. The bounds differ on 32-bit PHP,
- * its values are taken from the class of PHP 8.6 there.
+ * Values taken from the class of PHP 8.6, 64-bit and 32-bit: the test passes against it and against the polyfill.
  */
 #[Test]
 final class DurationTest
@@ -441,7 +439,9 @@ final class DurationTest
         // On 32-bit PHP the number is a float above PHP_INT_MAX, which the int property rejects.
         yield 'unserialize above max' => [
             static fn() => unserialize($data(\PHP_INT_SIZE === 4 ? 'i:2147483648' : 'i:9223372036', 'i:0', 'b:0')),
-            self::INVALID_DATA . (\PHP_INT_SIZE === 4 ? ' < TypeError' : ' < Time\TimeException'),
+            self::INVALID_DATA . ' < ' . (\PHP_INT_SIZE === 4
+                ? 'TypeError: Cannot assign float to property Time\Duration::$seconds of type int'
+                : self::OUT_OF_RANGE),
         ];
         yield 'unserialize negative zero' => [
             static fn() => unserialize($data('i:0', 'i:0', 'b:1')),
@@ -461,11 +461,11 @@ final class DurationTest
         ];
         yield 'unserialize float' => [
             static fn() => unserialize($data('d:1', 'i:0', 'b:0')),
-            self::INVALID_DATA . ' < TypeError',
+            self::INVALID_DATA . ' < TypeError: Cannot assign float to property Time\Duration::$seconds of type int',
         ];
         yield 'unserialize int as bool' => [
             static fn() => unserialize($data('i:1', 'i:0', 'i:1')),
-            self::INVALID_DATA . ' < TypeError',
+            self::INVALID_DATA . ' < TypeError: Cannot assign int to property Time\Duration::$negative of type bool',
         ];
         yield 'unserialize missing' => [
             static fn() => unserialize('O:13:"Time\Duration":1:{s:7:"seconds";i:1;}'),
@@ -475,11 +475,11 @@ final class DurationTest
             static fn() => unserialize(
                 'O:13:"Time\Duration":4:{s:7:"seconds";i:1;s:11:"nanoseconds";i:0;s:8:"negative";b:0;s:1:"x";i:1;}',
             ),
-            self::INVALID_DATA . ' < Error',
+            self::INVALID_DATA . ' < Error: Cannot create dynamic property Time\Duration::$x',
         ];
         yield 'unserialize into an existing object' => [
             static fn() => signed(1)->__unserialize(['seconds' => 2, 'nanoseconds' => 0, 'negative' => false]),
-            self::INVALID_DATA . ' < Error',
+            self::INVALID_DATA . ' < Error: Cannot modify readonly property Time\Duration::$seconds',
         ];
         yield 'json' => [
             static fn() => json_encode(signed(1, 2, true), JSON_THROW_ON_ERROR),

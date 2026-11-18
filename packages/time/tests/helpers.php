@@ -23,8 +23,8 @@ function signed(int $seconds, int $nanoseconds = 0, bool $negative = false): Dur
 }
 
 /**
- * The outcome of a call as a string: "90.5" or "-0.25" for a duration of either implementation,
- * "Time\TimeException: message" for an exception, the class of the polyfill copy named like the original.
+ * The outcome of a call as a string, the same for the polyfill copy and the class: "-0.250000000" for a duration,
+ * "Exception: message < TypeError: message" for an exception and its previous ones.
  *
  * @param callable(): mixed $call
  */
@@ -33,14 +33,14 @@ function outcome(callable $call): string
     try {
         return describe($call());
     } catch (\Throwable $exception) {
-        $previous = $exception->getPrevious();
+        $outcome = '';
 
-        return \sprintf(
-            '%s: %s%s',
-            str_replace('Thesis\Time\Polyfill\\', 'Time\\', $exception::class),
-            $exception->getMessage(),
-            $previous === null ? '' : ' < ' . str_replace('Thesis\Time\Polyfill\\', 'Time\\', $previous::class),
-        );
+        for ($cause = $exception; $cause !== null; $cause = $cause->getPrevious()) {
+            $class = str_replace('Thesis\Time\Polyfill\\', 'Time\\', $cause::class);
+            $outcome .= \sprintf('%s%s: %s', $outcome === '' ? '' : ' < ', $class, $cause->getMessage());
+        }
+
+        return $outcome;
     }
 }
 

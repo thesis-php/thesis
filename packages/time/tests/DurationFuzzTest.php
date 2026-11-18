@@ -13,11 +13,8 @@ use Testo\Test;
 use Time\Duration;
 
 /**
- * Differential test of the polyfill against the class of PHP 8.6: applies the same random operations
- * to both and requires identical results and exceptions. Runs on PHP 8.6 only, 64-bit and 32-bit, against
- * a renamed copy of the polyfill (see loadPolyfillCopy()); DurationTest pins the behavior below PHP 8.6.
- *
- * To reproduce a failure, run the reported seed alone.
+ * The same random operations on a renamed copy of the polyfill and on the class of PHP 8.6 give the same results
+ * and exceptions. Runs on PHP 8.6 only. To reproduce a failure, run the reported seed alone.
  */
 #[Test]
 final class DurationFuzzTest
@@ -74,14 +71,14 @@ final class DurationFuzzTest
         for ($case = 0; $case < self::CASES_PER_SEED; ++$case) {
             $a = [self::int($random), $random->getInt(0, 999_999_999), $random->getInt(0, 1) === 1];
             $b = [self::int($random), $random->getInt(0, 999_999_999), $random->getInt(0, 1) === 1];
-            $n = self::int($random);
+            $operand = self::int($random);
             $operation = $random->getInt(0, 7);
 
             Assert::same(
-                actual: outcome(static fn() => self::apply($polyfill, $operation, $a, $b, $n)),
-                expected: outcome(static fn() => self::apply(Duration::class, $operation, $a, $b, $n)),
+                actual: outcome(static fn() => self::apply($polyfill, $operation, $a, $b, $operand)),
+                expected: outcome(static fn() => self::apply(Duration::class, $operation, $a, $b, $operand)),
                 message: \sprintf('seed %d, case %d: operation %d of %s', $seed, $case, $operation, json_encode(
-                    [$a, $b, $n],
+                    [$a, $b, $operand],
                     JSON_THROW_ON_ERROR,
                 )),
             );
@@ -93,24 +90,24 @@ final class DurationFuzzTest
      * @param array{int, int, bool} $a
      * @param array{int, int, bool} $b
      */
-    private static function apply(string $class, int $operation, array $a, array $b, int $n): mixed
+    private static function apply(string $class, int $operation, array $a, array $b, int $operand): mixed
     {
         return match ($operation) {
             0 => self::create($class, $a)->add(self::create($class, $b)),
             1 => self::create($class, $a)->sub(self::create($class, $b)),
-            2 => self::create($class, $a)->multiplyBy($n),
-            3 => self::create($class, $a)->divideBy($n),
+            2 => self::create($class, $a)->multiplyBy($operand),
+            3 => self::create($class, $a)->divideBy($operand),
             4 => [
                 $class::compare(self::create($class, $a), self::create($class, $b)),
                 self::create($class, $a) < self::create($class, $b),
                 self::create($class, $a) <=> self::create($class, $b),
             ],
             5 => [
-                outcome(static fn() => $class::fromNanoseconds($n)),
-                outcome(static fn() => $class::fromMicroseconds($n)),
-                outcome(static fn() => $class::fromMilliseconds($n)),
-                outcome(static fn() => $class::fromMinutes($n)),
-                outcome(static fn() => $class::fromHours($n)),
+                outcome(static fn() => $class::fromNanoseconds($operand)),
+                outcome(static fn() => $class::fromMicroseconds($operand)),
+                outcome(static fn() => $class::fromMilliseconds($operand)),
+                outcome(static fn() => $class::fromMinutes($operand)),
+                outcome(static fn() => $class::fromHours($operand)),
             ],
             // The serialized form names the class, the copy of the polyfill has another name.
             6 => [

@@ -30,12 +30,17 @@ final class FunctionsTest
         yield 'negative ms' => [static fn() => ms(-1500), '-1.500000000'];
         yield 'sec' => [static fn() => sec(90), '90.000000000'];
         yield 'float sec' => [static fn() => sec(1.1), '1.100000000'];
-        yield 'sec rounds half away from zero' => [static fn() => sec(0.000_000_000_5), '0.000000001'];
-        yield 'negative sec rounds half away from zero' => [static fn() => sec(-0.000_000_000_5), '-0.000000001'];
+        yield 'sec rounds half away from zero' => [static fn() => sec(0.0000000005), '0.000000001'];
+        yield 'negative sec rounds half away from zero' => [static fn() => sec(-0.0000000005), '-0.000000001'];
+        // round() of PHP 8.3 and older rounds to 15 digits first and leaves a value of 1e15 and above as it is.
+        yield 'sec just below a half' => [static fn() => sec(4.9999999999999994e-10), '0.000000000'];
+        yield 'sec of 15 digits just below a half' => [static fn() => sec(1.0000000004999998), '1.000000000'];
+        yield 'sec above 1e15 ns' => [static fn() => sec(2000000.0000000007), '2000000.000000001'];
+        yield 'hours above 1e15 ns' => [static fn() => hours(300.0000000000002), '1080000.000000001'];
         yield 'min int sec' => [static fn() => sec(PHP_INT_MIN), self::OUT_OF_RANGE];
         yield 'float sec above max' => [static fn() => sec(1e10), self::OUT_OF_RANGE];
-        yield 'float sec at 2^63 ns' => [static fn() => sec(9.223_372_036_854_775_808e9), self::OUT_OF_RANGE];
-        yield 'float sec at -2^63 ns' => [static fn() => sec(-9.223_372_036_854_775_808e9), self::OUT_OF_RANGE];
+        yield 'float sec at 2^63 ns' => [static fn() => sec(2.0 ** 63 / 1e9), self::OUT_OF_RANGE];
+        yield 'float sec at -2^63 ns' => [static fn() => sec(-2.0 ** 63 / 1e9), self::OUT_OF_RANGE];
         // The nanoseconds of a finite float may overflow to INF.
         yield 'max float sec' => [static fn() => sec(PHP_FLOAT_MAX), self::OUT_OF_RANGE];
         yield 'min float ms' => [static fn() => ms(-PHP_FLOAT_MAX), self::OUT_OF_RANGE];

@@ -22,28 +22,25 @@ format($timeout);     // 1.5s
 composer require thesis/time
 ```
 
-Requires PHP 8.2+, 64-bit or 32-bit. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
+Requires PHP 8.2.2+, 64-bit or 32-bit. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
 
 ## Why
 
-`Time\Duration` is a fixed amount of elapsed time with nanosecond precision: a timeout, a delay, a TTL.
-It is the type the ecosystem will share, but it is minimal on purpose: its factories take only non-negative ints,
-and nothing converts it back to a number. This package fills the gaps with functions and does not wrap the class:
-every function takes and returns `Time\Duration`, so it passes to any other API as is.
+`Time\Duration` is elapsed time with nanosecond precision: a timeout, a delay, a TTL. The class is minimal on purpose:
+its factories take only non-negative ints, and nothing converts it back to a number. The functions here fill the gaps
+and take and return `Time\Duration` itself, so it passes to any other API as is.
 
 ## Polyfill
 
-Below PHP 8.6 the package declares `Time\Duration` and `Time\TimeException`. They behave as the classes of PHP 8.6
-down to the exception messages: factories, arithmetic, `compare()`, the `<`, `==` and `<=>` operators,
-ISO 8601 parsing and `serialize()`. A test compares the two on random input.
-
-What differs: `var_dump()`, `var_export()` and an `(array)` cast show one more private property,
-reflection sees `__serialize()`, and the error of a wrong argument type mentions the file of the caller.
-On PHP 8.6 the polyfill is not loaded.
+Below PHP 8.6 the package declares `Time\Duration` and `Time\TimeException`, which behave as in PHP 8.6
+down to the exception messages, compared with the original on random input. What differs: `var_dump()`
+and an `(array)` cast show two more private properties, reflection sees `__serialize()`, and a wrong call fails
+as with a userland method (extra arguments are ignored, `null` for an int is a `TypeError` in coercive mode too).
 
 ## Creating
 
-Each function takes a negative value too, and a float, rounded to the nearest nanosecond, half away from zero.
+Each function takes a negative value, and all but `ns()` a float, rounded to the nearest nanosecond,
+half away from zero.
 
 ```php
 use function Thesis\Time\{duration, hours, minutes, ms, ns, sec, us};
@@ -72,10 +69,9 @@ toSec($ttl, RoundingMode::PositiveInfinity); // whole seconds, rounded up
 toSecFloat($timeout); // for APIs that take float seconds, like the timers of Revolt
 ```
 
-`toUs()`, `toMs()`, `toSec()`, `toMinutes()` and `toHours()` round with a `\RoundingMode`, `TowardsZero` by default
-as in Go, Java and Rust. A timeout is usually rounded up, so that it never expires early. On 32-bit PHP a result
-above `PHP_INT_MAX` throws `Time\TimeException`: an int holds 2.1 seconds of nanoseconds, 35 minutes of microseconds
-and 24 days of milliseconds.
+The integer conversions round with a `\RoundingMode`, `TowardsZero` by default as in Go, Java and Rust:
+round a timeout up, so that it never expires early. On 32-bit PHP a result above `PHP_INT_MAX` throws
+`Time\TimeException`: an int holds 2.1 seconds of nanoseconds, 35 minutes of microseconds, 24 days of milliseconds.
 
 ## The rest
 
@@ -98,9 +94,8 @@ format(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s, like Duration.Str
 
 ## Points in time
 
-`between()` and `shift()` connect durations with `DateTimeImmutable`. They count elapsed time
-from the timestamps, so a change of the UTC offset (DST) in between does not count.
-`DateTimeImmutable` keeps microseconds: `shift()` drops the rest of the nanoseconds.
+`between()` and `shift()` count elapsed time between timestamps, so a change of the UTC offset (DST) does not count.
+`shift()` drops the nanoseconds below a microsecond, which `DateTimeImmutable` cannot hold.
 
 ```php
 use function Thesis\Time\{between, shift};
@@ -128,5 +123,5 @@ $clock->now = new DateTimeImmutable('2027-01-01 00:00:00 UTC');
 
 ## Durations themselves
 
-`Time\Duration` itself adds, subtracts and compares: `$a->add($b)`, `$a->sub($b)`, `$a->negate()`,
-`$a->absolute()`, `Duration::compare($a, $b)`, `$a < $b`.
+The class itself adds, subtracts and compares: `$a->add($b)`, `$a->sub($b)`, `$a->negate()`, `$a->absolute()`,
+`Duration::compare($a, $b)`, `$a < $b`.

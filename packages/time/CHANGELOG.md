@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-18
+
 ### Changed
 
-- Requires PHP 8.2+, 64-bit or 32-bit: the polyfill of `Time\Duration` serves PHP 8.2 to 8.5 and has the range
-  of the class on 32-bit PHP, the conversions throw `Time\TimeException` for a result above `PHP_INT_MAX`.
+- Requires PHP 8.2.2+, 64-bit or 32-bit: the polyfill of `Time\Duration` serves PHP 8.2 to 8.5,
+  below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
+- On 32-bit PHP a duration is up to about 68 years, and `toNs()`, `toUs()`, `toMs()` and `toSec()` throw
+  `Time\TimeException` for a result above `PHP_INT_MAX`.
 
 ### Fixed
 

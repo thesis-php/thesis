@@ -247,9 +247,8 @@ function longest(Duration $duration, Duration ...$durations): Duration
 }
 
 /**
- * Unlike Duration::multiplyBy(), takes a negative factor and a float one. An int factor is exact,
- * a float one is applied to the nanoseconds as a float: rounded to the nearest nanosecond, half away from zero,
- * and exact to the nanosecond while the product is below 2^53 nanoseconds (about 104 days).
+ * Unlike Duration::multiplyBy(), takes a negative and a float factor. An int factor is exact, a float one
+ * is rounded to the nearest nanosecond, half away from zero, exact while both durations are below 2^53 ns (104 days).
  *
  * @api
  * @throws TimeException out of the range of Duration
@@ -331,9 +330,8 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
 }
 
 /**
- * $time moved by the duration: later, or earlier if the duration is negative. The duration is elapsed time,
- * whatever the UTC offset (DST) does in between. DateTimeImmutable keeps microseconds:
- * the rest of the nanoseconds is dropped.
+ * $time moved by the duration, back if it is negative, whatever the UTC offset (DST) does in between.
+ * The nanoseconds below a microsecond are dropped: DateTimeImmutable cannot hold them.
  *
  * @api
  */

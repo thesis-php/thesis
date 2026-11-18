@@ -7,9 +7,8 @@ namespace Time;
 use Thesis\Time\Internal\IsoInterval;
 
 /**
- * Polyfill of the PHP 8.6 class (https://wiki.php.net/rfc/duration_class) for PHP 8.2 to 8.5, loaded by
- * src/polyfill.php only when the class does not exist. It follows the C implementation
- * (ext/date/time_duration.c and lib/duration.c of timelib) down to the exception messages.
+ * Polyfill of the class of PHP 8.6 (https://wiki.php.net/rfc/duration_class), loaded by src/polyfill.php.
+ * It follows ext/date/time_duration.c and lib/duration.c of timelib down to the exception messages.
  */
 final readonly class Duration
 {
@@ -29,9 +28,8 @@ final readonly class Duration
     private const DAYS_FOUND = 'The ISO 8601 duration string may only contain the time (T) aspect';
 
     /**
-     * Declared first on purpose: PHP compares two objects of one class property by property in the order
-     * of declaration, so `<`, `<=>` and `==` decide by the signed seconds, then by the signed nanoseconds,
-     * like the comparison handler of the C class. Not one int of nanoseconds: on 32-bit PHP it does not fit.
+     * First on purpose: PHP compares objects property by property in declaration order, so `<`, `<=>` and `==`
+     * compare the signed seconds, then the signed nanoseconds, as the C class does. Int nanoseconds overflow on 32-bit.
      */
     private int $signedSeconds;
 
