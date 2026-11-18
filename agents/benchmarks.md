@@ -29,4 +29,5 @@ Read before writing or changing a benchmark, or a change justified by one. How t
   of Tally is built for it, build the extension in the container as root (`apk add bash $PHPIZE_DEPS`, then
   `vendor/phpstan/tally/build/build-tally-hooks.sh var/tally-hooks/tally_hooks.so`) and load it by an ini file
   in a directory of `PHP_INI_SCAN_DIR` (`/usr/local/etc/php/conf.d:/workspace/var/tally-ini`), which `tally.php`
-  passes to the cases. CI meets the same trap.
+  passes to the cases. In CI the job `bench` is off (`if: false`) and out of `needs` of the release
+  for the same reason: turn it back on with the release of Tally.

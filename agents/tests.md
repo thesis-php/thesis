@@ -13,6 +13,12 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   everything inside the statement, so above a loop or an `if` with more in it the comment goes before
   the expression: `/* @infection-ignore LessThan */ $shift < 64`. A misspelt mutator skips nothing,
   Infection only warns, so the mutant still fails the run.
+- Trap: on x86_64 Xdebug 3.6.0alpha1 of the PHP 8.6 RC7 image dies with signal 11 in the first test
+  of the initial run of `make infect`, on every package. It is the per-test coverage that `--coverage-xml`
+  turns on: `XDEBUG_MODE=coverage vendor/bin/testo run --coverage --coverage-xml=/tmp/cov --suite=formatter`
+  crashes, the same without `--coverage-xml` passes, on any `--coverage-level`. aarch64 passes (a Mac),
+  so the job `infect` runs on `ubuntu-24.04-arm`; reproduce with `docker run --platform linux/amd64`.
+  Move it back to `ubuntu-latest` once a release of Xdebug passes there.
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
