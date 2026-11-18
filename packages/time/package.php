@@ -8,8 +8,7 @@ use Thesis\Monorepo\Manifest;
 use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
-    description: 'Polyfill of Time\Duration of PHP 8.6 for PHP 8.2 to 8.5, 64-bit and 32-bit, functions for it, '
-        . 'PSR-20 clocks.',
+    description: 'Time\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), PSR-20 clocks.',
     licenseSince: 2026,
     version: '0.4',
     keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
