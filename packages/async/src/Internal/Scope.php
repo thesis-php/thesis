@@ -102,6 +102,19 @@ final class Scope implements Waiter
         $this->deadline = $deadline;
     }
 
+    /**
+     * Runs $fn in the root scope with no scoped values, as the code of the event loop between the fibers runs:
+     * whoever has called {@see Loop::run()} or ended a scope, its state is not that of the callback.
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    public static function runInRoot(callable $fn): mixed
+    {
+        return ROOT_SCOPE->run(static fn() => Context::run([], $fn));
+    }
+
     public static function current(): self
     {
         /** @var self */
@@ -285,7 +298,7 @@ final class Scope implements Waiter
 
         if ($this->isCancelled && $callbacks !== []) {
             // As from the queue: in the root scope, with no scoped values.
-            ROOT_SCOPE->run(static fn() => Context::run([], static function () use ($callbacks) {
+            self::runInRoot(static function () use ($callbacks) {
                 foreach ($callbacks as $fire) {
                     try {
                         $fire();
@@ -297,7 +310,7 @@ final class Scope implements Waiter
                         });
                     }
                 }
-            }));
+            });
         }
     }
 

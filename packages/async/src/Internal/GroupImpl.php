@@ -59,9 +59,16 @@ final class GroupImpl implements Group
     public static function run(callable $body, string $function, ?string $name = null): mixed
     {
         // Outside a run of the event loop nothing could resume a wait: the loop runs here, in {main} or in a fiber
-        // of another scheduler (Testo runs a test so), and the group in a fiber of its own until it ends.
+        // of another scheduler (Testo runs a test so), and the group in a fiber of its own until it ends,
+        // with the scope, the values and the locks of the caller, as if it ran in the fiber of the caller.
         if (Loop::get()->main === null) {
-            return Loop::get()->run(static fn() => self::run($body, $function, $name));
+            return Loop::get()->run(inheritingFiber(static fn() => self::run($body, $function, $name)));
+        }
+
+        // Where the loop itself runs (a callback of onCancel(), a watchdog) the join could not wait, and its tasks
+        // would be orphans: refused before anything starts.
+        if (\Fiber::getCurrent() === Loop::get()->host) {
+            throw new \LogicException('A group cannot run in a callback of the event loop: it would wait there.');
         }
 
         $parent = Scope::current();

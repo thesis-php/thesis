@@ -28,7 +28,8 @@ use function Thesis\Time\toNs;
  *
  * A hang brings no event, so it reports from a timer of the event loop, outside the scope tree: unreferenced,
  * it never keeps the program alive, and it is virtual under `virtualTime()`, like every timer of the loop.
- * The timer is there only while a wait is not reported yet. Not seen: the waits of the root scope,
+ * A timer per wait, in the loop of that wait: a nested loop (`virtualTime()` in a task) runs on a clock of its own
+ * and blocks the outer one. It is there only while the wait is not reported yet. Not seen: the waits of the root scope,
  * which have no events, and a hang of the whole loop (blocking code, see {@see BlockingDetector}).
  *
  * It listens to the waits, so each costs a backtrace: a tool of debugging, not of every request in production.
@@ -47,16 +48,11 @@ final class LongWaitDetector implements Subscriber
     private array $scopes = [];
 
     /**
-     * The waits not reported yet, in the order they have begun: the first one is due first.
+     * The waits not reported yet: what cancels the timer of each, by scope.
      *
-     * @var array<positive-int, Wait>
+     * @var array<positive-int, \Closure(): void>
      */
-    private array $waits = [];
-
-    /**
-     * @var ?\Closure(): void cancels the timer
-     */
-    private ?\Closure $timer = null;
+    private array $timers = [];
 
     /**
      * @param Duration $threshold a wait that lasts so long is reported: one that ends exactly then may be or not,
@@ -107,67 +103,33 @@ final class LongWaitDetector implements Subscriber
             at: $event->at,
             wait: $event->caller === null ? 'a wait of unknown code' : (string) $event->caller,
         );
-        $this->waits[$event->scope] = $wait;
-        $this->timer ??= $this->arm($wait, $dispatcher);
+        // A listener before this one may have taken time: the wait may be overdue already.
+        $left = max(0, $this->threshold - toNs(Instant::now()->since($wait->at)));
+        $this->timers[$event->scope] = watchdog(ns($left), function () use ($wait, $dispatcher) {
+            unset($this->timers[$wait->scope]);
+            $dispatcher->dispatch(new LongWait(
+                scope: $wait->scope,
+                what: $wait->what,
+                at: $wait->at,
+                duration: Instant::now()->since($wait->at),
+                wait: $wait->wait,
+            ));
+        });
     }
 
     private function onResumed(Resumed $event): void
     {
-        unset($this->waits[$event->scope]);
-        $this->disarmIfNothingWaits();
+        $cancel = $this->timers[$event->scope] ?? null;
+
+        if ($cancel !== null) {
+            unset($this->timers[$event->scope]);
+            $cancel();
+        }
     }
 
     private function onEnded(Ended $event): void
     {
         // Its waits are over: `Resumed` comes before.
         unset($this->scopes[$event->scope]);
-    }
-
-    /**
-     * @return \Closure(): void
-     */
-    private function arm(Wait $wait, Dispatcher $dispatcher): \Closure
-    {
-        $left = max(0, $this->threshold - toNs(Instant::now()->since($wait->at)));
-
-        return watchdog(ns($left), function () use ($dispatcher) {
-            $this->report($dispatcher);
-        });
-    }
-
-    /**
-     * A timer of the real clock may wake a hair early: a wait not due yet waits for the next one.
-     */
-    private function report(Dispatcher $dispatcher): void
-    {
-        $this->timer = null;
-        $now = Instant::now();
-
-        foreach ($this->waits as $scope => $wait) {
-            $waited = toNs($now->since($wait->at));
-
-            if ($waited < $this->threshold) {
-                $this->timer = $this->arm($wait, $dispatcher);
-
-                return;
-            }
-
-            unset($this->waits[$scope]);
-            $dispatcher->dispatch(new LongWait(
-                scope: $wait->scope,
-                what: $wait->what,
-                at: $wait->at,
-                duration: ns($waited),
-                wait: $wait->wait,
-            ));
-        }
-    }
-
-    private function disarmIfNothingWaits(): void
-    {
-        if ($this->waits === [] && $this->timer !== null) {
-            ($this->timer)();
-            $this->timer = null;
-        }
     }
 }

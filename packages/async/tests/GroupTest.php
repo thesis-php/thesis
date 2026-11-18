@@ -691,6 +691,41 @@ final class GroupTest
         Assert::same($events, ['task cleaned up']);
     }
 
+    public function taskThatLeavesFiberOfItsOwnInWaitEndsAsUsual(): void
+    {
+        $fiber = new \Fiber(static fn() => delay(sec(1)));
+
+        $result = group(static function (Group $group) use ($fiber) {
+            // The wait of this fiber comes back to the task, which returns: nobody resumes it, and it is no error.
+            $group->spawn($fiber->start(...));
+            delay(sec(2));
+
+            return 'done';
+        });
+
+        Assert::same($result, 'done');
+        Assert::true($fiber->isSuspended());
+    }
+
+    public function groupInCallbackOfLoopIsRefused(): void
+    {
+        $exception = null;
+        $started = false;
+
+        later(sec(1), static function () use (&$exception, &$started) {
+            $exception = thrown(static function () use (&$started) {
+                all([static function () use (&$started) {
+                    $started = true;
+                }]);
+            });
+        });
+        delay(sec(2));
+
+        Assert::instanceOf($exception, \LogicException::class);
+        Assert::same($exception->getMessage(), 'A group cannot run in a callback of the event loop: it would wait there.');
+        Assert::false($started);
+    }
+
     public function deadlockInMainCancelsTasksAndIsRethrown(): void
     {
         $events = [];

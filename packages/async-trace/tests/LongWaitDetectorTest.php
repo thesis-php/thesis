@@ -21,6 +21,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\Async\virtualTime;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
@@ -133,6 +134,27 @@ final class LongWaitDetectorTest
         Assert::same($reports, [
             '#2 ' . self::at('task', $line) . ' has been waiting 2s in Thesis\Async\delay() at ' . self::file($line),
         ]);
+    }
+
+    public function reportsWaitOfNestedLoopWhileWaitOfOuterOneIsNotDue(): void
+    {
+        /** @var list<string> $reports */
+        $reports = [];
+        $listener = static function (LongWait $report) use (&$reports) {
+            $reports[] = $report->what;
+        };
+        $inner = static function (Group $group) {
+            $group->spawn(static fn() => delay(sec(3600)), name: 'inner');
+        };
+        observe(new Dispatcher([new LongWaitDetector(threshold: sec(5)), $listener]), static fn() => group(
+            static function (Group $group) use ($inner) {
+                $group->spawn(static fn() => delay(sec(1)), name: 'outer');
+                $group->spawn(static fn() => virtualTime(static fn() => group($inner)));
+            },
+        ));
+
+        // Without " at <file>:<line>".
+        Assert::same(array_map(static fn(string $what) => explode(' at ', $what)[0], $reports), ["task 'inner'"]);
     }
 
     public function namesScopeItHasNotSeenByItsId(): void

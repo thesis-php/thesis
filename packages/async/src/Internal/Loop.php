@@ -235,9 +235,13 @@ final class Loop
         $error = null;
 
         try {
-            while (!$main->isTerminated()) {
-                $this->tick();
-            }
+            // Between the fibers the code of the loop (a callback of onCancel(), a watchdog, a signal handler)
+            // runs in the fiber or {main} that has called run(): it must not see their scope and values.
+            Scope::runInRoot(function () use ($main) {
+                while (!$main->isTerminated()) {
+                    $this->tick();
+                }
+            });
 
             try {
                 /** @var T */
@@ -297,12 +301,22 @@ final class Loop
             if ($watched->watcher?->isActive() === true) {
                 $watched->watcher->remove();
             }
+
+            // A cycle through the data of the watcher, see updateWatchers().
+            $watched->watcher = null;
         }
 
         $this->streams = [];
         $this->changedStreams = [];
         $this->streamWaits = 0;
         $this->context = null;
+
+        // Done, as if fired: a cancel that comes later (a fiber destroyed in its wait, the cancel of a watchdog)
+        // finds nothing to do, and the counters of the next run stay right.
+        foreach ($this->timers as [, , $timer]) {
+            $timer->waiter = null;
+        }
+
         $this->timers = new \SplMinHeap();
         $this->pendingTimers = 0;
         $this->referencedTimers = 0;
@@ -473,11 +487,14 @@ final class Loop
     public function onSignal(int $signal, \Closure $handler): void
     {
         if (!isset($this->signalHandlers[$signal])) {
+            // First: it throws \ValueError for a number that is no signal, before anything is opened.
+            $previous = pcntl_signal_get_handler($signal);
+
             if ($this->signalHandlers === []) {
                 $this->openSignalPipe();
             }
 
-            $this->previousSignalHandlers[$signal] = pcntl_signal_get_handler($signal);
+            $this->previousSignalHandlers[$signal] = $previous;
             pcntl_signal($signal, $this->catchSignal(...));
         }
 
@@ -588,7 +605,9 @@ final class Loop
 
             $wait = self::takeParked();
 
-            if ($wait !== null) {
+            // A fiber of the user has parked and returned to this one, which has ended: no fiber is there
+            // to pass the suspension to, and nothing resumes that wait, as with any fiber left by its owner.
+            if ($wait !== null && !$fiber->isTerminated()) {
                 if ($fiber === $this->main) {
                     $this->mainWait = $wait;
                 }
@@ -836,8 +855,12 @@ final class Loop
         }
 
         // The pipe is drained even if the handlers have been removed since: a byte left in it would end every wait.
+        // A signal is an event as a stream is, even one whose handler has run only after the wait: the virtual
+        // clock must not jump past what it has woken.
         if ($signalled || $this->caughtSignals !== []) {
             $this->dispatchSignals();
+
+            return true;
         }
 
         return $watchers !== [];
@@ -917,6 +940,9 @@ final class Loop
 
             if ($events === []) {
                 $watcher?->remove();
+                // The watcher holds the stream as its data: a cycle that would keep the descriptor open
+                // until the collector runs, and a dropped socket would not be closed for its peer.
+                $watched->watcher = null;
 
                 unset($this->streams[$key]);
 
@@ -939,8 +965,14 @@ final class Loop
         try {
             // A stream without a descriptor warns, and throws the exception that tells it.
             $watched->watcher = @$this->context()->add(new \StreamPollHandle($watched->stream), $events, $watched);
-        } catch (InvalidHandleException|FailedHandleAddException|\TypeError) {
-            // Closed, without a descriptor, or one that the kernel does not watch (a file, /dev/null, php://temp):
+        } catch (InvalidHandleException|FailedHandleAddException|\TypeError $error) {
+            // Any other failure to add (no memory, the limit of watches) is of the system, not of the stream:
+            // woken at once, a socket would wait again and spin the loop.
+            if ($error instanceof FailedHandleAddException && $error->getCode() !== $error::ERROR_NOSUPPORT) {
+                throw $error;
+            }
+
+            // Closed, without a descriptor, or one that the kernel does not watch (/dev/null, php://temp):
             // it never blocks, a read or a write tells what is wrong with it.
             $this->wakeAll($watched, write: false);
             $this->wakeAll($watched, write: true);

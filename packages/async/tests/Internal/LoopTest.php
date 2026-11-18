@@ -590,6 +590,38 @@ final class LoopTest
         Assert::same(self::streams($loop), [[], 0]);
     }
 
+    public function timerDroppedByReleaseIsCancelledAsDone(): void
+    {
+        $loop = self::loop();
+        $timers = $loop->run(static fn() => self::delays($loop, 2));
+        $loop->release();
+
+        foreach ($timers as $timer) {
+            $loop->cancel($timer);
+        }
+
+        Assert::same(self::timers($loop), [0, 0, 0]);
+        Assert::same(self::heaped($loop), 0);
+    }
+
+    public function streamWaitedForClosesWithItsLastReference(): void
+    {
+        $loop = self::loop();
+        [$stream, $peer] = self::pair();
+        fwrite($peer, 'x');
+
+        $loop->run(static function () use ($loop, $stream) {
+            $continuation = new ContinuationImpl();
+            $loop->watch($stream, $continuation, write: false);
+            $continuation->park();
+            self::yield($loop); // the loop drops the watcher of nobody before this wait
+        });
+        unset($stream);
+
+        fread($peer, 1);
+        Assert::true(feof($peer), 'The stream is kept open by a cycle with its watcher.');
+    }
+
     public function streamThatKernelCannotWatchIsReadyAtOnce(): void
     {
         $loop = self::loop();
@@ -772,6 +804,46 @@ final class LoopTest
         }
 
         Assert::same($received, [SIGUSR1, SIGUSR1]);
+    }
+
+    public function invalidSignalLeavesNothingOpen(): void
+    {
+        $loop = self::loop();
+        $asyncSignals = pcntl_async_signals();
+
+        $exception = thrown(static fn() => $loop->onSignal(1000, static function (int $_) {}));
+
+        Assert::instanceOf($exception, \ValueError::class);
+        Assert::same(pcntl_async_signals(), $asyncSignals);
+        Assert::null((fn() => $this->signalPipe)->call($loop));
+    }
+
+    public function signalWhoseHandlerRunsAfterWaitStopsJumpOfVirtualClock(): void
+    {
+        $loop = self::loop();
+
+        $signal = $loop->run(static function () use ($loop) {
+            $timer = $loop->delay(toNs(sec(10)), new ContinuationImpl());
+            $continuation = new ContinuationImpl();
+            $handler = static function (int $signal) use ($continuation) {
+                $continuation->resume($signal);
+            };
+            $loop->onSignal(SIGUSR1, $handler);
+            // Only noted: its handler runs after the wait, in pcntl_signal_dispatch(), see the test below.
+            pcntl_async_signals(false);
+            posix_kill(posix_getpid(), SIGUSR1);
+            pcntl_async_signals(true);
+
+            try {
+                return $continuation->park();
+            } finally {
+                $loop->offSignal(SIGUSR1, $handler);
+                $loop->cancel($timer);
+            }
+        });
+
+        Assert::same($signal, SIGUSR1);
+        Assert::same($loop->clock?->now, 0);
     }
 
     public function signalWhoseHandlerHasNotRunBeforeWaitIsNotLost(): void

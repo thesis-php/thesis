@@ -190,3 +190,31 @@ function reaches(object $from, object $target): bool
 
     return false;
 }
+
+/**
+ * Runs $code in {main} of a PHP process of its own, where no event loop runs, and returns what it prints.
+ * A test runs in a fiber of a loop: only a process of its own shows what a call does outside.
+ */
+function inMain(string $code): string
+{
+    $autoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
+    $process = proc_open(
+        command: [PHP_BINARY, '-r', "require '{$autoload}'; {$code}"],
+        descriptor_spec: [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        pipes: $pipes,
+    );
+    \assert(\is_resource($process) && isset($pipes[1], $pipes[2]));
+
+    // Blocking: the child ends by itself, and the clock of the test is virtual.
+    $output = (string) stream_get_contents($pipes[1]);
+    $errors = (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+
+    if ($exitCode !== 0 || $errors !== '') {
+        throw new \RuntimeException(\sprintf("The child has failed with %d: %s\n%s", $exitCode, $errors, $output));
+    }
+
+    return $output;
+}

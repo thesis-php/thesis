@@ -46,8 +46,7 @@ read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `age
 2. Done: `Internal\Loop` and `tests/Internal/LoopTest.php`. `ContinuationImpl` parks on it while it runs.
 3. Done: async, async-trace, io and net run on `Internal\Loop`; Revolt and amphp are gone from the manifests.
    Done with it, since the tests needed them: the virtual time of stage 4 without the shuffle
-   (`virtualTime()` runs a loop of its own and releases it), and of stage 5 everything but the cleanup
-   of `Makefile`, `tally.php`, `check.yaml` and the root `AGENTS.md`.
+   (`virtualTime()` runs a loop of its own and releases it) and the cleanup of stage 5.
 4. Done: `virtualTime($fn, $seed)` shuffles the fibers ready in one tick (not the streams: their waiters go
    through the same queue), `VirtualTimePlugin` gives every test a random seed, prints it on a failure and takes
    `THESIS_SEED`. Eight tests that counted on one order were made robust (`fibers.md`).

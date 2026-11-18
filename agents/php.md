@@ -91,7 +91,7 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   or milliseconds, and never `float|Duration`: the unit of a number is only a convention, and a union can be widened
   later but not narrowed. Inside, time is `int` nanoseconds: exact like `Duration` (`ns()`/`toNs()` convert
   without a loss) and as cheap as a float, while a `Duration` object costs an allocation per operation.
-  Convert at the boundary to what the underlying API takes (Revolt: float seconds, `$ns / 1e9`).
+  Convert at the boundary to what the underlying API takes (float seconds: `$ns / 1e9`).
 
 ### Classes and state
 

@@ -45,7 +45,7 @@ final class Pacer
     {
         $this->countTick();
 
-        if ($this->count >= $this->perTick) {
+        if ($this->count >= $this->perTick && self::canYield()) {
             checkpoint();
             // Other callers of a shared pacer may have counted their calls in the new tick before this one:
             // the count is of the tick, not of this caller, and starts anew only if nobody has counted yet.
@@ -53,6 +53,17 @@ final class Pacer
         }
 
         ++$this->count;
+    }
+
+    /**
+     * Outside a run of the event loop, and in its callbacks, nothing else runs that a yield would let in,
+     * and nothing could resume it: an operation that does not have to wait just goes on there.
+     */
+    private static function canYield(): bool
+    {
+        $loop = Loop::get();
+
+        return $loop->main !== null && \Fiber::getCurrent() !== $loop->host;
     }
 
     /**

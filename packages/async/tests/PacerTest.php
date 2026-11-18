@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Internal\Loop;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
+use function Thesis\Async\Tests\inMain;
 use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
@@ -16,6 +17,35 @@ use function Thesis\Time\sec;
 #[Test]
 final class PacerTest
 {
+    public function neverYieldsOutsideRunOfLoop(): void
+    {
+        $output = inMain(<<<'PHP'
+            $pacer = new Thesis\Async\Pacer(16);
+            for ($i = 0; $i < 100; ++$i) {
+                $pacer->pace();
+            }
+            echo 'paced';
+            PHP);
+
+        Assert::same($output, 'paced');
+    }
+
+    public function neverYieldsInCallbackOfLoop(): void
+    {
+        $pacer = new Pacer(16);
+        $paced = 0;
+
+        later(sec(1), static function () use ($pacer, &$paced) {
+            for ($i = 0; $i < 100; ++$i) {
+                $pacer->pace();
+                ++$paced;
+            }
+        });
+        delay(sec(2));
+
+        Assert::same($paced, 100);
+    }
+
     public function doesNotYieldWithinLimit(): void
     {
         $pacer = new Pacer(perTick: 3);

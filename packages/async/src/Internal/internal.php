@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 use Thesis\Async\Cancelled;
+use Thesis\Async\KeyedSemaphore;
 use Thesis\Async\Lock;
+use Thesis\Async\Semaphore;
 
 /**
  * The key of the current fiber in the per-fiber maps: {@see CURRENT_SCOPE}, {@see CONTEXT}
@@ -153,3 +155,52 @@ function some(string $function, int $count, array $tasks): array
 
     return $results;
 }
+
+/**
+ * Wraps $fn to run in a new fiber with what the current one has of its own: the scope, the scoped values
+ * and the locks of `synchronized()`. For the fiber that runs on in place of the current one, which waits.
+ *
+ * @internal
+ * @template T
+ * @param callable(): T $fn
+ * @return \Closure(): T
+ */
+function inheritingFiber(callable $fn): \Closure
+{
+    $scope = Scope::current();
+    $values = Context::capture();
+    $locks = HELD_LOCKS[fiberKey()] ?? null;
+    $keyedLocks = HELD_KEYED_LOCKS[fiberKey()] ?? null;
+
+    return static function () use ($scope, $values, $locks, $keyedLocks, $fn) {
+        // A constant cannot be written to by offset, its object can.
+        $held = HELD_LOCKS;
+        $heldKeyed = HELD_KEYED_LOCKS;
+
+        if ($locks !== null) {
+            $held[fiberKey()] = $locks;
+        }
+
+        if ($keyedLocks !== null) {
+            $heldKeyed[fiberKey()] = $keyedLocks;
+        }
+
+        return $scope->run(static fn() => Context::run($values, $fn));
+    };
+}
+
+/**
+ * Locks taken by `Thesis\Async\synchronized()`, per fiber ({@see fiberKey()}).
+ *
+ * @internal
+ * @var \WeakMap<object, \WeakMap<Semaphore, Lock>>
+ */
+const HELD_LOCKS = new \WeakMap();
+
+/**
+ * Locks taken by `Thesis\Async\synchronizedKey()`, per fiber and key.
+ *
+ * @internal
+ * @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>>
+ */
+const HELD_KEYED_LOCKS = new \WeakMap();

@@ -80,6 +80,33 @@ final class OnCancelTest
         Assert::same($observed, [false, 'default', null]);
     }
 
+    public function isCalledInRootScopeWithoutValuesOfTaskThatRunsNestedLoop(): void
+    {
+        /** @var ScopedValue<string> */
+        $value = new ScopedValue('default');
+        $observed = null;
+
+        $observe = static function (Group $group) use ($value, &$observed) {
+            $task = $group->spawn(static function () use ($value, &$observed) {
+                onCancel(static function () use ($value, &$observed) {
+                    $observed = [$value->get(), remaining()];
+                });
+
+                never();
+            });
+            delay(sec(1));
+            $task->cancel();
+        };
+
+        timeout(sec(100), static function () use ($value, $observe) {
+            $value->with('of the host', static function () use ($observe) {
+                virtualTime(static fn() => group($observe));
+            });
+        });
+
+        Assert::same($observed, ['default', null]);
+    }
+
     public function isNotCalledAgainAfterScopeHasEnded(): void
     {
         $calls = 0;
