@@ -13,6 +13,8 @@ or changing the public API of a package that others use. How the generator works
 - Generated from the manifests and `monorepo.php` by `make sync`, never edited by hand:
   - `packages/<name>/composer.json` and the root `composer.json`,
   - `LICENSE` of the root and of every package, from the year in the manifest,
+  - the head of `packages/<name>/README.md` (the title, the badges, the note of the split)
+    and `packages/<name>/CONTRIBUTING.md`,
   - `packages/<name>/.split`: what the split repository, and so every install, has (`repositories.md`),
   - `skills.json` (`sources`),
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,
@@ -33,8 +35,9 @@ or changing the public API of a package that others use. How the generator works
 ### A package
 
 - `packages/<name>/` holds `package.php`, `src/`, `tests/`, `README.md`, `CHANGELOG.md` (`changelogs.md`),
-  `AGENTS.md`, `LICENSE` and optionally `skills/` and `benchmarks/` (`benchmarks.md`). Without `tests/`
-  (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite and no `autoload-dev`.
+  `AGENTS.md`, `LICENSE`, `CONTRIBUTING.md` and optionally `skills/` and `benchmarks/` (`benchmarks.md`).
+  Without `tests/` (`phpstan-extension`, checked by `make phpstan`) the package gets no Testo suite
+  and no `autoload-dev`.
 - `rootEntry: true` of the manifest puts the entry point named after the package in the root namespace
   (`php.md`): the psr-4 prefix of `src/` and `tests/` becomes `Thesis\`, so the class is `src/Dispatcher.php`,
   a function is in `src/api.php`, its test is `tests/DispatcherTest.php`, and the rest moves to `src/<Name>/`

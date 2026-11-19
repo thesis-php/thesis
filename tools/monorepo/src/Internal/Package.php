@@ -26,6 +26,13 @@ final class Package
     }
 
     /**
+     * @var non-empty-string
+     */
+    public string $title {
+        get => $this->manifest->title ?? 'Thesis ' . ucwords(str_replace('-', ' ', $this->dir));
+    }
+
+    /**
      * @var non-empty-string the psr-4 prefix of src/ and tests/
      */
     public string $namespace {

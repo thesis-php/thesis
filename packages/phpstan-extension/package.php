@@ -10,6 +10,7 @@ return new Manifest(
     description: 'PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.',
     licenseSince: 2026,
     version: '0.1',
+    title: 'Thesis PHPStan Extension',
     keywords: ['php', 'phpstan', 'phpstan-extension', 'static-analysis'],
     require: [
         'phpstan/phpstan' => '^2.3',

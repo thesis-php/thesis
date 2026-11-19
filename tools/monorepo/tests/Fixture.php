@@ -25,6 +25,7 @@ final readonly class Fixture
             );
             PHP);
         $this->file('skills.json', "{}\n");
+        $this->file('phpstan.neon', "parameters:\n    level: max\n");
         $this->file('AGENTS.md', "# Fixture\n\n" . Generator::CATALOG_START . "\n" . Generator::CATALOG_END . "\n");
         $this->file('README.md', "# Fixture\n\n" . Generator::CATALOG_START . "\n" . Generator::CATALOG_END . "\n");
     }

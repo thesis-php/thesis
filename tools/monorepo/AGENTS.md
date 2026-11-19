@@ -53,11 +53,21 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   which GitHub resolves from the root of the repository): it works only in the monorepo, the split repository
   and Packagist show the package alone. A package links another by `https://github.com/thesis-php/<name>`.
   Links in code (fenced blocks, inline code) are examples and are skipped.
-- `sync` writes a note that the package is a split to `README.md` of every package, since the split repository
-  has neither the tests nor pull requests (`agents/repositories.md`): between `SPLIT_NOTE_START` and `_END`
-  of `Generator`, under the title and the badges. Missing markers are added there, so a README starts with `# <name>`.
+- `sync` generates the head of `README.md` of every package, between `HEAD_START` and `HEAD_END` of `Generator`
+  at the top: the title, the badges and a note that the package is a split, since the split repository
+  has neither the tests nor pull requests (`agents/repositories.md`). Everything generated is inside the markers,
+  everything after them is written by hand. The title is `title` of the manifest or the words of the directory,
+  so every package is named alike. A README without the markers gets them at the top, its title is replaced.
+  The badges are generated so that every package has the same set: only those that need no service
+  and no secret (Packagist, the release of the split, the level read from `phpstan.neon`).
+  Rejected: the badge of the CI of the monorepo: it is one for all the packages and says nothing of this one.
+  Coverage and mutation testing need a service with a result per package (flags of Codecov, modules
+  of the Stryker Dashboard), not set up yet.
+  The note links `CONTRIBUTING.md`, also generated for every package and shipped in the split: how to report
+  an issue and make a pull request in the monorepo, with the commands narrowed to the package. GitHub shows it
+  in the split repository as the guide of the repository.
   Rejected: adding the note in the split, which copies the files of a commit as they are. A section "Contributing"
-  at the end of the README repeated the note.
+  at the end of the README: it repeated the note, a file of its own has room for the steps.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
 - `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
   creates it, sets the settings that differ, creates or replaces the two rulesets, adds the webhook of Packagist

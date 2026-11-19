@@ -9,6 +9,7 @@ return new Manifest(
     description: 'Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.',
     licenseSince: 2026,
     version: '0.1',
+    title: 'Thesis IO',
     keywords: ['php', 'async', 'fibers', 'io', 'non-blocking-io', 'streams', 'buffer', 'binary'],
     require: [
         // int64 and uint64 of Buffer are a native int (pack('J')), uint32 fits in int only on 64-bit.

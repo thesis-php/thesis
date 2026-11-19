@@ -15,8 +15,8 @@ a change made there would be lost on the next split or would diverge from the mo
   the history of the directory and is deterministic, so the pushes are never forced. How a split commit is written
   is ours to keep stable: a change to it rewrites every split repository.
 - **Only what is shipped.** A split has the entries of the package that `packages/<name>/.split` of the commit
-  lists (`manifests.md`): `src/`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `skills/`
-  and the top-level entries in `dist` of the manifest (a polyfill, resources that `src/` loads). The tests,
+  lists (`manifests.md`): `src/`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`,
+  `skills/` and the top-level entries in `dist` of the manifest (a polyfill, resources that `src/` loads). The tests,
   the manifest and `AGENTS.md` stay in the monorepo, so the repository is exactly what composer installs,
   from the archive and from source alike, and a commit that changes only the rest is not a commit of the split.
   A package without the list is split whole: that is the history before the lists.
