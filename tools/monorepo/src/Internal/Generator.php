@@ -497,9 +497,9 @@ final class Generator
 
             # Security policy of {$package->name}
 
-            Do not report a vulnerability in a public issue. Report it privately in the monorepo
-            [{$monorepo}](https://github.com/{$monorepo}), where `{$package->name}` is developed:
+            Do not report a vulnerability in a public issue. Report it privately:
             [report a vulnerability](https://github.com/{$monorepo}/security/advisories/new).
+            The report goes to the monorepo `{$monorepo}`, where `{$package->name}` is developed.
             Name the package and its version, and describe the problem and how to reproduce it.
 
             The [security policy of the monorepo](https://github.com/{$monorepo}/security/policy) says

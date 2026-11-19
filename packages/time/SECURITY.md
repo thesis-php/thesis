@@ -2,9 +2,9 @@
 
 # Security policy of thesis/time
 
-Do not report a vulnerability in a public issue. Report it privately in the monorepo
-[thesis-php/thesis](https://github.com/thesis-php/thesis), where `thesis/time` is developed:
+Do not report a vulnerability in a public issue. Report it privately:
 [report a vulnerability](https://github.com/thesis-php/thesis/security/advisories/new).
+The report goes to the monorepo `thesis-php/thesis`, where `thesis/time` is developed.
 Name the package and its version, and describe the problem and how to reproduce it.
 
 The [security policy of the monorepo](https://github.com/thesis-php/thesis/security/policy) says
