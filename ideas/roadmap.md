@@ -47,7 +47,7 @@ What amphp has, then what thesis makes of it.
   or not needed.
 - Stale or niche: `quic`, `ssh`, `beanstalk`, `stomp`, `dbus`, `react-adapter`, `react-stream-adapter`.
 - `injector`, `dependency-graph`: overlap with dic.
-- Infrastructure: `ext-uv` (a Revolt driver, used as is), `ext-fiber`, `green-thread`,
+- Infrastructure: `ext-uv`, `ext-fiber`, `green-thread`,
   `windows-process-wrapper` (Windows is not supported, `agents/platform.md`), `php-cs-fixer-config`,
   `template`, the websites.
 
@@ -117,7 +117,7 @@ grow from what `async` already has and amphp lacks, so they come first.
   along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over `http-server`.
   The tools around `Trace\observe()`: [trace.md](trace.md).
 - **Other models of concurrency** on top of the task tree: lazy tasks, `select()` over operations, effects,
-  transparent futures, actors, an event loop on `Io\Poll` ([loop.md](loop.md)): [async.md](async.md).
+  transparent futures, actors: [async.md](async.md). The next stages of the event loop: [loop.md](loop.md).
 - **Deadlines across services**: the time left of a cancellation passed on in HTTP and grpc headers
   (`grpc-timeout`) and as `statement_timeout` of postgres.
 - **Resilience** on `async`: a circuit breaker, a bulkhead, hedged requests, a retry policy on `Async\Backoff`,
@@ -142,5 +142,5 @@ grow from what `async` already has and amphp lacks, so they come first.
    ([postgres.md](postgres.md)): typed rows 1.8 times faster than ext-pgsql, pipelining it lacks.
 3. HTTP/2: right after HTTP/1.1, or only with grpc?
 4. The driver of `file`: through `parallel` (the default of amphp), ext-uv, or blocking only?
-5. Waits outside a group: answered by the loop of our own ([loop.md](loop.md)), the body of `group()` in `{main}`
+5. Waits outside a group: answered by the loop of our own (`packages/async/AGENTS.md`), the body of `group()` in `{main}`
    runs in a fiber of its own and `suspend()` in the root scope throws `LogicException`.

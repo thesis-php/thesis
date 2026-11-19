@@ -11,7 +11,7 @@ to `agents/memory.md` (a line in "Topics" of `AGENTS.md`) and a short rule to "C
   a cycle holds all it reaches: buffers, sockets, suspended fibers. A destructor that closes a resource runs late,
   or at shutdown. In a long-running process this is a leak that grows with the load.
 - Where cycles come from: a non-static closure (it captures `$this`) kept by the object itself or by what it owns,
-  a Revolt callback that references its owner, a child that holds its parent, a fiber whose stack holds
+  a callback of the loop that references its owner, a child that holds its parent, a fiber whose stack holds
   the fiber (`agents/fibers.md`).
 - A link back is not a strong reference: a key (`Entry::$olderKey` in thesis/cache), a `\WeakReference`
   or a `\WeakMap`. A cycle that must exist while the object is in use is cut by an operation that always runs

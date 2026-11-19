@@ -74,8 +74,7 @@ final class LocalTokenBucketRateLimiter implements RateLimiter
             $this->taken = 0;
         }
 
-        // The caller sleeps once and does not wait again: a timer of another event loop may wake a hair early,
-        // and a loop on a delay too small to move the clock would never end.
+        // The caller sleeps once: a timer of the loop never fires early, so the token is there once delay() returns.
         // A cancelled delay() throws before the token is taken.
         $tokenAt = $this->tokenAt($this->taken - $this->burst + 1);
 

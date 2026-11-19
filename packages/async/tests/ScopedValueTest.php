@@ -222,6 +222,30 @@ final class ScopedValueTest
         Assert::same($observed, ['first', 'parent', 'parent', 'parent']);
     }
 
+    public function bindingInTaskDoesNotLeakIntoNextTaskInSameFiber(): void
+    {
+        /** @var ScopedValue<?string> */
+        $value = new ScopedValue();
+        $first = null;
+        $second = null;
+        $seen = 'not run';
+
+        group(static function (Group $group) use ($value, &$first, &$second, &$seen) {
+            // Neither task waits, so the second runs in the fiber of the pool the first has left.
+            $group->spawn(static function () use ($value, &$first) {
+                $first = \Fiber::getCurrent();
+                $value->with('first', static fn() => null);
+            });
+            $group->spawn(static function () use ($value, &$second, &$seen) {
+                $second = \Fiber::getCurrent();
+                $seen = $value->get();
+            });
+        });
+
+        Assert::same($first, $second);
+        Assert::null($seen);
+    }
+
     public function nestedTaskInheritsFromTask(): void
     {
         /** @var ScopedValue<?string> */

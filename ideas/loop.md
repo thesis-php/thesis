@@ -1,71 +1,32 @@
-# An event loop of our own: plan
+# The event loop: next stages
 
-thesis/async moves from Revolt to a scheduler of its own on `Io\Poll` of PHP 8.6. A plan, not a decision yet:
+`Internal\Loop` of thesis/async on `Io\Poll` of PHP 8.6 is built and described in "The event loop"
+of `packages/async/AGENTS.md`. What it can give that a loop of a third party could not, a plan, not a decision:
 each stage moves what it settles to `packages/async/AGENTS.md` (or a topic) and deletes it from here.
-The file goes away with the last stage.
-
-## Decided
-
-- One loop, no Revolt under it or beside it: async, io, net, async-trace and testo-plugin drop
-  `revolt/event-loop`. The drivers `StreamSelect`, `Uv`, `Ev`, `Event` and their CI matrix go away.
-- No bridge to Revolt for now: we build it for ourselves first. So amphp code does not run in the process,
-  and `ampCancellable()` goes away with `amphp/amp` of the manifest; it comes back with the bridge.
-  The bridge, later: a `Revolt\EventLoop\Driver` on our loop, checked by the `DriverTest` of Revolt.
-- PHP 8.6 only, no fallback to `stream_select()`: the monorepo already requires 8.6.
-- The loop lives in thesis/async as `Internal\Loop`, until the core has a second user.
-- The order of what becomes ready in one tick: in production as the kernel gives it (free), on virtual time
-  shuffled by a seed that a failure prints. It makes the rule of `fibers.md` checked on every run, instead
-  of the matrix of drivers.
-- Open question 5 of `roadmap.md` is answered: the scheduler runs only in `{main}`, user code only in fibers.
-  `group()` called outside a run of the loop (in `{main}`, or in a fiber of another scheduler such as Testo)
-  runs its body in a fiber of its own and the scheduler until the group ends; a wait outside a run, or where
-  the loop runs, throws `LogicException` telling to wrap the code in `group()` (stage 3). A fiber of the loop
-  in the root scope (a test on `VirtualTimePlugin` or `EventLoopPlugin`) can wait.
-
-## Design
-
-- Built in stage 2, described in "The event loop" of `packages/async/AGENTS.md`: the core, its tick, timers,
-  streams, signals, deadlocks and the jump of a virtual clock. The clock is a nullable `VirtualClock`
-  rather than an interface: `hrtime(true)` needs no object, and the loop must know a virtual one to jump it.
-- `checkpoint()` puts the fiber to the next tick. The tick number is a property of the loop, so `Pacer`
-  compares two numbers instead of resetting itself by a `defer`.
-- Timers: a hierarchical wheel only if a benchmark asks for it.
-- The heartbeat of the detector of endless runs (`endless-runs.md`, open question 1) is the start of the tick,
-  a field: no timer wakes an idle process.
-- Virtual time is a clock, not a decorator of a driver: it jumps to the nearest timer only where the loop
-  is about to block (ready and microtasks empty, `wait(0)` found nothing). The pump of `VirtualTimeDriver`,
-  its two idle pumps and its trap with code that enters the loop past the driver go away.
+Before a stage read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md` and `agents/benchmarks.md`.
+Tally counts no time in the kernel: a change that saves syscalls (a fiber stack, a watcher) is also timed
+on the wall clock.
 
 ## Stages
 
-Each stage ends with a green `make check` and a commit. Before each stage
-read `packages/async/AGENTS.md`, `agents/fibers.md`, `agents/tests.md`, and `agents/benchmarks.md` for 1 and 5.
-
-1. Done: `ChannelBench`, `TimeoutBench`, `DelayBench`, `StreamWatcherBench` and `CheckpointBench` of async
-   have their numbers of Revolt (`UvDriver`, the default of the image, counted on aarch64) in `#[Expected]`.
-2. Done: `Internal\Loop` and `tests/Internal/LoopTest.php`. `ContinuationImpl` parks on it while it runs.
-3. Done: async, async-trace, io and net run on `Internal\Loop`; Revolt and amphp are gone from the manifests.
-   Done with it, since the tests needed them: the virtual time of stage 4 without the shuffle
-   (`virtualTime()` runs a loop of its own and releases it) and the cleanup of stage 5.
-4. Done: `virtualTime($fn, $seed)` shuffles the fibers ready in one tick (not the streams: their waiters go
-   through the same queue), `VirtualTimePlugin` gives every test a random seed, prints it on a failure and takes
-   `THESIS_SEED`. Eight tests that counted on one order were made robust (`fibers.md`).
-5. Done in stage 3, but for the numbers of the benchmarks: instructions and cycles are below those of Revolt
-   in all five, memory is about 16 KiB above in four (a fiber per run of `group()` in `{main}`): the user decides.
-5a. **A pool of fibers** (asked by the user). A new fiber costs about 5.3 µs (its stack), a task resumed
-   in a fiber that is alive already 0.14 µs: a fiber whose task has ended takes the next one instead of ending.
-   The state per fiber (the scope, `ScopedValue`, the locks of `synchronized()`) is reset between tasks,
-   `bindingInTaskDoesNotLeakIntoNextTaskInSameFiber` of `ScopedValueTest` comes back, a `SpawnBench`
-   of short tasks shows the gain.
-6. Done: the READMEs of async, io, net, cache, amqp and testo-plugin, the changelogs of async and testo-plugin.
-   No package was released, so the versions stay (`versions.md`).
-
-## Questions for the stages
-
-1. Answered in stage 3: `Trace\watchdog(Duration, callable): \Closure`, an unreferenced timer that calls
-   a function outside the fibers and returns its cancel.
-2. Answered in stage 2: `Thesis\Async\Deadlock`, an `@api` `\Error` (as Revolt's was): a group must tell it
-   from other failures, and a `LogicException` is an `\Exception` that a `catch (\Exception)` of user code takes.
-3. Answered in stage 3: it is thrown into the wait of the fiber of the loop, so out of the `group()`
-   that runs the loop in `{main}`, as a failure of that group.
-4. Answered in stage 2: unbounded, see "Decisions" of `packages/async/AGENTS.md`.
+1. **The numbers of the benchmarks.** `#[Expected]` of async are still those of the loop before ours.
+   Instructions and cycles are below them in all five, memory is about 20 KiB above in `CheckpointBench`
+   and `TimeoutBench`: the fiber of `Loop::run()` for a `group()` in `{main}`, which could come from the pool
+   of the tasks too. Then `make bench-accept P=async`.
+2. **Waits on the queues without closures.** The waits of the loop take the steps of `suspend()` without its
+   closures (`delay()`, `checkpoint()`, `StreamWatcher::wait()`): `CheckpointBench` −9 %,
+   `StreamWatcherBench` −14 % of instructions, a `delay()` on the wall clock 2.9 → 2.2 µs. `Deferred`, `Channel`
+   and the semaphores still pay for a closure of `$register`, one of `$unregister` and their captures per wait:
+   the same for a queue of continuations would show in `ChannelBench`.
+3. **The probe of the steps.** The loop knows a run of code exactly: a call of `runFiber()`, a microtask,
+   a callback of a timer or a signal. `BlockingDetector` of thesis/async-trace rebuilds it from the events
+   of the scopes, with the traps of its `AGENTS.md` (the join waits without `suspend()`, the waits of the root
+   scope have no events, a run whose end is lost is dropped) and a backtrace per wait. A probe of the loop
+   (the start and the end of a step and its fiber, two `hrtime()` a step while an observation runs) sees
+   the root scope and the callbacks of the loop too, takes the stack by `ReflectionFiber` only for a run
+   past the threshold, and makes the detector cheap enough for production. Its start is the heartbeat
+   of `endless-runs.md`. The fibers of the loop are also the dump of the live tasks of `trace.md`:
+   `Loop::describeDeadlock()` walks them already. A tracer maps a fiber to its task at `TaskStarted`.
+4. **One clock.** `Scope::$virtualClock` and `Loop::$clock` are the same clock bound twice: `Scope::now()`
+   could read the clock of the current loop. Check that `burnCpu()` and `Instant::now()` between the runs
+   of a `virtualTime()` still read it.

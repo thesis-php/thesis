@@ -31,7 +31,7 @@ final readonly class GeneratorTest
                 'source' => 'https://github.com/thesis-php/thesis/tree/main/packages/async',
                 'security' => 'https://github.com/thesis-php/thesis/security/policy',
             ],
-            'require' => ['php' => '^8.5', 'revolt/event-loop' => '^1.0', 'thesis/bytes' => '^0.1'],
+            'require' => ['php' => '^8.5', 'psr/log' => '^3.0', 'thesis/bytes' => '^0.1'],
             'require-dev' => ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
             'autoload' => ['psr-4' => ['Thesis\Async\\' => 'src/']],
             'autoload-dev' => ['psr-4' => ['Thesis\Async\\' => 'tests/']],
@@ -133,7 +133,7 @@ final readonly class GeneratorTest
             'description' => 'Fixture.',
             'license' => 'MIT',
             'type' => 'project',
-            'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'psr/clock' => '^1.1', 'revolt/event-loop' => '^1.0'],
+            'require' => ['php' => '^8.5', 'ext-bcmath' => '*', 'psr/clock' => '^1.1', 'psr/log' => '^3.0'],
             'require-dev' => ['amphp/amp' => '^3.0'],
             'replace' => ['thesis/async' => '0.1.x-dev', 'thesis/bytes' => '0.1.x-dev'],
             'autoload' => [
@@ -694,7 +694,7 @@ final readonly class GeneratorTest
             ->file('packages/bytes/tests/BytesTest.php', "<?php\n\nfinal class BytesTest {}\n")
             ->package('bytes', "require: ['ext-bcmath' => '*', 'psr/clock' => '^1.0']")
             ->package('async', <<<'PHP'
-                require: ['revolt/event-loop' => '^1.0', 'thesis/bytes' => '*'],
+                require: ['psr/log' => '^3.0', 'thesis/bytes' => '*'],
                 requireDev: ['amphp/amp' => '^3.0', 'psr/clock' => '^1.1'],
                 PHP)
         ;

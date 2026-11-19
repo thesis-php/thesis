@@ -38,6 +38,12 @@ use function Thesis\SourceLocation\caller;
 final class Tracer
 {
     /**
+     * Frames to look through for the call from outside: enough for a task of the library alone (a wait passed
+     * to `spawn()` as is), whose stack goes on past the loop to the call that runs it.
+     */
+    private const int FRAMES = 32;
+
+    /**
      * @var list<Dispatcher>
      */
     private array $dispatchers = [];
@@ -371,7 +377,7 @@ final class Tracer
 
     private static function location(): ?Location
     {
-        return caller(self::libraries())?->location;
+        return caller(self::libraries(), self::FRAMES)?->location;
     }
 
     /**
@@ -380,7 +386,7 @@ final class Tracer
      */
     private static function publicCaller(): ?Caller
     {
-        $caller = caller(self::libraries());
+        $caller = caller(self::libraries(), self::FRAMES);
         $implementation = '/^Thesis\\\Async\\\Internal\\\(\w+)Impl::(.+)$/D';
 
         if ($caller === null || preg_match($implementation, $caller->callee, $matches) !== 1) {

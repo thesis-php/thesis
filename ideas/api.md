@@ -40,8 +40,7 @@ of its package). Found by reading `src/` of every package.
 - A mistake of the caller is an exception of PHP, not ours: a wrong value is `\ValueError`, a wrong state
   or order is `\LogicException` with the fix in the message (`call confirmSelect() first.`,
   `call run() first.`).
-- A message is a sentence ending with a period, except one that copies PHP or Revolt (the polyfill,
-  `VirtualTimeDriver`). A failure is "Failed to <verb> …", a closed resource "The <noun> is closed." /
+- A message is a sentence ending with a period, except one that copies PHP (the polyfill). A failure is "Failed to <verb> …", a closed resource "The <noun> is closed." /
   "… was closed while reading.", a second reader "Another fiber is reading from the <noun>."
 
 ### Objects

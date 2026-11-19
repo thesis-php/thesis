@@ -25,8 +25,8 @@ use function Thesis\Time\toNs;
  * $register receives the {@see Continuation} of this wait and registers it wherever the event comes from
  * (timer, stream watcher, wait queue). It may return $unregister, a closure that undoes the registration.
  * $unregister is always called once the wait is over, whatever ended it,
- * so it must be harmless for a source that has already fired. Anything but a closure is ignored:
- * not even a callable string is called, since an id of a callback may be one ("dl", "die").
+ * so it must be harmless for a source that has already fired. Anything but a closure is ignored,
+ * a callable string too: an arrow function that resumes at once returns what it has called.
  *
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
@@ -61,7 +61,7 @@ function suspend(callable $register): mixed
         $scope->unsubscribe($continuation);
 
         // Anything else means there is nothing to undo: $register returned nothing,
-        // or it is an arrow function that returned the bool of Continuation::resume() or an id of a callback.
+        // or it is an arrow function that returned what it has called, such as the bool of Continuation::resume().
         if ($unregister instanceof \Closure) {
             $unregister();
         }
@@ -83,16 +83,33 @@ function suspend(callable $register): mixed
  */
 function checkpoint(): void
 {
-    suspend(static function (Continuation $continuation) {
-        \assert($continuation instanceof ContinuationImpl);
-        // To the next tick, not to the microtasks: they run before the timers, a loop of them would starve a deadline.
-        $loop = Loop::get();
-        $loop->defer($continuation);
+    // The steps of suspend() without its closures, about a fifth of such a wait: the check of cancellation,
+    // the registration, the subscription, the park, and the unregistration whatever ends it.
+    $scope = Scope::current();
+    $scope->throwIfCancelled();
 
-        return static function () use ($loop, $continuation) {
+    /** @var ContinuationImpl<bool> */
+    $continuation = new ContinuationImpl();
+    $loop = Loop::get();
+    // To the next tick, not to the microtasks: they run before the timers, a loop of them would starve a deadline.
+    $loop->defer($continuation);
+    $scope->subscribe($continuation);
+    $tracer = Scope::$tracer;
+
+    if ($tracer !== null) {
+        $tracer->park($scope, $continuation, static function () use ($loop, $continuation) {
             $loop->undefer($continuation);
-        };
-    });
+        });
+
+        return;
+    }
+
+    try {
+        $continuation->park();
+    } finally {
+        $scope->unsubscribe($continuation);
+        $loop->undefer($continuation);
+    }
 }
 
 /**
@@ -160,17 +177,31 @@ function remaining(): ?Duration
  */
 function delay(Duration $duration): void
 {
-    $nanoseconds = toNs($duration);
+    // The steps of suspend() without its closures, as in checkpoint().
+    $scope = Scope::current();
+    $scope->throwIfCancelled();
 
-    suspend(static function (Continuation $continuation) use ($nanoseconds) {
-        \assert($continuation instanceof ContinuationImpl);
-        $loop = Loop::get();
-        $timer = $loop->delay($nanoseconds, $continuation);
+    /** @var ContinuationImpl<bool> */
+    $continuation = new ContinuationImpl();
+    $loop = Loop::get();
+    $timer = $loop->delay(toNs($duration), $continuation);
+    $scope->subscribe($continuation);
+    $tracer = Scope::$tracer;
 
-        return static function () use ($loop, $timer) {
+    if ($tracer !== null) {
+        $tracer->park($scope, $continuation, static function () use ($loop, $timer) {
             $loop->cancel($timer);
-        };
-    });
+        });
+
+        return;
+    }
+
+    try {
+        $continuation->park();
+    } finally {
+        $scope->unsubscribe($continuation);
+        $loop->cancel($timer);
+    }
 }
 
 /**

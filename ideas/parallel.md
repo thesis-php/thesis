@@ -81,7 +81,7 @@ through a `closure://` stream wrapper, an `eval` in effect):
   on a line, `self::`/`static::`, a closure inside `eval`.
 - Code compiled through `eval` or a stream wrapper skips opcache and is compiled at every load:
   noticeable for a pool that gets thousands of small tasks.
-- A third-party PHP parser in a core package of an ecosystem built on Revolt alone.
+- A third-party PHP parser in a core package of an ecosystem built on thesis/async alone.
 
 Security is not the reason: the socket pair is ours, an HMAC signature like laravel's is not needed.
 If users need closures, a bridge over laravel/serializable-closure may turn one into a serializable invokable

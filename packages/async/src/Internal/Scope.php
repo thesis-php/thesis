@@ -30,8 +30,7 @@ final class Scope implements Waiter
 
     /**
      * The clock of {@see self::now()} while `Thesis\Async\virtualTime()` runs, bound by it.
-     * Here, not found through the event loop driver, which may be decorated;
-     * and here, not on {@see VirtualClock}, so that the class is loaded only if `virtualTime()` is used.
+     * Here, not on {@see VirtualClock}, so that the class is loaded only if `virtualTime()` is used.
      */
     public static ?VirtualClock $virtualClock = null;
 
@@ -385,8 +384,8 @@ const ROOT_SCOPE = new Scope();
  * Current scope of every fiber that has entered one, keyed by {@see fiberKey()}. Bound by {@see Scope::run()},
  * which restores the previous one, so nothing leaks into the next code that runs in the fiber.
  *
- * Read in every wait through {@see Scope::current()}, so it is a single WeakMap lookup. Revolt's FiberLocal
- * makes two (fiber → storage, then instance → value) and wraps the value in an array: ~0.9 µs (~8%) more per wait.
+ * Read in every wait through {@see Scope::current()}, so it is a single WeakMap lookup: a storage per fiber
+ * with a value per key makes two and cost ~0.9 µs (~8%) more per wait.
  *
  * @internal
  * @var \WeakMap<object, Scope>

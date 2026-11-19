@@ -45,7 +45,7 @@ The API and the design decisions are described in `README.md` — read it first.
   and the next commands of a pipeline, and they would get `EAGAIN` while it is on (or `echo` of our own process
   would drop output). A call is made only once `stream_select()` with a zero timeout says it will not block,
   a write passes at most `PIPE_BUF` (4096) bytes, and the waits go through a `StreamWatcher`
-  (`Io\Poll` leaves the mode alone, unlike the uv driver of Revolt, which set `O_NONBLOCK` for good).
+  (`Io\Poll` leaves the mode alone, unlike libuv, which sets `O_NONBLOCK` for good).
   Toggling the mode around each call was rejected: a neighbour blocked on the same full pipe wakes with us
   and sees the flag (half of its writes failed in a measurement).
 - stdio streams are over duplicates (`php://stdout` dups the descriptor in the CLI), so `close()` leaves `STDOUT` open.

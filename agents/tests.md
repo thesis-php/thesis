@@ -26,7 +26,8 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   so the job `infect` runs on `ubuntu-24.04-arm`; reproduce with `docker run --platform linux/amd64`.
   Move it back to `ubuntu-latest` once a release of Xdebug passes there.
 - For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
-  of the event loop left surviving mutants in `Stream` of io and in async-trace. Kill them, then make it block again.
+  of the event loop left surviving mutants in async (120 on CI, MSI 86 %), net, `Stream` of io and async-trace.
+  Kill them, then make it block again.
 - Coverage is for the badge of a package (`tools/monorepo/AGENTS.md`), not a gate: no target, no statuses
   and no comments of Codecov. The job `coverage` of `check.yaml` runs `make coverage P=<name>` for every package
   with `tests/` (the matrix is written by `sync`) and uploads its Clover report with the flag `<name>`.

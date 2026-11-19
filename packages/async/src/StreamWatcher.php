@@ -6,14 +6,16 @@ namespace Thesis\Async;
 
 use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\Loop;
+use Thesis\Async\Internal\Scope;
+use Thesis\Async\Internal\Timer;
 use Time\Duration;
 use function Thesis\Time\toNs;
 
 /**
  * The waits on one stream, owned by whoever owns the stream, so that closing it can end them.
  *
- * Every wait goes through {@see suspend()}: it is cancelled by the task tree and leaves nothing in the event loop
- * behind. Call {@see close()} before closing the stream: the kernel forgets a closed stream, and a fiber
+ * Every wait is a wait of {@see suspend()}, without its closures: it is cancelled by the task tree and leaves
+ * nothing in the event loop behind. Call {@see close()} before closing the stream: the kernel forgets a closed stream, and a fiber
  * waiting for it would never wake up. close() ends every wait with false, and every later one
  * returns false at once, so the fibers waiting for the stream learn that it is gone.
  *
@@ -26,7 +28,8 @@ final class StreamWatcher
     public private(set) bool $isClosed = false;
 
     /**
-     * @var array<int, array{ContinuationImpl<bool>, \Closure(): void}> each wait and what undoes it, by spl_object_id()
+     * @var array<int, array{ContinuationImpl<bool>, Loop, bool|Timer}> each wait, the loop it is registered in,
+     *     and for what: a write (true), a read (false) or a timer, by spl_object_id() of the continuation
      */
     private array $waits = [];
 
@@ -46,7 +49,7 @@ final class StreamWatcher
      */
     public function readable(): bool
     {
-        return $this->watch(write: false);
+        return $this->wait(false);
     }
 
     /**
@@ -57,7 +60,7 @@ final class StreamWatcher
      */
     public function writable(): bool
     {
-        return $this->watch(write: true);
+        return $this->wait(true);
     }
 
     /**
@@ -69,15 +72,7 @@ final class StreamWatcher
      */
     public function delay(Duration $duration): bool
     {
-        $nanoseconds = toNs($duration);
-
-        return $this->wait(static function (Loop $loop, ContinuationImpl $continuation) use ($nanoseconds) {
-            $timer = $loop->delay($nanoseconds, $continuation);
-
-            return static function () use ($loop, $timer) {
-                $loop->cancel($timer);
-            };
-        });
+        return $this->wait(toNs($duration));
     }
 
     /**
@@ -90,46 +85,83 @@ final class StreamWatcher
         $waits = $this->waits;
         $this->waits = [];
 
-        foreach ($waits as [$continuation, $undo]) {
-            $undo();
-            $continuation->resume(false);
+        foreach ($waits as $wait) {
+            $this->unregister($wait);
+            $wait[0]->resume(false);
         }
     }
 
-    private function watch(bool $write): bool
-    {
-        $stream = $this->stream;
-
-        return $this->wait(static function (Loop $loop, ContinuationImpl $continuation) use ($stream, $write) {
-            $loop->watch($stream, $continuation, $write);
-
-            return static function () use ($loop, $stream, $continuation, $write) {
-                $loop->unwatch($stream, $continuation, $write);
-            };
-        });
-    }
-
     /**
-     * @param \Closure(Loop, ContinuationImpl<bool>): (\Closure(): void) $register returns what undoes it
+     * The steps of `suspend()` without its closures, a fifth of a wait: the check of cancellation,
+     * the registration, the subscription, the park, and the unregistration whatever ends it.
+     *
+     * @param bool|int $for a write (true), a read (false) or a sleep of so many nanoseconds
      */
-    private function wait(\Closure $register): bool
+    private function wait(bool|int $for): bool
     {
         // Like a receive() from a closed channel: no wait, so no cancellation check either.
         if ($this->isClosed) {
             return false;
         }
 
-        /** @var bool */
-        return suspend(function (Continuation $continuation) use ($register) {
-            /** @var ContinuationImpl<bool> $continuation */
-            $undo = $register(Loop::get(), $continuation);
-            $id = spl_object_id($continuation);
-            $this->waits[$id] = [$continuation, $undo];
+        $scope = Scope::current();
+        $scope->throwIfCancelled();
 
-            return function () use ($id, $undo) {
-                $undo();
-                unset($this->waits[$id]);
-            };
-        });
+        /** @var ContinuationImpl<bool> */
+        $continuation = new ContinuationImpl();
+        $loop = Loop::get();
+
+        if (\is_int($for)) {
+            $registered = $loop->delay($for, $continuation);
+        } else {
+            $registered = $for;
+            $loop->watch($this->stream, $continuation, write: $for);
+        }
+
+        $id = spl_object_id($continuation);
+        $this->waits[$id] = [$continuation, $loop, $registered];
+        $scope->subscribe($continuation);
+        $tracer = Scope::$tracer;
+
+        if ($tracer !== null) {
+            /** @var bool */
+            return $tracer->park($scope, $continuation, function () use ($id) {
+                $this->forget($id);
+            });
+        }
+
+        try {
+            return $continuation->park();
+        } finally {
+            $scope->unsubscribe($continuation);
+            $this->forget($id);
+        }
+    }
+
+    /**
+     * A no-op for a wait that {@see close()} has ended.
+     */
+    private function forget(int $id): void
+    {
+        $wait = $this->waits[$id] ?? null;
+
+        if ($wait !== null) {
+            unset($this->waits[$id]);
+            $this->unregister($wait);
+        }
+    }
+
+    /**
+     * @param array{ContinuationImpl<bool>, Loop, bool|Timer} $wait
+     */
+    private function unregister(array $wait): void
+    {
+        [$continuation, $loop, $registered] = $wait;
+
+        if ($registered instanceof Timer) {
+            $loop->cancel($registered);
+        } else {
+            $loop->unwatch($this->stream, $continuation, write: $registered);
+        }
     }
 }

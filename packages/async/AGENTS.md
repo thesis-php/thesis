@@ -6,9 +6,14 @@ The model, the API and the guarantees are described in `README.md` — read it f
 ## Invariants that must not be broken
 
 - Every wait goes through `suspend()` or parks an `Internal\ContinuationImpl` registered in the loop
-  (`delay()`, `checkpoint()`, `StreamWatcher`). Nothing else calls `\Fiber::suspend()`.
+  (`delay()`, `checkpoint()`, `StreamWatcher`). Nothing else calls `\Fiber::suspend()`. Those of the loop take
+  the steps of `suspend()` in its order (the check of cancellation, the registration, the subscription, the park
+  through `Tracer::park()` if traced, the unregistration in `finally`) without its closures, a fifth of such a wait
+  (`delay()`, `checkpoint()`, `StreamWatcher::wait()`). A wait on a queue
+  of the library (`Deferred`, `Channel`, the semaphores) still goes through `suspend()`: `ideas/loop.md`.
 - The `$unregister` returned from `suspend()`'s `$register` is always called once the wait is over, whatever ended it.
-  Only a `\Closure` is called: a callback id of another loop (amphp, Revolt) is a string and may be callable (`"die"`).
+  Only a `\Closure` is called: an arrow function that resumes at once returns what it has called, and a string
+  may be callable (`"die"`).
 - Cancellation is level-triggered: while a scope is cancelled, every `suspend()` in it throws `Cancelled`.
 - `Cancelled extends \Error` and carries nothing. Its constructor is private: only the library creates it,
   through the `@internal` `Cancelled::create()`. Whose cancellation it is, is decided by the state of the scope tree
@@ -110,8 +115,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - `virtualTime()` runs a loop of its own on a `VirtualClock` and releases it at the end (`Loop::release()`):
   what is left in it is dropped. In a fiber (a task, a test of Testo) it is a nested loop that blocks the outer one
   until it ends; the outer clock is restored after its last tick.
-- A rate limiter keeps absolute times and sleeps once per call, without sleeping again after the wake-up:
-  a wake-up a hair early (a timer in float seconds of another loop) must not loop on a delay too small to move it.
+- A rate limiter keeps absolute times and sleeps once per call: a timer of the loop never fires early,
+  so a second sleep after the wake-up would never be needed.
   It reads the clock after the wake-up only to account for a late one: a blocked loop must not let `$burst + 1` calls
   through. The sliding window stores the later of the planned and the actual start; the token bucket restarts its
   counting from the wake-up only if the bucket has been full for a whole token interval by then. A smaller lateness
@@ -148,7 +153,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   Never let such an exception skip the join or `$bodyScope->close()`.
 - Tracing (`Trace\observe()`) only observes and costs nothing without an observation: every hook is
   `Scope::$tracer?->...`, which evaluates no arguments while it is null, and `suspend()` reads `Scope::$tracer`
-  once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was.
+  once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was;
+  the waits of the loop do the same.
   A hook goes where the outcome is decided (the task callback of `GroupImpl::start()`, after `join()`, `Expired::run()`,
   `shield()`), never into `Scope::run()` or `ContinuationImpl`. `ScopeCancelled` is emitted after `notify()`, so the
   listener never runs in the middle of the walk, and the tracer finds the scopes it reached by `$isCancelled`
@@ -192,7 +198,13 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   that has ended is dropped: nobody resumes that wait, as with any fiber its owner has left.
 - A tick wakes the waits deferred to it and the due timers, resumes the fibers that were ready when it began and
   drains the microtasks after each one: what they make ready waits for the next tick, so two fibers that ping-pong
-  cannot starve the streams and the timers. A started fiber is a microtask: it runs after the current one suspends.
+  cannot starve the streams and the timers. A started task is a microtask: it runs after the current one suspends.
+- A task runs in a fiber of the pool (`Loop::work()`): a fiber whose task has ended waits for the next one,
+  up to `IDLE_FIBERS`, and ends once the pool is full (a suspended fiber that the loop drops is unwound,
+  which costs more). A new fiber costs its stack in the kernel, which Tally does not count: a short task of `all()`
+  took 8 µs and takes 2 µs in a fiber of the pool. The task and its end pass through statics, never through
+  `\Fiber::suspend()` or a captured object, and `work()` is the only frame under the task: `Tracer` looks through
+  `FRAMES` frames only. An idle fiber is not in `$fibers`: a `Deadlock` lists the fibers that wait.
 - A wait allocates nothing in the loop: timers, streams and the deferred hold a `Waiter` (`ContinuationImpl`, `Scope`
   as the timer of a timeout), which puts its fiber to the ready queue. Only a signal handler is a closure.
 - An error that escapes to the loop (a microtask, a wake, a fiber other than the one of `run()`) is thrown into
@@ -238,13 +250,20 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
 
 ## Decisions
 
+- No `ext-io` in `require`: `Io\Poll` is a part of `ext/standard` of PHP 8.6 (`getExtensionName()` is `standard`),
+  there is no such platform package, and Composer would fail on it. `php: ^8.6` already guarantees it.
 - `Io\Poll::wait()` takes every ready event (no `maxEvents`): a cap would leave the rest for the next tick, which
   level-triggered watchers allow, but nothing asks for it.
 - The gap of a signal before a wait is closed by time (`SIGNAL_GAP`), not by the kernel: PHP has no `signalfd`
   and no `pselect()`, and the handler of the engine writes nothing. Rejected: blocking the signals around the wait,
   then they could not cut it short at all. 10 wakes a second while a signal is handled cost nothing.
-- Revolt is gone (`ideas/loop.md`): its drivers decided the order of callbacks and had a `Suspension` and fibers
-  of their own and float seconds; a loop of our own lets virtual time jump exactly where it would block.
+- The event loop is our own, never a third-party one under it or beside it: a foreign loop decides the order
+  of the callbacks, has a suspension and fibers of its own and float seconds, while ours lets virtual time
+  jump exactly where it would block. Rejected for now: a bridge that runs the code of another loop on ours.
+  PHP 8.6 only, no fallback to `stream_select()`.
+- The clock of the loop is a nullable `VirtualClock`, not an interface: `hrtime(true)` needs no object,
+  and the loop must know a virtual one to jump it. Timers are a heap: a hierarchical wheel only if a benchmark
+  asks for it.
 
 - Tracing is one stream of event objects to a `Thesis\Dispatcher`, not a method per event: a new event is a new
   class, which breaks no listener at runtime, and the dispatcher tells which events nobody gets, so the tracer
@@ -298,8 +317,7 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   of a task that ends before anything cancels it): `CancelledFirstTest` once took a third of the suite.
   Rejected: running the cases concurrently in one `virtualTime()`, it was five times slower (thousands of live fibers).
   Rejected: a random stress of groups, channels and semaphores with general checks.
-  It never found a defect, not even the ones a review found by reading, and its seed reproduced only
-  on one driver of Revolt.
+  It never found a defect, not even the ones a review found by reading.
 - A callable is named by what runs it: a `$body` is the body of a scope, a `$task` runs in a task,
   a third party's callable is named by its role, and anything else is a `$fn`.
   - `$body`: runs in the current fiber inside a new scope (`group()`, `timeout()`, `shield()`, `Scope::run()`).

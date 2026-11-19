@@ -37,14 +37,14 @@ A fiber suspends with a description of what it needs (`perform(new Sleep($durati
 decides what to do: the timers of the loop in production, virtual time and a seeded scheduler in tests
 (deterministic simulation, `roadmap.md`), a journal of results for durable execution (Temporal, Restate).
 
-- Found by running it: a nested fiber per handler, forwarding an unhandled effect by `Fiber::suspend()`,
-  is incompatible with Revolt. A suspension of Revolt inside returns to our handler with `null`, and Revolt
-  resumes the nested fiber directly later, past the handler.
-- So the scheme is flat: one task, one fiber, a stack of handlers in fiber-local state. A handler that answers
+- A nested fiber per handler, forwarding an unhandled effect by `Fiber::suspend()`, works on `Internal\Loop`:
+  it resumes the fiber that has returned to it (`Loop::$parked`), as Testo passes a test through. Each handler
+  costs a fiber and a hop per effect, though.
+- So the cheap scheme is flat: one task, one fiber, a stack of handlers in fiber-local state. A handler that answers
   at once (`Now`, `Random`, `Log`) is a function call, one that waits suspends to the scheduler.
 - A continuation is one-shot: no backtracking.
 
-The price: it replaces the bottom layer, Revolt libraries work only through an adapter. What to take without it:
+The price: every wait of the library becomes an effect, a layer under `suspend()`. What to take without it:
 time, randomness and I/O behind an interface of the runtime that a test replaces (as `virtualTime()` does
 for time).
 
@@ -76,5 +76,5 @@ own their background work.
 
 ## An event loop on `Io\Poll` of PHP 8.6
 
-Being built: the plan, the decisions and the probed facts of `Io\Poll` are in [loop.md](loop.md).
+Built: `Internal\Loop`, described in `packages/async/AGENTS.md`, its next stages in [loop.md](loop.md).
 A loop of our own is also what effects need, the scheduler sees every suspension.

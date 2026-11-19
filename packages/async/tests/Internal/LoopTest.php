@@ -507,6 +507,197 @@ final class LoopTest
         Assert::same($exception->getMessage(), 'escaped');
     }
 
+    public function taskThatHasEndedLeavesItsFiberToNextOne(): void
+    {
+        $loop = self::loop();
+        $fibers = [];
+
+        $loop->run(static function () use ($loop, &$fibers) {
+            $loop->start(static function () use (&$fibers) {
+                $fibers[] = \Fiber::getCurrent();
+            });
+            $loop->start(static function () use (&$fibers) {
+                $fibers[] = \Fiber::getCurrent();
+            });
+            self::yield($loop);
+        });
+
+        Assert::same(\count($fibers), 2);
+        Assert::same($fibers[0] ?? null, $fibers[1] ?? null);
+    }
+
+    public function taskThatWaitsKeepsItsFiber(): void
+    {
+        $loop = self::loop();
+        $fibers = [];
+
+        $loop->run(static function () use ($loop, &$fibers) {
+            $loop->start(static function () use ($loop, &$fibers) {
+                $fibers[] = \Fiber::getCurrent();
+                self::yield($loop);
+            });
+            $loop->start(static function () use (&$fibers) {
+                $fibers[] = \Fiber::getCurrent();
+            });
+            self::yield($loop);
+            self::yield($loop);
+        });
+
+        Assert::same(\count($fibers), 2);
+        Assert::notSame($fibers[0] ?? null, $fibers[1] ?? null);
+    }
+
+    public function fiberOfTaskThatHasFailedRunsNextOne(): void
+    {
+        $loop = self::loop();
+        $fibers = [];
+
+        $exception = thrown(static function () use ($loop, &$fibers) {
+            $loop->run(static function () use ($loop, &$fibers) {
+                $loop->start(static function () use (&$fibers) {
+                    $fibers[] = \Fiber::getCurrent();
+
+                    throw new \RuntimeException('of a task');
+                });
+                $loop->start(static function () use (&$fibers) {
+                    $fibers[] = \Fiber::getCurrent();
+                });
+                new ContinuationImpl()->park();
+            });
+        });
+
+        Assert::same($exception->getMessage(), 'of a task');
+        Assert::same(\count($fibers), 2);
+        Assert::same($fibers[0] ?? null, $fibers[1] ?? null);
+    }
+
+    public function taskThatHasLeftWaitOfFiberItRanInsideEndsAndLeavesItsFiber(): void
+    {
+        $loop = self::loop();
+        $log = [];
+
+        $loop->run(static function () use ($loop, &$log) {
+            $loop->start(static function () use (&$log) {
+                // The wait of a fiber run inside, which the task drops instead of passing it through.
+                $inner = new \Fiber(static fn() => new ContinuationImpl()->park());
+                $inner->start();
+                $log[] = 'first';
+            });
+            $loop->start(static function () use (&$log) {
+                $log[] = 'second';
+            });
+            self::yield($loop);
+        });
+
+        Assert::same($log, ['first', 'second']);
+    }
+
+    public function waitThatTaskHasLeftInFiberItRanInsideDoesNotResumeIdleFiber(): void
+    {
+        $loop = self::loop();
+        $left = null;
+
+        $loop->run(static function () use ($loop, &$left) {
+            $loop->start(static function () use (&$left) {
+                $inner = new \Fiber(static function () use (&$left) {
+                    $left = new ContinuationImpl();
+                    $left->park();
+                });
+                $inner->start();
+            });
+            self::yield($loop);
+            Assert::true($left?->resume() ?? false);
+            self::yield($loop);
+            self::yield($loop);
+        });
+
+        Assert::same(self::idleFibers($loop), 1);
+    }
+
+    public function failureOfTaskIsThrownOnce(): void
+    {
+        $loop = self::loop();
+        $failures = [];
+
+        $loop->run(static function () use ($loop, &$failures) {
+            $loop->start(static function () {
+                throw new \RuntimeException('of a task');
+            });
+
+            try {
+                self::yield($loop);
+            } catch (\RuntimeException $failure) {
+                $failures[] = $failure->getMessage();
+            }
+
+            $loop->start(static fn() => null);
+            self::yield($loop);
+            self::yield($loop);
+        });
+
+        Assert::same($failures, ['of a task']);
+    }
+
+    public function idleFiberKeepsNothingOfItsTask(): void
+    {
+        $loop = self::loop();
+        $references = [];
+
+        $loop->run(static function () use ($loop, &$references) {
+            $captured = new \stdClass();
+            $references[] = \WeakReference::create($captured);
+            $loop->start(static function () use ($captured) {
+                $captured->ran = true;
+            });
+            unset($captured);
+
+            $failure = new \RuntimeException('of a task');
+            $references[] = \WeakReference::create($failure);
+            $loop->start(static function () use ($failure) {
+                throw $failure;
+            });
+            unset($failure);
+
+            thrown(static fn() => self::yield($loop));
+            self::yield($loop);
+            gc_collect_cycles();
+
+            Assert::same(array_map(static fn(\WeakReference $reference) => $reference->get(), $references), [null, null]);
+        });
+    }
+
+    public function idleFibersAreNotAmongSuspendedOnDeadlock(): void
+    {
+        $loop = self::loop();
+
+        $exception = thrown(static fn() => $loop->run(static function () use ($loop) {
+            $loop->start(static fn() => null);
+            self::yield($loop);
+            new ContinuationImpl()->park();
+        }));
+
+        Assert::instanceOf($exception, Deadlock::class);
+        Assert::same(\count(explode("\n", $exception->getMessage())), 2);
+    }
+
+    public function burstOfTasksLeavesAtMost128IdleFibers(): void
+    {
+        $loop = self::loop();
+
+        $loop->run(static function () use ($loop) {
+            for ($i = 0; $i < 200; ++$i) {
+                $loop->start(static fn() => self::yield($loop));
+            }
+
+            self::yield($loop);
+            self::yield($loop);
+        });
+
+        Assert::same(self::idleFibers($loop), 128);
+        $loop->release();
+        Assert::same(self::idleFibers($loop), 0);
+    }
+
     public function readerWakesOnceBytesHaveCome(): void
     {
         [$reader, $writer] = self::pair();
@@ -1019,6 +1210,12 @@ final class LoopTest
         }
 
         return $timers;
+    }
+
+    private static function idleFibers(Loop $loop): int
+    {
+        /** @var int<0, max> */
+        return (fn() => \count($this->idleFibers))->call($loop);
     }
 
     /**

@@ -68,7 +68,7 @@ final class SuspendTest
 
     public function onlyClosureReturnedByRegisterIsCalled(): void
     {
-        // A Revolt callback id is a string, and a string may be callable: "dl", "die".
+        // An arrow function returns what it has called, and a string may be callable: "dl", "die".
         // gc_disable() stands for them: harmless, and its effect is visible.
         // @phpstan-ignore argument.type (the type rules it out, code without types does not)
         suspend(static function (Continuation $continuation) {

@@ -23,7 +23,8 @@ use function Thesis\Time\ns;
  *
  * It knows five things: the ready fibers, the timers, the streams, the signals and the microtasks. A wait hands
  * it a {@see Waiter}, which it wakes once the event has come; a woken {@see ContinuationImpl} puts its fiber
- * to the ready queue, and the loop resumes it.
+ * to the ready queue, and the loop resumes it. A task runs in a fiber of its pool: a fiber whose task has ended
+ * waits for the next one instead of ending, since a new fiber costs its stack ({@see work()}).
  *
  * A tick: wake the waits deferred to it ({@see defer()}) and the due timers; resume the fibers that were ready
  * when the tick began, draining the microtasks after each one, so what they make ready waits for the next tick
@@ -47,6 +48,11 @@ final class Loop
     private const int SIGNAL_GAP = 100 * 1_000_000;
 
     /**
+     * The most fibers of the pool that wait for a task: a burst of tasks leaves no more than these behind.
+     */
+    private const int IDLE_FIBERS = 128;
+
+    /**
      * The loop of the run in progress, or the one of the process: see {@see get()}.
      */
     private static ?self $current = null;
@@ -58,6 +64,23 @@ final class Loop
      * @var ?ContinuationImpl<mixed>
      */
     public static ?ContinuationImpl $parked = null;
+
+    /**
+     * The task that the fiber of the pool about to be resumed runs, see {@see work()}.
+     *
+     * @var ?\Closure(): mixed
+     */
+    private static ?\Closure $task = null;
+
+    /**
+     * Set by a fiber of the pool whose task has ended, before it suspends to wait for the next one.
+     */
+    private static bool $taskEnded = false;
+
+    /**
+     * What the task that has just ended has thrown.
+     */
+    private static ?\Throwable $taskFailure = null;
 
     /**
      * The number of the current tick, unique among the ticks of every loop: a counter of calls per tick
@@ -94,9 +117,14 @@ final class Loop
     private array $ready = [];
 
     /**
-     * @var list<(\Closure(): void)|\Fiber<mixed, mixed, mixed, mixed>> a fiber is started
+     * @var list<(\Closure(): mixed)|Callback> a closure is a task to start, a {@see Callback} is called
      */
     private array $microtasks = [];
+
+    /**
+     * @var list<\Fiber<mixed, mixed, mixed, mixed>> the fibers of the pool that wait for a task, the last one first
+     */
+    private array $idleFibers = [];
 
     /**
      * @var array<int, Waiter> woken at the start of the next tick, by spl_object_id()
@@ -161,7 +189,8 @@ final class Loop
     private ?WatchedStream $signalStream = null;
 
     /**
-     * @var array<int, \Fiber<mixed, mixed, mixed, mixed>> started by this loop and not terminated, by spl_object_id()
+     * @var array<int, \Fiber<mixed, mixed, mixed, mixed>> that run the fiber of {@see run()} or a task,
+     *     by spl_object_id(): not the idle ones of the pool
      */
     private array $fibers = [];
 
@@ -325,19 +354,20 @@ final class Loop
         $this->microtasks = [];
         $this->deferred = [];
         $this->fibers = [];
+        $this->idleFibers = [];
         $this->errors = [];
     }
 
     /**
-     * Starts a fiber for $fn with the microtasks: after the current fiber suspends, before the next ready one.
+     * Starts $task in a fiber with the microtasks: after the current fiber suspends, before the next ready one.
+     * The fiber is taken from the pool when the task starts, so a task that ends without a wait leaves its fiber
+     * to the next one. A throw goes to the fiber of {@see run()}.
      *
-     * @param \Closure(): mixed $fn what it returns is dropped
+     * @param \Closure(): mixed $task what it returns is dropped
      */
-    public function start(\Closure $fn): void
+    public function start(\Closure $task): void
     {
-        $fiber = new \Fiber($fn);
-        $this->fibers[spl_object_id($fiber)] = $fiber;
-        $this->microtasks[] = $fiber;
+        $this->microtasks[] = $task;
     }
 
     /**
@@ -348,7 +378,7 @@ final class Loop
      */
     public function queue(\Closure $fn): void
     {
-        $this->microtasks[] = $fn;
+        $this->microtasks[] = new Callback($fn);
     }
 
     /**
@@ -527,6 +557,40 @@ final class Loop
     }
 
     /**
+     * The function of a fiber of the pool: runs a task, then waits for the next one, which {@see drainMicrotasks()}
+     * leaves in {@see $task} before it resumes the fiber. Only statics pass the task and its end: a fiber suspended
+     * with a value keeps it from the cycle collector (`agents/fibers.md`), and a closure that captured an object
+     * would keep it while the fiber waits. One frame under the task: a trace looks through a few frames only.
+     */
+    private static function work(): void
+    {
+        // The fiber waits here for its next task until the pool is full.
+        while (true) {
+            /** @var \Closure(): mixed $task the loop has left it */
+            $task = self::$task;
+            self::$task = null;
+
+            try {
+                $task();
+            } catch (\Throwable $error) {
+                self::$taskFailure = $error;
+            }
+
+            // Not kept while the fiber waits: the task, what it holds and its failure would outlive it.
+            unset($task, $error);
+            self::$taskEnded = true;
+
+            // The loop that has run the task is the current one again. A full pool: the fiber ends here,
+            // which costs less than a suspended one the loop drops, unwound by the engine.
+            if (\count(self::get()->idleFibers) >= self::IDLE_FIBERS) {
+                return;
+            }
+
+            \Fiber::suspend();
+        }
+    }
+
+    /**
      * @return ?ContinuationImpl<mixed>
      */
     private static function takeParked(): ?ContinuationImpl
@@ -603,6 +667,12 @@ final class Loop
                 $fiber->start();
             }
 
+            if (self::$taskEnded) {
+                $this->taskEnded($fiber);
+
+                return;
+            }
+
             $wait = self::takeParked();
 
             // A fiber of the user has parked and returned to this one, which has ended: no fiber is there
@@ -634,17 +704,17 @@ final class Loop
         for ($i = 0; $i < \count($this->microtasks); ++$i) {
             $microtask = $this->microtasks[$i];
 
-            if ($microtask instanceof \Fiber) {
-                $this->runFiber($microtask);
+            if ($microtask instanceof Callback) {
+                $this->wake($microtask);
 
                 continue;
             }
 
-            try {
-                $microtask();
-            } catch (\Throwable $error) {
-                $this->errors[] = $error;
-            }
+            // Here, not in a method: a trace looks through a few frames only.
+            $fiber = array_pop($this->idleFibers) ?? new \Fiber(self::work(...));
+            $this->fibers[spl_object_id($fiber)] = $fiber;
+            self::$task = $microtask;
+            $this->runFiber($fiber);
         }
 
         $this->microtasks = [];
@@ -664,6 +734,27 @@ final class Loop
 
         if ($error !== null && $this->mainWait?->fail($error) === true) {
             array_shift($this->errors);
+        }
+    }
+
+    /**
+     * The task of $fiber, a fiber of the pool, has ended: the fiber waits for the next one, unless it has ended
+     * too, the pool being full.
+     *
+     * @param \Fiber<mixed, mixed, mixed, mixed> $fiber
+     */
+    private function taskEnded(\Fiber $fiber): void
+    {
+        self::$taskEnded = false;
+        unset($this->fibers[spl_object_id($fiber)]);
+
+        if (self::$taskFailure !== null) {
+            $this->errors[] = self::$taskFailure;
+            self::$taskFailure = null;
+        }
+
+        if (!$fiber->isTerminated()) {
+            $this->idleFibers[] = $fiber;
         }
     }
 

@@ -11,6 +11,9 @@ The model of tasks, scopes and cancellation is in `packages/async/README.md`.
   collector runs. Get the key again every time it is needed, in `finally` too. A test catches it: start a fiber
   that suspends inside, drop it, assert that its `\WeakReference` is null
   (`fiberSuspendedInsideGoesAwayWithLastReference`).
+- A fiber runs many tasks one after another (the pool of `Internal\Loop`): per-fiber state is gone when the code
+  that has set it ends, restored in `finally` as `Scope::run()` and `Context` do, never left for the end of the fiber.
+  `bindingInTaskDoesNotLeakIntoNextTaskInSameFiber` checks it for scoped values.
 - Since php/php-src#24134 (PHP 8.6 from RC4, the branches of 8.4 and 8.5 after 8.4.16 and 8.5.12), the cycle
   collector does not free an object that holds a suspended fiber of a closure bound to it (php/php-src#25540).
   Our code avoids the shape, but a task of the user may have it (`$this->wait->park()` in a method), and its wait

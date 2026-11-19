@@ -30,21 +30,21 @@ A draft, not a decision. It expands "Observability of the task tree" of `roadmap
    `Suspended` is emitted in `Internal\Tracer::park()` when the wait is already registered (the continuation
    is subscribed to the cancellation of the scope, the timer or the watcher that wakes it is set) but `park()`
    has not been called yet. A listener that waits there (a write to a socket through thesis/io):
-   - may be woken by that very timer: the resume goes to the wait of the listener, not to the original one,
-     if both go through the one suspension of the fiber, as in Revolt (to check). A foreign value or a lost wake-up,
-     that is a hang;
+   - delays the wait it reports: if that timer fires meanwhile, its continuation is not parked yet, so it only
+     takes the value, and `park()` returns it once the listener is done. Nothing is lost, but the wait is not
+     the one the trace says it is;
    - emits a `Suspended` of its own write, gets it and writes again: endless recursion.
 
    `ScopeCancelled` comes right after `Scope::notify()` has marked the subtree: while the listener waits,
    other fibers see the tree half-way.
-2. **Not every event comes from a fiber that can wait.** A cancellation by a deadline comes from a timer callback,
-   where Revolt does not allow a suspension (to check), other events come from `{main}` outside `run()`.
+2. **Not every event comes from a fiber that can wait.** A cancellation by a deadline comes from a timer
+   of the loop, where a wait throws `LogicException`, other events come from `{main}` outside a run.
    A listener that works in some places and fails in others is worse than a rule.
 3. **The observation changes what it observes.** Even a harmless wait would reorder the fibers and move
    the virtual clock: the trace would describe another program, and the determinism on virtual time,
    which the snapshot tests rely on, would be gone.
 
-So the live mode writes synchronously to a buffer in memory, and a raw `EventLoop::repeat()` callback flushes it
+So the live mode writes synchronously to a buffer in memory, and a `watchdog()` that arms itself again flushes it
 to a non-blocking socket. The callback is outside the tree: it does not appear in the trace and does not touch
 the fibers of the tasks. A reader that falls behind fills the buffer, and the events are dropped with a counter
 of the losses: the program never slows down for its observer.
@@ -95,7 +95,8 @@ of the losses: the program never slows down for its observer.
    needs the object of the wait and its holder: a wait-for graph.
 2. **An observation that begins mid-run** sees scopes whose creation it has not seen. A live view attached
    to a running process needs an initial snapshot: a walk of the tree at the moment of attaching.
-3. **Raw `EventLoop` callbacks** are outside the tree and invisible. That is fine, but it is said in the docs.
+3. **The callbacks of the loop itself** (`onCancel()`, `watchdog()`, the handlers of signals) are outside the tree
+   and invisible. That is fine, but it is said in the docs.
 
 ## Order
 

@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 /**
- * A timer of {@see Loop} that calls a function instead of resuming a fiber: `Thesis\Async\Trace\watchdog()`.
+ * A function that {@see Loop} calls instead of resuming a fiber: a timer of `Thesis\Async\Trace\watchdog()`,
+ * a microtask of {@see Loop::queue()}.
  *
  * @internal
  */

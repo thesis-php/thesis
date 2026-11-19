@@ -38,7 +38,7 @@ final class LocalTokenBucketRateLimiterTest
     }
 
     /**
-     * Rates that are not a power of two: the time of a token is not exact in binary, and a wake-up a hair early
+     * Rates that are not a power of two: the time of a token is not exact in binary, and a rounding of it
      * must not make the next token wait a delay so small that the clock does not move (it hung on virtual time).
      *
      * @param positive-int $burst

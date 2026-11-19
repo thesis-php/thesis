@@ -32,7 +32,7 @@ The sources of the timer:
   but whole seconds only, one alarm per process (it collides with the user's), and the signal breaks a syscall
   that is not restarted: `sleep()` and `usleep()` return early, so the detector changes the code it watches.
 
-Trap: never `EventLoop::onSignal()` or `SignalTrap` for this. Revolt runs their callbacks in the loop,
+Trap: never `Loop::onSignal()` or `SignalTrap` for this. The loop runs their handlers between the fibers,
 and the loop is the thing that is held. The same goes for the dump by SIGQUIT in `trace.md`: through `SignalTrap`
 it shows a process stuck in waits (a deadlock), never one whose loop is held.
 
@@ -51,18 +51,17 @@ which takes a backtrace at every wait.
 
 ## Open questions
 
-1. **The heartbeat.** An unreferenced repeat timer of Revolt every `$threshold / 2`: knows nothing of thesis/async,
-   sees raw callbacks and amphp too, but wakes an idle process. Or the events of the trace (`TaskStarted`,
-   `Resumed`, `Suspended`, as `BlockingDetector`): free while idle, names the task that holds the loop, but needs
-   `observe()` and misses the code outside the tree. Maybe both: the timer as the base, the name from the trace
-   when it is there.
+1. **The heartbeat.** The start of a step of `Internal\Loop`, a field: free while idle, sees the callbacks
+   of the loop too, and the fiber of the step names the task that holds the loop (`ideas/loop.md`, the probe
+   of the steps). Rejected: a repeating `watchdog()`, it wakes an idle process; the events of the trace,
+   they need `observe()` and miss the code outside the tree.
 2. **Throwing from the handler.** An exception thrown by a handler of `pcntl_signal()` (and of `ExcimerTimer`)
    comes out of the interrupted code: a deadline on CPU work. It breaks every invariant of the code it interrupts
    (a half-written buffer, a lock held), so probably rejected, at most a kill of the process after a report.
 3. **Report once or again.** One report per run, or one per `$interval` with the stack each time: a stack that
    changes is a slow loop, one that does not is a stuck one.
 4. **Where it lives.** thesis/async-trace next to `BlockingDetector`, with the report a noun like the others
-   (not `Hang`/`Stall`, rejected in `packages/async-trace/AGENTS.md`). With the timer heartbeat it needs only Revolt,
-   which may argue for a package of its own.
+   (not `Hang`/`Stall`, rejected in `packages/async-trace/AGENTS.md`). With the heartbeat of the loop it needs only
+   thesis/async, which may argue for a package of its own.
 5. **Outside the process.** reli-prof and phpspy read the PHP stack from the memory of another process: no code
    of ours, no extension in the watched process. A note in the docs, maybe enough for some users.

@@ -336,8 +336,8 @@ final class SignalTest
     }
 
     /**
-     * Sent after the waiters have had a tick of the loop: Revolt installs handlers then,
-     * and a signal sent before gets the default action and kills the test run.
+     * Sent after the waiters have had a tick of the loop to trap the signal:
+     * a signal sent before gets the default action and kills the test run.
      *
      * @param positive-int $signal
      */

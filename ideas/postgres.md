@@ -48,7 +48,7 @@ The variants:
 - `pgsql`: `pg_execute()` and `pg_fetch_all()`, values are strings.
 - `pgsql-typed`: the same plus a conversion by `pg_field_type_oid()` in a PHP loop, what a driver over ext-pgsql does.
 - PHP: text or binary format, a generic decoder (a loop with `match`) or a generated one (see below),
-  blocking or on Revolt; `skip` frames the messages without decoding them, the floor of a PHP client.
+  blocking or on an event loop; `skip` frames the messages without decoding them, the floor of a PHP client.
 
 CPU is the time of the PHP process (`getrusage()`, user + sys), the median; JIT off (tracing JIT changes
 the decoding by 5–10% only):
@@ -67,8 +67,8 @@ the decoding by 5–10% only):
   the round trip is ~75 µs. The client is invisible there.
 - Pipelining is the largest win: 9 times on a local round trip, more on a real network.
   ext-pgsql runs the queries one by one.
-- Revolt adds ~15 µs of CPU per query for ext-pgsql and PHP alike (`pg_send_execute()` + `pg_socket()`
-  vs our non-blocking socket): the cost of the loop, not of the protocol.
+- The third-party event loop of the measurement, before `Internal\Loop`, added ~15 µs of CPU per query
+  for ext-pgsql and PHP alike: the cost of the loop, not of the protocol. To measure again on ours.
 - The generated decoder takes 17% less than the generic one (0.62 against 0.75 µs per row),
   binary 22% less than text (0.62 against 0.80).
 
@@ -123,8 +123,7 @@ static function (string $b, int $pos, int $len, array &$rows): int {
 ```
 
 Not measured: pecl-pq (it builds on PHP 8.5: pq 2.2.3 with libpq 18.7), authentication and connect, a real network,
-types without a cheap decoder (`numeric`, `timestamptz`, `jsonb`, arrays), the drivers of Revolt other than
-the one `DriverFactory` chose.
+types without a cheap decoder (`numeric`, `timestamptz`, `jsonb`, arrays), `Internal\Loop` of thesis/async.
 
 ## The API
 
