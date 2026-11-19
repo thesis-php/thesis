@@ -420,7 +420,7 @@ final class Generator
             [![PHPStan](https://img.shields.io/badge/PHPStan-level%20{$level}-brightgreen)](https://github.com/{$monorepo}/blob/{$branch}/phpstan.neon)
 
             > A read-only split of [`{$package->path}`](https://github.com/{$monorepo}/tree/{$branch}/{$package->path})
-            > in the monorepo [{$monorepo}](https://github.com/{$monorepo}): issues and pull requests go there.
+            > from the [{$monorepo}](https://github.com/{$monorepo}) monorepo: issues and pull requests go there.
             >
             > [Report a bug]({$bug}) · [Request a feature]({$feature}) · [Changelog](CHANGELOG.md)
             > · [Contributing](CONTRIBUTING.md)
