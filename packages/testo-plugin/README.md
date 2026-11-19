@@ -4,13 +4,14 @@
 
 [![PHP](https://img.shields.io/packagist/dependency-v/thesis/testo-plugin/php)](https://packagist.org/packages/thesis/testo-plugin)
 [![Release](https://img.shields.io/github/v/release/thesis-php/testo-plugin)](https://github.com/thesis-php/testo-plugin/releases)
-[![Downloads](https://img.shields.io/packagist/dt/thesis/testo-plugin)](https://packagist.org/packages/thesis/testo-plugin/stats)
 [![License](https://img.shields.io/packagist/l/thesis/testo-plugin)](https://github.com/thesis-php/testo-plugin/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
 > A read-only split of [`packages/testo-plugin`](https://github.com/thesis-php/thesis/tree/main/packages/testo-plugin)
-> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there,
-> see [CONTRIBUTING.md](CONTRIBUTING.md).
+> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there.
+>
+> [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
+> · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 

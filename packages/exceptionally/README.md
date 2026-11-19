@@ -4,13 +4,14 @@
 
 [![PHP](https://img.shields.io/packagist/dependency-v/thesis/exceptionally/php)](https://packagist.org/packages/thesis/exceptionally)
 [![Release](https://img.shields.io/github/v/release/thesis-php/exceptionally)](https://github.com/thesis-php/exceptionally/releases)
-[![Downloads](https://img.shields.io/packagist/dt/thesis/exceptionally)](https://packagist.org/packages/thesis/exceptionally/stats)
 [![License](https://img.shields.io/packagist/l/thesis/exceptionally)](https://github.com/thesis-php/exceptionally/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
 > A read-only split of [`packages/exceptionally`](https://github.com/thesis-php/thesis/tree/main/packages/exceptionally)
-> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there,
-> see [CONTRIBUTING.md](CONTRIBUTING.md).
+> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there.
+>
+> [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
+> · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 

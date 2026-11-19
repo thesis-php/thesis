@@ -45,7 +45,7 @@ final readonly class Manifest
      *     those of every suite
      * @param list<non-empty-string> $dist top-level entries of the package that src/ needs at runtime (a polyfill,
      *     resources). The split repository has only them, src/, composer.json, LICENSE, README.md,
-     *     CHANGELOG.md, CONTRIBUTING.md and skills/
+     *     CHANGELOG.md, CONTRIBUTING.md, SECURITY.md and skills/
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
      *     installs by its type
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names

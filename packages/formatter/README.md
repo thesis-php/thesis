@@ -4,13 +4,14 @@
 
 [![PHP](https://img.shields.io/packagist/dependency-v/thesis/formatter/php)](https://packagist.org/packages/thesis/formatter)
 [![Release](https://img.shields.io/github/v/release/thesis-php/formatter)](https://github.com/thesis-php/formatter/releases)
-[![Downloads](https://img.shields.io/packagist/dt/thesis/formatter)](https://packagist.org/packages/thesis/formatter/stats)
 [![License](https://img.shields.io/packagist/l/thesis/formatter)](https://github.com/thesis-php/formatter/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
 > A read-only split of [`packages/formatter`](https://github.com/thesis-php/thesis/tree/main/packages/formatter)
-> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there,
-> see [CONTRIBUTING.md](CONTRIBUTING.md).
+> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there.
+>
+> [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
+> · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 

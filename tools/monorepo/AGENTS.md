@@ -59,13 +59,21 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   everything after them is written by hand. The title is `title` of the manifest or the words of the directory,
   so every package is named alike. A README without the markers gets them at the top, its title is replaced.
   The badges are generated so that every package has the same set: only those that need no service
-  and no secret (Packagist, the release of the split, the level read from `phpstan.neon`).
+  and no secret (the PHP of Packagist, the release of the split, the license, the level read from `phpstan.neon`).
   Rejected: the badge of the CI of the monorepo: it is one for all the packages and says nothing of this one.
-  Coverage and mutation testing need a service with a result per package (flags of Codecov, modules
-  of the Stryker Dashboard), not set up yet.
-  The note links `CONTRIBUTING.md`, also generated for every package and shipped in the split: how to report
-  an issue and make a pull request in the monorepo, with the commands narrowed to the package. GitHub shows it
-  in the split repository as the guide of the repository.
+  The downloads of Packagist: a new package shows a number near zero. Coverage and mutation testing need
+  a service with a result per package (flags of Codecov, modules of the Stryker Dashboard), not set up yet.
+  The table of packages in the root `README.md` has the release badge of each.
+- Under the note are links to the forms of a bug and a feature of the monorepo, the changelog
+  and `CONTRIBUTING.md`. The forms (`.github/ISSUE_TEMPLATE/bug.yml`, `feature.yml`) are generated: the package
+  is a dropdown of the packages, so a report names one exactly. Rejected: an input filled in by the link
+  (`?package=thesis/<name>`, GitHub fills in only a text field from the query): it saved a click and let a typo in.
+  `labels` of the query needs the right to label, which a reporter does not have.
+- `CONTRIBUTING.md` and `SECURITY.md` are generated for every package and shipped in the split, GitHub shows them
+  in the split repository: how to report an issue and make a pull request in the monorepo, with the commands
+  narrowed to the package, and that a vulnerability goes privately to the monorepo, whose `SECURITY.md`
+  is the policy. `composer.json` of a package has `support` (issues, source, security) of the monorepo:
+  Packagist would show the issues of the split, which are disabled.
   Rejected: adding the note in the split, which copies the files of a commit as they are. A section "Contributing"
   at the end of the README: it repeated the note, a file of its own has room for the steps.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.

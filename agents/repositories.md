@@ -16,9 +16,10 @@ a change made there would be lost on the next split or would diverge from the mo
   is ours to keep stable: a change to it rewrites every split repository.
 - **Only what is shipped.** A split has the entries of the package that `packages/<name>/.split` of the commit
   lists (`manifests.md`): `src/`, `composer.json`, `LICENSE`, `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`,
-  `skills/` and the top-level entries in `dist` of the manifest (a polyfill, resources that `src/` loads). The tests,
-  the manifest and `AGENTS.md` stay in the monorepo, so the repository is exactly what composer installs,
-  from the archive and from source alike, and a commit that changes only the rest is not a commit of the split.
+  `SECURITY.md`, `skills/` and the top-level entries in `dist` of the manifest (a polyfill, resources that `src/`
+  loads). The tests, the manifest and `AGENTS.md` stay in the monorepo, so the repository is exactly what composer
+  installs, from the archive and from source alike, and a commit that changes only the rest is not a commit
+  of the split.
   A package without the list is split whole: that is the history before the lists.
 - **Push by an app.** A GitHub App of the organization pushes the splits and manages the repositories:
   its id and key are `vars.BOT_CLIENT_ID` and `secrets.BOT_PRIVATE_KEY` of the monorepo.
@@ -32,7 +33,8 @@ a change made there would be lost on the next split or would diverge from the mo
   derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
   the description, the topics (`keywords` of the manifest), the homepage (`packages/<name>` in the monorepo),
   the disabled features and the rulesets. Of the monorepo `thesis-php/thesis` it sets only the description
-  and the topics, from `description` and `keywords` of `monorepo.php`: the rest of it is set by hand.
+  and the topics, from `description` and `keywords` of `monorepo.php`: the rest of it is set by hand,
+  private vulnerability reporting included (`SECURITY.md` of every package sends a report there).
   GitHub itself is the state, the command is idempotent and deletes nothing.
   CI runs it before the split, so a new package gets its repository with its first push.
 - **Packagist.** `github` also adds the webhook of Packagist to every repository (any webhook to its URL counts:

@@ -48,13 +48,16 @@ final class Generator
                 return "No packages yet.\n";
             }
 
-            $rows = "| Package | Description |\n|---|---|\n";
+            $rows = "| Package | Release | Description |\n|---|---|---|\n";
 
             foreach ($this->monorepo->packages as $package) {
+                $split = Repositories::ORGANIZATION . '/' . $package->dir;
                 $rows .= \sprintf(
-                    "| [%s](%s) | %s |\n",
+                    "| [%s](%s) | [![Release](https://img.shields.io/github/v/release/%s)](https://github.com/%s/releases) | %s |\n",
                     $package->name,
                     $package->path,
+                    $split,
+                    $split,
                     str_replace('|', '\|', $package->manifest->description),
                 );
             }
@@ -77,6 +80,8 @@ final class Generator
             'AGENTS.md' => $generator->withCatalog('AGENTS.md', $generator->agentsCatalog),
             'README.md' => $generator->withCatalog('README.md', $generator->readmeCatalog),
             'LICENSE' => $generator->license($monorepo->config->licenseSince),
+            '.github/ISSUE_TEMPLATE/bug.yml' => $generator->bugForm(),
+            '.github/ISSUE_TEMPLATE/feature.yml' => $generator->featureForm(),
         ];
 
         foreach ($monorepo->packages as $package) {
@@ -90,6 +95,7 @@ final class Generator
             $files[$package->path . '/composer.json'] = Json::encode($generator->packageComposer($package));
             $files[$package->path . '/LICENSE'] = $generator->license($package->manifest->licenseSince);
             $files[$package->path . '/CONTRIBUTING.md'] = self::contributing($package);
+            $files[$package->path . '/SECURITY.md'] = self::security($package);
             $files[$package->path . '/' . Monorepo::SPLIT] = $generator->splitList($package);
         }
 
@@ -157,6 +163,7 @@ final class Generator
             'license' => 'MIT',
             'type' => $manifest->type,
             'authors' => $config->authors,
+            'support' => self::support($package),
             'require' => self::sortRequire([
                 'php' => $config->php,
                 ...$this->versioned($package, $manifest->require),
@@ -323,6 +330,7 @@ final class Generator
             'README.md',
             'CHANGELOG.md',
             'CONTRIBUTING.md',
+            'SECURITY.md',
             ...$package->manifest->dist,
         ];
 
@@ -383,8 +391,8 @@ final class Generator
     /**
      * The head of README.md is generated: the title, the badges and a note that says where the package
      * is developed, since the split repository has neither the tests nor pull requests (agents/repositories.md).
-     * The badges are of what needs no service and no secret: Packagist, the release of the split
-     * and the level of PHPStan.
+     * The badges are of what needs no service and no secret and says something already for a new package:
+     * the PHP of Packagist, the release of the split, the license and the level of PHPStan.
      */
     private function packageReadme(Package $package): ?string
     {
@@ -399,6 +407,8 @@ final class Generator
         $split = Repositories::ORGANIZATION . '/' . $package->dir;
         $branch = Repositories::DEFAULT_BRANCH;
         $packagist = "https://packagist.org/packages/{$package->name}";
+        $bug = self::newIssue('bug');
+        $feature = self::newIssue('feature');
         $license = "https://github.com/{$split}/blob/{$branch}/LICENSE";
         $level = $this->phpstanLevel();
         $head = <<<MD
@@ -406,13 +416,14 @@ final class Generator
 
             [![PHP](https://img.shields.io/packagist/dependency-v/{$package->name}/php)]({$packagist})
             [![Release](https://img.shields.io/github/v/release/{$split})](https://github.com/{$split}/releases)
-            [![Downloads](https://img.shields.io/packagist/dt/{$package->name})]({$packagist}/stats)
             [![License](https://img.shields.io/packagist/l/{$package->name})]({$license})
             [![PHPStan](https://img.shields.io/badge/PHPStan-level%20{$level}-brightgreen)](https://github.com/{$monorepo}/blob/{$branch}/phpstan.neon)
 
             > A read-only split of [`{$package->path}`](https://github.com/{$monorepo}/tree/{$branch}/{$package->path})
-            > in the monorepo [{$monorepo}](https://github.com/{$monorepo}): issues and pull requests go there,
-            > see [CONTRIBUTING.md](CONTRIBUTING.md).
+            > in the monorepo [{$monorepo}](https://github.com/{$monorepo}): issues and pull requests go there.
+            >
+            > [Report a bug]({$bug}) · [Request a feature]({$feature}) · [Changelog](CHANGELOG.md)
+            > · [Contributing](CONTRIBUTING.md)
             MD;
 
         return self::withHead($readme, $head);
@@ -427,6 +438,8 @@ final class Generator
         $monorepo = Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
         $branch = Repositories::DEFAULT_BRANCH;
         $directory = "https://github.com/{$monorepo}/tree/{$branch}/{$package->path}";
+        $bug = self::newIssue('bug');
+        $feature = self::newIssue('feature');
 
         return <<<MD
             <!-- Generated by bin/monorepo sync, do not edit. -->
@@ -441,9 +454,10 @@ final class Generator
 
             ## Issues
 
-            Report a bug or propose a feature in the [issues of the monorepo](https://github.com/{$monorepo}/issues).
-            Name the package (`{$package->name}`) and its version, and for a bug give the code that reproduces it,
-            what you expected and what happened instead.
+            [Report a bug]({$bug}) or [request a feature]({$feature}) in the issues of the monorepo
+            and choose `{$package->name}` in it. For a bug give its version, the code that reproduces it,
+            what you expected and what happened instead. A vulnerability is reported privately, see
+            [SECURITY.md](SECURITY.md).
 
             ## Pull requests
 
@@ -468,6 +482,152 @@ final class Generator
             [`AGENTS.md`](https://github.com/{$monorepo}/blob/{$branch}/AGENTS.md) and the files it links.
 
             MD;
+    }
+
+    /**
+     * The split has no issues, a vulnerability is reported privately in the monorepo, whose SECURITY.md
+     * is the policy of every package.
+     */
+    private static function security(Package $package): string
+    {
+        $monorepo = Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
+
+        return <<<MD
+            <!-- Generated by bin/monorepo sync, do not edit. -->
+
+            # Security policy of {$package->name}
+
+            Do not report a vulnerability in a public issue. Report it privately in the monorepo
+            [{$monorepo}](https://github.com/{$monorepo}), where `{$package->name}` is developed:
+            [report a vulnerability](https://github.com/{$monorepo}/security/advisories/new).
+            Name the package and its version, and describe the problem and how to reproduce it.
+
+            The [security policy of the monorepo](https://github.com/{$monorepo}/security/policy) says
+            which versions get fixes and what happens after a report.
+
+            MD;
+    }
+
+    /**
+     * Packagist shows these links on the page of the package: without them the issues would be those
+     * of the split repository, which has them disabled.
+     *
+     * @return array<non-empty-string, non-empty-string>
+     */
+    private static function support(Package $package): array
+    {
+        $monorepo = 'https://github.com/' . Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
+
+        return [
+            'issues' => "{$monorepo}/issues",
+            'source' => "{$monorepo}/tree/" . Repositories::DEFAULT_BRANCH . "/{$package->path}",
+            'security' => "{$monorepo}/security/policy",
+        ];
+    }
+
+    /**
+     * A new issue of the monorepo by the form .github/ISSUE_TEMPLATE/<template>.yml.
+     *
+     * @param non-empty-string $template
+     * @return non-empty-string
+     */
+    private static function newIssue(string $template): string
+    {
+        $monorepo = Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
+
+        return "https://github.com/{$monorepo}/issues/new?template={$template}.yml";
+    }
+
+    /**
+     * The package is a dropdown of the packages of the monorepo, so a report names one exactly. GitHub fills in
+     * only a text field from the query of the link, so the links of the packages do not choose it.
+     */
+    private function bugForm(): string
+    {
+        $packages = $this->packageOptions();
+
+        return <<<YAML
+            # Generated by bin/monorepo sync, do not edit.
+            name: Bug report
+            description: Something in a package does not work as documented.
+            body:
+              - type: dropdown
+                id: package
+                attributes:
+                  label: Package
+                  options:
+            {$packages}
+                validations:
+                  required: true
+              - type: input
+                id: version
+                attributes:
+                  label: Version
+                  description: The version of the package (`composer show thesis/<name>`), PHP and the OS.
+                  placeholder: 0.1.2, PHP 8.6.0, Linux
+                validations:
+                  required: true
+              - type: textarea
+                id: reproduction
+                attributes:
+                  label: Code that reproduces it
+                  description: As short as you can make it.
+                  render: php
+                validations:
+                  required: true
+              - type: textarea
+                id: expected
+                attributes:
+                  label: What you expected and what happened instead
+                  description: With the exception and its trace, if there is one.
+                validations:
+                  required: true
+
+            YAML;
+    }
+
+    private function featureForm(): string
+    {
+        $packages = $this->packageOptions();
+
+        return <<<YAML
+            # Generated by bin/monorepo sync, do not edit.
+            name: Feature request
+            description: Something a package could do.
+            body:
+              - type: dropdown
+                id: package
+                attributes:
+                  label: Package
+                  options:
+            {$packages}
+                    - A new package or the monorepo
+                validations:
+                  required: true
+              - type: textarea
+                id: problem
+                attributes:
+                  label: The problem
+                  description: What you are trying to do and why the package does not let you.
+                validations:
+                  required: true
+              - type: textarea
+                id: solution
+                attributes:
+                  label: The solution you propose
+                  description: An API, an example of the code you would write.
+
+            YAML;
+    }
+
+    private function packageOptions(): string
+    {
+        $options = array_map(
+            static fn(Package $package) => '        - ' . $package->name,
+            $this->monorepo->packages,
+        );
+
+        return implode("\n", $options);
     }
 
     /**

@@ -4,13 +4,14 @@
 
 [![PHP](https://img.shields.io/packagist/dependency-v/thesis/source-location/php)](https://packagist.org/packages/thesis/source-location)
 [![Release](https://img.shields.io/github/v/release/thesis-php/source-location)](https://github.com/thesis-php/source-location/releases)
-[![Downloads](https://img.shields.io/packagist/dt/thesis/source-location)](https://packagist.org/packages/thesis/source-location/stats)
 [![License](https://img.shields.io/packagist/l/thesis/source-location)](https://github.com/thesis-php/source-location/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
 > A read-only split of [`packages/source-location`](https://github.com/thesis-php/thesis/tree/main/packages/source-location)
-> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there,
-> see [CONTRIBUTING.md](CONTRIBUTING.md).
+> in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis): issues and pull requests go there.
+>
+> [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
+> · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 

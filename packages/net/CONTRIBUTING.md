@@ -10,9 +10,10 @@ on the next split.
 
 ## Issues
 
-Report a bug or propose a feature in the [issues of the monorepo](https://github.com/thesis-php/thesis/issues).
-Name the package (`thesis/net`) and its version, and for a bug give the code that reproduces it,
-what you expected and what happened instead.
+[Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) or [request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) in the issues of the monorepo
+and choose `thesis/net` in it. For a bug give its version, the code that reproduces it,
+what you expected and what happened instead. A vulnerability is reported privately, see
+[SECURITY.md](SECURITY.md).
 
 ## Pull requests
 

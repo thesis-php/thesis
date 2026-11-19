@@ -28,6 +28,11 @@
             "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
         }
     ],
+    "support": {
+        "issues": "https://github.com/thesis-php/thesis/issues",
+        "source": "https://github.com/thesis-php/thesis/tree/main/packages/net",
+        "security": "https://github.com/thesis-php/thesis/security/policy"
+    },
     "require": {
         "php": "^8.6",
         "php-64bit": "*",

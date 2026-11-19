@@ -4,6 +4,7 @@ CHANGELOG.md
 CONTRIBUTING.md
 LICENSE
 README.md
+SECURITY.md
 composer.json
 polyfill
 src

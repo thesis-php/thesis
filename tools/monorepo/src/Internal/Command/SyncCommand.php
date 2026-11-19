@@ -35,7 +35,16 @@ final readonly class SyncCommand
 
         foreach (Generator::stale($monorepo, $files) as $path => $content) {
             try {
-                exceptionally(fn() => file_put_contents($this->root . '/' . $path, $content));
+                exceptionally(function () use ($path, $content) {
+                    $file = $this->root . '/' . $path;
+
+                    // A generated file may be the first of its directory (.github/ISSUE_TEMPLATE/).
+                    if (!is_dir(\dirname($file))) {
+                        mkdir(\dirname($file), recursive: true);
+                    }
+
+                    file_put_contents($file, $content);
+                });
             } catch (\ErrorException $error) {
                 $io->error(\sprintf('Cannot write %s: %s.', $path, $error->getMessage()));
 
