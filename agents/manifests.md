@@ -19,6 +19,9 @@ or changing the public API of a package that others use. How the generator works
   - `skills.json` (`sources`),
   - the forms of issues in `.github/ISSUE_TEMPLATE/` (the dropdown of the packages),
   - `.github/codecov.yml`: a component of Codecov per package with `tests/` (`tests.md`),
+  - the matrices of the jobs of `.github/workflows/check.yaml` that run per package, each under its marker
+    (`Matrices`): `test-alone` (every PHP below the monorepo that `php` of the manifest allows),
+    `test-32-bit` (`bit32Testing`), `infect` (`tests/` and `mutationTesting`), `coverage` (`tests/`),
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,
     from the descriptions.
 - The configs of the tools take what a package says about itself from the manifests (`Monorepo::load(__DIR__)`),
@@ -31,6 +34,11 @@ or changing the public API of a package that others use. How the generator works
   (a protocol, a transport, a kind of API) updates the `description` and `keywords` of its manifest
   in the same change, and those of `monorepo.php` when it changes what the ecosystem offers (a new package).
   They are how the package is found on Packagist and GitHub: a stale one hides a feature or promises a removed one.
+- **No list of packages is written by hand**, in a config, a workflow or a Makefile: what is done per package
+  is derived from the manifests and the layout of a package (`tests/`), by the configs through `Tools`
+  or by `make sync` into a generated file or a marked part of one. A package takes part or not by a field
+  of its manifest (`mutationTesting`, `bit32Testing`), so a new package is in every list by its manifest alone.
+  Examples in the text of a topic or a README are not lists.
 - An exception of a package to a tool is declared in its manifest (`optional`, `skip`), never in a config.
   PHPStan errors are ignored in the code instead, by `@phpstan-ignore identifier (reason)`.
 

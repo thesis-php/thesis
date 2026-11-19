@@ -6,7 +6,8 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
 ## Rules
 
 - Write the failing test first, then the fix.
-- `make infect P=<name>` kills every mutant of a package in the matrix of the job `infect` of `check.yaml`.
+- `make infect P=<name>` kills every mutant of a package with `mutationTesting` (on by default) in its manifest:
+  `sync` writes them to the matrix of the job `infect` of `check.yaml`.
   A surviving mutant gets a test. A mutant that shows code to be redundant gets the code simplified. Only one
   that no input tells from the code (most often it only makes the code slower) is skipped by a comment
   above the statement it mutates: the reason, then `// @infection-ignore <Mutator>, ...`. An annotation covers
@@ -28,7 +29,7 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   of the event loop left surviving mutants in `Stream` of io and in async-trace. Kill them, then make it block again.
 - Coverage is for the badge of a package (`tools/monorepo/AGENTS.md`), not a gate: no target, no statuses
   and no comments of Codecov. The job `coverage` of `check.yaml` runs `make coverage P=<name>` for every package
-  with `tests/` (the matrix is listed from `packages/`) and uploads its Clover report with the flag `<name>`.
+  with `tests/` (the matrix is written by `sync`) and uploads its Clover report with the flag `<name>`.
   The report of one suite lists the `src/` of every package, so the component `<name>` of `.github/codecov.yml`
   takes the flag and `packages/<name>/src/**` together: a package is covered by its own tests, not by those
   of the packages that use it. Trap: one run of every suite with coverage exhausts 2 GB in Xdebug,

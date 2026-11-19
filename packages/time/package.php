@@ -40,4 +40,5 @@ return new Manifest(
         ),
     ],
     dist: ['polyfill'],
+    bit32Testing: true,
 );

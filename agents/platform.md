@@ -10,7 +10,8 @@ Read before writing code that depends on the operating system or on the size of 
   a dependency already has it: the dependency may change, the code does not. Such code does not check `PHP_INT_SIZE`.
   A package that gets 64-bit only through a dependency (`cache`, `testo-plugin`) does not repeat it.
 - A package without it (`dispatcher`, `exceptionally`, `formatter`, `phpstan-extension`, `source-location`, `time`)
-  is not guaranteed on 32-bit: only `thesis/time` is tested there (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`),
+  is not guaranteed on 32-bit unless its manifest has `bit32Testing: true`, which puts it in the job `test-32-bit`
+  of CI: only `thesis/time` now (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`),
   how its code stays exact is in its `AGENTS.md`. A change that makes such a package rely on 64-bit `int`
   adds `php-64bit` to its manifest and drops "64-bit or 32-bit" from its `README.md`, if there is one.
 - Windows is not supported, and nothing is guaranteed to work there. The code is written for Unix only:

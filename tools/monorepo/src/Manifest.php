@@ -50,6 +50,10 @@ final readonly class Manifest
      *     installs by its type
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names
      *     outside src/ goes to $dist too
+     * @param bool $mutationTesting the job infect of check.yaml runs make infect on the tests/ of the package.
+     *     Turned off with a comment on why
+     * @param bool $bit32Testing CI tests the package on 32-bit PHP, which it guarantees: on its lowest PHP
+     *     and on that of the monorepo (agents/platform.md)
      */
     public function __construct(
         public string $description,
@@ -70,5 +74,7 @@ final readonly class Manifest
         public array $dist = [],
         public string $type = 'library',
         public array $extra = [],
+        public bool $mutationTesting = true,
+        public bool $bit32Testing = false,
     ) {}
 }

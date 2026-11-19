@@ -83,6 +83,7 @@ final class Generator
             '.github/ISSUE_TEMPLATE/bug.yml' => $generator->bugForm(),
             '.github/ISSUE_TEMPLATE/feature.yml' => $generator->featureForm(),
             '.github/codecov.yml' => $generator->codecov(),
+            Matrices::PATH => Matrices::write($monorepo),
         ];
 
         foreach ($monorepo->packages as $package) {

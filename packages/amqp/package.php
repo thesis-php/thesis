@@ -29,4 +29,6 @@ return new Manifest(
     ],
     // The test of the protocol layer compares the files in src/ with what generate() gives
     devFiles: ['codegen/generate.php'],
+    // Its tests need RabbitMQ, which make infect does not start, and its mutants have not been collected yet.
+    mutationTesting: false,
 );
