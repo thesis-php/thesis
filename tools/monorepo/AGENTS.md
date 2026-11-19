@@ -53,6 +53,11 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   which GitHub resolves from the root of the repository): it works only in the monorepo, the split repository
   and Packagist show the package alone. A package links another by `https://github.com/thesis-php/<name>`.
   Links in code (fenced blocks, inline code) are examples and are skipped.
+- `sync` writes a note that the package is a split to `README.md` of every package, since the split repository
+  has neither the tests nor pull requests (`agents/repositories.md`): between `SPLIT_NOTE_START` and `_END`
+  of `Generator`, under the title and the badges. Missing markers are added there, so a README starts with `# <name>`.
+  Rejected: adding the note in the split, which copies the files of a commit as they are. A section "Contributing"
+  at the end of the README repeated the note.
 - Generated JSON is compared by meaning, not by text: `composer normalize` owns the formatting of composer.json.
 - `github` (`Internal\GitHub\Repositories`) brings `thesis-php/<dir>` to the state of `agents/repositories.md`:
   creates it, sets the settings that differ, creates or replaces the two rulesets, adds the webhook of Packagist

@@ -25,8 +25,9 @@ a change made there would be lost on the next split or would diverge from the mo
 - **Read-only.** A split repository has pull requests, issues, wiki, projects and discussions disabled.
   Two rulesets, on all branches and on all tags, forbid creation, update, deletion and force pushes to everyone
   but the app, the owners of the organization included. Rulesets of a repository are free for public repositories,
-  so no paid plan is needed. A contribution is a pull request to the monorepo only, the homepage of a split
-  repository says so.
+  so no paid plan is needed. A contribution is a pull request to the monorepo only: the homepage of a split
+  repository links its directory there, and `make sync` writes a note that says so under the title of `README.md`
+  of every package, since GitHub and Packagist show only the README.
 - **Settings come from the manifests.** `bin/monorepo github` brings every `thesis-php/<name>` to the state
   derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
   the description, the topics (`keywords` of the manifest), the homepage (`packages/<name>` in the monorepo),
