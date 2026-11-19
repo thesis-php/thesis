@@ -350,9 +350,9 @@ final class Socket implements Reader, Writer, Closer
     /**
      * Runs $fn holding the write mutex.
      *
-     * @param \Closure(): void $fn
+     * @param callable(): void $fn
      */
-    private function exclusively(\Closure $fn): void
+    private function exclusively(callable $fn): void
     {
         ++$this->writers;
 

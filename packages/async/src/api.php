@@ -147,7 +147,7 @@ function isCancelled(): bool
  */
 function onCancel(callable $callback): \Closure
 {
-    return Scope::current()->onCancel($callback(...));
+    return Scope::current()->onCancel($callback);
 }
 
 /**
@@ -671,7 +671,7 @@ function virtualTime(callable $fn, ?int $seed = null): mixed
     Scope::$virtualClock = $clock;
 
     try {
-        return $loop->run($fn(...));
+        return $loop->run($fn);
     } finally {
         // What is left in the loop is dropped with it.
         $loop->release();

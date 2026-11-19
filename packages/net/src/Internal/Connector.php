@@ -67,10 +67,10 @@ final readonly class Connector
      * Starts the next attempt once the previous one fails or after {@see ATTEMPT_DELAY}, the first to connect wins.
      *
      * @param non-empty-list<non-empty-string> $ips
-     * @param \Closure(non-empty-string): (Socket|non-empty-string) $attempt
+     * @param callable(non-empty-string): (Socket|non-empty-string) $attempt
      * @return Socket|non-empty-string
      */
-    private static function race(array $ips, \Closure $attempt): Socket|string
+    private static function race(array $ips, callable $attempt): Socket|string
     {
         /** @var Channel<Socket|non-empty-string> $outcomes room for every attempt, so that none waits to report */
         $outcomes = new Channel(\count($ips));

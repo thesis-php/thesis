@@ -335,9 +335,9 @@ final class Repositories
     /**
      * @param non-empty-string $repository
      * @param non-empty-string $what
-     * @param \Closure(): mixed $apply
+     * @param callable(): mixed $apply
      */
-    private function change(string $repository, string $what, \Closure $apply): void
+    private function change(string $repository, string $what, callable $apply): void
     {
         if (!$this->dryRun) {
             $apply();

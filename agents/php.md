@@ -84,8 +84,12 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
-- A public API accepts `callable` with a signature (`callable(T): void`), not `Closure`: users may pass
-  invokable objects, `[$object, 'method']` and the like.
+- A parameter that is only called or captured by a closure is `callable` with a signature (`callable(T): void`),
+  not `Closure`, in a public API and inside alike: users may pass invokable objects, `[$object, 'method']`
+  and the like, and a callable passed on needs no `$fn(...)` on the way. `\Closure` stays where the value is
+  stored in a property (PHP has no `callable` property type, a conversion inside costs the same allocation),
+  compared by identity (`spl_object_id()`, the handler that `offSignal()` removes), told apart by `instanceof`
+  (a task from a `Callback` in the microtasks of `Loop`), and as a return type.
 - A duration in a public API (a timeout, a delay, a TTL, an interval) is `Time\Duration`, created and converted
   with the functions of `thesis/time` (`sec(5)`, `ms(250)`, `toSecFloat()`). Never a bare `int`/`float` of seconds
   or milliseconds, and never `float|Duration`: the unit of a number is only a convention, and a union can be widened

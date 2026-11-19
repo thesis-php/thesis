@@ -228,10 +228,10 @@ final class Scope implements Waiter
      *
      * The root scope is never cancelled and an ended one never calls back, so nothing is stored for them.
      *
-     * @param \Closure(): void $callback
+     * @param callable(): void $callback
      * @return \Closure(): void unsubscribe, idempotent
      */
-    public function onCancel(\Closure $callback): \Closure
+    public function onCancel(callable $callback): \Closure
     {
         if ($this === ROOT_SCOPE || $this->callbacksEnded) {
             return static function () {};

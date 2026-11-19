@@ -244,11 +244,11 @@ final class Loop
      * Runs $fn in a fiber, and the loop until the fiber ends. While it runs, it is the loop of {@see get()}.
      *
      * @template T
-     * @param \Closure(): T $fn
+     * @param callable(): T $fn
      * @return T
      * @throws \LogicException if the loop is running
      */
-    public function run(\Closure $fn): mixed
+    public function run(callable $fn): mixed
     {
         if ($this->main !== null) {
             throw new \LogicException('The event loop is already running: it cannot run again inside.');
