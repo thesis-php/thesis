@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/thesis-php/io)](https://github.com/thesis-php/io/releases)
 [![License](https://img.shields.io/packagist/l/thesis/io)](https://github.com/thesis-php/io/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+[![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=io)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/io/src)
 
 > A read-only split of [`packages/io`](https://github.com/thesis-php/thesis/tree/main/packages/io)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

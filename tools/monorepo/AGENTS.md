@@ -58,11 +58,13 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   has neither the tests nor pull requests (`agents/repositories.md`). Everything generated is inside the markers,
   everything after them is written by hand. The title is `title` of the manifest or the words of the directory,
   so every package is named alike. A README without the markers gets them at the top, its title is replaced.
-  The badges are generated so that every package has the same set: only those that need no service
-  and no secret (the PHP of Packagist, the release of the split, the license, the level read from `phpstan.neon`).
+  The badges are generated so that every package has the same set: the PHP of Packagist, the release
+  of the split, the license, the level read from `phpstan.neon` and the coverage of the component of the package
+  in Codecov (`agents/tests.md`), which `sync` writes to `.github/codecov.yml`. A package without `tests/`
+  has no coverage badge and no component: 0 % of code that another tool checks (`phpstan-extension`).
   Rejected: the badge of the CI of the monorepo: it is one for all the packages and says nothing of this one.
-  The downloads of Packagist: a new package shows a number near zero. Coverage and mutation testing need
-  a service with a result per package (flags of Codecov, modules of the Stryker Dashboard), not set up yet.
+  The downloads of Packagist: a new package shows a number near zero. Mutation testing needs a service
+  with a result per package (modules of the Stryker Dashboard), not set up yet.
   The table of packages in the root `README.md` has the release badge of each.
 - Under the note are links to the forms of a bug and a feature of the monorepo, the changelog
   and `CONTRIBUTING.md`. The forms (`.github/ISSUE_TEMPLATE/bug.yml`, `feature.yml`) are generated: the package

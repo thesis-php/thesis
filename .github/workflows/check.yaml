@@ -78,6 +78,37 @@ jobs:
       - uses: actions/checkout@v6
       - run: make infect P=${{ matrix.package }}
 
+  # The packages with tests/, the matrix of the job coverage: a new package gets its badge with no change here.
+  tested:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.list.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: list
+        run: echo "packages=$(ls -d packages/*/tests | cut -d/ -f2 | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+
+  # The coverage of every package by its own tests, uploaded to Codecov with the flag of the package for the badge
+  # of its README.md (the components of .github/codecov.yml). On ARM like infect (agents/tests.md).
+  # Out of `needs` of the release: a badge does not hold back a release.
+  coverage:
+    needs: tested
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.tested.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: make coverage P=${{ matrix.package }}
+      - uses: codecov/codecov-action@v5
+        with:
+          files: var/coverage/${{ matrix.package }}.xml
+          flags: ${{ matrix.package }}
+          disable_search: true
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   # Counts under Valgrind on one PHP and one driver (agents/benchmarks.md). The results are an artifact
   # for `make bench-accept`: `gh run download <run> -p 'tally-*' -D var/tally`.
   # Off until a release of Tally loads tally_hooks on PHP 8.6 RC7 (agents/benchmarks.md), and out of `needs`

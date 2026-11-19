@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/thesis-php/testo-plugin)](https://github.com/thesis-php/testo-plugin/releases)
 [![License](https://img.shields.io/packagist/l/thesis/testo-plugin)](https://github.com/thesis-php/testo-plugin/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+[![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=testo-plugin)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/testo-plugin/src)
 
 > A read-only split of [`packages/testo-plugin`](https://github.com/thesis-php/thesis/tree/main/packages/testo-plugin)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

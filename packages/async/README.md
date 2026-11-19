@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/thesis-php/async)](https://github.com/thesis-php/async/releases)
 [![License](https://img.shields.io/packagist/l/thesis/async)](https://github.com/thesis-php/async/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+[![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=async)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/async/src)
 
 > A read-only split of [`packages/async`](https://github.com/thesis-php/thesis/tree/main/packages/async)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

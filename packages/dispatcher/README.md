@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/thesis-php/dispatcher)](https://github.com/thesis-php/dispatcher/releases)
 [![License](https://img.shields.io/packagist/l/thesis/dispatcher)](https://github.com/thesis-php/dispatcher/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+[![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=dispatcher)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/dispatcher/src)
 
 > A read-only split of [`packages/dispatcher`](https://github.com/thesis-php/thesis/tree/main/packages/dispatcher)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

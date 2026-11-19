@@ -26,6 +26,15 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Move it back to `ubuntu-latest` once a release of Xdebug passes there.
 - For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
   of the event loop left surviving mutants in `Stream` of io and in async-trace. Kill them, then make it block again.
+- Coverage is for the badge of a package (`tools/monorepo/AGENTS.md`), not a gate: no target, no statuses
+  and no comments of Codecov. The job `coverage` of `check.yaml` runs `make coverage P=<name>` for every package
+  with `tests/` (the matrix is listed from `packages/`) and uploads its Clover report with the flag `<name>`.
+  The report of one suite lists the `src/` of every package, so the component `<name>` of `.github/codecov.yml`
+  takes the flag and `packages/<name>/src/**` together: a package is covered by its own tests, not by those
+  of the packages that use it. Trap: one run of every suite with coverage exhausts 2 GB in Xdebug,
+  a run per package takes at most a minute. On ARM like `infect`: the suites were checked under coverage
+  only there. The upload needs `secrets.CODECOV_TOKEN` of the monorepo or tokens turned off for public
+  repositories in the settings of the organization in Codecov.
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,

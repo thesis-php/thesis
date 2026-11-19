@@ -130,6 +130,13 @@ bench-accept: var vendor ## Make the results of the last `make bench` the expect
 	$(RUN) vendor/bin/tally accept $(ARGS) var/tally $(if $(P),packages/$(P)/benchmarks)
 .PHONY: bench-accept
 
+# (Coverage of one package by its own tests, uploaded by the job coverage of check.yaml (agents/tests.md).
+# A run of every suite at once exhausts 2 GB in Xdebug)
+coverage: var vendor up ## Collect the coverage of a package by its tests into var/coverage/<name>.xml P=
+	$(if $(P),,$(error P= names the package))
+	$(RUN) env XDEBUG_MODE=coverage vendor/bin/testo --suite=$(P) --coverage --coverage-clover=var/coverage/$(P).xml $(ARGS)
+.PHONY: coverage
+
 infect: var vendor ## Run mutation testing [P=]
 	$(RUN) php -d memory_limit=2G vendor/bin/infection --show-mutations --threads=max $(if $(P),--test-framework-options=--suite=$(P) packages/$(P)/src/) $(ARGS)
 .PHONY: infect

@@ -18,6 +18,7 @@ or changing the public API of a package that others use. How the generator works
   - `packages/<name>/.split`: what the split repository, and so every install, has (`repositories.md`),
   - `skills.json` (`sources`),
   - the forms of issues in `.github/ISSUE_TEMPLATE/` (the dropdown of the packages),
+  - `.github/codecov.yml`: a component of Codecov per package with `tests/` (`tests.md`),
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,
     from the descriptions.
 - The configs of the tools take what a package says about itself from the manifests (`Monorepo::load(__DIR__)`),

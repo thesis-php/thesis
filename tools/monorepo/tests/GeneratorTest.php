@@ -252,6 +252,48 @@ final readonly class GeneratorTest
             MD);
     }
 
+    public static function writesCoverageBadgeOfPackageWithTests(): void
+    {
+        $fixture = self::fixture()->file('packages/bytes/README.md', "Usage.\n");
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files['packages/bytes/README.md'] ?? '')->contains(<<<'MD'
+            [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+            [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=bytes)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/bytes/src)
+
+            > A read-only split
+            MD);
+    }
+
+    public static function writesCodecovComponentOfEveryPackageWithTests(): void
+    {
+        $fixture = self::fixture()->package('stan');
+
+        $files = Generator::generate($fixture->load());
+
+        Assert
+            ::string($files['.github/codecov.yml'] ?? '')
+            ->endsWith(<<<'YAML'
+                component_management:
+                  individual_components:
+                    - component_id: async
+                      name: thesis/async
+                      paths:
+                        - packages/async/src/**
+                      flag_regexes:
+                        - '^async$'
+                    - component_id: bytes
+                      name: thesis/bytes
+                      paths:
+                        - packages/bytes/src/**
+                      flag_regexes:
+                        - '^bytes$'
+
+                YAML)
+        ;
+    }
+
     public static function replacesHeadOfPackageReadme(): void
     {
         $start = Generator::HEAD_START;
