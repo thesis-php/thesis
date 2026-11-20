@@ -56,7 +56,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - Timestamps come from `format('U')` (`Internal\timestamp()`), never `getTimestamp()`, which throws on 32-bit
   outside of 1901 to 2038. A float beyond int becomes a string by `whole()`: `%s` gives 14 digits.
 - The `to*()` conversions throw `Time\TimeException` for a magnitude above `PHP_INT_MAX`, which happens only
-  on 32-bit. `toNs(ns(PHP_INT_MIN))` throws too: one value is not worth a branch.
+  on 32-bit. `toNs(ns(PHP_INT_MIN))` throws too: one value is not worth a branch. The `to*Float()` ones
+  never throw, hence `toNsFloat()`, of no use on 64-bit, where `toNs()` is exact.
 - Functions throw `Time\TimeException` out of range, as the class does, so a caller handles one kind.
 
 ## Decisions
@@ -83,7 +84,7 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   and as a function `multiplyBy($delay, 2)` reads as multiplying by `$delay`. Rejected: a `\RoundingMode`:
   the result is a duration rounded to a nanosecond, as `sec(1.5)` is, and a mode matters only where
   a conversion rounds to the unit of an API (`toMs()`). An optional one can be added later without a break.
-- `ratio()` divides the float nanoseconds of both durations (`toFloatFractions()` of a billion), one path
+- `ratio()` divides the float nanoseconds of both durations (`toNsFloat()`), one path
   for 64-bit and 32-bit: they are exact below 2^53 (104 days), so the quotient is the nearest float and durations
   that divide evenly give a whole number, which `(int)` keeps. Rejected: `toSecFloat($a) / toSecFloat($b)`,
   rounded three times (`ratio(sec(0.3), sec(0.1))` was 2.9999999999999996, and its floor lost an interval).

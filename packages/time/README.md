@@ -129,10 +129,11 @@ The float conversions never throw.
 ### Converting to float
 
 ```php
-use function Thesis\Time\{sec, toHoursFloat, toMinutesFloat, toMsFloat, toSecFloat, toUsFloat};
+use function Thesis\Time\{sec, toHoursFloat, toMinutesFloat, toMsFloat, toNsFloat, toSecFloat, toUsFloat};
 
 $duration = sec(90.5);
 
+toNsFloat($duration);      // 90500000000.0
 toUsFloat($duration);      // 90500000.0
 toMsFloat($duration);      // 90500.0
 toSecFloat($duration);     // 90.5
@@ -142,7 +143,7 @@ toHoursFloat($duration);   // 0.025138888888888888
 
 For APIs that take float seconds, like the timeout of `stream_socket_client()`, and for metrics and logs.
 The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
-in the last place off above.
+in the last place off above. `toNsFloat()` is for 32-bit PHP, where `toNs()` throws above 2.1 seconds.
 
 ### Passing to other APIs
 

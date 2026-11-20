@@ -187,6 +187,16 @@ function toHours(Duration $duration, \RoundingMode $rounding): int
 }
 
 /**
+ * Nanoseconds as a float: exact up to 2^53 (104 days), and never throws, unlike toNs() on 32-bit PHP.
+ *
+ * @api
+ */
+function toNsFloat(Duration $duration): float
+{
+    return toFloatFractions($duration, NANOSECONDS_PER_SECOND);
+}
+
+/**
  * Microseconds with a fraction.
  *
  * @api
@@ -273,7 +283,7 @@ function multiply(Duration $duration, int|float $factor): Duration
 function ratio(Duration $dividend, Duration $divisor): float
 {
     // The nanoseconds, not the float seconds, which are rounded already: 0.3 / 0.1 is 2.9999999999999996.
-    return toFloatFractions($dividend, NANOSECONDS_PER_SECOND) / toFloatFractions($divisor, NANOSECONDS_PER_SECOND);
+    return toNsFloat($dividend) / toNsFloat($divisor);
 }
 
 /**

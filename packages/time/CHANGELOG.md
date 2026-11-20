@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parseDuration()` reads a duration from a string like `1h30m`, `1.5s` or `250ms`, as `time.ParseDuration()` of Go:
   the reverse of `formatDuration()`.
 - `ratio()` divides a duration by a duration into a float: a progress, a rate, the intervals that have passed.
+- `toNsFloat()`, like the other float conversions: on 32-bit PHP `toNs()` throws above 2.1 seconds.
 
 ### Changed
 

@@ -76,6 +76,13 @@ final class FunctionsTest
         ];
         yield 'toHours' => [static fn() => toHours(minutes(-119), \RoundingMode::TowardsZero), '-1'];
         yield 'toHours of a half' => [static fn() => toHours(minutes(30), \RoundingMode::HalfOdd), '1'];
+        yield 'toNsFloat' => [static fn() => toNsFloat(sec(1.5)), '1500000000.0'];
+        yield 'negative toNsFloat' => [static fn() => toNsFloat(ns(-1)), '-1.0'];
+        // Above 2^53 ns a float is a multiple of 2: the nearest one.
+        yield 'toNsFloat above 2^53 ns' => [
+            static fn() => toNsFloat(Duration::fromSeconds(10_000_000, 500_000_003)),
+            '10000000500000004.0',
+        ];
         yield 'toUsFloat' => [static fn() => toUsFloat(ns(1500)), '1.5'];
         yield 'negative toUsFloat' => [static fn() => toUsFloat(sec(-1)->sub(ns(1))), '-1000000.001'];
         yield 'toMsFloat' => [static fn() => toMsFloat(us(1500)), '1.5'];
@@ -199,6 +206,11 @@ final class FunctionsTest
         ];
         yield 'toHours of max' => [static fn() => toHours(sec(PHP_INT_MAX), \RoundingMode::TowardsZero), '596523'];
         // The float conversions never throw: the products wider than int are floats.
+        yield 'toNsFloat above max int' => [static fn() => toNsFloat(sec(3)), '3000000000.0'];
+        yield 'toNsFloat of max' => [
+            static fn() => toNsFloat(Duration::fromSeconds(PHP_INT_MAX, 999_999_999)),
+            '2.147483648E+18',
+        ];
         yield 'toUsFloat of max' => [
             static fn() => toUsFloat(Duration::fromSeconds(PHP_INT_MAX, 999_999_999)),
             '2147483648000000.0',
