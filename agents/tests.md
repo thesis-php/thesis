@@ -48,7 +48,10 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   of the packages that use it. Trap: one run of every suite with coverage exhausts 2 GB in Xdebug,
   a run per package takes at most a minute. On ARM like `infect`: the suites were checked under coverage
   only there. The upload needs `secrets.CODECOV_TOKEN` of the monorepo or tokens turned off for public
-  repositories in the settings of the organization in Codecov.
+  repositories in the settings of the organization in Codecov. Trap: the default branch of the monorepo
+  in the settings of Codecov must be `main` (Codecov creates a repository with `master`). The badge reads
+  the components from the config Codecov has saved for the repository, and it saves the config only of an upload
+  on the default branch: otherwise the API shows the coverage of a component and its badge says `unknown`.
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
