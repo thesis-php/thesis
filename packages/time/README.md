@@ -76,7 +76,9 @@ a duration back to a number. The [functions](#functions) fill these gaps.
 A duration spans about ±292 years, ±68 years on 32-bit PHP. A value out of range throws `Time\TimeException`.
 
 The polyfill behaves as the class of PHP 8.6 down to the exception messages, compared with the original
-on random input.
+on random input. What differs: `var_dump()` and an `(array)` cast show two more private properties,
+reflection sees `__serialize()`, and a wrong call fails as with a userland method (extra arguments are ignored,
+`null` for an int is a `TypeError` in coercive mode too).
 
 ## Functions
 

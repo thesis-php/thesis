@@ -198,6 +198,12 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   a reference between values (rejected by it), `__unserialize([])` on a live duration (a no-op there).
   It costs the unmangling, scopes and references of `object_properties_load()` for input nobody makes.
   What `serialize()` writes, wrong types and values, missing and extra keys behave as in 8.6.
+- Rejected: matching the C class where a userland class cannot, `README.md` lists these differences instead.
+  `null` for an int in coercive mode is a `TypeError` (8.6 deprecates it and takes 0): `?int` would take `null`
+  in strict mode too, and a method does not know the mode of its caller. `var_dump()` and an `(array)` cast show
+  `$signedSeconds` and `$signedNanoseconds`, which the comparison needs, and reflection sees `__serialize()`,
+  which keeps them out of `serialize()`. Extra arguments are ignored (8.6 throws `ArgumentCountError`): this one
+  can be matched by `func_num_args()` in every method, for a call that fails on 8.6 and in PHPStan anyway.
 
 ## Tests
 
