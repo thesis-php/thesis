@@ -117,8 +117,9 @@ toHours($duration, RoundingMode::PositiveInfinity); // 1
 
 `toNs()` is exact. The others take a `\RoundingMode` and have no default: the right one depends on what the number
 means. Round a timeout, a TTL or an interval up with `PositiveInfinity`, so that it never expires early and a positive
-one never becomes the `0` that many APIs take as "no limit". A deadline that has passed still gives `0` or less:
-take `max(1, ...)` or check it with `$remaining > sec(0)` first. Drop the fraction of elapsed time with `TowardsZero`.
+one never becomes the `0` that many APIs take as "no limit", see [the table](#passing-to-other-apis) below.
+A deadline that has passed still gives `0` or less: take `max(1, ...)` or check it with `$remaining > sec(0)` first.
+Drop the fraction of elapsed time with `TowardsZero`.
 
 On 64-bit PHP every duration fits in an int of any unit, nanoseconds too. On 32-bit PHP an int holds 2.1 seconds
 of nanoseconds, 35 minutes of microseconds, 24 days of milliseconds, and a larger result throws `Time\TimeException`.
@@ -141,6 +142,36 @@ toHoursFloat($duration);   // 0.025138888888888888
 For APIs that take float seconds, like the timeout of `stream_socket_client()`, and for metrics and logs.
 The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
 in the last place off above.
+
+### Passing to other APIs
+
+What to pass where a timeout or a TTL is a number, and what `0` means there: rarely "at once".
+
+| Where                              | Pass                                              | `0` means                   |
+|------------------------------------|---------------------------------------------------|-----------------------------|
+| curl, `CURLOPT_TIMEOUT_MS`         | `toMs($timeout, RoundingMode::PositiveInfinity)`  | **no limit**                |
+| curl, `CURLOPT_CONNECTTIMEOUT_MS`  | `toMs($timeout, RoundingMode::PositiveInfinity)`  | the default, 300 seconds    |
+| Guzzle, `timeout`                  | `toSecFloat($timeout)`                            | **no limit**                |
+| Guzzle, `connect_timeout`          | `toSecFloat($timeout)`                            | 300 seconds                 |
+| Symfony HttpClient, `max_duration` | `toSecFloat($timeout)`                            | **no limit**                |
+| Symfony HttpClient, `timeout`      | `toSecFloat($timeout)`                            | times out at once           |
+| PDO, `PDO::ATTR_TIMEOUT`           | `toSec($timeout, RoundingMode::PositiveInfinity)` | **no limit**, not in SQLite |
+| `stream_set_timeout()`             | `toUs($timeout, RoundingMode::PositiveInfinity)`  | a read does not wait        |
+| PSR-16, `$ttl`                     | `toSec($ttl, RoundingMode::PositiveInfinity)`     | the item is deleted         |
+| Postgres, `statement_timeout`      | `toMs($timeout, RoundingMode::PositiveInfinity)`  | **no limit**                |
+
+- **curl.** `CURLOPT_TIMEOUT` and `CURLOPT_CONNECTTIMEOUT` take whole seconds: `toSec()` with the same mode.
+- **Guzzle, Symfony HttpClient.** Float seconds need no mode, but with curl both turn them into whole milliseconds
+  and drop the fraction: 0.9 ms becomes `0`, no limit. Where a timeout can be that short (the time left
+  until a deadline), pass `max(0.001, toSecFloat($timeout))`. `timeout` of Symfony limits the wait between
+  two chunks, the whole request is limited by `max_duration`.
+- **PDO.** The time to connect in MySQL and Postgres, where `0` waits as long as the system does. In SQLite
+  the wait for a locked database, where `0` fails at once.
+- **`stream_set_timeout()`.** The microseconds, with `0` seconds before them: PHP carries whole seconds over,
+  `stream_set_timeout($stream, 0, toUs($timeout, RoundingMode::PositiveInfinity))`. No limit is `-1` second.
+- **PSR-16.** A negative TTL deletes the item too, `null` is the default TTL of the cache.
+- **Postgres.** A number without a unit is milliseconds, also in `lock_timeout`
+  and `idle_in_transaction_session_timeout`.
 
 ### Checking, comparing, multiplying
 

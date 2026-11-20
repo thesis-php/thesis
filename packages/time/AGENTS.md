@@ -89,6 +89,10 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   the caller of `toMs()` is. Rejected: `TowardsZero` by default (the getters of Go, Java, Rust): no caller
   in the monorepo used it. Rejected: a function per direction: `\RoundingMode` already names them.
   A default can be added later without a break.
+- The table "Passing to other APIs" of `README.md` is the case for that decision: every int in it rounds up.
+  Each row is checked against the source or by a run, the docs do not say it all: the curl handlers of Guzzle
+  and Symfony HttpClient multiply float seconds by 1000 for `curl_setopt()`, which truncates (0.9 ms is no limit),
+  `PDO::ATTR_TIMEOUT` means what its driver makes of it. Check a new row the same way.
 - Every unit has a float conversion of its own (`toMsFloat()`), named apart from the int one. Rejected:
   a float from `toMs($duration)` without a `\RoundingMode` and an int with it (as `toMilliseconds($precision)`
   of `thesis/time-span`): a forgotten mode is no longer an `ArgumentCountError` but a float that `sprintf('%d')`,
