@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/packagist/l/thesis/cache)](https://github.com/thesis-php/cache/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=cache)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/cache/src)
+[![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dcache)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=cache)
 
 > A read-only split of [`packages/cache`](https://github.com/thesis-php/thesis/tree/main/packages/cache)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

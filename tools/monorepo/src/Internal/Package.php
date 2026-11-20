@@ -52,6 +52,13 @@ final class Package
     }
 
     /**
+     * The job infect of check.yaml runs on the package and sends its mutation score for the badge of README.md.
+     */
+    public bool $isMutationTested {
+        get => $this->hasTests && $this->manifest->mutationTesting;
+    }
+
+    /**
      * @param non-empty-string $dir
      * @param list<non-empty-string> $files autoload files, relative to the package: those of src/ without classes
      *     (EagerFiles), then those of the manifest

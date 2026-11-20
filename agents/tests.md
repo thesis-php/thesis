@@ -28,6 +28,13 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
 - For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
   of the event loop left surviving mutants in async (120 on CI, MSI 86 %), net, `Stream` of io and async-trace.
   Kill them, then make it block again.
+- The mutation score is also the badge of a package (`tools/monorepo/AGENTS.md`). `make infect P=<name>` writes
+  the summary of the run to `var/infection/<name>.json`, and on a push to `main` the job `infect` puts its `msi`
+  to the module `<name>` of the project `github.com/thesis-php/thesis` in the Stryker Dashboard, also when
+  Infection has failed on a surviving mutant: the badge shows the score there is. It needs
+  `secrets.STRYKER_DASHBOARD_API_KEY` of the monorepo, the key of the repository enabled
+  at dashboard.stryker-mutator.io, and fails without it. Only the score is sent: the report with the mutants
+  is built by Infection only inside its own upload.
 - Open: Infection generates no mutants in a file of plain functions (`src/api.php`, `src/Internal/internal.php`),
   only in classes: all 73 mutants of time are in `IsoInterval`, all 19 of exceptionally in `ErrorHandler`
   (`--logger-text=var/mutants.txt --log-verbosity=all` lists them). It once did, hence the `@infection-ignore`
@@ -53,6 +60,10 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Infection could skip only a whole method or a line found by its text in every class, and `sync` had to find
   the method and the line to fail on a stale skip. An annotation of Infection 0.35.10 names the mutators
   of one statement, sits next to the reason, and leaves with the code.
+- Rejected: the upload to the Stryker Dashboard by Infection itself (`logs.stryker` of `infection.json5`).
+  Infection 0.35.12 sends a report to the project and the branch without `?module=`, so the packages of the matrix
+  would overwrite one score, and it reads the branch and the key from the environment of CI, which the container
+  of `make` does not have.
 - Rejected: moving the files of the other tools from `var` to `/tmp` of the container, like those of Infection.
   Infection keeps there only the files of one run and deletes them at its end. The caches of PHPStan, Rector
   and PHP CS Fixer (`var/phpstan`, `var/rector`, `var/php-cs-fixer.cache`) live between runs, and `/tmp` dies

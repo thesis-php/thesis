@@ -252,7 +252,7 @@ final readonly class GeneratorTest
             MD);
     }
 
-    public static function writesCoverageBadgeOfPackageWithTests(): void
+    public static function writesCoverageAndMutationBadgesOfPackageWithTests(): void
     {
         $fixture = self::fixture()->file('packages/bytes/README.md', "Usage.\n");
 
@@ -260,6 +260,24 @@ final readonly class GeneratorTest
 
         Assert::string($files['packages/bytes/README.md'] ?? '')->contains(<<<'MD'
             [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
+            [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=bytes)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/bytes/src)
+            [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dbytes)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=bytes)
+
+            > A read-only split
+            MD);
+    }
+
+    public static function writesNoMutationBadgeOfPackageWithoutMutationTesting(): void
+    {
+        $fixture = new Fixture()
+            ->file('packages/bytes/tests/BytesTest.php', "<?php\n\nfinal class BytesTest {}\n")
+            ->file('packages/bytes/README.md', "Usage.\n")
+            ->package('bytes', 'mutationTesting: false')
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        Assert::string($files['packages/bytes/README.md'] ?? '')->contains(<<<'MD'
             [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=bytes)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/bytes/src)
 
             > A read-only split

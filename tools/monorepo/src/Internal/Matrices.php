@@ -66,7 +66,7 @@ final readonly class Matrices
     private function matrices(): array
     {
         $tested = array_filter($this->monorepo->packages, static fn(Package $package) => $package->hasTests);
-        $mutated = array_filter($tested, static fn(Package $package) => $package->manifest->mutationTesting);
+        $mutated = array_filter($tested, static fn(Package $package) => $package->isMutationTested);
         $alone = [];
         $bits32 = [];
         $monorepoPhp = self::minor($this->monorepo->config->php);

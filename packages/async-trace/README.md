@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/packagist/l/thesis/async-trace)](https://github.com/thesis-php/async-trace/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=async-trace)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/async-trace/src)
+[![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dasync-trace)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=async-trace)
 
 > A read-only split of [`packages/async-trace`](https://github.com/thesis-php/thesis/tree/main/packages/async-trace)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

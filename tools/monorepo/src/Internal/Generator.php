@@ -394,8 +394,10 @@ final class Generator
      * The head of README.md is generated: the title, the badges and a note that says where the package
      * is developed, since the split repository has neither the tests nor pull requests (agents/repositories.md).
      * The badges say something already for a new package: the PHP of Packagist, the release of the split,
-     * the license, the level of PHPStan and the coverage of the package by its own tests in Codecov.
-     * A package without tests has no coverage badge: it would show 0 % of code that another tool checks.
+     * the license, the level of PHPStan, the coverage of the package by its own tests in Codecov
+     * and its mutation score in the Stryker Dashboard. A package without tests has no coverage badge: it would
+     * show 0 % of code that another tool checks. One out of the job infect has no mutation badge: nothing sends
+     * its score.
      */
     private function packageReadme(Package $package): ?string
     {
@@ -415,13 +417,14 @@ final class Generator
         $license = "https://github.com/{$split}/blob/{$branch}/LICENSE";
         $level = $this->phpstanLevel();
         $coverage = $package->hasTests ? "\n" . self::coverageBadge($package) : '';
+        $mutation = $package->isMutationTested ? "\n" . self::mutationBadge($package) : '';
         $head = <<<MD
             # {$package->title}
 
             [![PHP](https://img.shields.io/packagist/dependency-v/{$package->name}/php)]({$packagist})
             [![Release](https://img.shields.io/github/v/release/{$split})](https://github.com/{$split}/releases)
             [![License](https://img.shields.io/packagist/l/{$package->name})]({$license})
-            [![PHPStan](https://img.shields.io/badge/PHPStan-level%20{$level}-brightgreen)](https://github.com/{$monorepo}/blob/{$branch}/phpstan.neon){$coverage}
+            [![PHPStan](https://img.shields.io/badge/PHPStan-level%20{$level}-brightgreen)](https://github.com/{$monorepo}/blob/{$branch}/phpstan.neon){$coverage}{$mutation}
 
             > A read-only split of [`{$package->path}`](https://github.com/{$monorepo}/tree/{$branch}/{$package->path})
             > from the [{$monorepo}](https://github.com/{$monorepo}) monorepo: issues and pull requests go there.
@@ -553,6 +556,20 @@ final class Generator
 
         return "[![Coverage]({$codecov}/branch/{$branch}/graph/badge.svg?component={$package->dir})]"
             . "({$app}/tree/{$branch}/{$package->path}/src)";
+    }
+
+    /**
+     * The module of the package in the project of the monorepo in the Stryker Dashboard: the job infect
+     * of check.yaml sends the score of the package on the default branch there.
+     */
+    private static function mutationBadge(Package $package): string
+    {
+        $monorepo = Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
+        $module = "github.com/{$monorepo}/" . Repositories::DEFAULT_BRANCH . "?module={$package->dir}";
+        $score = rawurlencode("https://badge-api.stryker-mutator.io/{$module}");
+
+        return "[![Mutation score](https://img.shields.io/endpoint?url={$score})]"
+            . "(https://dashboard.stryker-mutator.io/reports/{$module})";
     }
 
     /**

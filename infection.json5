@@ -10,11 +10,6 @@
             "skills"
         ]
     },
-    "logs": {
-        "stryker": {
-            "report": "/^(?>main|\\d+\\.\\d+\\.x)$/D"
-        },
-    },
     "testFramework": "testo",
     // A mutant that hangs a test (an endless loop, an event loop that never ends) waits out the timeout, and most
     // of the timeouts of thesis/async are such hangs: the default of 10 s took two thirds of its run. A timeout counts

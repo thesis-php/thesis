@@ -77,6 +77,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: make infect P=${{ matrix.package }}
+      # The score of the package goes to its module of the monorepo in the Stryker Dashboard for the badge
+      # of its README.md (agents/tests.md), also when Infection has failed on a surviving mutant. Not sent
+      # by Infection (logs.stryker): it knows no modules, the packages would overwrite one score.
+      - if: ${{ !cancelled() && github.event_name == 'push' }}
+        env:
+          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+          REPORT: github.com/${{ github.repository }}/${{ github.ref_name }}?module=${{ matrix.package }}
+        run: |
+          score=$(jq --exit-status .stats.msi var/infection/${{ matrix.package }}.json)
+          curl --fail-with-body --silent --show-error --request PUT \
+            --header 'Content-Type: application/json' --header "X-Api-Key: $STRYKER_DASHBOARD_API_KEY" \
+            --data "{\"mutationScore\": $score}" "https://dashboard.stryker-mutator.io/api/reports/$REPORT"
 
   # The coverage of every package by its own tests, uploaded to Codecov with the flag of the package for the badge
   # of its README.md (the components of .github/codecov.yml). On ARM like infect (agents/tests.md).

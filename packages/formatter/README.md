@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/packagist/l/thesis/formatter)](https://github.com/thesis-php/formatter/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=formatter)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/formatter/src)
+[![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dformatter)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=formatter)
 
 > A read-only split of [`packages/formatter`](https://github.com/thesis-php/thesis/tree/main/packages/formatter)
 > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.

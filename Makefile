@@ -129,8 +129,10 @@ coverage: var vendor up ## Collect the coverage of a package by its tests into v
 	$(RUN) env XDEBUG_MODE=coverage vendor/bin/testo --suite=$(P) --coverage --coverage-clover=var/coverage/$(P).xml $(ARGS)
 .PHONY: coverage
 
+# (The score of a package goes to var/infection/<name>.json: the job infect of check.yaml sends it
+# to the Stryker Dashboard for the badge of the package (agents/tests.md))
 infect: var vendor ## Run mutation testing [P=]
-	$(RUN) php -d memory_limit=2G vendor/bin/infection --show-mutations --threads=max $(if $(P),--test-framework-options=--suite=$(P) packages/$(P)/src/) $(ARGS)
+	$(RUN) php -d memory_limit=2G vendor/bin/infection --show-mutations --threads=max $(if $(P),--test-framework-options=--suite=$(P) --logger-summary-json=var/infection/$(P).json packages/$(P)/src/) $(ARGS)
 .PHONY: infect
 
 # CI
