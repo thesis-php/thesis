@@ -64,6 +64,13 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
   rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
   they stay.
+- A comment, an error message and the docs (`README.md`, `CHANGELOG.md`, `AGENTS.md`) are plain English:
+  every sentence names its subject and says the verb. No words left out for the reader to restore
+  and no stand-in for a noun (`one`, `that of`, a trailing `otherwise`): not `as a server has got it otherwise`
+  but `A server builds the URI from the request line and Host`, not `one of a reader only once`
+  but `A body made from a reader can be read only once`, not `the length is that of the body`
+  but `the length comes from the body`. A noun in front beats a chain of `of`: `an HTTP/1.1 request`,
+  not `a request of HTTP/1.1`. Two short sentences beat one long sentence with a colon and three commas.
 - No one-letter names except a loop index (`$i`) and the operands of a comparator (`$a`, `$b`):
   `$n`, `$o`, `$v` make the reader look up what they hold.
 - Where the PHP standard library has a name for the same thing, take it: a number of bytes is `$length`
