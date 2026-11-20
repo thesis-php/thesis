@@ -51,6 +51,9 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
     the archives that GitHub attaches are of the whole monorepo. `prerelease` and `make_latest` are those
     of the split repository, so the latest release of the monorepo is the last stable one of any package.
   - The split repository stays the source: nothing reads the tags or the releases of the monorepo.
+  - Trap: GitHub refuses a tag at a commit whose `.github/workflows/` differ from those of `main`
+    (403 `Resource not accessible by integration`) to a token that may not write workflows. So the app has
+    the permission Workflows and the job asks for it (`permission-workflows`). `GITHUB_TOKEN` cannot get it.
 - **The workflow.** The release is a job of the workflow of the checks and `needs` them. A run of `main` has
   a concurrency group of its own (per `run_id`): in a shared group a newer run would replace a pending one,
   its release with it. Only a pull request cancels its older runs. The release needs `fetch-depth: 0`:

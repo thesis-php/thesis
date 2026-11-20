@@ -144,7 +144,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       # The app pushes the tags and makes the releases in the split repositories, bypassing their rulesets,
-      # and repeats the releases in the monorepo: it is installed there too.
+      # and repeats the releases in the monorepo. Workflows: GitHub refuses a tag of the monorepo at a commit
+      # whose workflows differ from those of main to a token that may not write them (agents/releases.md).
       - id: token
         uses: actions/create-github-app-token@v3
         with:
@@ -153,6 +154,7 @@ jobs:
           owner: thesis-php
           permission-administration: read
           permission-contents: write
+          permission-workflows: write
       - run: make release
         env:
           COMMIT: ${{ github.sha }}
