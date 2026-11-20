@@ -17,7 +17,6 @@ use function Thesis\Async\timeoutOr;
 use function Thesis\Net\connect;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
-use function Thesis\Time\toNs;
 
 /**
  * A connection to RabbitMQ that reconnects. A passive object until {@see run()} (agents/clients.md):
@@ -205,7 +204,7 @@ final class Client
 
             // Only a connection that has lived starts the backoff anew: a broker that accepts and drops at once
             // (a limit of connections, a node going down) must not be retried every 100 ms.
-            if (toNs(Instant::now()->since($openedAt)) > toNs(sec(30))) {
+            if (Instant::now()->since($openedAt) > sec(30)) {
                 $backoff->reset();
             }
 

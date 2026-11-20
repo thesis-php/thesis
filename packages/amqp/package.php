@@ -11,7 +11,7 @@ return new Manifest(
     title: 'Thesis AMQP',
     keywords: ['php', 'async', 'fibers', 'amqp', 'amqp-client', 'rabbitmq', 'message-queue'],
     require: [
-        // uint32 frame-max (0xFF_FF_FF_FF), uint64 delivery tags and body sizes, toNs() of 30 seconds.
+        // uint32 frame-max (0xFF_FF_FF_FF), uint64 delivery tags and body sizes.
         'php-64bit' => '*',
         'ext-filter' => '*',
         'ext-uri' => '*',
