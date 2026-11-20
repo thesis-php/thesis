@@ -143,7 +143,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # The app pushes the tags and makes the releases in the split repositories, bypassing their rulesets.
+      # The app pushes the tags and makes the releases in the split repositories, bypassing their rulesets,
+      # and repeats the releases in the monorepo: it is installed there too.
       - id: token
         uses: actions/create-github-app-token@v3
         with:

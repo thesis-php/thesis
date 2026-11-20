@@ -27,7 +27,7 @@ final readonly class Split
         // Resolved once: the ref may move while the split runs.
         $commit = trim($git->run(['rev-parse', '--verify', '--quiet', '--end-of-options', self::REF . '^{commit}']));
         \assert($commit !== '');
-        $commits = Splitter::split($git, $commit);
+        $commits = Splitter::split($git, $commit)->commits;
 
         if ($commits === []) {
             throw new MonorepoException(\sprintf('%s has no packages to split.', self::REF));

@@ -199,8 +199,9 @@ Invariants:
 - The release knows three things: the tree of the commit (the changelogs and the generated `composer.json`
   of the packages, read from the objects, never from the working tree or by running PHP of it), the tags
   of the split repositories (`git ls-remote` of the packages with a heading, nothing is fetched) and two answers
-  of GitHub (`Repositories::isSplit()`, `GET releases/tags/<tag>`). Nothing else decides: no other commit
-  of the monorepo, no object of a split repository, no branch of it.
+  of GitHub (`Repositories::isSplit()`, `GET releases/tags/<tag>` of the split repository and of the monorepo:
+  `Publisher::hasGitHubRelease()`). Nothing else decides: no other commit of the monorepo, no object
+  of a split repository, no branch of it, no tag of the monorepo.
   A new check must fit into that, or it is not added (`agents/releases.md`, "What the release does not check").
 - A test that the commit of a tag is not read needs a tag at a split the clone cannot compute: the clone is made
   first, the tag is of a later commit (`continuesReleaseAtCommitOfItsTagThatIsNotLocal`). A tag at a split
@@ -212,8 +213,13 @@ Invariants:
   The other reasons of that package are lost with it. Rejected: collecting them around every call that throws:
   GitHub failing is transient, nothing is released, and the next run prints the rest.
 - Whether a heading is released is decided by the tag `vX.Y.Z` alone: without a tag of the version it is checked
-  and released, with the tag only its GitHub Release is made if it is missing (`GET releases/tags/<tag>`),
-  and a tag of the version without `v` is of an older package of the same name.
+  and released, with the tag only the GitHub Releases that are missing are made (its own and the one
+  of the monorepo), and a tag of the version without `v` is of an older package of the same name.
+- The monorepo repeats a release by one request (`Publisher::mirror()`), in a second pass of `ReleaseCommand`
+  over the releases. The commit of its tag `<package>/vX.Y.Z` (`Release::$mirrorTag`) is `Release::$origin`:
+  `Splitter` remembers the commit of the monorepo that every split commit was made from (`Splits::$origins`),
+  so it is known for the split of the head and for a tag of any ancestor. It is `null` for a tag of a later
+  commit, and then `Plan` does not ask GitHub about the monorepo and `mirror()` only says so.
 - The series is the `branch-alias` of the generated `composer.json` (`Series::ofComposer()`), which CI keeps
   in sync with the manifest.
 - Versions in the split repositories are read by composer/semver (`Refs`), so `v0.1.4` and `0.1.4` are one

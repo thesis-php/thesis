@@ -43,6 +43,11 @@ final class Splitter
     private array $split = [];
 
     /**
+     * @var array<string, non-empty-string> split commit of any package => the monorepo commit it was made from
+     */
+    private array $origins = [];
+
+    /**
      * Most commits leave most packages as they are: the tree of a split is made once per change of the package.
      * Only the last one of a package is kept, so the memory does not grow with the history.
      *
@@ -52,9 +57,8 @@ final class Splitter
 
     /**
      * @param non-empty-string $commit the id of a commit, resolved once by the caller: a ref may move meanwhile
-     * @return array<string, non-empty-string> package => its split commit, for every package of the commit
      */
-    public static function split(Git $git, string $commit): array
+    public static function split(Git $git, string $commit): Splits
     {
         if (trim($git->run(['rev-parse', '--is-shallow-repository'])) === 'true') {
             throw new MonorepoException('The history is shallow: fetch it whole (fetch-depth: 0 in CI).');
@@ -71,7 +75,7 @@ final class Splitter
         $packages = array_keys($splitter->catFile->subtrees($commit . ':' . Monorepo::PACKAGES_DIR));
 
         if ($packages === []) {
-            return [];
+            return new Splits(commits: [], origins: []);
         }
 
         // --topo-order lists every parent before its children, whatever the dates say.
@@ -106,7 +110,7 @@ final class Splitter
             $commits[$package] = $heads[0]->id;
         }
 
-        return $commits;
+        return new Splits($commits, $splitter->origins);
     }
 
     private function __construct(
@@ -139,6 +143,7 @@ final class Splitter
                 $raw ??= $this->catFile->read($commit, type: 'commit')
                     ?? throw new MonorepoException(\sprintf('No commit %s.', $commit));
                 $heads = [$this->write($tree, $heads, $raw)];
+                $this->origins[$heads[0]->id] ??= $commit;
             }
 
             $this->heads[$commit][$package] = $heads;

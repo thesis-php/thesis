@@ -35,6 +35,24 @@ final readonly class SplitterTest
     }
 
     /**
+     * The release tags that commit in the monorepo: of the commits that leave a split as it is, the first one.
+     */
+    public static function tellsCommitOfMonorepoThatEverySplitCommitWasMadeFrom(): void
+    {
+        $repository = new Repository();
+        $add = $repository->commit('Add a and b', ['packages/a/A.php' => 'a1', 'packages/b/B.php' => 'b1']);
+        $change = $repository->commit('Change a', ['packages/a/A.php' => 'a2']);
+        $head = $repository->commit('Change b', ['packages/b/B.php' => 'b2']);
+
+        $splits = Splitter::split($repository->git, $head);
+
+        $a = $splits->commits['a'] ?? '';
+        Assert::same($splits->origins[$a] ?? null, $change);
+        Assert::same($splits->origins[$repository->id($a . '^')] ?? null, $add);
+        Assert::same($splits->origins[$splits->commits['b'] ?? ''] ?? null, $head);
+    }
+
+    /**
      * The ids are the published history: the pushes are never forced, so a split that gave other ids
      * for the same commits could not be pushed. This history is the one splitsh-lite gave the same ids for.
      */
@@ -318,7 +336,7 @@ final readonly class SplitterTest
         $before = memory_get_usage();
         memory_reset_peak_usage();
 
-        $split = Splitter::split($repository->git, $commit);
+        $split = Splitter::split($repository->git, $commit)->commits;
 
         Assert::int(memory_get_peak_usage() - $before)->lessThan(4 * 1024 * 1024);
         Assert::same(\count($split), 20);
@@ -418,7 +436,7 @@ final readonly class SplitterTest
      */
     private static function split(Repository $repository, string $revision = 'HEAD'): array
     {
-        return Splitter::split($repository->git, $repository->id($revision . '^{commit}'));
+        return Splitter::split($repository->git, $repository->id($revision . '^{commit}'))->commits;
     }
 
     /**

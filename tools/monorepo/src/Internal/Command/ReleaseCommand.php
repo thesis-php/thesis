@@ -26,7 +26,7 @@ final readonly class ReleaseCommand
     /**
      * @param string $remote where the split repositories are, with the credentials to push when $push
      * @param bool $push false to only print what would be released
-     * @param ?Api $api GITHUB_TOKEN of the app: the split repositories and their releases
+     * @param ?Api $api GITHUB_TOKEN of the app: the split repositories, their releases and those of the monorepo
      */
     public function __construct(
         private string $root,
@@ -75,7 +75,13 @@ final readonly class ReleaseCommand
         }
 
         foreach ($plan->releases as $release) {
-            $io->writeln(\sprintf('%s: %s at %s', $release->package, $release->tag, $release->commit));
+            $io->writeln(\sprintf('%s: %s at %s', $release->package, $release->tag, $release->commit) . (
+                $release->origin === null ? '' : \sprintf(
+                    ', %s of the monorepo at %s',
+                    $release->mirrorTag,
+                    $release->origin,
+                )
+            ));
         }
 
         if (!$this->push) {
@@ -87,21 +93,24 @@ final readonly class ReleaseCommand
         $publisher = new Publisher($git, $remote, $api);
 
         // Dependencies first, and nothing after a failure: a dependent would require a version that is not there.
-        foreach ($plan->releases as $release) {
-            try {
-                foreach ($publisher->publish($release) as $step) {
-                    $io->writeln(\sprintf('%s: %s', $release->package, $step), OutputInterface::OUTPUT_RAW);
-                }
-            } catch (MonorepoException $exception) {
-                $error = \sprintf('%s: %s', $release->package, $exception->getMessage());
-                $io->writeln($error, OutputInterface::OUTPUT_RAW);
-                $io->error(\sprintf(
-                    'The release stopped at %s %s. Re-run the job, or the next push of main continues it.',
-                    $release->package,
-                    $release->tag,
-                ));
+        // The monorepo repeats the releases after all of them, so it holds back none.
+        foreach ([$publisher->publish(...), $publisher->mirror(...)] as $publish) {
+            foreach ($plan->releases as $release) {
+                try {
+                    foreach ($publish($release) as $step) {
+                        $io->writeln(\sprintf('%s: %s', $release->package, $step), OutputInterface::OUTPUT_RAW);
+                    }
+                } catch (MonorepoException $exception) {
+                    $error = \sprintf('%s: %s', $release->package, $exception->getMessage());
+                    $io->writeln($error, OutputInterface::OUTPUT_RAW);
+                    $io->error(\sprintf(
+                        'The release stopped at %s %s. Re-run the job, or the next push of main continues it.',
+                        $release->package,
+                        $release->tag,
+                    ));
 
-                return Command::FAILURE;
+                    return Command::FAILURE;
+                }
             }
         }
 

@@ -7,18 +7,31 @@ namespace Thesis\Monorepo\Internal\Release;
 use Thesis\Monorepo\Internal\Git\Git;
 use Thesis\Monorepo\Internal\GitHub\Api;
 use Thesis\Monorepo\Internal\GitHub\Repositories;
+use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\MonorepoException;
 use Thesis\Monorepo\Internal\Split\Remote;
 
 /**
- * Makes the steps of a release: the tag in the split repository, then its GitHub Release. A step that exists
- * already counts as made, so a re-run continues a release that failed halfway, and two runs may release
- * the same headings at once.
+ * Makes the steps of a release: the tag in the split repository, its GitHub Release, then the GitHub Release
+ * of the monorepo that repeats it. A step that exists already counts as made, so a re-run continues a release
+ * that failed halfway, and two runs may release the same headings at once.
  *
  * @internal
  */
 final readonly class Publisher
 {
+    public const string MONOREPO = Repositories::ORGANIZATION . '/' . Repositories::MONOREPO;
+
+    /**
+     * @param non-empty-string $repository
+     * @param non-empty-string $tag
+     * @throws MonorepoException
+     */
+    public static function hasGitHubRelease(Api $api, string $repository, string $tag): bool
+    {
+        return $api->get(\sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($tag))) !== null;
+    }
+
     public function __construct(
         private Git $git,
         private Remote $remote,
@@ -32,6 +45,48 @@ final readonly class Publisher
     public function publish(Release $release): array
     {
         return [$this->tag($release), $this->gitHubRelease($release)];
+    }
+
+    /**
+     * Repeats the release in the monorepo: the tag <package>/vX.Y.Z at the commit that the split commit
+     * was made from, and a GitHub Release of it. One request makes both: GitHub makes the tag, its commit
+     * is in the monorepo already.
+     *
+     * @return array{non-empty-string} what was done
+     * @throws MonorepoException
+     */
+    public function mirror(Release $release): array
+    {
+        if ($release->origin === null) {
+            return [\sprintf(
+                'no %s in the monorepo: %s is of a later commit, whose run makes it',
+                $release->mirrorTag,
+                $release->tag,
+            )];
+        }
+
+        $repository = Repositories::ORGANIZATION . '/' . $release->package;
+        $made = $this->make(
+            repository: self::MONOREPO,
+            tag: $release->mirrorTag,
+            commit: $release->origin,
+            name: \sprintf('%s/%s %s', Monorepo::VENDOR, $release->package, $release->version->toString()),
+            // GitHub attaches the archives of the repository of a release, here of every package.
+            notes: \sprintf(
+                '> A copy of [%s %s](https://github.com/%s/releases/tag/%s): '
+                    . "the archives below are of the whole monorepo.\n\n%s",
+                $repository,
+                $release->tag,
+                $repository,
+                rawurlencode($release->tag),
+                $release->notes,
+            ),
+            release: $release,
+        );
+
+        return [$made
+            ? \sprintf('released in the monorepo as %s at %s', $release->mirrorTag, $release->origin)
+            : \sprintf('%s exists in the monorepo', $release->mirrorTag)];
     }
 
     /**
@@ -71,33 +126,61 @@ final readonly class Publisher
      */
     private function gitHubRelease(Release $release): string
     {
-        $repository = Repositories::ORGANIZATION . '/' . $release->package;
-        $existing = \sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($release->tag));
+        $made = $this->make(
+            repository: Repositories::ORGANIZATION . '/' . $release->package,
+            tag: $release->tag,
+            commit: $release->commit,
+            name: $release->tag,
+            notes: $release->notes,
+            release: $release,
+        );
 
-        if ($this->api->get($existing) !== null) {
+        if (!$made) {
             return 'the GitHub Release exists';
+        }
+
+        return 'released on GitHub' . ($release->latest ? ' as the latest' : '');
+    }
+
+    /**
+     * @param non-empty-string $repository
+     * @param non-empty-string $tag
+     * @param non-empty-string $commit of the tag
+     * @param non-empty-string $name
+     * @return bool false if the GitHub Release of the tag exists, made by another run meanwhile too
+     */
+    private function make(
+        string $repository,
+        string $tag,
+        string $commit,
+        string $name,
+        string $notes,
+        Release $release,
+    ): bool {
+        if (self::hasGitHubRelease($this->api, $repository, $tag)) {
+            return false;
         }
 
         try {
             $this->api->send('POST', \sprintf('repos/%s/releases', $repository), [
-                'tag_name' => $release->tag,
+                'tag_name' => $tag,
                 // GitHub would tag the default branch otherwise.
-                'target_commitish' => $release->commit,
-                'name' => $release->tag,
-                'body' => $release->notes,
+                'target_commitish' => $commit,
+                'name' => $name,
+                'body' => $notes,
                 'draft' => false,
                 'prerelease' => $release->version->preRelease,
                 // GitHub takes true when it is not sent.
                 'make_latest' => $release->latest ? 'true' : 'false',
             ]);
         } catch (MonorepoException $exception) {
-            if ($this->api->get($existing) !== null) {
-                return 'the GitHub Release exists';
+            if (self::hasGitHubRelease($this->api, $repository, $tag)) {
+                return false;
             }
 
             throw $exception;
         }
 
-        return 'released on GitHub' . ($release->latest ? ' as the latest' : '');
+        return true;
     }
 }

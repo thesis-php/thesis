@@ -18,9 +18,9 @@ use Thesis\Monorepo\Internal\Split\Splitter;
 
 /**
  * Decides what a push of main releases (agents/releases.md): the version right under [Unreleased] of every package
- * that has no tag in its split repository yet. Everything is read from the tree of the commit and from the tags
- * of the split repositories, and everything is checked before anything is pushed: one reason not to release
- * a package releases nothing.
+ * that has no tag in its split repository yet, or whose release was not finished. Everything is read from the tree
+ * of the commit and from the tags of the split repositories, and everything is checked before anything is pushed:
+ * one reason not to release a package releases nothing.
  *
  * @internal
  */
@@ -45,6 +45,11 @@ final class Plan
     private array $unreleased = [];
 
     /**
+     * @var array<string, non-empty-string> split commit => the commit of the monorepo it was made from
+     */
+    private array $origins = [];
+
+    /**
      * @param non-empty-string $commit of main, resolved
      */
     public static function of(Git $git, Api $api, Remote $remote, string $commit): self
@@ -57,6 +62,7 @@ final class Plan
         }
 
         $splits = Splitter::split($git, $commit);
+        $plan->origins = $splits->origins;
         $tags = $plan->tags(array_keys($headings));
         $releases = [];
         $requires = [];
@@ -68,7 +74,7 @@ final class Plan
             }
 
             try {
-                $split = $splits[$package] ?? throw new MonorepoException('no split.');
+                $split = $splits->commits[$package] ?? throw new MonorepoException('no split.');
                 $composer = $plan->composer($package);
                 $release = $plan->release($package, $version, $notes, $tags[$package], $split, $composer);
             } catch (MonorepoException $exception) {
@@ -137,7 +143,8 @@ final class Plan
      * @param non-empty-string $notes
      * @param non-empty-string $split the split commit of the package
      * @param array<array-key, mixed> $composer
-     * @return ?Release null if the version is released, an older package of the name has it, or it is refused
+     * @return ?Release null if the version is released and repeated in the monorepo, an older package
+     *     of the name has it, or it is refused
      */
     private function release(
         string $package,
@@ -161,6 +168,7 @@ final class Plan
                 version: $version,
                 tag: $version->tag,
                 commit: $split,
+                origin: $this->origins[$split] ?? null,
                 notes: $notes,
                 tagged: false,
                 latest: self::isLatest($version, $tags),
@@ -169,23 +177,30 @@ final class Plan
 
         // The release writes vX.Y.Z: a tag of the version without v is of an older package of the same name.
         $tag = array_find($tagged, static fn(array $tag) => $tag['name'] === $version->tag);
-        $repository = Repositories::ORGANIZATION . '/' . $package;
-        $existing = \sprintf('repos/%s/releases/tags/%s', $repository, rawurlencode($version->tag));
 
-        if ($tag === null || $this->api->get($existing) !== null) {
+        if ($tag === null) {
             return null;
         }
 
-        // An earlier run pushed the tag and failed before its GitHub Release.
-        return new Release(
+        // An earlier run pushed the tag and failed before one of the GitHub Releases, or the monorepo
+        // did not repeat the releases then.
+        $release = new Release(
             package: $package,
             version: $version,
             tag: $tag['name'],
             commit: $tag['commit'],
+            origin: $this->origins[$tag['commit']] ?? null,
             notes: $notes,
             tagged: true,
             latest: self::isLatest($version, $tags),
         );
+        $repository = Repositories::ORGANIZATION . '/' . $package;
+        $finished = Publisher::hasGitHubRelease($this->api, $repository, $release->tag)
+            // Without the commit to tag the monorepo is left to the run of the commit of the tag.
+            && ($release->origin === null
+                || Publisher::hasGitHubRelease($this->api, Publisher::MONOREPO, $release->mirrorTag));
+
+        return $finished ? null : $release;
     }
 
     /**

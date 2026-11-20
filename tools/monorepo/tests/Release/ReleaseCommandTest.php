@@ -42,7 +42,7 @@ final readonly class ReleaseCommandTest
 
         [$code, $output] = self::run($repository, $remotes, $api);
 
-        $split = Splitter::split($repository->git, $head)['a'] ?? '';
+        $split = Splitter::split($repository->git, $head)->commits['a'] ?? '';
         Assert::same($code, Command::SUCCESS, $output);
         Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), $split);
         Assert::same($remotes->head('a', 'refs/heads/main'), null);
@@ -55,6 +55,55 @@ final readonly class ReleaseCommandTest
             'prerelease' => false,
             'make_latest' => 'true',
         ]);
+        Assert::same($api->bodies['POST repos/thesis-php/thesis/releases'] ?? null, [
+            'tag_name' => 'a/v0.1.0',
+            'target_commitish' => $head,
+            'name' => 'thesis/a 0.1.0',
+            'body' => '> A copy of [thesis-php/a v0.1.0](https://github.com/thesis-php/a/releases/tag/v0.1.0): '
+                . "the archives below are of the whole monorepo.\n\n- Notes of 0.1.0.",
+            'draft' => false,
+            'prerelease' => false,
+            'make_latest' => 'true',
+        ]);
+    }
+
+    /**
+     * The tag of the monorepo is at the commit that made the split commit, whatever the head of the run is:
+     * every run that repeats the release tags the same commit.
+     */
+    public static function repeatsReleaseInMonorepoAtCommitThatMadeItsSplit(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a', self::package('a'));
+        $release = $repository->commit('Release a', ['packages/a/CHANGELOG.md' => self::changelog('0.1.0')]);
+        $repository->commit('Change the root', ['README.md' => 'readme']);
+        $api = new FakeApi(self::SPLITS);
+
+        [$code, $output] = self::run($repository, self::remotes(), $api);
+
+        Assert::same($code, Command::SUCCESS, $output);
+        Assert::same($api->bodies['POST repos/thesis-php/thesis/releases']['target_commitish'] ?? null, $release);
+        Assert::string($output)->contains(\sprintf('a: released in the monorepo as a/v0.1.0 at %s', $release));
+    }
+
+    /**
+     * A version released before the monorepo repeated the releases, or by a run that failed after its GitHub
+     * Release: the next run repeats it.
+     */
+    public static function repeatsReleaseThatMonorepoLacks(): void
+    {
+        $repository = new Repository();
+        $first = $repository->commit('Add a', self::package('a', released: ['0.1.0']));
+        $remotes = self::remotes();
+        self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
+        $repository->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
+
+        [$code, $output] = self::run($repository, $remotes, $api);
+
+        Assert::same($code, Command::SUCCESS, $output);
+        Assert::same($api->writes, ['POST repos/thesis-php/thesis/releases']);
+        Assert::same($api->bodies['POST repos/thesis-php/thesis/releases']['target_commitish'] ?? null, $first);
     }
 
     /**
@@ -71,7 +120,10 @@ final readonly class ReleaseCommandTest
         [$code, $output] = self::run($repository, $remotes, new FakeApi(self::SPLITS));
 
         Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), Splitter::split($repository->git, $head)['a'] ?? '');
+        Assert::same(
+            actual: $remotes->head('a', 'refs/tags/v0.1.0'),
+            expected: Splitter::split($repository->git, $head)->commits['a'] ?? '',
+        );
     }
 
     public static function releasesNothingWhoseTagAndGitHubReleaseExist(): void
@@ -81,7 +133,11 @@ final readonly class ReleaseCommandTest
         $remotes = self::remotes();
         self::tag($repository, $remotes, $first, 'a', 'v0.1.0');
         $repository->commit('Change a', ['packages/a/src/A.php' => 'a2']);
-        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
+        $api = new FakeApi([
+            ...self::SPLITS,
+            'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1],
+            'repos/thesis-php/thesis/releases/tags/a%2Fv0.1.0' => ['id' => 2],
+        ]);
 
         [$code, $output] = self::run($repository, $remotes, $api);
 
@@ -113,8 +169,9 @@ final readonly class ReleaseCommandTest
 
         Assert::same($code, Command::SUCCESS);
         Assert::same($output, \sprintf(
-            "a: v0.1.0 at %s\nSet SPLIT_REMOTE to release.\n",
-            Splitter::split($repository->git, $head)['a'] ?? '',
+            "a: v0.1.0 at %s, a/v0.1.0 of the monorepo at %s\nSet SPLIT_REMOTE to release.\n",
+            Splitter::split($repository->git, $head)->commits['a'] ?? '',
+            $head,
         ));
         Assert::same($remotes->head('a', 'refs/tags/v0.1.0'), null);
         Assert::same($api->writes, []);
@@ -136,13 +193,14 @@ final readonly class ReleaseCommandTest
 
         Assert::same($code, Command::SUCCESS, $output);
         Assert::string($output)->contains(\sprintf('a: the tag v0.1.0 exists at %s', $split));
-        Assert::same($api->writes, ['POST repos/thesis-php/a/releases']);
+        Assert::same($api->writes, ['POST repos/thesis-php/a/releases', 'POST repos/thesis-php/thesis/releases']);
     }
 
     /**
      * A later push tagged the version and failed before its GitHub Release, then the job of an older push
      * is re-run: the GitHub Release is of the tag. CI clones the monorepo, and the commit of the tag
-     * is of a later split, so it is not local: nothing reads it.
+     * is of a later split, so it is not local: nothing reads it. The history of the older push does not tell
+     * the commit of the monorepo that made it, so the monorepo is left to the run of the later push.
      */
     public static function continuesReleaseAtCommitOfItsTagThatIsNotLocal(): void
     {
@@ -159,6 +217,28 @@ final readonly class ReleaseCommandTest
         Assert::same($code, Command::SUCCESS, $output);
         Assert::same($api->bodies['POST repos/thesis-php/a/releases']['target_commitish'] ?? null, $split);
         Assert::false($clone->git->succeeds(['cat-file', '-e', $split]));
+        Assert::same($api->writes, ['POST repos/thesis-php/a/releases']);
+        Assert::string($output)->contains(
+            'a: no a/v0.1.0 in the monorepo: v0.1.0 is of a later commit, whose run makes it',
+        );
+    }
+
+    /**
+     * The run of an older push cannot tell whether the monorepo repeats a release of a later one, and does not ask.
+     */
+    public static function releasesNothingWhoseTagOfLaterCommitHasGitHubRelease(): void
+    {
+        $source = new Repository();
+        $source->commit('Add a', self::package('a', released: ['0.1.0']));
+        $clone = new Repository(cloneOf: $source);
+        $later = $source->commit('Change a', ['packages/a/src/A.php' => 'a2']);
+        $remotes = self::remotes();
+        self::tag($source, $remotes, $later, 'a', 'v0.1.0');
+        $api = new FakeApi([...self::SPLITS, 'repos/thesis-php/a/releases/tags/v0.1.0' => ['id' => 1]]);
+
+        [$code, $output] = self::run($clone, $remotes, $api);
+
+        Assert::same([$code, $output], [Command::SUCCESS, "Nothing to release.\n"]);
     }
 
     /**
@@ -429,8 +509,33 @@ final readonly class ReleaseCommandTest
     }
 
     /**
-     * The tests ran against the head of the dependency, and a user installs its tag.
+     * The monorepo only repeats the releases: one it failed to repeat holds back no other.
      */
+    public static function repeatsReleasesInMonorepoAfterAllOfThem(): void
+    {
+        $repository = new Repository();
+        $repository->commit('Add a and b', [
+            ...self::package('a', released: ['0.1.0']),
+            ...self::package('b', require: ['thesis/a' => '^0.1'], released: ['0.1.0']),
+        ]);
+        $remotes = self::remotes();
+        $api = new FakeApi(self::SPLITS, failingWrites: ['POST repos/thesis-php/thesis/releases' => 'GitHub is down.']);
+
+        [$code, $output] = self::run($repository, $remotes, $api);
+
+        Assert::same($code, Command::FAILURE);
+        Assert
+            ::string($output)
+            ->contains('a: GitHub is down.')
+            ->contains('The release stopped at a v0.1.0.')
+        ;
+        Assert::same($api->writes, [
+            'POST repos/thesis-php/a/releases',
+            'POST repos/thesis-php/b/releases',
+            'POST repos/thesis-php/thesis/releases',
+        ]);
+    }
+
     public static function refusesDependentOfDependencyWithChangesUnderUnreleased(): void
     {
         $repository = new Repository();
@@ -489,6 +594,8 @@ final readonly class ReleaseCommandTest
         Assert::same($code, Command::SUCCESS, $output);
         $body = $api->bodies['POST repos/thesis-php/a/releases'] ?? [];
         Assert::same([$body['prerelease'] ?? null, $body['make_latest'] ?? null], [true, 'false']);
+        $mirror = $api->bodies['POST repos/thesis-php/thesis/releases'] ?? [];
+        Assert::same([$mirror['prerelease'] ?? null, $mirror['make_latest'] ?? null], [true, 'false']);
     }
 
     /**
@@ -512,7 +619,10 @@ final readonly class ReleaseCommandTest
         [$code, $output] = self::run($repository, $remotes, $api, commit: $fix);
 
         Assert::same($code, Command::SUCCESS, $output);
-        Assert::same($remotes->head('a', 'refs/tags/v0.1.1'), Splitter::split($repository->git, $fix)['a'] ?? '');
+        Assert::same(
+            actual: $remotes->head('a', 'refs/tags/v0.1.1'),
+            expected: Splitter::split($repository->git, $fix)->commits['a'] ?? '',
+        );
         Assert::same($api->bodies['POST repos/thesis-php/a/releases']['make_latest'] ?? null, 'false');
     }
 
@@ -591,7 +701,7 @@ final readonly class ReleaseCommandTest
         string $package,
         string $tag,
     ): string {
-        $split = Splitter::split($repository->git, $commit)[$package] ?? '';
+        $split = Splitter::split($repository->git, $commit)->commits[$package] ?? '';
         \assert($split !== '');
         $url = 'file://' . $remotes->dir . '/' . $package . '.git';
         $repository->git->run(['push', '--quiet', $url, $split . ':refs/tags/' . $tag]);

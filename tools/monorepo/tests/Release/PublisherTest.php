@@ -106,6 +106,17 @@ final readonly class PublisherTest
         self::publisher($repository, $remotes, $api)->publish(self::release($commit));
     }
 
+    public static function takesGitHubReleaseOfMonorepoThatExists(): void
+    {
+        [$repository, $remotes, $commit] = self::setUp();
+        $api = new FakeApi(['repos/thesis-php/thesis/releases/tags/a%2Fv0.1.0' => ['id' => 1]]);
+
+        $steps = self::publisher($repository, $remotes, $api)->mirror(self::release($commit));
+
+        Assert::same($steps, ['a/v0.1.0 exists in the monorepo']);
+        Assert::same($api->writes, []);
+    }
+
     /**
      * @return array{Repository, Remotes, non-empty-string}
      */
@@ -137,6 +148,7 @@ final readonly class PublisherTest
             version: $version,
             tag: 'v0.1.0',
             commit: $commit,
+            origin: $commit,
             notes: '- Notes.',
             tagged: false,
             latest: true,
