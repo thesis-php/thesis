@@ -6,8 +6,14 @@ Plugins for Testo that the tests of thesis packages and of their users need. The
 
 - `VirtualTimePlugin` and `#[VirtualTime]` register the same `Internal\VirtualTimeInterceptor`, which conflicts
   with itself (`ConflictPolicy::First`): a test gets one `virtualTime()`, whichever way it was asked for.
-- The interceptor is outer to the lifecycle hooks and inner to data providers: the hooks share the test's clock,
-  and every data set starts on a fresh one.
+- Both loop interceptors sit at `InterceptorOptions::ORDER_ASYNC_COROUTINE`, the slot of Testo for an interceptor
+  that owns the fiber of the test: inner to data providers (every data set starts on a fresh clock) and
+  to the guards of Testo that keep the state of a test (the assertion collector, the scope of the messenger,
+  the error handler, the coverage window), outer only to the lifecycle hooks (`PHP_INT_MAX`), which share
+  the test's clock. Trap: a guard outer to nothing but the test wraps it in a fiber of its own and steps aside
+  on every suspension, so a loop outer to the guards runs the tasks of the test outside of it: at `ORDER_DEFAULT`
+  their assertions were not counted, their lines were not covered, and the error handlers set by the test
+  were off the stack (php-testo/testo#430).
 - Every test on virtual time gets a random seed of the order of the fibers ready in one tick, or `THESIS_SEED`
   for all; a test that has not passed logs its seed to the channel `virtual-time`, so a run that failed once
   is replayed: `THESIS_SEED=<seed> make test P=<name> ARGS=--filter=<test>`.
@@ -30,8 +36,8 @@ Plugins for Testo that the tests of thesis packages and of their users need. The
   `testo-virtual-time` (outgrown by the next plugin), `testo-bridge` (a bridge of Testo brings a library
   into Testo, the other way round).
 - Rejected: `PhpErrorsPlugin` replaced by `ErrorHandlerPlugin(failOnError: true)` of testo/error-handler.
-  It fails the test after it ends, so the test runs on past the warning, and it takes its handler off the stack
-  while the fiber of the test is suspended, when the tasks of the test run: their errors escape it.
+  It fails the test after it ends, so the test runs on past the warning and fails on its consequence.
+  Rethink once it can throw where the error happens (php-testo/testo#438).
   Testo registers it in every suite by default, inner to ours (`ORDER_CLOSE_TO_TEST`): it forwards an error
   to our handler first, ours throws, and nothing is left for it to capture.
 - thesis/async requires this package in `requireDev` for its own tests, and this package requires thesis/async:

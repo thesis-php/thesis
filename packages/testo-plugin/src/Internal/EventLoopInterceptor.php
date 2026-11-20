@@ -12,13 +12,16 @@ use Testo\Pipeline\Policy\ConflictPolicy;
 use function Thesis\Async\group;
 
 /**
- * Outer to the lifecycle hooks, which run right before the test: they can wait too.
+ * The loop owns the fiber of the test, so it is inner to the guards of Testo that keep the state of a test
+ * (its assertions, messages, error handlers, coverage): outer to them, it would run the tasks of the test
+ * while they have stepped aside. Still outer to the lifecycle hooks, which run right before the test:
+ * they can wait too.
  *
  * One per test: registered by the plugin and by the attribute alike, it is the same class, which conflicts with itself.
  *
  * @internal
  */
-#[InterceptorOptions(order: InterceptorOptions::ORDER_DEFAULT, onConflict: ConflictPolicy::First)]
+#[InterceptorOptions(order: InterceptorOptions::ORDER_ASYNC_COROUTINE, onConflict: ConflictPolicy::First)]
 final readonly class EventLoopInterceptor implements TestRunInterceptor
 {
     #[\Override]

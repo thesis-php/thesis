@@ -15,7 +15,8 @@ use function Thesis\Async\virtualTime;
 
 /**
  * Outer to the lifecycle hooks, which run right before the test, and inner to data providers:
- * the hooks share the test's clock, and every data set starts at zero.
+ * the hooks share the test's clock, and every data set starts at zero. Inner to the guards of Testo too,
+ * see {@see EventLoopInterceptor}.
  *
  * Every test gets a seed of its own for the order of what is ready together, or the one of the variable
  * {@see self::SEED} for all: a test that has not passed names its seed, which replays it.
@@ -24,7 +25,7 @@ use function Thesis\Async\virtualTime;
  *
  * @internal
  */
-#[InterceptorOptions(order: InterceptorOptions::ORDER_DEFAULT, onConflict: ConflictPolicy::First)]
+#[InterceptorOptions(order: InterceptorOptions::ORDER_ASYNC_COROUTINE, onConflict: ConflictPolicy::First)]
 final readonly class VirtualTimeInterceptor implements TestRunInterceptor
 {
     public const string SEED = 'THESIS_SEED';

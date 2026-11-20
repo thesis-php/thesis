@@ -34,7 +34,7 @@
     "require": {
         "php": "^8.6",
         "internal/container": "^1.1",
-        "testo/testo": "^0.10.29",
+        "testo/testo": "^0.10.39",
         "thesis/async": "^0.1"
     },
     "require-dev": {

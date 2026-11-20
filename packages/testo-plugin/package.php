@@ -11,7 +11,7 @@ return new Manifest(
     keywords: ['php', 'async', 'testing', 'testo', 'event-loop', 'virtual-time', 'error-handling'],
     require: [
         'internal/container' => '^1.1',
-        'testo/testo' => '^0.10.29',
+        'testo/testo' => '^0.10.39',
         'thesis/async' => '*',
     ],
     requireDev: [

@@ -45,6 +45,31 @@ final class PhpErrorsTest
         group(static fn(Group $group) => $group->spawn(static fn() => trigger_error('boom', E_USER_WARNING))->await());
     }
 
+    /**
+     * The task runs while the test is suspended, when the guards of Testo outer to the loop would step aside:
+     * the one of its error handler takes the handlers of the test off the stack.
+     */
+    #[EventLoop]
+    public function handlerOfTestSeesErrorOfTaskStartedByTest(): void
+    {
+        $messages = [];
+        set_error_handler(static function (int $level, string $message) use (&$messages): bool {
+            $messages[] = $message;
+
+            return true;
+        });
+
+        try {
+            group(static function (Group $group) {
+                $group->spawn(static fn() => trigger_error('boom', E_USER_WARNING))->await();
+            });
+        } finally {
+            restore_error_handler();
+        }
+
+        Assert::same($messages, ['boom']);
+    }
+
     public function skipsSuppressedError(): void
     {
         error_clear_last();
