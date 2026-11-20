@@ -87,7 +87,10 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
   after `sub()`, `negate()` or `durationBetween()`, and `shiftTime($now, sec(-30))` beats `sec(30)->negate()`.
   A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
-- They throw `Time\TimeException` out of range, as the class does, so a caller handles one kind.
+- They throw `Time\TimeException` out of range, as the class does, so a caller handles one kind,
+  and `\ValueError` only for NAN and INF given. `Internal\fromFloat()` tells the two apart by doing
+  the multiplication itself: it gets the argument of the caller as the value and the rest as the unit,
+  never a product, which overflows to INF and reads as a wrong argument (`multiply()` passes the factor).
 - No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
   is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
   The check is `isZero()`. Rejected for the same reason: `zero()` with a `static` instance, which makes

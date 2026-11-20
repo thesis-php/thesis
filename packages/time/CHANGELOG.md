@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BC break:** `isPositive()` and `isNegative()`. Use `$duration > sec(0)` and `$duration->negative`.
 - **BC break:** `shortest()` and `longest()`. Use `min()` and `max()` of PHP, which compare durations by value.
 
+### Fixed
+
+- `multiply()` by a finite float throws `Time\TimeException`, not `\ValueError`, when the product is too large
+  for a float.
+
 ## [0.3.1] - 2026-11-18
 
 ### Changed

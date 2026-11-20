@@ -113,6 +113,18 @@ final class FunctionsTest
         yield 'multiply zero by min int' => [static fn() => multiply(ns(0), PHP_INT_MIN), '0.000000000'];
         yield 'multiply above max' => [static fn() => multiply(hours(500_000), 2000), self::OUT_OF_RANGE];
         yield 'multiply long by float' => [static fn() => multiply(sec(2_000_000_000), -1.0), '-2000000000.000000000'];
+        // The product of a finite factor may overflow to INF: the result is out of range, the factor is not wrong.
+        yield 'multiply by max float' => [static fn() => multiply(sec(2), PHP_FLOAT_MAX), self::OUT_OF_RANGE];
+        yield 'multiply by min float' => [static fn() => multiply(sec(2), -PHP_FLOAT_MAX), self::OUT_OF_RANGE];
+        yield 'multiply by NAN' => [
+            static fn() => multiply(sec(1), NAN),
+            'ValueError: A duration must be finite, NAN given',
+        ];
+        // Not NAN, the product of zero and INF.
+        yield 'multiply zero by INF' => [
+            static fn() => multiply(sec(0), INF),
+            'ValueError: A duration must be finite, INF given',
+        ];
         yield 'ratio' => [static fn() => ratio(sec(30), minutes(2)), '0.25'];
         yield 'ratio above one' => [static fn() => ratio(sec(5), ms(2000)), '2.5'];
         yield 'ratio of nanoseconds' => [static fn() => ratio(ns(1), ns(3)), '0.3333333333333333'];

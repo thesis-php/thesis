@@ -260,6 +260,7 @@ function isZero(Duration $duration): bool
  * is rounded to the nearest nanosecond, half away from zero, exact while both durations are below 2^53 ns (104 days).
  *
  * @api
+ * @throws \ValueError if the factor is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function multiply(Duration $duration, int|float $factor): Duration
@@ -268,7 +269,9 @@ function multiply(Duration $duration, int|float $factor): Duration
         // Exact on 64-bit PHP, on 32-bit PHP a float, exact as well: the product is a multiple of 2^9 below 2^61.
         $nanoseconds = $duration->seconds * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
 
-        return fromFloat(($duration->negative ? -$nanoseconds : $nanoseconds) * $factor, 1);
+        // The factor is the value and the nanoseconds are its unit: fromFloat() takes a product that overflowed
+        // to INF for a wrong argument, not for a duration out of the range.
+        return fromFloat($factor, $duration->negative ? -$nanoseconds : $nanoseconds);
     }
 
     return $factor >= 0 ? $duration->multiplyBy($factor) : $duration->multiplyBy(-$factor)->negate();
