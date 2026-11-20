@@ -65,6 +65,9 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   (the old `thesis/time-span`).
 - Short names as in Go: `ns()` to `hours()` create, `to*()` convert. A full unit is plural, it takes an amount
   (`minutes(1.5)`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, maybe with a loss.
+- `formatDuration()` and `parseDuration()`, not `format()` and `parse()` (renamed in 0.5): an imported function
+  has no `time.` before it as in Go, and `parse($string)` does not say what it reads. The other names say time
+  themselves (`sec()`, `toMs()`) or take a `Duration`. The same rule as `formatValue()` of `thesis/formatter`.
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
   after `sub()`, `negate()` or `between()`, and `shift($now, sec(-30))` beats `sec(30)->negate()`.
   A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
@@ -105,14 +108,15 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   gave `0.009000000000000001`). Above 2^53 nanoseconds (104 days) a float no longer holds them, so the whole units
   stay exact and only the fraction is divided: rarely an ulp off (above 2^53 µs, 285 years, for `toUsFloat()`).
   Rejected: the nearest float there too, it needs integer arithmetic wider than 64 bits for durations nobody has.
-- `parse()` takes the grammar of `time.ParseDuration()` of Go and nothing else: one known contract, which reads
-  what `format()` writes and the strings of Go services and Kubernetes. Hence `0` alone, units in any order
-  and twice, `.5s`, and no spaces, no days (`1d`), no `sec` or `min`. A string that is not a duration throws
-  `Time\TimeException`, as `fromIso8601DurationString()` does.
-- A number of `parse()` is a float converted by `fromFloat()`, so `parse('1.5h')` is `hours(1.5)`, on 64-bit
-  and 32-bit alike. Whatever `format()` writes comes back exactly: its hours and minutes are whole, its seconds
-  are below 60. Rejected: arithmetic in decimal digits (the digits times 6 or 36, then the point moved), which
-  was exact for a number of any length: 35 lines for numbers of more than 15 significant digits that nobody writes.
+- `parseDuration()` takes the grammar of `time.ParseDuration()` of Go and nothing else: one known contract,
+  which reads what `formatDuration()` writes and the strings of Go services and Kubernetes. Hence `0` alone,
+  units in any order and twice, `.5s`, and no spaces, no days (`1d`), no `sec` or `min`. A string
+  that is not a duration throws `Time\TimeException`, as `fromIso8601DurationString()` does.
+- A number of `parseDuration()` is a float converted by `fromFloat()`, so `parseDuration('1.5h')` is `hours(1.5)`,
+  on 64-bit and 32-bit alike. Whatever `formatDuration()` writes comes back exactly: its hours and minutes
+  are whole, its seconds are below 60. Rejected: arithmetic in decimal digits (the digits times 6 or 36,
+  then the point moved), which was exact for a number of any length: 35 lines for numbers of more than
+  15 significant digits that nobody writes.
 - No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
   a duration (the `Time\Instant` RFC).
 - `between()` and `shift()` work on timestamps: elapsed time does not stretch with DST. `shift()` drops

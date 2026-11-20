@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 use Time\Duration;
-use function Thesis\Time\format;
+use function Thesis\Time\formatDuration;
 
 /**
  * Thrown by {@see timeout()} when its own deadline, not an outer cancellation, interrupted the body.
@@ -21,6 +21,6 @@ final class TimedOut extends \RuntimeException
         public readonly Duration $timeout,
         Cancelled $previous,
     ) {
-        parent::__construct(\sprintf('Timed out after %s.', format($timeout)), previous: $previous);
+        parent::__construct(\sprintf('Timed out after %s.', formatDuration($timeout)), previous: $previous);
     }
 }

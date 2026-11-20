@@ -9,8 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `parse()` reads a duration from a string like `1h30m`, `1.5s` or `250ms`, as `time.ParseDuration()` of Go:
-  the reverse of `format()`.
+- `parseDuration()` reads a duration from a string like `1h30m`, `1.5s` or `250ms`, as `time.ParseDuration()` of Go:
+  the reverse of `formatDuration()`.
+
+### Changed
+
+- **BC break:** `format()` is renamed to `formatDuration()`.
 
 ### Removed
 

@@ -268,7 +268,7 @@ function multiply(Duration $duration, int|float $factor): Duration
  *
  * @api
  */
-function format(Duration $duration): string
+function formatDuration(Duration $duration): string
 {
     $sign = $duration->negative ? '-' : '';
 
@@ -303,14 +303,14 @@ function format(Duration $duration): string
 }
 
 /**
- * The reverse of format(), like Go's ParseDuration(): 1h30m, 1.5s, 250ms, -15ns, 0. Numbers with a unit each
+ * The reverse of formatDuration(), like Go's ParseDuration(): 1h30m, 1.5s, 250ms, -15ns, 0. Numbers with a unit each
  * (h, m, s, ms, us or µs, ns) after an optional sign, a fraction in any of them, nothing in between.
- * A number is converted like the function of its unit: parse('1.5h') is hours(1.5).
+ * A number is converted like the function of its unit: parseDuration('1.5h') is hours(1.5).
  *
  * @api
  * @throws TimeException if the string is not such a duration or is out of the range of Duration
  */
-function parse(string $string): Duration
+function parseDuration(string $string): Duration
 {
     $negative = str_starts_with($string, '-');
     $offset = $negative || str_starts_with($string, '+') ? 1 : 0;

@@ -234,7 +234,7 @@ final class FunctionsTest
     #[DataProvider('formats')]
     public function formatsLikeGo(Duration $duration, string $expected): void
     {
-        Assert::same(format($duration), $expected);
+        Assert::same(formatDuration($duration), $expected);
     }
 
     /**
@@ -325,7 +325,7 @@ final class FunctionsTest
     #[DataProvider('strings')]
     public function parsesLikeGo(string $string, string $expected): void
     {
-        Assert::same(outcome(static fn() => parse($string)), $expected);
+        Assert::same(outcome(static fn() => parseDuration($string)), $expected);
     }
 
     public function parsesWhatFormatWrites(): void
@@ -333,16 +333,16 @@ final class FunctionsTest
         $random = new Randomizer(new Mt19937(1));
 
         for ($case = 0; $case < 2000; ++$case) {
-            // Of every length, a half without seconds: format() changes the unit below a second, a millisecond
-            // and a microsecond.
+            // Of every length, a half without seconds: formatDuration() changes the unit below a second,
+            // a millisecond and a microsecond.
             $duration = signed(
                 seconds: $random->getInt(0, 1) * $random->getInt(0, intdiv(MAX_SECONDS, 10 ** $random->getInt(0, 9))),
                 nanoseconds: $random->getInt(0, 10 ** $random->getInt(0, 9) - 1),
                 negative: $random->getInt(0, 1) === 1,
             );
-            $string = format($duration);
+            $string = formatDuration($duration);
 
-            Assert::same(describe(parse($string)), describe($duration), $string);
+            Assert::same(describe(parseDuration($string)), describe($duration), $string);
         }
     }
 

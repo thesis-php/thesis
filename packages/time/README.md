@@ -20,15 +20,15 @@ A polyfill of [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 
 short functions for it and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
-use function Thesis\Time\{format, ms, parse, sec, toMs, toSecFloat};
+use function Thesis\Time\{formatDuration, ms, parseDuration, sec, toMs, toSecFloat};
 
 $timeout = sec(1.5);
 
 toMs($timeout, RoundingMode::PositiveInfinity); // 1500
 toSecFloat($timeout); // 1.5
-format($timeout); // 1.5s
+formatDuration($timeout); // 1.5s
 
-$timeout = parse($_ENV['HTTP_TIMEOUT'] ?? '1.5s');
+$timeout = parseDuration($_ENV['HTTP_TIMEOUT'] ?? '1.5s');
 ```
 
 ## Installation
@@ -197,24 +197,25 @@ and others make it `===`, which compares the objects.
 
 ### Formatting and parsing
 
-`format()` writes a duration like `Duration.String()` of Go, and `parse()` reads it back like `time.ParseDuration()`:
-for logs, and for a timeout in an environment variable, a config or an option of a command.
+`formatDuration()` writes a duration like `Duration.String()` of Go, and `parseDuration()` reads it back
+like `time.ParseDuration()`: for logs, and for a timeout in an environment variable, a config or an option of a command.
 
 ```php
-use function Thesis\Time\{duration, format, parse};
+use function Thesis\Time\{duration, formatDuration, parseDuration};
 
-format(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s
-format(parse('90s')); // 1m30s
+formatDuration(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s
+formatDuration(parseDuration('90s')); // 1m30s
 
-parse('1h2m3.5s');
-parse('250ms');
-parse('-1.5h');
-parse('0');
+parseDuration('1h2m3.5s');
+parseDuration('250ms');
+parseDuration('-1.5h');
+parseDuration('0');
 ```
 
 A string is numbers with a unit each (`h`, `m`, `s`, `ms`, `us` or `µs`, `ns`) after an optional sign, with a fraction
 in any of them and no spaces. Only `0` has no unit. A number is converted like the function of its unit:
-`parse('1.5h')` is `hours(1.5)`. A string that is not a duration or is out of range throws `Time\TimeException`.
+`parseDuration('1.5h')` is `hours(1.5)`. A string that is not a duration or is out of range throws
+`Time\TimeException`.
 
 ### Points in time
 
