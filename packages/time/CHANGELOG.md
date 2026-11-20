@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **BC break:** `isPositive()` and `isNegative()`. Use `$duration > sec(0)` and `$duration->negative`.
+
 ### Changed
 
 - `shortest()` and `longest()` take no named arguments (`@no-named-arguments`), PHPStan reports them.

@@ -94,14 +94,6 @@ final class FunctionsTest
         ];
         yield 'toHoursFloat above 2^53 ns' => [static fn() => toHoursFloat(minutes(200_000.5)), '3333.3416666666667'];
         yield 'isZero' => [static fn() => [isZero(ns(0)), isZero(ns(1)), isZero(ns(-1))], '[true, false, false]'];
-        yield 'isNegative' => [
-            static fn() => [isNegative(ns(0)), isNegative(ns(1)), isNegative(ns(-1))],
-            '[false, false, true]',
-        ];
-        yield 'isPositive' => [
-            static fn() => [isPositive(ns(0)), isPositive(ns(1)), isPositive(ns(-1))],
-            '[false, true, false]',
-        ];
         yield 'shortest' => [static fn() => shortest(sec(1), ms(-1), ns(5)), '-0.001000000'];
         yield 'shortest of one' => [static fn() => shortest(sec(1)), '1.000000000'];
         yield 'longest' => [static fn() => longest(sec(-1), ms(1), ns(5)), '0.001000000'];

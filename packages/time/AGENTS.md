@@ -64,10 +64,19 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   (`minutes(1.5)`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, maybe with a loss.
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
   after `sub()`, `negate()` or `between()`, and `shift($now, sec(-30))` beats `sec(30)->negate()`.
-  A caller that needs a positive duration (a timeout) checks it with `isPositive()`.
+  A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
 - No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
   is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
-  The check is `isZero()`.
+  The check is `isZero()`. Rejected for the same reason: `zero()` with a `static` instance, which makes
+  `=== zero()` pass for its own result and fail for a computed zero (`sub($a, $a)`).
+- No sign functions but `isZero()`: `<`, `>` and `<=>` compare durations, and the class has `$negative`.
+  `isZero()` stays because `==` would be made `===` by the fixer. Rejected: `isPositive()`
+  and `isNegative()` (removed in 0.5), a second way to write `$duration > sec(0)` and `$duration->negative`.
+- `multiply()` stays next to `multiplyBy()`: it takes a float and a negative factor, which the class does not.
+  Rejected: naming it `multiplyBy()`: one name for two contracts (the method throws on a negative factor),
+  and as a function `multiplyBy($delay, 2)` reads as multiplying by `$delay`. Rejected: a `\RoundingMode`:
+  the result is a duration rounded to a nanosecond, as `sec(1.5)` is, and a mode matters only where
+  a conversion rounds to the unit of an API (`toMs()`). An optional one can be added later without a break.
 - No function named after a built-in (`min()`, `max()`): imported, it shadows the built-in in the whole file
   and ignores extra arguments. Hence `minutes()`, `shortest()` and `longest()`.
 - The integer conversions require a `\RoundingMode`, with no default. Their main use is a timeout, a TTL

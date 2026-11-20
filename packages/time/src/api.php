@@ -244,22 +244,6 @@ function isZero(Duration $duration): bool
 
 /**
  * @api
- */
-function isNegative(Duration $duration): bool
-{
-    return $duration->negative;
-}
-
-/**
- * @api
- */
-function isPositive(Duration $duration): bool
-{
-    return !$duration->negative && !isZero($duration);
-}
-
-/**
- * @api
  * @no-named-arguments
  */
 function shortest(Duration $duration, Duration ...$durations): Duration

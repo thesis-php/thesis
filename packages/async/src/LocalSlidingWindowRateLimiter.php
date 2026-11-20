@@ -7,8 +7,8 @@ namespace Thesis\Async;
 use Thesis\Async\Internal\Scope;
 use Time\Duration;
 use function Thesis\Time\format;
-use function Thesis\Time\isPositive;
 use function Thesis\Time\ns;
+use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
 /**
@@ -55,7 +55,7 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         private readonly int $limit,
         Duration $window,
     ) {
-        if (!isPositive($window)) {
+        if ($window <= sec(0)) {
             throw new \ValueError(\sprintf(
                 'LocalSlidingWindowRateLimiter needs a positive window, got %s.',
                 format($window),

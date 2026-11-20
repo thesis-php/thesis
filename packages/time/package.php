@@ -10,7 +10,7 @@ use Thesis\Monorepo\RectorSkip;
 return new Manifest(
     description: 'Time\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), PSR-20 clocks.',
     licenseSince: 2026,
-    version: '0.4',
+    version: '0.5',
     keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
     require: [
         // The polyfill runs where the rest of the monorepo does not: PHP 8.2 of Debian 12, the main 32-bit system.
