@@ -43,7 +43,7 @@
         "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
         "symfony/polyfill-php84": "^1.34",
-        "testo/testo": "^0.10.29"
+        "testo/testo": "^0.10.60"
     },
     "require-dev": {
         "ext-intl": "*",

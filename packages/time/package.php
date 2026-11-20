@@ -25,7 +25,7 @@ return new Manifest(
         'testo/codecov' => '^0.2.5',
         'testo/data' => '^0.1.10',
         'testo/test' => '^0.1.8',
-        'testo/testo' => '^0.10.29',
+        'testo/testo' => '^0.10.60',
     ],
     files: ['polyfill/load.php'],
     skip: [

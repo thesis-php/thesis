@@ -98,7 +98,6 @@ test: var vendor up ## Run tests [P=]
 # by default: ours has no i386 build, Composer installs in it all the same)
 ARCH ?=
 IMAGE ?= php:$(or $(PHP_VERSION),8.6)-cli
-TESTO_ORDERS = var/alone/$(P)/vendor/testo/testo/core/Pipeline/Attribute/InterceptorOptions.php
 test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=] [ARCH=386] [IMAGE=]
 	$(if $(P),,$(error P= names the package))
 	rm -rf var/alone/$(P)
@@ -106,13 +105,6 @@ test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=] 
 	cp -R packages/$(P) var/alone/$(P)
 	$(RUN) sh -c 'cd var/alone/$(P) && composer update --no-interaction --no-progress'
 ifeq ($(ARCH),386)
-	# Testo orders its interceptors by numbers above 2^31, floats on 32-bit PHP: fixed in its main after 0.10.59
-	# (php-testo/testo#418), brought below here in the same order until a release. The checks fail once a release
-	# changes them or adds one, then drop the patch.
-	$(RUN) sed -i -e 's/= -300_000_000_000;/= -2_000_000_000;/' -e 's/= 300_000_000_000;/= 1_000_000_000;/' \
-		-e 's/= 300_000_100_000;/= 1_000_100_000;/' -e 's/= 300_000_300_000;/= 1_000_300_000;/' $(TESTO_ORDERS)
-	$(RUN) sh -c 'test "$$(grep -cE "= (-2_000_000_000|1_000_[013]00_000);" $(TESTO_ORDERS))" = 4'
-	$(RUN) sh -c '! grep -E "[0-9]{3}_[0-9]{3}_[0-9]{3}_[0-9]{3}" $(TESTO_ORDERS)'
 	docker run --rm --platform linux/386 --user $(DOCKER_USER) --volume "$(CURDIR)":/workspace \
 		--workdir /workspace/var/alone/$(P) $(IMAGE) vendor/bin/testo --config=../../../testo-alone.php $(ARGS)
 else

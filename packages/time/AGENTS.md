@@ -124,10 +124,10 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   against the polyfill by `PHP_VERSION=8.2 make test-alone P=time` (CI: 8.2 to 8.5). `outcome()` includes
   the messages of the previous exceptions.
 - 32-bit: `PHP_VERSION=8.2 ARCH=386 make test-alone P=time`, and `IMAGE=php:8.6-rc-cli` for 8.6 until its release
-  (ours has no i386 build), where `DurationFuzzTest` compares with the 32-bit class. Testo 0.10.59 orders
-  interceptors by numbers above 2^31 (php-testo/testo#418): the Makefile patches them in the copy and fails
-  once a release changes them. A literal above 2^31 is a float on 32-bit, so the bounds of each platform
-  have their own provider (`factoriesOf32Bits()`) with values from the class of that platform.
+  (ours has no i386 build), where `DurationFuzzTest` compares with the 32-bit class. Testo runs on 32-bit
+  since 0.10.60 (before it ordered interceptors by numbers above 2^31, php-testo/testo#418), hence the constraint.
+  A literal above 2^31 is a float on 32-bit, so the bounds of each platform have their own provider
+  (`factoriesOf32Bits()`) with values from the class of that platform.
 - Mutation testing runs on 8.6, without the polyfill: `IsoInterval` is in `src/` and tested directly.
 - `DurationFuzzTest` runs on 8.6 only: it compares a renamed copy of the polyfill (`loadPolyfillCopy()`)
   with the class on random input, ISO strings built from the grammar and then broken. Boundaries random input
