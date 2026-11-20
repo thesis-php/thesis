@@ -35,7 +35,7 @@ final readonly class StreamWatcherBench
         stream_set_blocking($this->server, false);
     }
 
-    #[Expected(instructions: '107.8M', cycles: '177.6M', memory: '41.70KiB')]
+    #[Expected(instructions: '52.83M', cycles: '85.07M', memory: '41.14KiB')]
     public function benchEcho(): void
     {
         $client = $this->client;

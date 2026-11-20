@@ -17,7 +17,7 @@ use function Thesis\Time\sec;
 #[Warmup(1)]
 final class TimeoutBench
 {
-    #[Expected(instructions: '201.8M', cycles: '293.1M', memory: '3.438KiB')]
+    #[Expected(instructions: '159.0M', cycles: '222.5M', memory: '23.81KiB')]
     public function benchCancelledBeforeFiring(): void
     {
         group(static function () {

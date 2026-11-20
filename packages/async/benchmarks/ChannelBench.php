@@ -16,7 +16,7 @@ use function Thesis\Async\group;
 #[Warmup(1)]
 final class ChannelBench
 {
-    #[Expected(instructions: '52.03M', cycles: '80.91M', memory: '30.20KiB')]
+    #[Expected(instructions: '37.85M', cycles: '57.97M', memory: '33.04KiB')]
     public function benchPingPong(): void
     {
         $pings = new Channel(capacity: 0);

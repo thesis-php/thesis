@@ -17,7 +17,7 @@ use function Thesis\Time\ms;
 #[Warmup(1)]
 final class DelayBench
 {
-    #[Expected(instructions: '68.43M', cycles: '131.8M', memory: '23.31MiB')]
+    #[Expected(instructions: '41.27M', cycles: '62.81M', memory: '16.29MiB')]
     public function benchFanOut(): void
     {
         group(static function (Group $group) {

@@ -15,7 +15,7 @@ use function Thesis\Async\group;
 #[Warmup(1)]
 final class CheckpointBench
 {
-    #[Expected(instructions: '358.2M', cycles: '551.4M', memory: '4.969KiB')]
+    #[Expected(instructions: '144.3M', cycles: '183.7M', memory: '24.66KiB')]
     public function benchLoop(): void
     {
         group(static function () {
