@@ -6,6 +6,8 @@ namespace Thesis\Time\Internal;
 
 use Time\Duration;
 use Time\TimeException;
+use function Thesis\Time\formatDuration;
+use function Thesis\Time\isZero;
 
 /** @internal */
 const NANOSECONDS_PER_MICROSECOND = 1000;
@@ -293,16 +295,7 @@ function rounded(int|float $quotient, ?int $half, bool $negative, \RoundingMode 
         throw notInt();
     }
 
-    $awayFromZero = $half !== null && match ($rounding) {
-        \RoundingMode::TowardsZero => false,
-        \RoundingMode::AwayFromZero => true,
-        \RoundingMode::PositiveInfinity => !$negative,
-        \RoundingMode::NegativeInfinity => $negative,
-        \RoundingMode::HalfAwayFromZero => $half >= 0,
-        \RoundingMode::HalfTowardsZero => $half > 0,
-        \RoundingMode::HalfEven => $half > 0 || ($half === 0 && $quotient % 2 !== 0),
-        \RoundingMode::HalfOdd => $half > 0 || ($half === 0 && $quotient % 2 === 0),
-    };
+    $awayFromZero = isRoundedAwayFromZero($half, isOdd: $quotient % 2 !== 0, negative: $negative, rounding: $rounding);
 
     if ($awayFromZero && $quotient === PHP_INT_MAX) {
         throw notInt();
@@ -311,6 +304,101 @@ function rounded(int|float $quotient, ?int $half, bool $negative, \RoundingMode 
     $magnitude = $awayFromZero ? $quotient + 1 : $quotient;
 
     return $negative ? -$magnitude : $magnitude;
+}
+
+/**
+ * Whether a quotient truncated toward zero goes a unit further from it.
+ *
+ * @internal
+ * @param ?int $half how the remainder compares with a half of the divisor, null if nothing remains
+ * @param bool $isOdd whether the truncated quotient is odd
+ */
+function isRoundedAwayFromZero(?int $half, bool $isOdd, bool $negative, \RoundingMode $rounding): bool
+{
+    return $half !== null && match ($rounding) {
+        \RoundingMode::TowardsZero => false,
+        \RoundingMode::AwayFromZero => true,
+        \RoundingMode::PositiveInfinity => !$negative,
+        \RoundingMode::NegativeInfinity => $negative,
+        \RoundingMode::HalfAwayFromZero => $half >= 0,
+        \RoundingMode::HalfTowardsZero => $half > 0,
+        \RoundingMode::HalfEven => $half > 0 || ($half === 0 && $isOdd),
+        \RoundingMode::HalfOdd => $half > 0 || ($half === 0 && !$isOdd),
+    };
+}
+
+/**
+ * What to add to a magnitude to round it to a multiple of the unit: the rest of the unit away from zero
+ * or the remainder, negated, toward it. The magnitude is in parts: a timestamp is beyond the range of Duration.
+ *
+ * @internal
+ * @param int|float $seconds not negative, a float beyond int: a whole number, exact below 2^53
+ * @param int $nanoseconds not negative, less than a second
+ * @param bool $negative whether the magnitude is of a negative value
+ * @throws \ValueError if the unit is not positive
+ */
+function roundingStep(
+    int|float $seconds,
+    int $nanoseconds,
+    bool $negative,
+    Duration $unit,
+    \RoundingMode $rounding,
+): Duration {
+    if ($unit->negative || isZero($unit)) {
+        throw new \ValueError(\sprintf('A unit of rounding must be positive, %s given', formatDuration($unit)));
+    }
+
+    // Neither the quotient nor the nanoseconds fit in int on 32-bit PHP and for a timestamp, hence no division:
+    // the unit is doubled up to the magnitude, then the multiples are taken from it, the largest first.
+    $multiples = [];
+
+    for (
+        $multiple = [$unit->seconds, $unit->nanoseconds];
+        $multiple <= [$seconds, $nanoseconds];
+        $multiple = doubled($multiple)
+    ) {
+        $multiples[] = $multiple;
+    }
+
+    $isOdd = false;
+
+    foreach (array_reverse($multiples) as $multiple) {
+        // The last multiple is the unit itself: the quotient is odd if it is taken.
+        $isOdd = $multiple <= [$seconds, $nanoseconds];
+
+        if ($isOdd) {
+            $seconds -= $multiple[0];
+            $nanoseconds -= $multiple[1];
+
+            if ($nanoseconds < 0) {
+                --$seconds;
+                $nanoseconds += NANOSECONDS_PER_SECOND;
+            }
+        }
+    }
+
+    // Below the unit, so the seconds are an int again.
+    $remainder = Duration::fromSeconds((int) $seconds, $nanoseconds);
+    $restOfUnit = $unit->sub($remainder);
+    $half = isZero($remainder) ? null : $remainder <=> $restOfUnit;
+
+    return isRoundedAwayFromZero($half, $isOdd, $negative, $rounding) ? $restOfUnit : $remainder->negate();
+}
+
+/**
+ * @internal
+ * @param array{int|float, int} $magnitude seconds and nanoseconds
+ * @return array{int|float, int}
+ */
+function doubled(array $magnitude): array
+{
+    [$seconds, $nanoseconds] = $magnitude;
+    // Less than 2 billion: fits in int on 32-bit PHP too.
+    $nanoseconds *= 2;
+
+    return $nanoseconds < NANOSECONDS_PER_SECOND
+        ? [$seconds * 2, $nanoseconds]
+        : [$seconds * 2 + 1, $nanoseconds - NANOSECONDS_PER_SECOND];
 }
 
 /**

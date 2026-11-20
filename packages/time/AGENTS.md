@@ -66,9 +66,12 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   (the old `thesis/time-span`).
 - Short names as in Go: `ns()` to `hours()` create, `to*()` convert. A full unit is plural, it takes an amount
   (`minutes(1.5)`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, maybe with a loss.
-- `formatDuration()` and `parseDuration()`, not `format()` and `parse()` (renamed in 0.5): an imported function
-  has no `time.` before it as in Go, and `parse($string)` does not say what it reads. The other names say time
-  themselves (`sec()`, `toMs()`) or take a `Duration`. The same rule as `formatValue()` of `thesis/formatter`.
+- A function names its type where no argument does and in a pair, so that both read alike. `parseDuration($string)`:
+  an imported function has no `time.` before it as in Go, and `parse($string)` does not say what it reads.
+  `formatDuration()` is its pair (both renamed in 0.5 from `format()` and `parse()`), `roundDurationTo()`
+  is the pair of `roundTimeTo()`, not `roundTo()`. The other names say time themselves (`sec()`, `toMs()`)
+  or take a `Duration` or a time and have no pair: `multiply()`, `ratio()`, `isZero()`, `shift()`, `between()`.
+  The same rule as `formatValue()` of `thesis/formatter`.
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
   after `sub()`, `negate()` or `between()`, and `shift($now, sec(-30))` beats `sec(30)->negate()`.
   A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
@@ -94,6 +97,19 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   is `-0.0`, as `/` gives: a negative total is not worth a branch.
 - No function named after a built-in (`min()`): imported, it shadows the built-in in the whole file
   and ignores extra arguments. Hence `minutes()`.
+- `roundDurationTo()` and `roundTimeTo()` round to a multiple of any positive unit (`ms(1500)` too),
+  as `Duration.Round()` and `Time.Truncate()` of Go, and require a `\RoundingMode` like the integer conversions:
+  no `truncate()` or `floor()` per direction, and `floor()` is a built-in as `round()` is. Two functions, not one
+  that takes `Duration|\DateTimeImmutable`: a union can be added later, not taken back, and the time has rules
+  of its own (a unit of whole microseconds, the sign is the side of 1970). A wrong unit is a `\ValueError`.
+  Rejected: returning the duration as it is for a unit of zero and below, as Go does: it hides a wrong config.
+- `roundTimeTo()` counts the multiples from 1970-01-01 00:00:00 UTC in elapsed time, like `between()` and `shift()`:
+  a window of `hours(24)` starts at the midnight of UTC in any time zone. A calendar day is not a duration.
+- Both take the remainder by doubling the unit (`Internal\roundingStep()`), one path for 64-bit and 32-bit,
+  durations and timestamps: int nanoseconds hold 2.1 seconds on 32-bit and a timestamp only until 2262 on 64-bit,
+  and the quotient does not fit either. It costs 5 to 15 µs a call (up to 63 doublings). Not tried:
+  a division of int nanoseconds first, where both fit. It needs a benchmark, and leaves the doubling
+  to the 32-bit tests alone.
 - No functions for the minimum and the maximum: `min()`, `max()` and `sort()` of PHP compare durations as `<` does,
   on 8.6 and with the polyfill (`DurationTest` pins it), and PHPStan types their result as `Time\Duration`.
   Rejected: `shortest()` and `longest()` (removed in 0.5), a second way to write them.

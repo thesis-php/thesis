@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reverse of `formatDuration()`.
 - `ratio()` divides a duration by a duration into a float: a progress, a rate, the intervals that have passed.
 - `toNsFloat()`, like the other float conversions: on 32-bit PHP `toNs()` throws above 2.1 seconds.
+- `roundDurationTo()` rounds a duration to a multiple of a unit: to `ms(1)` for a log.
+- `roundTimeTo()` rounds a time to a multiple of a unit since 1970: the start of a window of 5 minutes.
 
 ### Changed
 

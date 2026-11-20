@@ -130,6 +130,166 @@ final class DateTimeTest
         Assert::same(shift(new \DateTimeImmutable($time), $duration)->format('Y-m-d\TH:i:s.uP'), $expected);
     }
 
+    /**
+     * @return iterable<string, array{string, Duration, \RoundingMode, string}>
+     */
+    public static function roundings(): iterable
+    {
+        yield 'down' => [
+            '2026-01-01 12:34:56.789 UTC',
+            minutes(5),
+            \RoundingMode::NegativeInfinity,
+            '2026-01-01T12:30:00.000000+00:00',
+        ];
+        yield 'up' => [
+            '2026-01-01 12:34:56.789 UTC',
+            minutes(5),
+            \RoundingMode::PositiveInfinity,
+            '2026-01-01T12:35:00.000000+00:00',
+        ];
+        yield 'to the nearest' => [
+            '2026-01-01 12:32:30 UTC',
+            minutes(5),
+            \RoundingMode::HalfAwayFromZero,
+            '2026-01-01T12:35:00.000000+00:00',
+        ];
+        yield 'a multiple' => [
+            '2026-01-01 12:35:00 UTC',
+            minutes(5),
+            \RoundingMode::AwayFromZero,
+            '2026-01-01T12:35:00.000000+00:00',
+        ];
+        // 1767225602 seconds are even.
+        yield 'a half to even, down' => [
+            '2026-01-01 00:00:02.5 UTC',
+            sec(1),
+            \RoundingMode::HalfEven,
+            '2026-01-01T00:00:02.000000+00:00',
+        ];
+        yield 'a half to even, up' => [
+            '2026-01-01 00:00:03.5 UTC',
+            sec(1),
+            \RoundingMode::HalfEven,
+            '2026-01-01T00:00:04.000000+00:00',
+        ];
+        yield 'below a second' => [
+            '2026-01-01 12:34:56.789 UTC',
+            ms(250),
+            \RoundingMode::NegativeInfinity,
+            '2026-01-01T12:34:56.750000+00:00',
+        ];
+        yield 'to microseconds' => [
+            '2026-01-01 12:34:56.789123 UTC',
+            us(1),
+            \RoundingMode::AwayFromZero,
+            '2026-01-01T12:34:56.789123+00:00',
+        ];
+        yield 'a unit with a fraction of a second' => [
+            '1970-01-01 00:00:10 UTC',
+            ms(1500),
+            \RoundingMode::NegativeInfinity,
+            '1970-01-01T00:00:09.000000+00:00',
+        ];
+        yield 'keeps the time zone' => [
+            '2026-01-01 12:34:56 Europe/Moscow',
+            minutes(5),
+            \RoundingMode::NegativeInfinity,
+            '2026-01-01T12:30:00.000000+03:00',
+        ];
+        // The multiples are counted from 1970-01-01 00:00:00 UTC, not from the midnight of the time zone.
+        yield 'a day of UTC' => [
+            '2026-01-01 12:34:56 Europe/Moscow',
+            hours(24),
+            \RoundingMode::NegativeInfinity,
+            '2026-01-01T03:00:00.000000+03:00',
+        ];
+        yield 'the first second of 1970' => [
+            '1970-01-01 00:00:00.75 UTC',
+            sec(1),
+            \RoundingMode::NegativeInfinity,
+            '1970-01-01T00:00:00.000000+00:00',
+        ];
+        yield 'before 1970, down' => [
+            '1969-12-31 23:59:57.75 UTC',
+            sec(5),
+            \RoundingMode::NegativeInfinity,
+            '1969-12-31T23:59:55.000000+00:00',
+        ];
+        yield 'before 1970, up' => [
+            '1969-12-31 23:59:57.75 UTC',
+            sec(5),
+            \RoundingMode::PositiveInfinity,
+            '1970-01-01T00:00:00.000000+00:00',
+        ];
+        yield 'before 1970, towards 1970' => [
+            '1969-12-31 23:59:52.75 UTC',
+            sec(5),
+            \RoundingMode::TowardsZero,
+            '1969-12-31T23:59:55.000000+00:00',
+        ];
+        yield 'before 1970, away from 1970' => [
+            '1969-12-31 23:59:52.75 UTC',
+            sec(5),
+            \RoundingMode::AwayFromZero,
+            '1969-12-31T23:59:50.000000+00:00',
+        ];
+        yield 'before 1970 by whole seconds' => [
+            '1969-12-31 23:59:58 UTC',
+            sec(5),
+            \RoundingMode::NegativeInfinity,
+            '1969-12-31T23:59:55.000000+00:00',
+        ];
+        // Beyond int timestamps on 32-bit PHP.
+        yield 'after 2038' => [
+            '2040-01-01 00:07:30.5 UTC',
+            minutes(5),
+            \RoundingMode::NegativeInfinity,
+            '2040-01-01T00:05:00.000000+00:00',
+        ];
+        yield 'before 1901' => [
+            '1900-01-01 00:07:30.5 UTC',
+            minutes(5),
+            \RoundingMode::NegativeInfinity,
+            '1900-01-01T00:05:00.000000+00:00',
+        ];
+        // Beyond the range of Duration.
+        yield 'year 9999' => [
+            '9999-12-31 23:59:59.999999 UTC',
+            hours(1),
+            \RoundingMode::NegativeInfinity,
+            '9999-12-31T23:00:00.000000+00:00',
+        ];
+        yield 'year 9999 below a second' => [
+            '9999-12-31 23:59:59.999999 UTC',
+            ms(250),
+            \RoundingMode::NegativeInfinity,
+            '9999-12-31T23:59:59.750000+00:00',
+        ];
+        yield 'zero' => [
+            '2026-01-01 00:00:00 UTC',
+            ns(0),
+            \RoundingMode::NegativeInfinity,
+            'ValueError: A unit of rounding must be positive, 0s given',
+        ];
+        yield 'a fraction of a microsecond' => [
+            '2026-01-01 00:00:00 UTC',
+            ns(1500),
+            \RoundingMode::NegativeInfinity,
+            'ValueError: A unit of rounding a time must be whole microseconds, 1.5µs given',
+        ];
+    }
+
+    #[DataProvider('roundings')]
+    public function roundsTimeToUnit(string $time, Duration $unit, \RoundingMode $rounding, string $expected): void
+    {
+        Assert::same(
+            actual: outcome(
+                static fn() => roundTimeTo(new \DateTimeImmutable($time), $unit, $rounding)->format('Y-m-d\TH:i:s.uP'),
+            ),
+            expected: str_starts_with($expected, 'ValueError') ? $expected : var_export($expected, true),
+        );
+    }
+
     public function measuresWhatItShifted(): void
     {
         $time = new \DateTimeImmutable('2026-03-29 01:30:00.123456 Europe/Berlin');

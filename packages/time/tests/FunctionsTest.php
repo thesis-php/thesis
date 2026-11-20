@@ -129,6 +129,107 @@ final class FunctionsTest
         yield 'ratio above 2^53 ns' => [static fn() => ratio(hours(24 * 365), hours(24)), '365.0'];
         yield 'ratio of long to short' => [static fn() => ratio(sec(2_000_000_000), ns(1)), '2.0E+18'];
         yield 'ratio of short to long' => [static fn() => ratio(ns(1), sec(2_000_000_000)), '5.0E-19'];
+        yield 'roundDurationTo' => [
+            static fn() => roundDurationTo(ns(1_234_567_891), ms(1), \RoundingMode::HalfAwayFromZero),
+            '1.235000000',
+        ];
+        yield 'roundDurationTo towards zero' => [
+            static fn() => roundDurationTo(ns(1_234_567_891), ms(1), \RoundingMode::TowardsZero),
+            '1.234000000',
+        ];
+        yield 'roundDurationTo a multiple' => [
+            static fn() => roundDurationTo(sec(90), sec(30), \RoundingMode::AwayFromZero),
+            '90.000000000',
+        ];
+        yield 'roundDurationTo of zero' => [
+            static fn() => roundDurationTo(ns(0), sec(1), \RoundingMode::AwayFromZero),
+            '0.000000000',
+        ];
+        yield 'roundDurationTo of a negative' => [
+            static fn() => roundDurationTo(ms(-1500), sec(1), \RoundingMode::HalfAwayFromZero),
+            '-2.000000000',
+        ];
+        yield 'roundDurationTo of a negative down' => [
+            static fn() => roundDurationTo(ms(-1200), sec(1), \RoundingMode::NegativeInfinity),
+            '-2.000000000',
+        ];
+        yield 'roundDurationTo of a negative up' => [
+            static fn() => roundDurationTo(ms(-1200), sec(1), \RoundingMode::PositiveInfinity),
+            '-1.000000000',
+        ];
+        yield 'roundDurationTo of a negative to zero' => [
+            static fn() => roundDurationTo(ms(-400), sec(1), \RoundingMode::HalfEven),
+            '0.000000000',
+        ];
+        yield 'roundDurationTo of a half to even' => [
+            static fn() => roundDurationTo(ms(2500), sec(1), \RoundingMode::HalfEven),
+            '2.000000000',
+        ];
+        yield 'roundDurationTo of a half to odd' => [
+            static fn() => roundDurationTo(ms(2500), sec(1), \RoundingMode::HalfOdd),
+            '3.000000000',
+        ];
+        yield 'roundDurationTo a unit above the duration' => [
+            static fn() => roundDurationTo(sec(1), minutes(5), \RoundingMode::HalfAwayFromZero),
+            '0.000000000',
+        ];
+        yield 'roundDurationTo a unit above the duration, away from zero' => [
+            static fn() => roundDurationTo(sec(1), minutes(5), \RoundingMode::AwayFromZero),
+            '300.000000000',
+        ];
+        // 142 units of 7 ms and 6 ms more.
+        yield 'roundDurationTo a unit that does not divide a second' => [
+            static fn() => roundDurationTo(sec(1), ms(7), \RoundingMode::TowardsZero),
+            '0.994000000',
+        ];
+        yield 'roundDurationTo a unit that does not divide a second, up' => [
+            static fn() => roundDurationTo(sec(1), ms(7), \RoundingMode::HalfAwayFromZero),
+            '1.001000000',
+        ];
+        yield 'roundDurationTo a unit with a fraction of a second' => [
+            static fn() => roundDurationTo(sec(10), ms(1500), \RoundingMode::TowardsZero),
+            '9.000000000',
+        ];
+        yield 'roundDurationTo of max to ns' => [
+            static fn() => roundDurationTo(
+                duration: Duration::fromSeconds(MAX_SECONDS, 999_999_999),
+                unit: ns(1),
+                rounding: \RoundingMode::AwayFromZero,
+            ),
+            MAX_SECONDS . '.999999999',
+        ];
+        yield 'roundDurationTo of max to hours' => [
+            static fn() => formatDuration(roundDurationTo(
+                duration: Duration::fromSeconds(MAX_SECONDS, 999_999_999),
+                unit: hours(1),
+                rounding: \RoundingMode::TowardsZero,
+            )),
+            \PHP_INT_SIZE === 4 ? "'596523h0m0s'" : "'2562047h0m0s'",
+        ];
+        yield 'roundDurationTo above max' => [
+            static fn() => roundDurationTo(
+                duration: Duration::fromSeconds(MAX_SECONDS),
+                unit: hours(1),
+                rounding: \RoundingMode::PositiveInfinity,
+            ),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'roundDurationTo below min' => [
+            static fn() => roundDurationTo(
+                duration: Duration::fromSeconds(MAX_SECONDS)->negate(),
+                unit: hours(1),
+                rounding: \RoundingMode::AwayFromZero,
+            ),
+            self::OUT_OF_RANGE,
+        ];
+        yield 'roundDurationTo zero' => [
+            static fn() => roundDurationTo(sec(1), ns(0), \RoundingMode::TowardsZero),
+            'ValueError: A unit of rounding must be positive, 0s given',
+        ];
+        yield 'roundDurationTo a negative unit' => [
+            static fn() => roundDurationTo(sec(1), ms(-1), \RoundingMode::TowardsZero),
+            'ValueError: A unit of rounding must be positive, -1ms given',
+        ];
 
         yield from \PHP_INT_SIZE === 4 ? self::callsOf32Bits() : self::callsOf64Bits();
     }
@@ -390,7 +491,72 @@ final class FunctionsTest
                 Assert::same(toUs(ns($thousandths), $rounding), $expected, $message);
                 Assert::same(toSec(ms($thousandths), $rounding), $expected, $message);
                 Assert::same(toMinutes(ms($thousandths * 60), $rounding), $expected, $message);
+                Assert::same(
+                    actual: describe(roundDurationTo(us($thousandths), ms(1), $rounding)),
+                    expected: describe(ms($expected)),
+                    message: $message,
+                );
+                // A unit that neither divides a second nor is a number of them.
+                Assert::same(
+                    actual: describe(roundDurationTo(us($thousandths * 1500), ms(1500), $rounding)),
+                    expected: describe(ms($expected * 1500)),
+                    message: $message,
+                );
             }
+        }
+    }
+
+    public function roundsToAnyUnit(): void
+    {
+        $random = new Randomizer(new Mt19937(1));
+
+        for ($case = 0; $case < 2000; ++$case) {
+            // Of every length: from nanoseconds taken up to 2^61 times to a unit above the duration.
+            $unit = Duration::fromSeconds(
+                seconds: $random->getInt(0, 1) * $random->getInt(0, intdiv(MAX_SECONDS, 10 ** $random->getInt(0, 9))),
+                nanoseconds: $random->getInt(1, 10 ** $random->getInt(1, 9) - 1),
+            );
+            // A quarter of the range at most: the multiple above the duration is in the range too.
+            $maxCount = (int) min(PHP_INT_MAX, MAX_SECONDS / toSecFloat($unit) / 4);
+            $count = $random->getInt(0, $maxCount >> $random->getInt(0, \PHP_INT_SIZE * 8 - 2));
+            $remainder = match ($random->getInt(0, 3)) {
+                0 => ns(0),
+                // A half of a unit of even nanoseconds, a half of a nanosecond less of odd ones.
+                1 => $unit->divideBy(2),
+                default => multiply($unit, $random->getInt(0, 999) / 1000),
+            };
+
+            if ($remainder >= $unit) {
+                continue;
+            }
+
+            $negative = $random->getInt(0, 1) === 1;
+            $signed = static fn(Duration $magnitude) => describe($negative ? $magnitude->negate() : $magnitude);
+            $below = $unit->multiplyBy($count);
+            $above = $below->add($unit);
+            $duration = $below->add($remainder);
+            $duration = $negative ? $duration->negate() : $duration;
+            $message = \sprintf('%s to %s', formatDuration($duration), formatDuration($unit));
+
+            Assert::same(
+                actual: describe(roundDurationTo($duration, $unit, \RoundingMode::TowardsZero)),
+                expected: $signed($below),
+                message: $message,
+            );
+            Assert::same(
+                actual: describe(roundDurationTo($duration, $unit, \RoundingMode::AwayFromZero)),
+                expected: $signed(isZero($remainder) ? $below : $above),
+                message: $message,
+            );
+            Assert::same(
+                actual: describe(roundDurationTo($duration, $unit, \RoundingMode::HalfEven)),
+                expected: $signed(match ($remainder <=> $unit->sub($remainder)) {
+                    -1 => $below,
+                    0 => $count % 2 === 0 ? $below : $above,
+                    1 => $above,
+                }),
+                message: $message,
+            );
         }
     }
 }

@@ -205,6 +205,21 @@ and others make it `===`, which compares the objects.
 to the quotient while both are up to 104 days, so durations that divide evenly give a whole number.
 A zero divisor throws `\DivisionByZeroError`.
 
+### Rounding
+
+```php
+use function Thesis\Time\{formatDuration, minutes, ms, roundDurationTo};
+
+formatDuration($elapsed); // 1.234567891s
+formatDuration(roundDurationTo($elapsed, ms(1), RoundingMode::HalfAwayFromZero)); // 1.235s
+
+roundDurationTo($timeout, minutes(1), RoundingMode::PositiveInfinity);
+```
+
+`roundDurationTo()` rounds a duration to a multiple of a unit, like `Duration.Round()` and `Duration.Truncate()` of Go.
+The unit is any positive duration, `ms(1500)` too, anything else throws `\ValueError`. The `\RoundingMode`
+has no default, as in the [conversions to int](#converting-to-int).
+
 ### Formatting and parsing
 
 `formatDuration()` writes a duration like `Duration.String()` of Go, and `parseDuration()` reads it back
@@ -239,6 +254,21 @@ $expiresAt = shift($clock->now(), $ttl);
 $retainedSince = shift($clock->now(), $retention->negate());
 $elapsed = between($startedAt, $clock->now());
 ```
+
+`roundTimeTo()` rounds a time to a multiple of a unit since 1970-01-01 00:00:00 UTC, like `Time.Round()`
+and `Time.Truncate()` of Go: rounded down, the times of one window give its start, a key for a limit or a metric.
+
+```php
+use function Thesis\Time\{minutes, roundTimeTo};
+
+$now = new DateTimeImmutable('2026-01-01 12:34:56 Europe/Moscow');
+
+roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity); // 2026-01-01 12:30:00 Europe/Moscow
+```
+
+The multiples are of elapsed time, not of the wall clock: those of `hours(24)` are the midnights of UTC,
+whatever the time zone of the time, which is kept. The unit is positive and of whole microseconds,
+anything else throws `\ValueError`.
 
 ## [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks
 

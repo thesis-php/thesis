@@ -13,6 +13,7 @@ use function Thesis\Time\Internal\fromMultiples;
 use function Thesis\Time\Internal\fromParts;
 use function Thesis\Time\Internal\outOfRange;
 use function Thesis\Time\Internal\rounded;
+use function Thesis\Time\Internal\roundingStep;
 use function Thesis\Time\Internal\timestamp;
 use function Thesis\Time\Internal\toFloatFractions;
 use function Thesis\Time\Internal\toFloatMultiples;
@@ -287,6 +288,23 @@ function ratio(Duration $dividend, Duration $divisor): float
 }
 
 /**
+ * The duration rounded to a multiple of the unit, like Go's Duration.Round() and Duration.Truncate():
+ * roundDurationTo($elapsed, ms(1), RoundingMode::HalfAwayFromZero) makes 1.234567891s 1.235s.
+ *
+ * @api
+ * @param Duration $unit positive, of any length: 1ms, 1.5s, 5m
+ * @throws \ValueError if the unit is not positive
+ * @throws TimeException out of the range of Duration
+ */
+function roundDurationTo(Duration $duration, Duration $unit, \RoundingMode $rounding): Duration
+{
+    $step = roundingStep($duration->seconds, $duration->nanoseconds, $duration->negative, $unit, $rounding);
+    $magnitude = $duration->absolute()->add($step);
+
+    return $duration->negative ? $magnitude->negate() : $magnitude;
+}
+
+/**
  * Like Go's Duration.String(): 1h2m3.5s, 1m0s, 1.5s, 2.5ms, 1µs, 15ns, 0s, -1.5s.
  *
  * @api
@@ -431,4 +449,40 @@ function shift(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
     }
 
     return $time->modify($timestamp)->setTimezone($time->getTimezone());
+}
+
+/**
+ * $time rounded to a multiple of the unit since 1970-01-01 00:00:00 UTC, like Go's Time.Round() and Time.Truncate():
+ * roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity) is the start of a window of 5 minutes.
+ * The multiples are of elapsed time, whatever the time zone of $time: those of hours(24) are the midnights of UTC.
+ *
+ * @api
+ * @param Duration $unit positive, of whole microseconds: DateTimeImmutable cannot hold less
+ * @throws \ValueError if the unit is not positive or has a fraction of a microsecond
+ */
+function roundTimeTo(\DateTimeImmutable $time, Duration $unit, \RoundingMode $rounding): \DateTimeImmutable
+{
+    if ($unit->nanoseconds % NANOSECONDS_PER_MICROSECOND !== 0) {
+        throw new \ValueError(\sprintf(
+            'A unit of rounding a time must be whole microseconds, %s given',
+            formatDuration($unit),
+        ));
+    }
+
+    // A float on 32-bit PHP beyond int.
+    $seconds = timestamp($time);
+    $microseconds = (int) $time->format('u');
+    $negative = $seconds < 0;
+
+    // The magnitude: a quarter of a second before 1970 is the second -1 and 750_000 microseconds.
+    if ($negative && $microseconds > 0) {
+        $seconds = -($seconds + 1);
+        $microseconds = MICROSECONDS_PER_SECOND - $microseconds;
+    } elseif ($negative) {
+        $seconds = -$seconds;
+    }
+
+    $step = roundingStep($seconds, $microseconds * NANOSECONDS_PER_MICROSECOND, $negative, $unit, $rounding);
+
+    return shift($time, $negative ? $step->negate() : $step);
 }
