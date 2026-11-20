@@ -48,6 +48,9 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - An int that overflows becomes a float, and that float is the check: an `int|float` parameter (the constructor
   of the polyfill, `fromParts()`, `rounded()`) rejects it or compares it with the range. Never on a local
   variable: PHPStan types `int * int` as `int` and reports `is_float()` as always false.
+  The price: PHPStan checks nothing of the `non-negative-int` of such a parameter, any int passes as its float
+  (`new self(-1, 0, false)` is not reported). The code that can go below zero asserts it itself
+  (`subtractMagnitudes()` of the polyfill), the ranges of the int parameters (`$nanoseconds`) are checked.
 - A float of nanoseconds (`fromFloat()`) is split by `fmod()` and a rounded quotient: above 2^62 ns a float
   is a multiple of 1024 and a truncated quotient loses a second. A finite value times the unit may be INF.
 - Timestamps come from `format('U')` (`Internal\timestamp()`), never `getTimestamp()`, which throws on 32-bit

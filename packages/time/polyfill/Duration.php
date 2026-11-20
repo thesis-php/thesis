@@ -50,15 +50,14 @@ final readonly class Duration
     public bool $negative;
 
     /**
-     * @param int|float $seconds a float is an int that overflowed in the arithmetic of the caller, above the range
+     * @param non-negative-int|float $seconds
+     * @param int<0, 999999999> $nanoseconds
      */
     private function __construct(int|float $seconds, int $nanoseconds, bool $negative)
     {
         if (\is_float($seconds) || $seconds > self::MAX_SECONDS) {
             throw new TimeException(self::OUT_OF_RANGE);
         }
-
-        \assert($seconds >= 0 && $nanoseconds >= 0 && $nanoseconds < self::NANOSECONDS_PER_SECOND);
 
         $negative = $negative && ($seconds !== 0 || $nanoseconds !== 0);
         $this->signedSeconds = $negative ? -$seconds : $seconds;
@@ -336,6 +335,8 @@ final readonly class Duration
             --$seconds;
             $nanoseconds += self::NANOSECONDS_PER_SECOND;
         }
+
+        \assert($seconds >= 0);
 
         return new self($seconds, $nanoseconds, $original->negative);
     }
