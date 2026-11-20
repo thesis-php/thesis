@@ -237,7 +237,10 @@ final class ExceptionallyTest
 
     public function passesOnAnErrorOfAFiberStartedInside(): void
     {
-        exceptionally(static fn() => new \Fiber(static fn() => trigger_error('child', E_USER_WARNING))->start());
+        exceptionally(static function () {
+            $child = new \Fiber(static fn() => trigger_error('child', E_USER_WARNING));
+            $child->start();
+        });
 
         Assert::same($this->passedOn, ['child']);
     }
@@ -387,10 +390,12 @@ final class ExceptionallyTest
 
     public function takesItsHandlerOffWhenAnAbandonedFiberIsCollected(): void
     {
-        new \Fiber(static function () {
+        $abandoned = new \Fiber(static function () {
             $cycle = \Fiber::getCurrent();
             exceptionally(\Fiber::suspend(...));
-        })->start();
+        });
+        $abandoned->start();
+        unset($abandoned);
 
         gc_collect_cycles();
 
@@ -405,10 +410,12 @@ final class ExceptionallyTest
     {
         for ($free = 0; $free < 24; ++$free) {
             gc_collect_cycles();
-            new \Fiber(static function () {
+            $abandoned = new \Fiber(static function () {
                 $cycle = \Fiber::getCurrent();
                 exceptionally(\Fiber::suspend(...));
-            })->start();
+            });
+            $abandoned->start();
+            unset($abandoned);
             $roots = [];
             $status = gc_status();
 

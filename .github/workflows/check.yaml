@@ -42,6 +42,10 @@ jobs:
         include:
           - {package: dispatcher, php: '8.4'}
           - {package: dispatcher, php: '8.5'}
+          - {package: exceptionally, php: '8.2'}
+          - {package: exceptionally, php: '8.3'}
+          - {package: exceptionally, php: '8.4'}
+          - {package: exceptionally, php: '8.5'}
           - {package: formatter, php: '8.4'}
           - {package: formatter, php: '8.5'}
           - {package: source-location, php: '8.4'}

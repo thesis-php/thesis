@@ -30,7 +30,8 @@
         "security": "https://github.com/thesis-php/thesis/security/policy"
     },
     "require": {
-        "php": "^8.6"
+        "php": "^8.2.2",
+        "symfony/polyfill-php85": "^1.32"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",

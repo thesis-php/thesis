@@ -19,4 +19,6 @@ return Tools
     )
     // thesis/time takes \RoundingMode from it below PHP 8.4, where the analyser runs the class is native.
     ->ignoreErrorsOnPackage('symfony/polyfill-php84', [ErrorType::UNUSED_DEPENDENCY])
+    // thesis/exceptionally takes get_error_handler() from it below PHP 8.5, likewise.
+    ->ignoreErrorsOnPackage('symfony/polyfill-php85', [ErrorType::UNUSED_DEPENDENCY])
 ;

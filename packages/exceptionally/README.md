@@ -32,7 +32,7 @@ $content = exceptionally(static fn() => file_get_contents('/path/to/file'));
 composer require thesis/exceptionally
 ```
 
-Requires PHP 8.6+. No extensions.
+Requires PHP 8.2.2+. No extensions. Below PHP 8.5 `get_error_handler()` comes from `symfony/polyfill-php85`.
 
 ## Why
 

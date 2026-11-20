@@ -30,12 +30,28 @@
   `false` goes straight to the standard handler of PHP and skips the one of the application.
 - Suppression is `error_reporting() & $level`: PHP keeps `error_reporting()` per fiber (`@` in a suspended fiber
   does not affect others, `throwsWhileAnotherFiberIsSuspendedInSuppression`), and it respects the ini setting.
+  Trap: PHP 8.6.0 starts a fiber with 0 when the ini setting has no value, nothing is thrown there (`agents/errors.md`).
+- The package runs on PHP 8.2.2+, the rest of the monorepo on 8.6. The code, tests included, has no syntax or API
+  newer than 8.2 but `get_error_handler()`: no `new X()->call()` (a variable keeps the fixer from making it).
+  PHPStan and Rector take the PHP of the monorepo and miss it, `make test-alone P=exceptionally` on 8.2 to 8.5
+  catches it.
+- Below 8.5 `get_error_handler()` is of `symfony/polyfill-php85`: `set_error_handler(null)`, then
+  `restore_error_handler()`. Nothing is released between the two, so the collector never starts while the top
+  is taken off, and while a handler runs the pair puts the same nothing back. A polyfill that does more
+  between them breaks the loop of `finally`.
 
 ## Decisions
 
 - The function is `Thesis\exceptionally()`, as in the old `thesis/exceptionally`: `Thesis\Exceptionally\...`
   stutters. The manifest sets `rootEntry: true`, the handler and the helpers of the tests are
   in `Thesis\Exceptionally\`.
+- PHP 8.2.2, not the 8.6 of the monorepo: the package is useful without the rest, 0.3 ran on 8.3, and the code
+  needs nothing newer but `get_error_handler()`. 8.2 is the lowest PHP of Testo: the code runs on 8.1,
+  where nothing would test it. 8.2.2: before it the collector does not see the stack of a fiber
+  (php-src GH-9735), an abandoned fiber and its handler stay until the exit, and the two tests of it fail.
+- `symfony/polyfill-php85` for `get_error_handler()`, not a function of our own: a global function defined
+  by a library collides with the polyfill of an application, and a wrapper with `function_exists()` costs
+  a call on 8.5+ too. Accepted: below 8.5 a call sets and restores a handler twice more.
 - No dependency on `thesis/async`: the package is useful without an event loop. So the key of the fiber
   is inlined (`\Fiber::getCurrent() ?? $main`) instead of `Internal\fiberKey()` of async.
 - A fiber started inside the function does not inherit the levels: its errors are its own.
@@ -79,7 +95,8 @@
   from a call by the handler above that passes on, and its restore drops that one.
 - Rejected: one handler set once and never restored: code that sets a handler for a while and restores it
   (a test framework per test) would remove ours and leave its own forever.
-- A call costs about 400 ns (PHP 8.5, no opcache), a `file_get_contents()` of a small file 3 to 4 µs.
+- A call costs about 400 ns on PHP 8.5+ and 650 to 800 ns below, with the polyfill (no opcache),
+  a `file_get_contents()` of a small file 3 to 4 µs.
   Rejected: a list of levels per fiber in the map instead of the local variable, 100 ns more for a call.
   Rejected: a second function for a callable that does not suspend (a handler per call, a blind restore),
   190 ns: when the callable suspends after all, errors of other fibers are thrown and the restore takes off
@@ -106,3 +123,10 @@
 - The stress test of random scenarios and the sweep of the collector that checked the design are not in the suite:
   they dump the stack after every step and run for minutes. A change in how handlers are set or taken off needs
   such a check written again.
+- The last one compared the polyfill with `get_error_handler()` of PHP: 3000 random scenarios of 300 steps
+  (fibers with nested calls, abandoned, with a cycle and without, handlers of other code set and restored,
+  one that calls `exceptionally()` and one that destroys a fiber) logged every error and the stack after
+  every step, and the logs of PHP 8.2 to 8.6 were equal. The collector starts inside a call at 1 to 5 free slots
+  of the root buffer on each of them, `keepsTheHandlerBelowWhenTheCollectorRunsInside` sweeps 24.
+  Traps of such a comparison: `E_ALL` has `E_STRICT` below 8.4, so the levels of a log differ. The output
+  goes through stdout of the container: files written by several containers to a mounted directory had holes.
