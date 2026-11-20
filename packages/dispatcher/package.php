@@ -10,6 +10,8 @@ return new Manifest(
     version: '0.4',
     keywords: ['php', 'event-dispatcher', 'events'],
     require: [
+        // The PHP of thesis/formatter. The package itself needs 8.4 too: array_any() and array_all().
+        'php' => '^8.4',
         'thesis/formatter' => '*',
     ],
     requireDev: [

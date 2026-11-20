@@ -4,6 +4,12 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
 
 ## Invariants that must not be broken
 
+- The package runs on PHP 8.4+, the rest of the monorepo on 8.6. The code, tests included, has no syntax or API
+  newer than 8.4. PHPStan and Rector take the PHP of the monorepo and miss it, `make test-alone P=dispatcher`
+  on 8.4 and 8.5 catches it. A rule of the 8.5 set of Rector that rewrites the code gets a `RectorSkip`
+  in the manifest.
+- `make test-alone` installs thesis/formatter and thesis/source-location from Packagist, not from the monorepo:
+  a change that needs an unreleased one fails there until it is released. Raise its lower bound in the manifest then.
 - The hot path is `dispatch()`: one lookup of `$listenersByClass[$event::class]` and the calls. Everything else
   is done once: the types are parsed and checked in the constructor (`Internal\Listener::of()`), the listeners
   of a class are found on its first event or `listens()`. Never reflect or match types per event.
@@ -42,6 +48,9 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
 
 ## Decisions
 
+- Rejected: PHP 8.2, like thesis/time. thesis/formatter and thesis/source-location require 8.4 (their `AGENTS.md`),
+  and nobody below 8.4 has asked for the dispatcher. Its own code would need only loops instead of `array_any()`
+  and `array_all()`.
 - The class is `Thesis\Dispatcher`, as in the older package: `Thesis\Dispatcher\Dispatcher` stutters.
   The manifest sets `rootEntry: true`, `Internal\` and the fixtures of the tests are in `Thesis\Dispatcher\`.
 - Rejected: PSR-14 in the core. `StoppableEventInterface` makes the order of listeners part of their meaning and

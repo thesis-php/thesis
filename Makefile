@@ -94,7 +94,7 @@ test: var vendor up ## Run tests [P=]
 
 # (A package that runs on an older PHP than the monorepo (thesis/time) is copied to var/alone/<name>, installed there
 # with the newest dependencies its composer.json allows and tested on PHP_VERSION. A monorepo package it requires
-# (thesis/source-location of thesis/formatter) comes from Packagist, as released, not from packages/.
+# (thesis/formatter of thesis/dispatcher) comes from Packagist, as released, not from packages/.
 # ARCH=386 runs the tests on 32-bit PHP of IMAGE, the official image by default: ours has no i386 build,
 # Composer installs in it all the same)
 ARCH ?=

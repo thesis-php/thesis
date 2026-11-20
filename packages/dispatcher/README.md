@@ -38,7 +38,7 @@ $dispatcher->dispatch(new UserRegistered('user@example.com'));
 composer require thesis/dispatcher
 ```
 
-Requires PHP 8.6+. No extensions.
+Requires PHP 8.4+. No extensions.
 
 ## Listeners
 
