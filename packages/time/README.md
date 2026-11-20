@@ -20,13 +20,15 @@ A polyfill of [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 
 short functions for it and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
-use function Thesis\Time\{format, ms, sec, toMs, toSecFloat};
+use function Thesis\Time\{format, ms, parse, sec, toMs, toSecFloat};
 
 $timeout = sec(1.5);
 
 toMs($timeout, RoundingMode::PositiveInfinity); // 1500
 toSecFloat($timeout); // 1.5
 format($timeout); // 1.5s
+
+$timeout = parse($_ENV['HTTP_TIMEOUT'] ?? '1.5s');
 ```
 
 ## Installation
@@ -140,10 +142,10 @@ For APIs that take float seconds, like the timeout of `stream_socket_client()`, 
 The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
 in the last place off above.
 
-### Checking, comparing, multiplying, formatting
+### Checking, comparing, multiplying
 
 ```php
-use function Thesis\Time\{format, isZero, longest, multiply, sec, shortest};
+use function Thesis\Time\{isZero, longest, multiply, sec, shortest};
 
 isZero($duration);
 $duration->negative;
@@ -156,12 +158,31 @@ longest($a, $b, $c);
 multiply($delay, 2); // exact
 multiply($delay, 1.5); // rounded to the nearest nanosecond
 multiply($delay, -1);
-
-format(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s, like Duration.String() of Go
 ```
 
 `<`, `<=`, `>`, `>=` and `<=>` compare durations by value, on PHP 8.6 and with the polyfill.
 Check zero with `isZero()`, not with `==`: PHP CS Fixer and others make it `===`, which compares the objects.
+
+### Formatting and parsing
+
+`format()` writes a duration like `Duration.String()` of Go, and `parse()` reads it back like `time.ParseDuration()`:
+for logs, and for a timeout in an environment variable, a config or an option of a command.
+
+```php
+use function Thesis\Time\{duration, format, parse};
+
+format(duration(hours: 1, minutes: 2, sec: 3.5)); // 1h2m3.5s
+format(parse('90s')); // 1m30s
+
+parse('1h2m3.5s');
+parse('250ms');
+parse('-1.5h');
+parse('0');
+```
+
+A string is numbers with a unit each (`h`, `m`, `s`, `ms`, `us` or `µs`, `ns`) after an optional sign, with a fraction
+in any of them and no spaces. Only `0` has no unit. A number is converted like the function of its unit:
+`parse('1.5h')` is `hours(1.5)`. A string that is not a duration or is out of range throws `Time\TimeException`.
 
 ### Points in time
 

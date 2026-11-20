@@ -37,6 +37,14 @@ const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
 const MAX_SECONDS = \PHP_INT_SIZE === 4 ? PHP_INT_MAX : 9_223_372_035;
 
 /**
+ * A number of parse() with its unit, from the start of the subject. The micro sign (U+00B5) is what format()
+ * and Go write, the Greek mu (U+03BC) looks the same.
+ *
+ * @internal
+ */
+const NUMBER_WITH_UNIT = '/([0-9]++\.?[0-9]*+|\.[0-9]++)(ns|us|' . "\u{B5}s|\u{3BC}s" . '|ms|s|m|h)/A';
+
+/**
  * A value in units of 1 / $perSecond of a second: nanoseconds, microseconds, milliseconds.
  *
  * @internal

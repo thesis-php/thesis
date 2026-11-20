@@ -29,7 +29,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 | [thesis/phpstan-extension](packages/phpstan-extension) | [![Release](https://img.shields.io/github/v/release/thesis-php/phpstan-extension)](https://github.com/thesis-php/phpstan-extension/releases) | PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them. |
 | [thesis/source-location](packages/source-location) | [![Release](https://img.shields.io/github/v/release/thesis-php/source-location)](https://github.com/thesis-php/source-location/releases) | Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved. |
 | [thesis/testo-plugin](packages/testo-plugin) | [![Release](https://img.shields.io/github/v/release/thesis-php/testo-plugin)](https://github.com/thesis-php/testo-plugin/releases) | Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures. |
-| [thesis/time](packages/time) | [![Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases) | Time\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), PSR-20 clocks. |
+| [thesis/time](packages/time) | [![Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases) | Time\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), strings like 1h30m, PSR-20 clocks. |
 
 <!-- packages:end -->
 

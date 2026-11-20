@@ -95,6 +95,14 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   gave `0.009000000000000001`). Above 2^53 nanoseconds (104 days) a float no longer holds them, so the whole units
   stay exact and only the fraction is divided: rarely an ulp off (above 2^53 µs, 285 years, for `toUsFloat()`).
   Rejected: the nearest float there too, it needs integer arithmetic wider than 64 bits for durations nobody has.
+- `parse()` takes the grammar of `time.ParseDuration()` of Go and nothing else: one known contract, which reads
+  what `format()` writes and the strings of Go services and Kubernetes. Hence `0` alone, units in any order
+  and twice, `.5s`, and no spaces, no days (`1d`), no `sec` or `min`. A string that is not a duration throws
+  `Time\TimeException`, as `fromIso8601DurationString()` does.
+- A number of `parse()` is a float converted by `fromFloat()`, so `parse('1.5h')` is `hours(1.5)`, on 64-bit
+  and 32-bit alike. Whatever `format()` writes comes back exactly: its hours and minutes are whole, its seconds
+  are below 60. Rejected: arithmetic in decimal digits (the digits times 6 or 36, then the point moved), which
+  was exact for a number of any length: 35 lines for numbers of more than 15 significant digits that nobody writes.
 - No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
   a duration (the `Time\Instant` RFC).
 - `between()` and `shift()` work on timestamps: elapsed time does not stretch with DST. `shift()` drops

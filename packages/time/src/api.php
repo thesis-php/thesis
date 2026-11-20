@@ -11,6 +11,7 @@ use function Thesis\Time\Internal\fromFloat;
 use function Thesis\Time\Internal\fromFractions;
 use function Thesis\Time\Internal\fromMultiples;
 use function Thesis\Time\Internal\fromParts;
+use function Thesis\Time\Internal\outOfRange;
 use function Thesis\Time\Internal\rounded;
 use function Thesis\Time\Internal\timestamp;
 use function Thesis\Time\Internal\toFloatFractions;
@@ -23,6 +24,7 @@ use const Thesis\Time\Internal\MILLISECONDS_PER_SECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MICROSECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_MILLISECOND;
 use const Thesis\Time\Internal\NANOSECONDS_PER_SECOND;
+use const Thesis\Time\Internal\NUMBER_WITH_UNIT;
 use const Thesis\Time\Internal\SECONDS_PER_HOUR;
 use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
 
@@ -328,6 +330,57 @@ function format(Duration $duration): string
         $minutes > 0 => "{$minutes}m{$seconds}s",
         default => "{$seconds}s",
     };
+}
+
+/**
+ * The reverse of format(), like Go's ParseDuration(): 1h30m, 1.5s, 250ms, -15ns, 0. Numbers with a unit each
+ * (h, m, s, ms, us or µs, ns) after an optional sign, a fraction in any of them, nothing in between.
+ * A number is converted like the function of its unit: parse('1.5h') is hours(1.5).
+ *
+ * @api
+ * @throws TimeException if the string is not such a duration or is out of the range of Duration
+ */
+function parse(string $string): Duration
+{
+    $negative = str_starts_with($string, '-');
+    $offset = $negative || str_starts_with($string, '+') ? 1 : 0;
+    $duration = Duration::fromSeconds(0);
+
+    // Only zero has no unit.
+    if (substr($string, $offset) === '0') {
+        return $duration;
+    }
+
+    $length = \strlen($string);
+
+    do {
+        if (preg_match(NUMBER_WITH_UNIT, $string, $match, offset: $offset) !== 1) {
+            throw new TimeException(\sprintf(
+                'A duration must be like 1h30m, 1.5s or 250ms, %s given',
+                var_export($string, return: true),
+            ));
+        }
+
+        [$numberWithUnit, $number, $unit] = $match;
+        $value = (float) $number;
+
+        // More than 308 digits. fromFloat() takes INF for a wrong argument, not for a duration out of the range.
+        if (is_infinite($value)) {
+            throw outOfRange();
+        }
+
+        $duration = $duration->add(fromFloat($value, match ($unit) {
+            'ns' => 1,
+            'us', "\u{B5}s", "\u{3BC}s" => NANOSECONDS_PER_MICROSECOND,
+            'ms' => NANOSECONDS_PER_MILLISECOND,
+            's' => NANOSECONDS_PER_SECOND,
+            'm' => SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND,
+            'h' => SECONDS_PER_HOUR * NANOSECONDS_PER_SECOND,
+        }));
+        $offset += \strlen($numberWithUnit);
+    } while ($offset < $length);
+
+    return $negative ? $duration->negate() : $duration;
 }
 
 /**

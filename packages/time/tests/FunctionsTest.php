@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Thesis\Time;
 
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 use Testo\Assert;
 use Testo\Core\Exception\SkipTest;
 use Testo\Data\DataProvider;
 use Testo\Test;
 use Time\Duration;
+use const Thesis\Time\Internal\MAX_SECONDS;
 
 #[Test]
 final class FunctionsTest
@@ -235,6 +238,115 @@ final class FunctionsTest
     public function formatsLikeGo(Duration $duration, string $expected): void
     {
         Assert::same(format($duration), $expected);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function strings(): iterable
+    {
+        yield 'zero without a unit' => ['0', '0.000000000'];
+        yield 'zero with a plus' => ['+0', '0.000000000'];
+        yield 'zero with a minus' => ['-0', '0.000000000'];
+        yield 'negative zero' => ['-0s', '0.000000000'];
+        yield 'ns' => ['15ns', '0.000000015'];
+        yield 'us' => ['1us', '0.000001000'];
+        yield 'us with the micro sign' => ["1\u{B5}s", '0.000001000'];
+        yield 'us with the Greek mu' => ["1\u{3BC}s", '0.000001000'];
+        yield 'ms' => ['2.5ms', '0.002500000'];
+        yield 'sec' => ['1.5s', '1.500000000'];
+        yield 'minutes' => ['1m30s', '90.000000000'];
+        yield 'hours' => ['1h2m3.5s', '3723.500000000'];
+        yield 'negative' => ['-1.5s', '-1.500000000'];
+        yield 'negative of several units' => ['-1m30s', '-90.000000000'];
+        yield 'plus' => ['+5s', '5.000000000'];
+        yield 'no digits before the point' => ['.5s', '0.500000000'];
+        yield 'no digits after the point' => ['5.s', '5.000000000'];
+        yield 'leading zeros' => ['007s', '7.000000000'];
+        yield 'a fraction of hours' => ['1.5h', '5400.000000000'];
+        yield 'a fraction of minutes' => ['0.1m', '6.000000000'];
+        yield 'a fraction of minutes with a carry' => ['0.75m', '45.000000000'];
+        yield 'a nanosecond after a second' => ['1.000000001s', '1.000000001'];
+        yield 'units in any order' => ['1s1h', '3601.000000000'];
+        yield 'a unit twice' => ['1s1.5s', '2.500000000'];
+        // Each number is rounded to nanoseconds: a float of 0.1 + 0.2 is 0.30000000000000004.
+        yield 'tenths' => ['0.1s0.2s', '0.300000000'];
+        yield 'below a half of ns' => ['0.4ns', '0.000000000'];
+        yield 'a half of ns' => ['0.5ns', '0.000000001'];
+        yield 'a negative half of ns' => ['-0.5ns', '-0.000000001'];
+        yield 'above a half of ns rounds to a second' => ['1.9999999996s', '2.000000000'];
+        yield '3.6 ns in hours' => ['0.000000000001h', '0.000000004'];
+        yield '0.6 ns in minutes' => ['0.00000000001m', '0.000000001'];
+        yield '0.48 ns in minutes' => ['0.000000000008m', '0.000000000'];
+        yield 'more digits than a float holds' => ['0.33333333333333333333s', '0.333333333'];
+        yield 'hours above any int' => ['999999999999999999999999999999h', self::OUT_OF_RANGE];
+        yield 'zeros above any int' => ['000000000000000000000000000001h', '3600.000000000'];
+        yield 'ns above any float' => [str_repeat('9', 400) . 'ns', self::OUT_OF_RANGE];
+
+        foreach ([
+            '', '-', '+', '1', '1.5', '00', '0.0', 's', '.s', '-.s', '1x', '1 s', ' 1s', '1s ', "1s\n", "1s\0", '1S',
+            '1d', '1w', '--1s', '1s-1s', '1s+1s', '1e3s', '1,5s', '1h30', '1ms1', '1.2.3s', "1\u{B5}", 'PT1S',
+        ] as $string) {
+            yield var_export($string, true) => [
+                $string,
+                \sprintf(
+                    'Time\TimeException: A duration must be like 1h30m, 1.5s or 250ms, %s given',
+                    var_export($string, true),
+                ),
+            ];
+        }
+
+        yield from \PHP_INT_SIZE === 4 ? self::stringsOf32Bits() : self::stringsOf64Bits();
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function stringsOf64Bits(): iterable
+    {
+        yield 'max' => ['2562047h47m15.999999999s', '9223372035.999999999'];
+        yield 'min' => ['-2562047h47m15.999999999s', '-9223372035.999999999'];
+        yield 'a fraction of hours near max' => ['2562047.5h', '9223371000.000000000'];
+        yield 'sec above max' => ['9223372036s', self::OUT_OF_RANGE];
+        yield 'a sum above max' => ['9223372035s1s', self::OUT_OF_RANGE];
+        yield 'a sum below min' => ['-9223372035s1s', self::OUT_OF_RANGE];
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function stringsOf32Bits(): iterable
+    {
+        yield 'max' => ['596523h14m7.999999999s', '2147483647.999999999'];
+        yield 'min' => ['-596523h14m7.999999999s', '-2147483647.999999999'];
+        yield 'ns above max int' => ['3000000000ns', '3.000000000'];
+        yield 'sec above max' => ['2147483648s', self::OUT_OF_RANGE];
+        yield 'a sum above max' => ['2147483647s1s', self::OUT_OF_RANGE];
+        yield 'a sum below min' => ['-2147483647s1s', self::OUT_OF_RANGE];
+    }
+
+    #[DataProvider('strings')]
+    public function parsesLikeGo(string $string, string $expected): void
+    {
+        Assert::same(outcome(static fn() => parse($string)), $expected);
+    }
+
+    public function parsesWhatFormatWrites(): void
+    {
+        $random = new Randomizer(new Mt19937(1));
+
+        for ($case = 0; $case < 2000; ++$case) {
+            // Of every length, a half without seconds: format() changes the unit below a second, a millisecond
+            // and a microsecond.
+            $duration = signed(
+                seconds: $random->getInt(0, 1) * $random->getInt(0, intdiv(MAX_SECONDS, 10 ** $random->getInt(0, 9))),
+                nanoseconds: $random->getInt(0, 10 ** $random->getInt(0, 9) - 1),
+                negative: $random->getInt(0, 1) === 1,
+            );
+            $string = format($duration);
+
+            Assert::same(describe(parse($string)), describe($duration), $string);
+        }
     }
 
     public function roundsAsRoundOfFloats(): void

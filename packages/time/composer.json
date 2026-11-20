@@ -1,6 +1,6 @@
 {
     "name": "thesis/time",
-    "description": "Time\\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), PSR-20 clocks.",
+    "description": "Time\\Duration polyfill for PHP >=8.2, shorthands like sec(5) and toMs(), strings like 1h30m, PSR-20 clocks.",
     "keywords": [
         "php",
         "time",

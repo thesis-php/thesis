@@ -28,6 +28,11 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
 - For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
   of the event loop left surviving mutants in async (120 on CI, MSI 86 %), net, `Stream` of io and async-trace.
   Kill them, then make it block again.
+- Open: Infection generates no mutants in a file of plain functions (`src/api.php`, `src/Internal/internal.php`),
+  only in classes: all 73 mutants of time are in `IsoInterval`, all 19 of exceptionally in `ErrorHandler`
+  (`--logger-text=var/mutants.txt --log-verbosity=all` lists them). It once did, hence the `@infection-ignore`
+  in `timestamp()` of time. Until it does again, `make infect` says nothing about functions: go through
+  the mutants of a changed one by hand (a bound, a sign, a dropped statement) and check that a test fails.
 - Coverage is for the badge of a package (`tools/monorepo/AGENTS.md`), not a gate: no target, no statuses
   and no comments of Codecov. The job `coverage` of `check.yaml` runs `make coverage P=<name>` for every package
   with `tests/` (the matrix is written by `sync`) and uploads its Clover report with the flag `<name>`.
