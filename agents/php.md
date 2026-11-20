@@ -9,8 +9,8 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 
 - No syntax of PHP 8.6 yet (partial application, default values of `readonly` properties): not every analyzer
   parses it. The functions and classes of 8.6 (`Time\Duration`, `clamp()`) may be used. Rector applies the sets
-  up to 8.5 only, for the same reason. `thesis/time` and `thesis/exceptionally` run on PHP 8.2,
-  `thesis/source-location`, `thesis/formatter` and `thesis/dispatcher` on 8.4, see their `AGENTS.md`.
+  up to 8.5 only, for the same reason. A package whose manifest requires an older PHP has no syntax or API newer
+  than that PHP. Its `AGENTS.md` says which PHP the package runs on and why.
 - Lines are at most 120 characters, comments and tests included. The only exception is a line that cannot be wrapped:
   a single string literal (an exception message, an expected error) or a URL.
 - A call stays on one line while it fits in 120 characters, named arguments or not:

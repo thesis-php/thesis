@@ -5,15 +5,15 @@ Read before writing code that depends on the operating system or on the size of 
 ## Rules
 
 - `php-64bit` is required only by a package whose own code relies on 64-bit `int`: `int` nanoseconds (`toNs()`,
-  `Instant`, timers), `pack('J')`, a constant above 2^31 (`0xFF_FF_FF_FF`). Now: `amqp`, `async`, `async-trace`,
-  `io`, `net`. Its manifest has `'php-64bit' => '*'` in `require` with a comment on what needs it, even when
-  a dependency already has it: the dependency may change, the code does not. Such code does not check `PHP_INT_SIZE`.
-  A package that gets 64-bit only through a dependency (`cache`, `testo-plugin`) does not repeat it.
-- A package without it (`dispatcher`, `exceptionally`, `formatter`, `phpstan-extension`, `source-location`, `time`)
-  is not guaranteed on 32-bit unless its manifest has `bit32Testing: true`, which puts it in the job `test-32-bit`
-  of CI: only `thesis/time` now (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`),
-  how its code stays exact is in its `AGENTS.md`. A change that makes such a package rely on 64-bit `int`
-  adds `php-64bit` to its manifest and drops "64-bit or 32-bit" from its `README.md`, if there is one.
+  `Instant`, timers), `pack('J')`, a constant above 2^31 (`0xFF_FF_FF_FF`). Its manifest has `'php-64bit' => '*'`
+  in `require` with a comment on what needs it, even when a dependency already has it: the dependency may change,
+  the code does not. Such code does not check `PHP_INT_SIZE`. A package that gets 64-bit only through a dependency
+  (`cache` through `async`) does not repeat it.
+- A package without `php-64bit` is not guaranteed on 32-bit unless its manifest has `bit32Testing: true`.
+  That flag puts the package in the CI job `test-32-bit` (`PHP_VERSION=8.2 ARCH=386 make test-alone P=time`),
+  and the package `AGENTS.md` says how the code stays exact on 32-bit. A change that makes such a package rely
+  on 64-bit `int` adds `php-64bit` to its manifest and drops "64-bit or 32-bit" from its `README.md`,
+  if there is one.
 - Windows is not supported, and nothing is guaranteed to work there. The code is written for Unix only:
   no `PHP_OS_FAMILY` checks, no Windows branches, no Windows paths. `net` keeps Unix sockets, `socketPair()`
   on `STREAM_PF_UNIX` and the DNS configuration from `/etc/resolv.conf`. `process`, `parallel` and `cluster`

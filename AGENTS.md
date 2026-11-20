@@ -26,6 +26,10 @@ on them. Unix only, 64-bit where a package needs it (`platform.md`).
   a topic if it spans several, a new topic with a line in "Topics" if none fits. A topic over about 8 KB is split
   where its parts are needed apart.
 - This file changes only when the user asks or a topic is added: parallel sessions would collide in it.
+- A shared file (this file, a topic, the `Makefile`, a workflow) does not list the packages that share
+  a manifest property (the PHP version, `php-64bit`). Such a list repeats the manifests and gets stale.
+  Every session that adds a package to the list collides with the other sessions. The shared file states the rule.
+  The manifest and the package `AGENTS.md` state the fact. A shared file names a package only as an example of a rule.
 - `packages/<name>/AGENTS.md` is for those who *change* the package and is loaded only when you read its files.
   How to *use* a package is in its `README.md` or its `skills/`: read them before using a package
   you have not used yet in this session.
@@ -65,8 +69,7 @@ the whole monorepo is for the final check.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
   so commit the generated files. Everything runs on PHP 8.6. A package whose manifest allows an older PHP
-  (`time` 8.2, `source-location` 8.4) is also tested alone on every minor below 8.6
-  (`PHP_VERSION=8.2 make test-alone P=time`)
+  is also tested alone on every minor below 8.6 (`PHP_VERSION=8.2 make test-alone P=time`)
 
 ## Git
 
