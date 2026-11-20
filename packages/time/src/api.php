@@ -213,7 +213,7 @@ function toMsFloat(Duration $duration): float
  */
 function toSecFloat(Duration $duration): float
 {
-    return toFloatFractions($duration, 1);
+    return toFloatMultiples($duration, 1);
 }
 
 /**

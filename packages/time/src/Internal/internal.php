@@ -176,7 +176,7 @@ function toFractions(Duration $duration, int $perSecond, \RoundingMode $rounding
 }
 
 /**
- * The duration in units of 1 / $perSecond of a second with a fraction: microseconds, milliseconds, seconds.
+ * The duration in units of 1 / $perSecond of a second with a fraction: microseconds, milliseconds.
  *
  * @internal
  * @param positive-int $perSecond a divisor of a billion
@@ -194,7 +194,7 @@ function toFloatFractions(Duration $duration, int $perSecond): float
 }
 
 /**
- * The duration in units of $secondsPerUnit seconds with a fraction: minutes, hours.
+ * The duration in units of $secondsPerUnit seconds with a fraction: seconds, minutes, hours.
  *
  * @internal
  * @param positive-int $secondsPerUnit
