@@ -41,7 +41,7 @@ return new Config(
         'llm/skills' => '^1.17',
         'phpstan/phpstan' => '^2.3.6',
         'phpstan/phpstan-strict-rules' => '^2.1.1',
-        'phpstan/tally' => '^1.0.1',
+        'phpstan/tally' => '^1.0.2',
         'rector/rector' => '^2.8.5',
         'shipmonk/composer-dependency-analyser' => '^1.8.4',
         'symfony/console' => '^8.0',

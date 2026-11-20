@@ -19,9 +19,9 @@ The model of tasks, scopes and cancellation is in `packages/async/README.md`.
   Our code avoids the shape, but a task of the user may have it (`$this->wait->park()` in a method), and its wait
   holds the event loop: `virtualTime()` releases the loop it drops (`Internal\Loop::release()`), so its descriptors
   close even then (`loopLeftWithFiberOfBoundClosureReleasesWhatItHolds`). Delete the release and this rule once
-  a release of PHP has the fix.
+  a release of PHP has the fix: 8.6.0 does not.
 - A fiber suspended with a value (`\Fiber::suspend($object)`) keeps it where the cycle collector does not look
-  (PHP 8.6.0RC7): a cycle through the fiber and that object is never freed, even after the caller has dropped
+  (PHP 8.6.0): a cycle through the fiber and that object is never freed, even after the caller has dropped
   the value. Suspend without one: `Internal\ContinuationImpl::park()` leaves itself in `Internal\Loop::$parked`
   instead, and `loopGoesAwayWithFiberLeftSuspended` checks it. Worth a report upstream.
 - A test does not rely on the order of the fibers that become ready in one tick: on virtual time the loop

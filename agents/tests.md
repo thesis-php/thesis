@@ -19,7 +19,7 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Trap: a `tmpDir` in the config (it was `var`) is shared by every run, and Infection deletes all of it at the end
   of a run, the coverage of the others too. Every run takes `--threads=max`, so two at once share the cores:
   a mutant that runs slower than `timeout` counts as killed, check the timeouts of such a run alone.
-- Trap: on x86_64 Xdebug 3.6.0alpha1 of the PHP 8.6 RC7 image dies with signal 11 in the first test
+- Trap: on x86_64 Xdebug 3.6.0alpha1 of the PHP 8.6 image (8.6.0) dies with signal 11 in the first test
   of the initial run of `make infect`, on every package. It is the per-test coverage that `--coverage-xml`
   turns on: `XDEBUG_MODE=coverage vendor/bin/testo run --coverage --coverage-xml=/tmp/cov --suite=formatter`
   crashes, the same without `--coverage-xml` passes, on any `--coverage-level`. aarch64 passes (a Mac),

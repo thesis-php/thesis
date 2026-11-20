@@ -48,7 +48,7 @@ jobs:
 
   # A package with bit32Testing in its manifest on 32-bit PHP, on its lowest PHP and on that of the monorepo
   # (thesis/time: the polyfill and the functions against the class of PHP 8.6).
-  # The official images, ours have no i386 build. 8.6 is a release candidate there yet.
+  # The official images, ours have no i386 build.
   test-32-bit:
     runs-on: ubuntu-latest
     strategy:
@@ -58,13 +58,12 @@ jobs:
         include: [{package: time, php: '8.2'}, {package: time, php: '8.6'}]
     env:
       PHP_VERSION: ${{ matrix.php }}
-      IMAGE: ${{ matrix.php == '8.6' && 'php:8.6-rc-cli' || format('php:{0}-cli', matrix.php) }}
     steps:
       - uses: actions/checkout@v6
       - run: make test-alone P=${{ matrix.package }} ARCH=386
 
   # Mutation testing of the packages with mutationTesting in their manifests (agents/tests.md).
-  # On ARM: Xdebug of the PHP 8.6 RC7 image crashes on x86_64 under coverage per test (agents/tests.md).
+  # On ARM: Xdebug of the PHP 8.6 image crashes on x86_64 under coverage per test (agents/tests.md).
   # Allowed to fail and out of `needs` of the release until the mutants of io and async-trace are killed.
   infect:
     continue-on-error: true
@@ -113,10 +112,10 @@ jobs:
 
   # Counts under Valgrind on one PHP and one driver (agents/benchmarks.md). The results are an artifact
   # for `make bench-accept`: `gh run download <run> -p 'tally-*' -D var/tally`.
-  # Off until a release of Tally loads tally_hooks on PHP 8.6 RC7 (agents/benchmarks.md), and out of `needs`
-  # of the release: a skipped job skips the jobs that need it.
+  # Allowed to fail and out of `needs` of the release until the numbers of the event loop of thesis/async
+  # are accepted from a run of this job (agents/benchmarks.md).
   bench:
-    if: false
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

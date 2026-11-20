@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b9b0c626b03b552292f437123c782575",
+    "content-hash": "058d4212b6efb4120104d4c8f5c38c02",
     "packages": [
         {
             "name": "internal/container",
@@ -4488,16 +4488,16 @@
         },
         {
             "name": "phpstan/tally",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/tally.git",
-                "reference": "f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21"
+                "reference": "271862815f400ca92b072bd54a0b5df824da0363"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/tally/zipball/f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21",
-                "reference": "f62fb265cbe7fd916af1e8d61ee49bb2c1af4b21",
+                "url": "https://api.github.com/repos/phpstan/tally/zipball/271862815f400ca92b072bd54a0b5df824da0363",
+                "reference": "271862815f400ca92b072bd54a0b5df824da0363",
                 "shasum": ""
             },
             "require": {
@@ -4540,10 +4540,10 @@
             ],
             "support": {
                 "issues": "https://github.com/phpstan/tally/issues",
-                "source": "https://github.com/phpstan/tally/tree/1.0.1"
+                "source": "https://github.com/phpstan/tally/tree/1.0.2"
             },
-            "time": "2026-11-14T22:36:03+00:00",
-            "published-time": "2026-11-14T22:42:17+00:00"
+            "time": "2026-11-19T13:17:48+00:00",
+            "published-time": "2026-11-19T13:34:31+00:00"
         },
         {
             "name": "react/cache",
