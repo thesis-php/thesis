@@ -8,8 +8,8 @@ use Composer\Semver\VersionParser;
 
 /**
  * The matrices of the jobs of check.yaml that run per package, derived from the manifests: no list of packages
- * is written by hand (agents/manifests.md). The workflow itself is written by hand, sync rewrites only the line
- * under each marker.
+ * is written by hand (agents/manifests.md). The workflow itself is written by hand, sync rewrites only the key
+ * under each marker: its line and the lines indented deeper, an item of the matrix per line.
  *
  * @internal
  */
@@ -28,7 +28,7 @@ final readonly class Matrices
         $written = [];
 
         $workflow = preg_replace_callback(
-            pattern: '/^( *)# (\S+) ' . preg_quote(self::MARKER, '/') . '\n[^\n]*$/m',
+            pattern: '/^( *)# (\S+) ' . preg_quote(self::MARKER, '/') . '\n[^\n]*(?:\n\1 +[^\n]*)*$/m',
             callback: static function (array $match) use ($matrices, &$written) {
                 [, $indent, $job] = $match;
                 $matrix = $matrices[$job] ?? throw new MonorepoException(
@@ -36,7 +36,7 @@ final readonly class Matrices
                 );
                 $written[] = $job;
 
-                return "{$indent}# {$job} " . self::MARKER . "\n{$indent}{$matrix}";
+                return "{$indent}# {$job} " . self::MARKER . "\n{$indent}" . implode("\n{$indent}", $matrix);
             },
             subject: $workflow,
         );
@@ -61,7 +61,7 @@ final readonly class Matrices
     ) {}
 
     /**
-     * @return array<non-empty-string, non-empty-string> job => the line of its matrix
+     * @return array<non-empty-string, non-empty-list<non-empty-string>> job => the lines of its matrix
      */
     private function matrices(): array
     {
@@ -86,20 +86,25 @@ final readonly class Matrices
         }
 
         return [
-            'test-alone' => 'include: [' . implode(', ', $alone) . ']',
-            'test-32-bit' => 'include: [' . implode(', ', $bits32) . ']',
-            'infect' => 'package: ' . self::names($mutated),
-            'coverage' => 'package: ' . self::names($tested),
+            'test-alone' => self::sequence('include', $alone),
+            'test-32-bit' => self::sequence('include', $bits32),
+            'infect' => self::sequence('package', array_column($mutated, 'dir')),
+            'coverage' => self::sequence('package', array_column($tested, 'dir')),
         ];
     }
 
     /**
-     * @param array<Package> $packages
-     * @return non-empty-string
+     * @param non-empty-string $key
+     * @param list<string> $items
+     * @return non-empty-list<non-empty-string> a YAML sequence, an item per line
      */
-    private static function names(array $packages): string
+    private static function sequence(string $key, array $items): array
     {
-        return '[' . implode(', ', array_map(static fn(Package $package) => $package->dir, $packages)) . ']';
+        if ($items === []) {
+            return ["{$key}: []"];
+        }
+
+        return ["{$key}:", ...array_map(static fn(string $item) => "  - {$item}", $items)];
     }
 
     /**
