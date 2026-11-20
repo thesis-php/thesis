@@ -4,6 +4,13 @@ Where in the source code: `Location` and `caller()`. The API is described in `RE
 
 ## Invariants that must not be broken
 
+- The package runs on PHP 8.4+, the rest of the monorepo on 8.6. The code, tests included, has no syntax or API
+  newer than 8.4. PHPStan and Rector take the PHP of the monorepo and miss it, `make test-alone P=source-location`
+  on 8.4 and 8.5 catches it. A rule of the 8.5 set of Rector that rewrites the code gets a `RectorSkip`
+  in the manifest.
+- The tests also run in the package installed alone, where the root of the project is the package, not the monorepo:
+  a test takes the root from `InstalledVersions` and the package from `dirname(__DIR__)`, never the root
+  by counting directories up.
 - Nothing here throws: a location is taken while an error is reported (thesis/formatter) or while a trace is recorded
   (thesis/async), where an exception would change the behaviour it describes. `caller()` returns `null`
   where it finds nothing, `Location::ofFunction()` returns `null` for an internal function. A function that warns
@@ -25,6 +32,11 @@ Where in the source code: `Location` and `caller()`. The API is described in `RE
 
 ## Decisions
 
+- Rejected: PHP 8.2, like thesis/time. `Location::$shortFile` is a property hook of 8.4: a method instead breaks
+  the API, a property computed in the constructor costs the `substr()` per location that the hook avoids.
+  Before 8.4 the frame of a closure is `App\{closure}` with nothing of where it is declared (checked on 8.2
+  and 8.3), so `callee()` would need a branch and `Caller::$callee` would differ by the PHP. Nobody below 8.4
+  has asked for the package.
 - `composer-runtime-api: ^2.1` has no test: it would need Composer 2.0 installed, and an assertion on the manifest
   repeats the manifest. The invariant above guards it.
 - The name stays `thesis/source-location` with `Thesis\SourceLocation\Location`: the repetition is only in `use`,

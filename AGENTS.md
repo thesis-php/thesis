@@ -64,8 +64,9 @@ the whole monorepo is for the final check.
 - `make test` starts the services of `compose.yaml` (RabbitMQ) first (`make up`), `make down` stops them.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
 - `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
-  so commit the generated files. Everything runs on PHP 8.6. `thesis/time` requires PHP 8.2 and is also
-  tested alone on 8.2 to 8.5 (`PHP_VERSION=8.2 make test-alone P=time`)
+  so commit the generated files. Everything runs on PHP 8.6. A package whose manifest allows an older PHP
+  (`time` 8.2, `source-location` 8.4) is also tested alone on every minor below 8.6
+  (`PHP_VERSION=8.2 make test-alone P=time`)
 
 ## Git
 

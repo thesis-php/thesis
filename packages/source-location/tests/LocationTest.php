@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\SourceLocation;
 
+use Composer\InstalledVersions;
 use Testo\Assert;
 use Testo\Test;
 
@@ -78,15 +79,14 @@ final class LocationTest
 
     public function shortensFileUnderProjectRoot(): void
     {
-        $file = 'packages/source-location/tests/LocationTest.php';
-
-        Assert::same(new Location(__FILE__, 1)->shortFile, $file);
+        Assert::same(self::projectRoot() . '/' . new Location(__FILE__, 1)->shortFile, __FILE__);
     }
 
     public function keepsFileIfProjectRootIsOutsideOpenBasedir(): void
     {
         $code = <<<'PHP'
-            require $argv[1] . '/vendor/autoload.php';
+            [, $vendor, $src] = $argv;
+            require $vendor . '/autoload.php';
             set_error_handler(static function (int $type, string $message) {
                 if ((error_reporting() & $type) !== 0) {
                     throw new \ErrorException($message);
@@ -94,11 +94,11 @@ final class LocationTest
 
                 return false;
             });
-            ini_set('open_basedir', $argv[1] . '/packages:' . $argv[1] . '/vendor');
+            ini_set('open_basedir', $src . ':' . $vendor);
             echo new \Thesis\SourceLocation\Location('/elsewhere/foo.php', 1)->shortFile;
             PHP;
         $process = proc_open(
-            command: [PHP_BINARY, '-r', $code, \dirname(__DIR__, 3)],
+            command: [PHP_BINARY, '-r', $code, self::projectRoot() . '/vendor', \dirname(__DIR__) . '/src'],
             descriptor_spec: [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             pipes: $pipes,
         );
@@ -113,5 +113,16 @@ final class LocationTest
     public function keepsFileOutsideProjectRoot(): void
     {
         Assert::same(new Location('/elsewhere/foo.php', 1)->shortFile, '/elsewhere/foo.php');
+    }
+
+    /**
+     * The monorepo, or the package itself when it is installed alone (`make test-alone`).
+     */
+    private static function projectRoot(): string
+    {
+        $root = realpath(InstalledVersions::getRootPackage()['install_path']);
+        \assert($root !== false);
+
+        return $root;
     }
 }

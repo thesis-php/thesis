@@ -10,6 +10,9 @@ return new Manifest(
     version: '0.1',
     keywords: ['php', 'source-location', 'backtrace', 'debugging'],
     require: [
+        // Location::$shortFile is a property hook of PHP 8.4, and only since 8.4 the name of a closure
+        // says where it is declared (Caller::$callee).
+        'php' => '^8.4',
         'composer-runtime-api' => '^2.1',
     ],
     requireDev: [
