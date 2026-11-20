@@ -260,6 +260,7 @@ function isPositive(Duration $duration): bool
 
 /**
  * @api
+ * @no-named-arguments
  */
 function shortest(Duration $duration, Duration ...$durations): Duration
 {
@@ -274,6 +275,7 @@ function shortest(Duration $duration, Duration ...$durations): Duration
 
 /**
  * @api
+ * @no-named-arguments
  */
 function longest(Duration $duration, Duration ...$durations): Duration
 {

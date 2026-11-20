@@ -604,6 +604,7 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
  * To keep handling a signal, such as SIGHUP to reload, use {@see trapSignals()}.
  *
  * @api
+ * @no-named-arguments
  * @param positive-int $signal
  * @param positive-int ...$signals
  * @throws \LogicException without ext-pcntl

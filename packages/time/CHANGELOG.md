@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `shortest()` and `longest()` take no named arguments (`@no-named-arguments`), PHPStan reports them.
+
 ## [0.4.0] - 2026-11-19
 
 ### Added

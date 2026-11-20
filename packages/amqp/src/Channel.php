@@ -601,6 +601,7 @@ final class Channel
     }
 
     /**
+     * @no-named-arguments
      * @param class-string<Method> ...$replies
      * @throws AmqpException
      */
@@ -615,7 +616,7 @@ final class Channel
         }
 
         $pending = new PendingCall(
-            replies: array_values($replies),
+            replies: $replies,
             lock: $lock,
             getNoAck: $method instanceof BasicGet && $method->noAck,
         );
