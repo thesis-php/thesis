@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `toNsFloat()`, `toUsFloat()`, `toMsFloat()`, `toMinutesFloat()` and `toHoursFloat()`, like `toSecFloat()`.
   On 32-bit PHP `toNs()` throws above 2.1 seconds, `toNsFloat()` does not.
-- `parseDuration()` reads a duration from a string like `1h30m`, `1.5s` or `250ms`, as `time.ParseDuration()` of Go:
-  the reverse of `formatDuration()`.
+- `parseDuration()` reads a duration from a string like `1h30m`, `1.5s` or `250ms`, in the grammar
+  of `time.ParseDuration()` of Go: the reverse of `formatDuration()`.
 - `ratio()` divides a duration by a duration into a float: a progress, a rate, the intervals that have passed.
 - `roundDurationTo()` rounds a duration to a multiple of a unit: to `ms(1)` for a log.
 - `roundTimeTo()` rounds a time to a multiple of a unit since 1970: the start of a window of 5 minutes.

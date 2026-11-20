@@ -51,6 +51,7 @@ const NUMBER_WITH_UNIT = '/([0-9]++\.?[0-9]*+|\.[0-9]++)(ns|us|' . "\u{B5}s|\u{3
  *
  * @internal
  * @param positive-int $perSecond a divisor of a billion
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function fromFractions(int|float $value, int $perSecond): Duration
@@ -69,6 +70,7 @@ function fromFractions(int|float $value, int $perSecond): Duration
  *
  * @internal
  * @param positive-int $secondsPerUnit
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function fromMultiples(int|float $value, int $secondsPerUnit): Duration
@@ -82,9 +84,12 @@ function fromMultiples(int|float $value, int $secondsPerUnit): Duration
 }
 
 /**
- * Rounded to the nearest nanosecond, half away from zero.
+ * $value units of $nanosecondsPerUnit, rounded to the nearest nanosecond, half away from zero. The value is
+ * the argument of the caller, never a product: one that overflows to INF is a duration out of the range,
+ * while INF given is a wrong argument.
  *
  * @internal
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
@@ -161,7 +166,7 @@ function fromParts(int|float $seconds, int $nanoseconds): Duration
  *
  * @internal
  * @param positive-int $perSecond a divisor of a billion
- * @throws TimeException if the result does not fit in int, as on 32-bit PHP
+ * @throws TimeException on 32-bit PHP, if the result does not fit in int
  */
 function toFractions(Duration $duration, int $perSecond, \RoundingMode $rounding): int
 {
@@ -212,7 +217,7 @@ function toFloatMultiples(Duration $duration, int $secondsPerUnit): float
 }
 
 /**
- * The nearest float to the duration in units of $nanosecondsPerUnit, given also as whole units and a remainder.
+ * The duration as a float of units of $nanosecondsPerUnit, given also as whole units and a remainder.
  * The products wider than int on 32-bit PHP are floats, exact below 2^53.
  *
  * @internal
@@ -239,7 +244,7 @@ function toFloatUnits(
  *
  * @internal
  * @param positive-int $secondsPerUnit
- * @throws TimeException if the result does not fit in int, as on 32-bit PHP
+ * @throws TimeException on 32-bit PHP, if the result does not fit in int
  */
 function toMultiples(Duration $duration, int $secondsPerUnit, \RoundingMode $rounding): int
 {

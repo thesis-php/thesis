@@ -145,7 +145,7 @@ toHoursFloat($duration);   // 0.025138888888888888
 
 For APIs that take float seconds, like the timeout of `stream_socket_client()`, and for metrics and logs.
 The result is the float nearest to the duration up to 104 days (2^53 nanoseconds), and at most a unit
-in the last place off above. `toNsFloat()` is for 32-bit PHP, where `toNs()` throws above 2.1 seconds.
+in the last place off above. `toNsFloat()` is for 32-bit PHP, where `toNs()` throws.
 
 ### Passing to other APIs
 
@@ -225,7 +225,8 @@ has no default, as in the [conversions to int](#converting-to-int).
 ### Formatting and parsing
 
 `formatDuration()` writes a duration like `Duration.String()` of Go, and `parseDuration()` reads it back
-like `time.ParseDuration()`: for logs, and for a timeout in an environment variable, a config or an option of a command.
+in the grammar of `time.ParseDuration()`: for logs, and for a timeout in an environment variable, a config
+or an option of a command.
 
 ```php
 use function Thesis\Time\{duration, formatDuration, parseDuration};
@@ -240,9 +241,10 @@ parseDuration('0');
 ```
 
 A string is numbers with a unit each (`h`, `m`, `s`, `ms`, `us` or `µs`, `ns`) after an optional sign, with a fraction
-in any of them and no spaces. Only `0` has no unit. A number is converted like the function of its unit:
-`parseDuration('1.5h')` is `hours(1.5)`. A string that is not a duration or is out of range throws
-`Time\TimeException`.
+in any of them and no spaces. Only `0` has no unit. A number is a float converted like the function of its unit:
+`parseDuration('1.5h')` is `hours(1.5)`. So a fraction of a nanosecond is rounded, while Go drops it,
+and a number is as precise as a float, to 15 significant digits. A string that is not a duration
+or is out of range throws `Time\TimeException`.
 
 ### Points in time
 
@@ -257,8 +259,8 @@ $retainedSince = shiftTime($clock->now(), $retention->negate());
 $elapsed = durationBetween($startedAt, $clock->now());
 ```
 
-`roundTimeTo()` rounds a time to a multiple of a unit since 1970-01-01 00:00:00 UTC, like `Time.Round()`
-and `Time.Truncate()` of Go: rounded down, the times of one window give its start, a key for a limit or a metric.
+`roundTimeTo()` rounds a time to a multiple of a unit since 1970-01-01 00:00:00 UTC: rounded down, the times
+of one window give its start, a key for a limit or a metric.
 
 ```php
 use function Thesis\Time\{minutes, roundTimeTo};
@@ -272,11 +274,14 @@ The multiples are of elapsed time, not of the wall clock: those of `hours(24)` a
 whatever the time zone of the time, which is kept. The unit is positive and of whole microseconds,
 anything else throws `\ValueError`.
 
+`Time.Round()` and `Time.Truncate()` of Go do the same from the year 1: the results match for a unit
+that divides a day, but a week starts on Thursday here and on Monday there.
+
 The ends of int64 timestamps (the year ±292 billion) are out of reach: `shiftTime()` beyond them gives a wrong time
 or an error, as `DateTimeImmutable::add()` wraps around there, and `roundTimeTo()` within 512 seconds of them
 may give a time that is not a multiple of the unit.
 
-## [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks
+## PSR-20 clocks
 
 `WallClock` and `FrozenClock` implement
 [`Psr\Clock\ClockInterface`](https://www.php-fig.org/psr/psr-20/#21-clockinterface).

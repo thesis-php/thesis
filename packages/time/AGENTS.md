@@ -14,9 +14,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   no `new X()->call()` (a variable keeps the fixer from making it), no `getMicrosecond()`, no non-constant
   initializer of a `static` variable. PHPStan and Rector take the PHP of the monorepo and miss it,
   `make test-alone P=time` on 8.2 to 8.5 catches it.
-- 8.2.2, not 8.2: before it `modify('@...')` of `shiftTime()` moved a time by its UTC offset (php-src GH-9891).
-  CI runs only the latest patch of each minor, so a bound on a patch is checked by hand on its image
-  (`php:8.2.0-cli-alpine`).
+- 8.2.2, not 8.2: the manifest names the bug. CI runs only the latest patch of each minor, so a bound
+  on a patch is checked by hand on its image (`php:8.2.0-cli-alpine`).
 - No `round()` of a float, which is wrong before 8.4: `Internal\roundHalfAwayFromZero()` is exact,
   its docblock says why, `FunctionsTest` pins it.
 - `\RoundingMode` comes from `symfony/polyfill-php84` below 8.4. It is only the enum: the test that compares
@@ -29,11 +28,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   the C code is right: read it, do not guess.
 - `polyfill/` holds only `Time\Duration`, `Time\TimeException` and `load.php`, which loads them:
   the namespace belongs to PHP. The rest lives in `Thesis\Time\Internal` (`IsoInterval`).
-- `$signedSeconds` and `$signedNanoseconds` are declared first: PHP compares objects property by property
-  in declaration order, which makes `<`, `==`, `<=>`, `min()`, `max()` and `sort()` work as in 8.6.
-  Two ints, since int nanoseconds do not fit on 32-bit. `__serialize()` leaves them out.
-- `__unserialize()` assigns the properties as they come, like `object_properties_load()`, so the engine throws
-  the `TypeError` or `Error` that 8.6 wraps as the previous exception.
+- `$signedSeconds` and `$signedNanoseconds` stay the first properties: `<`, `==`, `<=>`, `min()`, `max()`
+  and `sort()` of durations depend on it, their docblock says how. `__serialize()` leaves them out.
 - Messages name `Time\Duration` literally, not by `self::class`: `DurationFuzzTest` loads a renamed copy.
 - `Time\TimeException` is not final, as in 8.6: the manifest keeps the file from `final_class` of the fixer.
 
@@ -51,8 +47,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   checks nothing of the `non-negative-int` of such a parameter, any int passes as its float
   (`new self(-1, 0, false)` is not reported), so the code that can go below zero asserts it itself
   (`subtractMagnitudes()` of the polyfill). The ranges of the `int` parameters (`$nanoseconds`) are checked.
-- Timestamps come from `Internal\timestamp()`, never `getTimestamp()`, which throws on 32-bit outside
-  of 1901 to 2038. A float beyond int becomes a string by `whole()`: `%s` gives 14 digits.
+- Timestamps come from `Internal\timestamp()`, never `getTimestamp()`, and become a string
+  by `Internal\whole()`, never `%s`: their docblocks say why.
 - The `to*()` conversions throw `Time\TimeException` for a magnitude above `PHP_INT_MAX`, which happens only
   on 32-bit. `toNs(ns(PHP_INT_MIN))` throws too: one value is not worth a branch. The `to*Float()` ones
   never throw, hence `toNsFloat()`, of no use on 64-bit, where `toNs()` is exact.
@@ -88,9 +84,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   after `sub()`, `negate()` or `durationBetween()`, and `shiftTime($now, sec(-30))` beats `sec(30)->negate()`.
   A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
 - They throw `Time\TimeException` out of range, as the class does, so a caller handles one kind,
-  and `\ValueError` only for NAN and INF given. `Internal\fromFloat()` tells the two apart by doing
-  the multiplication itself: it gets the argument of the caller as the value and the rest as the unit,
-  never a product, which overflows to INF and reads as a wrong argument (`multiply()` passes the factor).
+  and `\ValueError` only for NAN and INF given. `Internal\fromFloat()` tells the two apart,
+  its docblock says how (`multiply()` passes the factor).
 - No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
   is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
   The check is `isZero()`. Rejected for the same reason: `zero()` with a `static` instance, which makes
@@ -105,6 +100,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 ### Arithmetic
 
 - `multiply()` stays next to `multiplyBy()`: it takes a float and a negative factor, which the method does not.
+  A float factor multiplies the float nanoseconds, which are rounded above 2^53 (104 days): there even
+  `multiply($duration, 1.0)` changes the duration, and between 2^52 and 2^53 a half goes to the even nanosecond.
   Rejected: naming it `multiplyBy()`: one name for two contracts (the method throws on a negative factor),
   and `multiplyBy($delay, 2)` reads as multiplying by `$delay`. Rejected: a `\RoundingMode`: the result
   is rounded to a nanosecond, as `sec(1.5)` is, and a mode matters only where a conversion rounds to the unit
@@ -146,7 +143,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - `roundDurationTo()` and `roundTimeTo()` round to a multiple of any positive unit (`ms(1500)` too),
   as `Duration.Round()` and `Time.Truncate()` of Go, and require a `\RoundingMode` like the integer conversions,
   with no `truncate()` or `floor()` per direction. A wrong unit is a `\ValueError`. Rejected: returning
-  the duration as it is for a unit of zero and below, as Go does: it hides a wrong config.
+  the duration as it is for a unit of zero and below, as Go does: it hides a wrong config. A result out of range
+  throws `Time\TimeException`, where Go returns its longest duration.
 - Two functions, not one that takes `Duration|\DateTimeImmutable`: a union can be added later, not taken back,
   and the time has rules of its own (a unit of whole microseconds, the sign is the side of 1970).
 - Both take the remainder by doubling the unit (`Internal\roundingStep()`), one path for 64-bit and 32-bit,
@@ -166,12 +164,21 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   are whole, its seconds are below 60. Rejected: arithmetic in decimal digits (the digits times 6 or 36,
   then the point moved), which was exact for a number of any length: 35 lines for numbers of more than
   15 significant digits that nobody writes.
+- What "as Go" means is checked by runs of Go 1.26. `formatDuration()` writes
+  the string of `Duration.String()`, and `roundDurationTo()` with `HalfAwayFromZero` and `TowardsZero` returns
+  what `Duration.Round()` and `Duration.Truncate()` do (20_000 random durations each). `parseDuration()` accepts
+  and rejects the strings of `time.ParseDuration()` (200_000 random ones), but not always with its value:
+  Go computes in int64 and drops a fraction of a nanosecond (`1.5ns` is 1 ns there, 2 ns here), a float is off
+  above 2^53 nanoseconds (`9223372035s` by 512 ns), and `9223372035999999999ns`, the longest duration,
+  is out of range here: its float is a nanosecond longer.
 
 ### Points in time and clocks
 
 - `durationBetween()`, `shiftTime()` and `roundTimeTo()` work on timestamps: elapsed time does not stretch
   with DST. So `roundTimeTo()` counts the multiples from 1970-01-01 00:00:00 UTC, and a window of `hours(24)`
-  starts at the midnight of UTC in any time zone: a calendar day is not a duration.
+  starts at the midnight of UTC in any time zone: a calendar day is not a duration. `Time.Truncate()` of Go
+  counts from the year 1, 719_162 days earlier: the same result for a unit that divides a day, another
+  for `hours(7)` or a week (Thursday here, Monday there), checked by a run of Go 1.26. The docs say so.
 - `shiftTime()` drops nanoseconds toward zero and takes the time first, as `multiply()` takes the duration first.
   Rejected: `after()`/`before()`, which break that order, `plus()`/`minus()`, two functions for one operation,
   and `fromInterval(\DateInterval)`, whose day is a calendar day.

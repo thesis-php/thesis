@@ -29,7 +29,8 @@ final readonly class Duration
 
     /**
      * First on purpose: PHP compares objects property by property in declaration order, so `<`, `<=>` and `==`
-     * compare the signed seconds, then the signed nanoseconds, as the C class does. Int nanoseconds overflow on 32-bit.
+     * compare the signed seconds, then the signed nanoseconds, as the C class does. Two ints: nanoseconds alone
+     * do not fit in int on 32-bit PHP.
      */
     private int $signedSeconds;
 

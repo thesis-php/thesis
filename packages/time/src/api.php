@@ -30,7 +30,7 @@ use const Thesis\Time\Internal\SECONDS_PER_HOUR;
 use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
 
 /**
- * Unlike Duration::fromNanoseconds(), takes a negative value too.
+ * Unlike Duration::fromNanoseconds(), takes a negative value.
  *
  * @api
  * @throws TimeException out of the range of Duration
@@ -41,9 +41,11 @@ function ns(int $nanoseconds): Duration
 }
 
 /**
- * Microseconds. A float is rounded to the nearest nanosecond, half away from zero.
+ * Unlike Duration::fromMicroseconds(), takes a negative value and a float, rounded to the nearest nanosecond,
+ * half away from zero.
  *
  * @api
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function us(int|float $microseconds): Duration
@@ -52,9 +54,11 @@ function us(int|float $microseconds): Duration
 }
 
 /**
- * A float is rounded to the nearest nanosecond, half away from zero.
+ * Unlike Duration::fromMilliseconds(), takes a negative value and a float, rounded to the nearest nanosecond,
+ * half away from zero.
  *
  * @api
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function ms(int|float $milliseconds): Duration
@@ -63,9 +67,11 @@ function ms(int|float $milliseconds): Duration
 }
 
 /**
- * A float is rounded to the nearest nanosecond, half away from zero.
+ * Unlike Duration::fromSeconds(), takes a negative value and a float, rounded to the nearest nanosecond,
+ * half away from zero.
  *
  * @api
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function sec(int|float $seconds): Duration
@@ -74,9 +80,11 @@ function sec(int|float $seconds): Duration
 }
 
 /**
- * A float is rounded to the nearest nanosecond, half away from zero.
+ * Unlike Duration::fromMinutes(), takes a negative value and a float, rounded to the nearest nanosecond,
+ * half away from zero.
  *
  * @api
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function minutes(int|float $minutes): Duration
@@ -85,9 +93,11 @@ function minutes(int|float $minutes): Duration
 }
 
 /**
- * A float is rounded to the nearest nanosecond, half away from zero.
+ * Unlike Duration::fromHours(), takes a negative value and a float, rounded to the nearest nanosecond,
+ * half away from zero.
  *
  * @api
+ * @throws \ValueError if the value is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function hours(int|float $hours): Duration
@@ -99,6 +109,7 @@ function hours(int|float $hours): Duration
  * The sum of the parts, each converted like the function of its unit: duration(minutes: 1, sec: 30).
  *
  * @api
+ * @throws \ValueError if a part is NAN or INF
  * @throws TimeException out of the range of Duration
  */
 function duration(
@@ -160,7 +171,7 @@ function toMs(Duration $duration, \RoundingMode $rounding): int
  * Whole seconds, see toSecFloat() for a fraction.
  *
  * @api
- * @throws TimeException on 32-bit PHP, if the longest duration is rounded away from zero
+ * @throws TimeException on 32-bit PHP, if the last second of the range is rounded away from zero
  */
 function toSec(Duration $duration, \RoundingMode $rounding): int
 {
@@ -256,8 +267,9 @@ function isZero(Duration $duration): bool
 }
 
 /**
- * Unlike Duration::multiplyBy(), takes a negative and a float factor. An int factor is exact, a float one
- * is rounded to the nearest nanosecond, half away from zero, exact while both durations are below 2^53 ns (104 days).
+ * Unlike Duration::multiplyBy(), takes a negative and a float factor. An int factor is exact. A float one multiplies
+ * the nanoseconds as a float, which holds each of them below 2^53 (104 days), and the product is rounded
+ * to the nearest nanosecond, half away from zero.
  *
  * @api
  * @throws \ValueError if the factor is NAN or INF
@@ -265,12 +277,13 @@ function isZero(Duration $duration): bool
  */
 function multiply(Duration $duration, int|float $factor): Duration
 {
+    // PHP_INT_MIN goes with the floats: multiplyBy() takes a magnitude, and it has none in int.
     if (\is_float($factor) || $factor === PHP_INT_MIN) {
-        // Exact on 64-bit PHP, on 32-bit PHP a float, exact as well: the product is a multiple of 2^9 below 2^61.
+        // An int on 64-bit PHP, which fromFloat() casts to float. On 32-bit PHP a float already, of the same value:
+        // the product of the seconds is exact (a multiple of 2^9 below 2^61), so only the sum is rounded.
         $nanoseconds = $duration->seconds * NANOSECONDS_PER_SECOND + $duration->nanoseconds;
 
-        // The factor is the value and the nanoseconds are its unit: fromFloat() takes a product that overflowed
-        // to INF for a wrong argument, not for a duration out of the range.
+        // The factor is the value and the nanoseconds are its unit, see fromFloat().
         return fromFloat($factor, $duration->negative ? -$nanoseconds : $nanoseconds);
     }
 
@@ -291,7 +304,7 @@ function ratio(Duration $dividend, Duration $divisor): float
 }
 
 /**
- * The duration rounded to a multiple of the unit, like Go's Duration.Round() and Duration.Truncate():
+ * The duration rounded to a multiple of the unit, like Duration.Round() and Duration.Truncate() of Go:
  * roundDurationTo($elapsed, ms(1), RoundingMode::HalfAwayFromZero) makes 1.234567891s 1.235s.
  *
  * @api
@@ -308,7 +321,7 @@ function roundDurationTo(Duration $duration, Duration $unit, \RoundingMode $roun
 }
 
 /**
- * Like Go's Duration.String(): 1h2m3.5s, 1m0s, 1.5s, 2.5ms, 1µs, 15ns, 0s, -1.5s.
+ * Like Duration.String() of Go: 1h2m3.5s, 1m0s, 1.5s, 2.5ms, 1µs, 15ns, 0s, -1.5s.
  *
  * @api
  */
@@ -347,9 +360,11 @@ function formatDuration(Duration $duration): string
 }
 
 /**
- * The reverse of formatDuration(), like Go's ParseDuration(): 1h30m, 1.5s, 250ms, -15ns, 0. Numbers with a unit each
- * (h, m, s, ms, us or µs, ns) after an optional sign, a fraction in any of them, nothing in between.
- * A number is converted like the function of its unit: parseDuration('1.5h') is hours(1.5).
+ * The reverse of formatDuration(), in the grammar of time.ParseDuration() of Go: 1h30m, 1.5s, 250ms, -15ns, 0.
+ * Numbers with a unit each (h, m, s, ms, us or µs, ns) after an optional sign, a fraction in any of them,
+ * nothing in between. A number is a float converted like the function of its unit: parseDuration('1.5h')
+ * is hours(1.5). So a fraction of a nanosecond is rounded, while Go drops it, and a number is as precise
+ * as a float, to 15 significant digits.
  *
  * @api
  * @throws TimeException if the string is not such a duration or is out of the range of Duration
@@ -457,9 +472,11 @@ function shiftTime(\DateTimeImmutable $time, Duration $duration): \DateTimeImmut
 }
 
 /**
- * $time rounded to a multiple of the unit since 1970-01-01 00:00:00 UTC, like Go's Time.Round() and Time.Truncate():
+ * $time rounded to a multiple of the unit since 1970-01-01 00:00:00 UTC:
  * roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity) is the start of a window of 5 minutes.
  * The multiples are of elapsed time, whatever the time zone of $time: those of hours(24) are the midnights of UTC.
+ * Time.Round() and Time.Truncate() of Go count from the year 1: the same result for a unit that divides a day,
+ * but a week starts on Thursday here and on Monday there.
  * Within 512 seconds of the ends of int64 timestamps (the year ±292 billion) the result may not be a multiple.
  *
  * @api

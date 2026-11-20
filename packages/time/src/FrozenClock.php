@@ -8,7 +8,7 @@ use Psr\Clock\ClockInterface;
 use Time\Duration;
 
 /**
- * A clock for tests: the time stands still until it is moved with advance() or set to $now.
+ * A clock for tests: the time stands still until advance() moves it or $now is assigned.
  *
  * @api
  */

@@ -309,8 +309,7 @@ final class DurationTest
         Assert::true($one > $minusTwo);
         Assert::same($minusTwo <=> $minusOne, -1);
         Assert::same($one <=> $tiny, 1);
-        // Assert::equals(), not ==: php-cs-fixer turns == into ===, and the class of PHP 8.6 caches
-        // the last created duration, so === would pass by accident there.
+        // Assert::equals(), not ==, which the fixer turns into ===: see "Tests" in AGENTS.md.
         Assert::equals($one, Duration::fromMilliseconds(1000));
         Assert::notEquals($one, $tiny);
         Assert::true($one >= Duration::fromMilliseconds(1000));
