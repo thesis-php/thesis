@@ -21,7 +21,7 @@ A polyfill of [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 
 short functions for it and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
-use function Thesis\Time\{formatDuration, ms, parseDuration, sec, toMs, toSecFloat};
+use function Thesis\Time\{formatDuration, parseDuration, sec, toMs, toSecFloat};
 
 $timeout = sec(1.5);
 
