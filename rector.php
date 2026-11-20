@@ -18,7 +18,10 @@ return RectorConfig
     ])
     ->withRootFiles()
     ->withParallel()
-    ->withCache(__DIR__ . '/var/rector')
+    // The container cache goes to var/cache: in /tmp of the Docker container (the default) it is rebuilt on every run
+    // and cannot be written once the disk of the Docker VM is full. Not a directory of its own: Rector requires
+    // the directory to exist, and `make` creates only var.
+    ->withCache(cacheDirectory: __DIR__ . '/var/rector', containerCacheDirectory: __DIR__ . '/var')
     // Not up to the PHP of composer.json: the syntax of PHP 8.6 waits until every analyzer parses it (agents/php.md).
     ->withPhpSets(php85: true)
     ->withRules([
