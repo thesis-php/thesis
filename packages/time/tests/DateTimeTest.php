@@ -78,7 +78,7 @@ final class DateTimeTest
     public function measuresBetween(string $from, string $to, string $expected): void
     {
         Assert::same(
-            actual: outcome(static fn() => between(new \DateTimeImmutable($from), new \DateTimeImmutable($to))),
+            actual: outcome(static fn() => durationBetween(new \DateTimeImmutable($from), new \DateTimeImmutable($to))),
             expected: $expected,
         );
     }
@@ -127,7 +127,7 @@ final class DateTimeTest
     #[DataProvider('shifts')]
     public function shiftsByElapsedTime(string $time, Duration $duration, string $expected): void
     {
-        Assert::same(shift(new \DateTimeImmutable($time), $duration)->format('Y-m-d\TH:i:s.uP'), $expected);
+        Assert::same(shiftTime(new \DateTimeImmutable($time), $duration)->format('Y-m-d\TH:i:s.uP'), $expected);
     }
 
     /**
@@ -295,6 +295,6 @@ final class DateTimeTest
         $time = new \DateTimeImmutable('2026-03-29 01:30:00.123456 Europe/Berlin');
         $duration = duration(hours: 49, sec: 1.5, us: 7);
 
-        Assert::same(outcome(static fn() => between($time, shift($time, $duration))), describe($duration));
+        Assert::same(outcome(static fn() => durationBetween($time, shiftTime($time, $duration))), describe($duration));
     }
 }

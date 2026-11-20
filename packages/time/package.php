@@ -14,7 +14,7 @@ return new Manifest(
     keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
     require: [
         // The polyfill runs where the rest of the monorepo does not: PHP 8.2 of Debian 12, the main 32-bit system.
-        // 8.2.2: before it modify('@...') of shift() moved a time by its UTC offset (php-src GH-9891).
+        // 8.2.2: before it modify('@...') of shiftTime() moved a time by its UTC offset (php-src GH-9891).
         'php' => '^8.2.2',
         'psr/clock' => '^1.0',
         // \RoundingMode of PHP 8.4, which the functions take.

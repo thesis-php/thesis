@@ -244,15 +244,15 @@ in any of them and no spaces. Only `0` has no unit. A number is converted like t
 
 ### Points in time
 
-`between()` and `shift()` count elapsed time between timestamps, so a change of the UTC offset (DST) does not count.
-`shift()` drops the nanoseconds below a microsecond, which `DateTimeImmutable` cannot hold.
+`durationBetween()` and `shiftTime()` count elapsed time between timestamps, so a change of the UTC offset (DST)
+does not count. `shiftTime()` drops the nanoseconds below a microsecond, which `DateTimeImmutable` cannot hold.
 
 ```php
-use function Thesis\Time\{between, shift};
+use function Thesis\Time\{durationBetween, shiftTime};
 
-$expiresAt = shift($clock->now(), $ttl);
-$retainedSince = shift($clock->now(), $retention->negate());
-$elapsed = between($startedAt, $clock->now());
+$expiresAt = shiftTime($clock->now(), $ttl);
+$retainedSince = shiftTime($clock->now(), $retention->negate());
+$elapsed = durationBetween($startedAt, $clock->now());
 ```
 
 `roundTimeTo()` rounds a time to a multiple of a unit since 1970-01-01 00:00:00 UTC, like `Time.Round()`

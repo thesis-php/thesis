@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **BC break:** `format()` is renamed to `formatDuration()`.
+- **BC break:** `between()` is renamed to `durationBetween()`, `shift()` to `shiftTime()`.
 
 ### Removed
 

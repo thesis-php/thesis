@@ -28,6 +28,6 @@ final class FrozenClock implements ClockInterface
      */
     public function advance(Duration $duration): void
     {
-        $this->now = shift($this->now, $duration);
+        $this->now = shiftTime($this->now, $duration);
     }
 }

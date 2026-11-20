@@ -14,7 +14,7 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   from making it), no `getMicrosecond()`, no non-constant initializer of a `static` variable. PHPStan and Rector
   take the PHP of the monorepo and miss it, `make test-alone P=time` on 8.2 to 8.5 catches it.
   The rules of `agents/php.md` give way to this.
-- 8.2.2, not 8.2: before it `modify('@...')` of `shift()` moved a time by its UTC offset (php-src GH-9891).
+- 8.2.2, not 8.2: before it `modify('@...')` of `shiftTime()` moved a time by its UTC offset (php-src GH-9891).
   CI runs only the latest patch of each minor, so a bound on a patch is checked by hand on its image
   (`php:8.2.0-cli-alpine`).
 - No `round()` of a float: before 8.4 it rounds to 15 digits first (0.49999999999999994 becomes 1) and leaves
@@ -66,14 +66,27 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   (the old `thesis/time-span`).
 - Short names as in Go: `ns()` to `hours()` create, `to*()` convert. A full unit is plural, it takes an amount
   (`minutes(1.5)`). `toMs()`, not `inMs()` or `asMs()`: `to` says the value is converted, maybe with a loss.
-- A function names its type where no argument does and in a pair, so that both read alike. `parseDuration($string)`:
-  an imported function has no `time.` before it as in Go, and `parse($string)` does not say what it reads.
-  `formatDuration()` is its pair (both renamed in 0.5 from `format()` and `parse()`), `roundDurationTo()`
-  is the pair of `roundTimeTo()`, not `roundTo()`. The other names say time themselves (`sec()`, `toMs()`)
-  or take a `Duration` or a time and have no pair: `multiply()`, `ratio()`, `isZero()`, `shift()`, `between()`.
+- A name says what the function does by itself, where it is called: an imported function has no `time.` before it
+  as in Go, and the types of its arguments are not on the line. A unit says time (`sec()`, `toMs()`).
+  A word that reads another way, or means something only for a duration or a time, names its subject:
+  `parseDuration()` and `formatDuration()`, not `parse($string)` and `format()`, `roundDurationTo()`
+  and `roundTimeTo()`, not `roundTo()`, `durationBetween()`, not `between()` (a check of a range in Carbon
+  and SQL, a random value of a range), `shiftTime()`, not `shift()` (`array_shift()`, a shift of bits).
+  All but `parseDuration()` and the two of rounding were renamed so in 0.5. Arithmetic of a quantity means
+  the same for anything and stays bare: `multiply()`, `ratio()`, `isZero()`. The names of the two families
+  read alike: `duration()` and `durationBetween()` make a duration, `shiftTime()` and `roundTimeTo()` return a time.
   The same rule as `formatValue()` of `thesis/formatter`.
+  Rejected: no subject where the type of a parameter gives it (`between()` of two times, `shift()` of a time
+  and a duration): the reader of a call does not see the types. Rejected: the subject in every name
+  (`multiplyDuration()`, `durationRatio()`, `isZeroDuration()`): longer, and those words have no other reading
+  to rule out. Rejected: `elapsed()` for `durationBetween()`: it reads as the time until now, which needs a clock,
+  and the result may be negative.
+- Rejected: a namespace `Thesis\Time\Duration\` for the functions of a duration. PHP imports a function
+  by its short name, so `multiply` collides with another `multiply` from any namespace, and a call with a prefix
+  (`Duration\multiply()`) needs `use Thesis\Time\Duration`, a fatal error next to `use Time\Duration`.
+  Nearly every function is about a duration anyway.
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
-  after `sub()`, `negate()` or `between()`, and `shift($now, sec(-30))` beats `sec(30)->negate()`.
+  after `sub()`, `negate()` or `durationBetween()`, and `shiftTime($now, sec(-30))` beats `sec(30)->negate()`.
   A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
 - No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
   is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
@@ -103,8 +116,9 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   that takes `Duration|\DateTimeImmutable`: a union can be added later, not taken back, and the time has rules
   of its own (a unit of whole microseconds, the sign is the side of 1970). A wrong unit is a `\ValueError`.
   Rejected: returning the duration as it is for a unit of zero and below, as Go does: it hides a wrong config.
-- `roundTimeTo()` counts the multiples from 1970-01-01 00:00:00 UTC in elapsed time, like `between()` and `shift()`:
-  a window of `hours(24)` starts at the midnight of UTC in any time zone. A calendar day is not a duration.
+- `roundTimeTo()` counts the multiples from 1970-01-01 00:00:00 UTC in elapsed time, like `durationBetween()`
+  and `shiftTime()`: a window of `hours(24)` starts at the midnight of UTC in any time zone.
+  A calendar day is not a duration.
 - Both take the remainder by doubling the unit (`Internal\roundingStep()`), one path for 64-bit and 32-bit,
   durations and timestamps: int nanoseconds hold 2.1 seconds on 32-bit and a timestamp only until 2262 on 64-bit,
   and the quotient does not fit either. It costs 5 to 15 µs a call (up to 63 doublings). Not tried:
@@ -144,8 +158,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   15 significant digits that nobody writes.
 - No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
   a duration (the `Time\Instant` RFC).
-- `between()` and `shift()` work on timestamps: elapsed time does not stretch with DST. `shift()` drops
-  nanoseconds toward zero and takes the time first, as `multiply()` takes the duration first.
+- `durationBetween()` and `shiftTime()` work on timestamps: elapsed time does not stretch with DST.
+  `shiftTime()` drops nanoseconds toward zero and takes the time first, as `multiply()` takes the duration first.
   Rejected: `after()`/`before()`, which break that order, `plus()`/`minus()`, two functions for one operation,
   and `fromInterval(\DateInterval)`, whose day is a calendar day.
 - `WallClock` and `FrozenClock` live here: a clock and a duration go together (`$clock->advance(sec(30))`),
@@ -159,7 +173,7 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - The ISO 8601 parser replicates the scanner of timelib: `\DateInterval` drops the start, the end
   and the recurrences, which the class rejects with messages of their own.
 - Accepted: on 32-bit a timestamp beyond ±2^53 seconds (year ±285 million) is a float off by a second
-  in `between()` and `shift()`: exact int64 in strings costs code for dates nobody has.
+  in `durationBetween()` and `shiftTime()`: exact int64 in strings costs code for dates nobody has.
 - Rejected: matching the C class on data that `serialize()` never writes: mangled keys (accepted by 8.6),
   a reference between values (rejected by it), `__unserialize([])` on a live duration (a no-op there).
   It costs the unmangling, scopes and references of `object_properties_load()` for input nobody makes.

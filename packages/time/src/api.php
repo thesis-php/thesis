@@ -401,7 +401,7 @@ function parseDuration(string $string): Duration
  * @api
  * @throws TimeException out of the range of Duration
  */
-function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
+function durationBetween(\DateTimeInterface $from, \DateTimeInterface $to): Duration
 {
     // A float on 32-bit PHP beyond int, in the range or not: fromParts() takes either.
     $seconds = timestamp($to) - timestamp($from);
@@ -425,7 +425,7 @@ function between(\DateTimeInterface $from, \DateTimeInterface $to): Duration
  *
  * @api
  */
-function shift(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
+function shiftTime(\DateTimeImmutable $time, Duration $duration): \DateTimeImmutable
 {
     $sign = $duration->negative ? -1 : 1;
     // A float on 32-bit PHP beyond int: DateTimeImmutable takes timestamps of int64.
@@ -484,5 +484,5 @@ function roundTimeTo(\DateTimeImmutable $time, Duration $unit, \RoundingMode $ro
 
     $step = roundingStep($seconds, $microseconds * NANOSECONDS_PER_MICROSECOND, $negative, $unit, $rounding);
 
-    return shift($time, $negative ? $step->negate() : $step);
+    return shiftTime($time, $negative ? $step->negate() : $step);
 }
