@@ -177,6 +177,10 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   and `fromInterval(\DateInterval)`, whose day is a calendar day.
 - Accepted: on 32-bit a timestamp beyond ±2^53 seconds (year ±285 million) is a float off by a second
   in `durationBetween()` and `shiftTime()`: exact int64 in strings costs code for dates nobody has.
+- Accepted: at the ends of int64 timestamps (year ±292 billion), on 64-bit too. Within 512 seconds of them
+  `roundTimeTo()` may return a time that is not a multiple of the unit: a doubled multiple overflows to the float
+  2^63, which is equal to any int that close to `PHP_INT_MAX`. `shiftTime()` beyond them returns a wrong time
+  or fails with the error of `modify()`. Rejected: checks of the range for dates nobody has.
 - `WallClock` and `FrozenClock` live here: a clock and a duration go together (`$clock->advance(sec(30))`),
   and `psr/clock` is an interface only. `FrozenClock` moves only when told: an implicit tick makes tests
   depend on the order of calls.
