@@ -264,6 +264,19 @@ function multiply(Duration $duration, int|float $factor): Duration
 }
 
 /**
+ * How many times $divisor fits in $dividend, with a fraction: a progress, a rate, the intervals that have passed.
+ * The nearest float while both durations are below 2^53 ns (104 days), a few units in the last place off above.
+ *
+ * @api
+ * @throws \DivisionByZeroError if $divisor is zero
+ */
+function ratio(Duration $dividend, Duration $divisor): float
+{
+    // The nanoseconds, not the float seconds, which are rounded already: 0.3 / 0.1 is 2.9999999999999996.
+    return toFloatFractions($dividend, NANOSECONDS_PER_SECOND) / toFloatFractions($divisor, NANOSECONDS_PER_SECOND);
+}
+
+/**
  * Like Go's Duration.String(): 1h2m3.5s, 1m0s, 1.5s, 2.5ms, 1µs, 15ns, 0s, -1.5s.
  *
  * @api

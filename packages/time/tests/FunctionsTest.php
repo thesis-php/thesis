@@ -106,6 +106,22 @@ final class FunctionsTest
         yield 'multiply zero by min int' => [static fn() => multiply(ns(0), PHP_INT_MIN), '0.000000000'];
         yield 'multiply above max' => [static fn() => multiply(hours(500_000), 2000), self::OUT_OF_RANGE];
         yield 'multiply long by float' => [static fn() => multiply(sec(2_000_000_000), -1.0), '-2000000000.000000000'];
+        yield 'ratio' => [static fn() => ratio(sec(30), minutes(2)), '0.25'];
+        yield 'ratio above one' => [static fn() => ratio(sec(5), ms(2000)), '2.5'];
+        yield 'ratio of nanoseconds' => [static fn() => ratio(ns(1), ns(3)), '0.3333333333333333'];
+        yield 'ratio of negative' => [static fn() => ratio(ms(-1500), sec(1)), '-1.5'];
+        yield 'ratio to negative' => [static fn() => ratio(ms(1500), sec(-1)), '-1.5'];
+        yield 'ratio of negative to negative' => [static fn() => ratio(sec(-1), sec(-4)), '0.25'];
+        yield 'ratio of zero' => [static fn() => ratio(ns(0), sec(1)), '0.0'];
+        // As the division of PHP gives it.
+        yield 'ratio of zero to negative' => [static fn() => ratio(ns(0), sec(-1)), '-0.0'];
+        yield 'ratio to zero' => [static fn() => ratio(sec(1), ns(0)), 'DivisionByZeroError: Division by zero'];
+        yield 'ratio of zero to zero' => [static fn() => ratio(ns(0), ns(0)), 'DivisionByZeroError: Division by zero'];
+        // The float seconds are rounded already: 0.3 / 0.1 is 2.9999999999999996, and its floor loses an interval.
+        yield 'ratio rounds once' => [static fn() => ratio(sec(0.3), sec(0.1)), '3.0'];
+        yield 'ratio above 2^53 ns' => [static fn() => ratio(hours(24 * 365), hours(24)), '365.0'];
+        yield 'ratio of long to short' => [static fn() => ratio(sec(2_000_000_000), ns(1)), '2.0E+18'];
+        yield 'ratio of short to long' => [static fn() => ratio(ns(1), sec(2_000_000_000)), '5.0E-19'];
 
         yield from \PHP_INT_SIZE === 4 ? self::callsOf32Bits() : self::callsOf64Bits();
     }

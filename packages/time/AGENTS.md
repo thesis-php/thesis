@@ -83,6 +83,14 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   and as a function `multiplyBy($delay, 2)` reads as multiplying by `$delay`. Rejected: a `\RoundingMode`:
   the result is a duration rounded to a nanosecond, as `sec(1.5)` is, and a mode matters only where
   a conversion rounds to the unit of an API (`toMs()`). An optional one can be added later without a break.
+- `ratio()` divides the float nanoseconds of both durations (`toFloatFractions()` of a billion), one path
+  for 64-bit and 32-bit: they are exact below 2^53 (104 days), so the quotient is the nearest float and durations
+  that divide evenly give a whole number, which `(int)` keeps. Rejected: `toSecFloat($a) / toSecFloat($b)`,
+  rounded three times (`ratio(sec(0.3), sec(0.1))` was 2.9999999999999996, and its floor lost an interval).
+  Rejected: `intdiv()` and `%` of int nanoseconds, exact above 104 days too: there are none on 32-bit.
+  A zero divisor throws the `\DivisionByZeroError` of `/` itself, as `divideBy(0)` does, with no check of ours.
+  Rejected: INF and NAN as `fdiv()` gives, a progress of NAN goes on silently. Zero by a negative duration
+  is `-0.0`, as `/` gives: a negative total is not worth a branch.
 - No function named after a built-in (`min()`): imported, it shadows the built-in in the whole file
   and ignores extra arguments. Hence `minutes()`.
 - No functions for the minimum and the maximum: `min()`, `max()` and `sort()` of PHP compare durations as `<` does,

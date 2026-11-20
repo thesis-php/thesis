@@ -173,10 +173,10 @@ What to pass where a timeout or a TTL is a number, and what `0` means there: rar
 - **Postgres.** A number without a unit is milliseconds, also in `lock_timeout`
   and `idle_in_transaction_session_timeout`.
 
-### Checking, comparing, multiplying
+### Checking, comparing, multiplying, dividing
 
 ```php
-use function Thesis\Time\{isZero, multiply, sec};
+use function Thesis\Time\{isZero, multiply, ratio, sec};
 
 isZero($duration);
 $duration->negative;
@@ -189,11 +189,19 @@ max($a, $b, $c);
 multiply($delay, 2); // exact
 multiply($delay, 1.5); // rounded to the nearest nanosecond
 multiply($delay, -1);
+
+ratio($elapsed, $total); // 0.25, a progress
+ratio($cpuTime, $elapsed); // 0.8, a load
+(int) ratio($elapsed, $interval); // the intervals that have passed
 ```
 
 `<`, `<=`, `>`, `>=` and `<=>` compare durations by value, on PHP 8.6 and with the polyfill,
 and so do `min()`, `max()` and `sort()` of PHP. Check zero with `isZero()`, not with `==`: PHP CS Fixer
 and others make it `===`, which compares the objects.
+
+`ratio()` divides a duration by a duration, which the class does not. The result is the float nearest
+to the quotient while both are up to 104 days, so durations that divide evenly give a whole number.
+A zero divisor throws `\DivisionByZeroError`.
 
 ### Formatting and parsing
 
