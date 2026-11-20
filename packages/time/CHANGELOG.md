@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `toSecFloat()` returns the float nearest to the duration: `toSecFloat(ms(2530))` was `2.5300000000000002`.
 - `multiply()` by a finite float throws `Time\TimeException`, not `\ValueError`, when the product is too large
   for a float.
 
