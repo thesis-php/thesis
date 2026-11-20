@@ -4,6 +4,12 @@ Functions that format values and code for error messages. The API is described i
 
 ## Invariants that must not be broken
 
+- The package runs on PHP 8.4+, the rest of the monorepo on 8.6. The code, tests included, has no syntax or API
+  newer than 8.4. PHPStan and Rector take the PHP of the monorepo and miss it, `make test-alone P=formatter`
+  on 8.4 and 8.5 catches it. A rule of the 8.5 set of Rector that rewrites the code gets a `RectorSkip`
+  in the manifest.
+- `make test-alone` installs thesis/source-location from Packagist, not from the monorepo: a change that needs
+  an unreleased one fails there until thesis/source-location is released. Raise its lower bound in the manifest then.
 - Formatting never fails and never grows without a bound: it runs while an error is reported, often on a value
   from outside. Every function takes any input of its native type and formats what it does not recognize
   as a value or a string literal (`formatFunction(42)` is `42()`), never asserts on it.
@@ -31,6 +37,9 @@ Functions that format values and code for error messages. The API is described i
 
 ## Decisions
 
+- Rejected: PHP 8.2, like thesis/time. thesis/source-location requires 8.4 (its `AGENTS.md`), and before 8.4
+  a closure is named `App\{closure}`, which `reflectedFunctionName()` does not take for a closure (checked on 8.2
+  and 8.3). The constants with types would also lose them (8.3).
 - Continues the older `thesis/formatter` (0.1.0) in the monorepo, the next series is 0.2.
 - Values are written in the notation of PHPStan (`list{1, 2}`, `array{a: 1}`, `array{}` for an empty array,
   `...` for the rest) because readers of the errors know it. Exceptions where PHPStan has no notation:

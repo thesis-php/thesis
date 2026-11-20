@@ -12,6 +12,8 @@ return new Manifest(
     version: '0.2',
     keywords: ['php', 'formatter', 'error-messages'],
     require: [
+        // The PHP of thesis/source-location: the package itself needs no more.
+        'php' => '^8.4',
         'thesis/source-location' => '*',
     ],
     requireDev: [
