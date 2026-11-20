@@ -85,7 +85,7 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
 - A function or method with a variadic parameter whose values are a list, not options by name
-  (`shortest($a, $b, $c)`, `awaitSignal(SIGINT, SIGTERM)`), is marked `@no-named-arguments`: PHP would put
+  (`awaitSignal(SIGINT, SIGTERM)`), is marked `@no-named-arguments`: PHP would put
   a named argument into the array under its name as a key, and PHPStan then reports such a call.
   Without the tag a variadic parameter takes names only where they mean something (`...$options`).
 - A parameter that is only called or captured by a closure is `callable` with a signature (`callable(T): void`),

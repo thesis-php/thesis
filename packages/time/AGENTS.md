@@ -30,8 +30,8 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - `polyfill/` holds only `Time\Duration`, `Time\TimeException` and `load.php`, which loads them:
   the namespace belongs to PHP. The rest lives in `Thesis\Time\Internal` (`IsoInterval`).
 - `$signedSeconds` and `$signedNanoseconds` are declared first: PHP compares objects property by property
-  in declaration order, which makes `<`, `==` and `<=>` work as in 8.6. Two ints, since int nanoseconds
-  do not fit on 32-bit. `__serialize()` leaves them out.
+  in declaration order, which makes `<`, `==`, `<=>`, `min()`, `max()` and `sort()` work as in 8.6.
+  Two ints, since int nanoseconds do not fit on 32-bit. `__serialize()` leaves them out.
 - `__unserialize()` assigns the properties as they come, like `object_properties_load()`, so the engine throws
   the `TypeError` or `Error` that 8.6 wraps as the previous exception.
 - Messages name `Time\Duration` literally, not by `self::class`: `DurationFuzzTest` loads a renamed copy.
@@ -80,8 +80,11 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
   and as a function `multiplyBy($delay, 2)` reads as multiplying by `$delay`. Rejected: a `\RoundingMode`:
   the result is a duration rounded to a nanosecond, as `sec(1.5)` is, and a mode matters only where
   a conversion rounds to the unit of an API (`toMs()`). An optional one can be added later without a break.
-- No function named after a built-in (`min()`, `max()`): imported, it shadows the built-in in the whole file
-  and ignores extra arguments. Hence `minutes()`, `shortest()` and `longest()`.
+- No function named after a built-in (`min()`): imported, it shadows the built-in in the whole file
+  and ignores extra arguments. Hence `minutes()`.
+- No functions for the minimum and the maximum: `min()`, `max()` and `sort()` of PHP compare durations as `<` does,
+  on 8.6 and with the polyfill (`DurationTest` pins it), and PHPStan types their result as `Time\Duration`.
+  Rejected: `shortest()` and `longest()` (removed in 0.5), a second way to write them.
 - The integer conversions require a `\RoundingMode`, with no default. Their main use is a timeout, a TTL
   or an interval for an API of whole units, which must round up: a fraction dropped makes it expire early,
   and `0` is "no limit" in curl, Postgres, AMQP heartbeats. Elapsed time rounds toward zero. One default

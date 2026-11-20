@@ -176,23 +176,24 @@ What to pass where a timeout or a TTL is a number, and what `0` means there: rar
 ### Checking, comparing, multiplying
 
 ```php
-use function Thesis\Time\{isZero, longest, multiply, sec, shortest};
+use function Thesis\Time\{isZero, multiply, sec};
 
 isZero($duration);
 $duration->negative;
 $duration > sec(0);
 $elapsed >= $timeout;
 
-shortest($a, $b, $c);
-longest($a, $b, $c);
+min($a, $b, $c);
+max($a, $b, $c);
 
 multiply($delay, 2); // exact
 multiply($delay, 1.5); // rounded to the nearest nanosecond
 multiply($delay, -1);
 ```
 
-`<`, `<=`, `>`, `>=` and `<=>` compare durations by value, on PHP 8.6 and with the polyfill.
-Check zero with `isZero()`, not with `==`: PHP CS Fixer and others make it `===`, which compares the objects.
+`<`, `<=`, `>`, `>=` and `<=>` compare durations by value, on PHP 8.6 and with the polyfill,
+and so do `min()`, `max()` and `sort()` of PHP. Check zero with `isZero()`, not with `==`: PHP CS Fixer
+and others make it `===`, which compares the objects.
 
 ### Formatting and parsing
 

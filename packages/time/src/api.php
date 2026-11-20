@@ -245,36 +245,6 @@ function isZero(Duration $duration): bool
 }
 
 /**
- * @api
- * @no-named-arguments
- */
-function shortest(Duration $duration, Duration ...$durations): Duration
-{
-    foreach ($durations as $another) {
-        if (Duration::compare($another, $duration) < 0) {
-            $duration = $another;
-        }
-    }
-
-    return $duration;
-}
-
-/**
- * @api
- * @no-named-arguments
- */
-function longest(Duration $duration, Duration ...$durations): Duration
-{
-    foreach ($durations as $another) {
-        if (Duration::compare($another, $duration) > 0) {
-            $duration = $another;
-        }
-    }
-
-    return $duration;
-}
-
-/**
  * Unlike Duration::multiplyBy(), takes a negative and a float factor. An int factor is exact, a float one
  * is rounded to the nearest nanosecond, half away from zero, exact while both durations are below 2^53 ns (104 days).
  *

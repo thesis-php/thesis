@@ -318,6 +318,24 @@ final class DurationTest
         Assert::true(signed(MAX_SECONDS - 1, 999_999_999) < signed(MAX_SECONDS));
     }
 
+    public function isOrderedByBuiltInFunctions(): void
+    {
+        $minusTwo = signed(2, negative: true);
+        $minusTiny = signed(0, 999_999_999, negative: true);
+        $tiny = signed(0, 1);
+        $one = signed(1);
+        $durations = [$one, $minusTiny, $tiny, $minusTwo];
+
+        Assert::same(min($one, $minusTiny, $tiny, $minusTwo), $minusTwo);
+        Assert::same(max($minusTwo, $tiny, $one, $minusTiny), $one);
+        Assert::same(min($durations), $minusTwo);
+        Assert::same(max($durations), $one);
+
+        sort($durations);
+
+        Assert::same($durations, [$minusTwo, $minusTiny, $tiny, $one]);
+    }
+
     public function hasExtensibleException(): void
     {
         $exception = new \ReflectionClass(TimeException::class);
