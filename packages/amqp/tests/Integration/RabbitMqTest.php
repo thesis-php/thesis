@@ -13,6 +13,7 @@ use Thesis\Amqp\Message;
 use Thesis\Amqp\MessageReturned;
 use Thesis\Amqp\Publish;
 use Thesis\Amqp\ReplyCode;
+use function Thesis\Amqp\thrown;
 use function Thesis\Amqp\withRabbitMq;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
@@ -59,14 +60,13 @@ final class RabbitMqTest
             $channel->confirmSelect();
 
             $nowhere = 'no-such-queue-' . bin2hex(random_bytes(4));
+            $publish = static fn() => $channel->publish(new Message('lost'), routingKey: $nowhere, mandatory: true);
 
-            try {
-                $channel->publish(new Message('lost'), routingKey: $nowhere, mandatory: true);
-                Assert::fail('The message must be returned.');
-            } catch (MessageReturned $returned) {
-                Assert::same($returned->replyCode, ReplyCode::NoRoute);
-                Assert::equals($returned->returnedMessage, new Message('lost'));
-            }
+            $returned = thrown($publish);
+
+            Assert::instanceOf($returned, MessageReturned::class);
+            Assert::same($returned->replyCode, ReplyCode::NoRoute);
+            Assert::equals($returned->returnedMessage, new Message('lost'));
         });
     }
 
@@ -120,13 +120,12 @@ final class RabbitMqTest
         withRabbitMq(static function (Client $client) {
             $channel = $client->channel();
 
-            try {
-                $channel->queueDeclare('no-such-queue-' . bin2hex(random_bytes(4)), passive: true);
-                Assert::fail('The queue must not be found.');
-            } catch (ChannelClosed $exception) {
-                Assert::same($exception->replyCode, ReplyCode::NotFound);
-            }
+            $missing = 'no-such-queue-' . bin2hex(random_bytes(4));
 
+            $failure = thrown(static fn() => $channel->queueDeclare($missing, passive: true));
+
+            Assert::instanceOf($failure, ChannelClosed::class);
+            Assert::same($failure->replyCode, ReplyCode::NotFound);
             Assert::true($channel->isClosed);
             Assert::same($client->channel()->queueDeclare(exclusive: true)->messages, 0);
         });

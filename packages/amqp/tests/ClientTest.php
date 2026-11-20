@@ -85,12 +85,10 @@ final class ClientTest
             $peer->expect(ConnectionCloseOk::class);
             delay(ms(10));
 
-            try {
-                $client->channel();
-                Assert::fail('The channel must not open.');
-            } catch (ConnectionClosed $exception) {
-                Assert::same($exception->replyCode, ReplyCode::ConnectionForced);
-            }
+            $failure = thrown($client->channel(...));
+
+            Assert::instanceOf($failure, ConnectionClosed::class);
+            Assert::same($failure->replyCode, ReplyCode::ConnectionForced);
         });
     }
 
@@ -110,12 +108,8 @@ final class ClientTest
             $client->run($group);
             $peer = $peer->await();
 
-            // The client sends its heartbeats and, hearing nothing for 2 seconds, closes the socket.
-            try {
-                $peer->frame();
-                Assert::fail('The client must send nothing but heartbeats.');
-            } catch (IoException) {
-            }
+            // The client sends nothing but its heartbeats and, hearing nothing for 2 seconds, closes the socket.
+            Assert::instanceOf(thrown($peer->frame(...)), IoException::class);
 
             Expect
                 ::exception(ConnectionClosed::class)
@@ -226,11 +220,8 @@ final class ClientTest
             $peer->tune();
             $closed->await();
 
-            try {
-                $peer->frame();
-                Assert::fail('The client must close the connection it opened during close().');
-            } catch (IoException) {
-            }
+            // The client closes the connection it has opened during close().
+            Assert::instanceOf(thrown($peer->frame(...)), IoException::class);
 
             Expect::exception(ConnectionClosed::class)->withMessage('The client is closed.');
 
@@ -254,13 +245,9 @@ final class ClientTest
             $peer->expect(BasicPublish::class);
             $peer->expectMessage();
 
-            $closed = false;
-            $close = $group->spawn(static function () use ($client, &$closed) {
-                $client->close();
-                $closed = true;
-            });
+            $close = $group->spawn($client->close(...));
             delay(ms(10));
-            Assert::false($closed);
+            Assert::false($close->isDone);
 
             $peer->send($id, new BasicAck(1, false));
             $publish->await();

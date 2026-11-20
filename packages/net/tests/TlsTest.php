@@ -163,12 +163,9 @@ final class TlsTest
         [$client, $server] = tcpPair();
         $tls = new ClientTls(peerName: 'server.test');
 
-        try {
-            timeout(ms(50), static fn() => $client->enableTls($tls));
-            Assert::fail('Expected TimedOut.');
-        } catch (TimedOut) {
-        }
+        $failure = thrown(static fn() => timeout(ms(50), static fn() => $client->enableTls($tls)));
 
+        Assert::instanceOf($failure, TimedOut::class);
         Assert::true($client->isClosed);
         Assert::false($server->isClosed);
     }

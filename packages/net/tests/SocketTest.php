@@ -137,9 +137,9 @@ final class SocketTest
         $left->close();
 
         $failures = [
-            self::failure(static fn() => $left->write('x')),
-            self::failure($left->closeWrite(...)),
-            self::failure(static fn() => $left->enableTls(new ClientTls(peerName: 'server.test'))),
+            thrown(static fn() => $left->write('x')),
+            thrown($left->closeWrite(...)),
+            thrown(static fn() => $left->enableTls(new ClientTls(peerName: 'server.test'))),
         ];
 
         foreach ($failures as $failure) {
@@ -155,9 +155,9 @@ final class SocketTest
         $bytes = str_repeat('a', 10_000_000);
 
         [$first, $second] = group(static function (Group $group) use ($left, $bytes) {
-            $first = $group->spawn(static fn() => self::failure(static fn() => $left->write($bytes)));
+            $first = $group->spawn(static fn() => thrown(static fn() => $left->write($bytes)));
             // waits for the write above
-            $second = $group->spawn(static fn() => self::failure(static fn() => $left->write('b')));
+            $second = $group->spawn(static fn() => thrown(static fn() => $left->write('b')));
             delay(ms(10));
             $left->close();
 
@@ -336,12 +336,7 @@ final class SocketTest
 
         Assert::same(readExactly($server, 7), 'request');
 
-        try {
-            $server->read(1);
-            Assert::fail('Expected the end of the stream.');
-        } catch (UnexpectedEof) {
-        }
-
+        Assert::instanceOf(thrown(static fn() => $server->read(1)), UnexpectedEof::class);
         $server->write('response');
         Assert::same(readExactly($client, 8), 'response');
     }
@@ -361,19 +356,5 @@ final class SocketTest
         [$client] = tcpPair('::1');
 
         Assert::string((string) $client->remoteAddress)->startsWith('[::1]:');
-    }
-
-    /**
-     * @param \Closure(): void $operation
-     */
-    private static function failure(\Closure $operation): ?\Throwable
-    {
-        try {
-            $operation();
-
-            return null;
-        } catch (\Throwable $error) {
-            return $error;
-        }
     }
 }

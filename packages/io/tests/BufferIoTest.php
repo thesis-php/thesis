@@ -183,12 +183,9 @@ final class BufferIoTest
             $buffer->write('d');
         });
 
-        try {
-            $buffer->flush($writer);
-            Assert::fail('WriteFailed expected.');
-        } catch (WriteFailed) {
-        }
+        $failure = thrown(static fn() => $buffer->flush($writer));
 
+        Assert::instanceOf($failure, WriteFailed::class);
         Assert::same($buffer->drain(), 'bcd');
     }
 
@@ -200,12 +197,9 @@ final class BufferIoTest
             $buffer->read(1);
         });
 
-        try {
-            $buffer->flush($writer);
-            Assert::fail('WriteFailed expected.');
-        } catch (WriteFailed) {
-        }
+        $failure = thrown(static fn() => $buffer->flush($writer));
 
+        Assert::instanceOf($failure, WriteFailed::class);
         Assert::same($buffer->drain(), 'abce');
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\AsyncTrace\Tests;
 
+use Testo\Assert;
 use Thesis\Async\Trace\Event;
 use Thesis\Dispatcher;
 use Thesis\Dispatcher\Subscriber;
@@ -34,4 +35,20 @@ function unheardEvents(Subscriber $subscriber): array
     }
 
     return $unheard;
+}
+
+/**
+ * What $fn throws, for a program whose failure must not end the observation around it.
+ *
+ * @param callable(): mixed $fn
+ */
+function thrown(callable $fn): \Throwable
+{
+    try {
+        $fn();
+    } catch (\Throwable $exception) {
+        return $exception;
+    }
+
+    Assert::fail('Nothing was thrown.');
 }

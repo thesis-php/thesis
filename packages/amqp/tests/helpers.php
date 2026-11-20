@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Amqp;
 
+use Testo\Assert;
 use Thesis\Async\Group;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
@@ -43,11 +44,13 @@ function openChannel(Group $group, Client $client, FakePeer $peer): array
 }
 
 /**
- * What $fn throws, for a task whose failure the test awaits: a task that throws fails its group.
+ * What $fn throws, for a test that goes on after the failure or awaits it from a task: a task that throws
+ * fails its group.
+ * When the exception is the only outcome, use Expect::exception() instead.
  *
  * @param callable(): mixed $fn
  */
-function failure(callable $fn): ?\Throwable
+function thrown(callable $fn): \Throwable
 {
     try {
         $fn();
@@ -55,7 +58,7 @@ function failure(callable $fn): ?\Throwable
         return $exception;
     }
 
-    return null;
+    Assert::fail('Nothing was thrown.');
 }
 
 /**

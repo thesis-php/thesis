@@ -43,12 +43,9 @@ final class CancellationTest
                 $peer->send($id, new ExchangeDeclareOk());
             });
 
-            try {
-                timeout(ms(10), static fn() => $channel->queueDeclare('first'));
-                Assert::fail('The declaration must time out.');
-            } catch (TimedOut) {
-            }
+            $failure = thrown(static fn() => timeout(ms(10), static fn() => $channel->queueDeclare('first')));
 
+            Assert::instanceOf($failure, TimedOut::class);
             $channel->exchangeDeclare('second');
             Assert::false($channel->isClosed);
         });
@@ -112,12 +109,9 @@ final class CancellationTest
             });
             $channel->confirmSelect();
 
-            try {
-                timeout(ms(10), static fn() => $channel->publish(new Message('first')));
-                Assert::fail('The confirm must time out.');
-            } catch (TimedOut) {
-            }
+            $failure = thrown(static fn() => timeout(ms(10), static fn() => $channel->publish(new Message('first'))));
 
+            Assert::instanceOf($failure, TimedOut::class);
             $channel->publish(new Message('second'));
         });
     }

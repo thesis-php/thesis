@@ -18,6 +18,7 @@ use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\AsyncTrace\Tests\thrown;
 use function Thesis\AsyncTrace\Tests\unheardEvents;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
@@ -124,7 +125,7 @@ final class NdjsonWriterTest
     public function writesFailureCancellingGroup(): void
     {
         $line = __LINE__ + 1;
-        $records = self::write(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+        $records = self::write(static fn() => thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(5)));
             $group->spawn(static function () {
                 delay(sec(1));
@@ -246,20 +247,6 @@ final class NdjsonWriterTest
         new Dispatcher([$writer])->dispatch(new Joining(scope: 1, at: Instant::now()));
 
         Assert::same($writer->lost, 2);
-    }
-
-    /**
-     * @param callable(): mixed $fn
-     */
-    private static function thrown(callable $fn): ?\Throwable
-    {
-        try {
-            $fn();
-        } catch (\Throwable $error) {
-            return $error;
-        }
-
-        return null;
     }
 
     /**

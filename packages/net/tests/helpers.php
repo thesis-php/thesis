@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
+use Testo\Assert;
 use Thesis\Async\Group;
 use function Thesis\Async\group;
 
@@ -132,4 +133,21 @@ function exchange(Socket $client, Socket $server, string $up, string $down): arr
 
         return [$receivedUp->await(), $receivedDown->await()];
     });
+}
+
+/**
+ * What $fn throws, for a test that goes on after the failure.
+ * When the exception is the only outcome, use Expect::exception() instead.
+ *
+ * @param callable(): mixed $fn
+ */
+function thrown(callable $fn): \Throwable
+{
+    try {
+        $fn();
+    } catch (\Throwable $exception) {
+        return $exception;
+    }
+
+    Assert::fail('Nothing was thrown.');
 }

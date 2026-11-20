@@ -19,6 +19,7 @@ use function Thesis\Async\shield;
 use function Thesis\Async\suspend;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\AsyncTrace\Tests\thrown;
 use function Thesis\AsyncTrace\Tests\unheardEvents;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
@@ -116,7 +117,7 @@ final class TextLogTest
 
     public function writesFailureCancellingGroup(): void
     {
-        $log = self::record(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+        $log = self::record(static fn() => thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(5)));
             $group->spawn(static function () {
                 delay(sec(1));
@@ -184,7 +185,7 @@ final class TextLogTest
 
     public function writesWaitResumedWithError(): void
     {
-        $log = self::record(static fn() => self::thrown(static fn() => shield(static fn() => suspend(
+        $log = self::record(static fn() => thrown(static fn() => shield(static fn() => suspend(
             /** @param Continuation<null> $continuation */
             static function (Continuation $continuation) {
                 $continuation->throw(new \LogicException());
@@ -216,20 +217,6 @@ final class TextLogTest
     public function listensToEveryEventOfAsync(): void
     {
         Assert::same(unheardEvents(new TextLog()), []);
-    }
-
-    /**
-     * @param callable(): mixed $fn
-     */
-    private static function thrown(callable $fn): ?\Throwable
-    {
-        try {
-            $fn();
-        } catch (\Throwable $error) {
-            return $error;
-        }
-
-        return null;
     }
 
     /**

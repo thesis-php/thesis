@@ -53,6 +53,11 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   the components from the config Codecov has saved for the repository, and it saves the config only of an upload
   on the default branch: otherwise the API shows the coverage of a component and its badge says `unknown`.
 - No traits for test helpers: plain functions (in `tests/helpers.php`) or a base class.
+- A failure the test goes on after is taken by `thrown()` of `tests/helpers.php` of the package, the same
+  in each (it fails the test if nothing is thrown), and checked with `Assert::instanceOf()`, not by `try`,
+  `Assert::fail()` and `catch`. When the exception is the only outcome, it is `Expect::exception()`.
+- That a task still waits is `Assert::false($task->isDone)` after a pause, not a flag the task sets at its end:
+  the flag takes a closure around the call and a capture by reference.
 - A closure that writes a variable of the test captures it by reference, and so does every closure on its way:
   `static function () use (&$called)`, never `static fn()` around it. An arrow function captures by value,
   the write is lost, and an assertion like `Assert::false($called)` passes on a broken library.
@@ -71,3 +76,9 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Infection keeps there only the files of one run and deletes them at its end. The caches of PHPStan, Rector
   and PHP CS Fixer (`var/phpstan`, `var/rector`, `var/php-cs-fixer.cache`) live between runs, and `/tmp` dies
   with the container of `--rm`: every run would start cold. Parallel runs only overwrite each other's cache.
+- Rejected: `TextLog` of thesis/async-trace in the tests of the packages built on async (cache, io, net, amqp).
+  It fits a test of the scope tree itself: who has cancelled whom, where a task waits. These tests check results
+  (values, bytes, frames). io, net and most of amqp run on real time, where the seconds of a line differ
+  on every run. On virtual time the log holds the scopes and waits inside the package (the shields
+  and `synchronizedKey()` of `AtomicCache`), so a refactoring there would fail the test, and the seed
+  of `VirtualTimePlugin` reorders the lines of a tick. One line of it is no shorter than `Instant::elapsed()`.

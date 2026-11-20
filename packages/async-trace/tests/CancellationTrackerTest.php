@@ -25,6 +25,7 @@ use function Thesis\Async\shield;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\Trace\watchdog;
+use function Thesis\AsyncTrace\Tests\thrown;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
 
@@ -106,7 +107,7 @@ final class CancellationTrackerTest
     public function reportsFailureOfTaskWithItsError(): void
     {
         $line = __LINE__ + 2;
-        $reports = self::reports(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+        $reports = self::reports(static fn() => thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(5)));
             $group->spawn(static fn() => throw new \RuntimeException('boom'), name: 'fetch');
         })));
@@ -120,7 +121,7 @@ final class CancellationTrackerTest
     public function reportsFailureOfBodyWithItsError(): void
     {
         $line = __LINE__ + 2;
-        $reports = self::reports(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+        $reports = self::reports(static fn() => thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(5)));
 
             throw new \LogicException('bad');
@@ -185,7 +186,7 @@ final class CancellationTrackerTest
     public function reportsFirstCancellationOfGroupToTasksSpawnedAfter(): void
     {
         $line = __LINE__ + 2;
-        $reports = self::reports(static fn() => self::thrown(static fn() => group(static function (Group $group) {
+        $reports = self::reports(static fn() => thrown(static fn() => group(static function (Group $group) {
             $group->spawn(static function () {
                 try {
                     delay(sec(5));
@@ -235,7 +236,7 @@ final class CancellationTrackerTest
         $reports = self::reports(static fn() => timeoutOr(sec(5), static function () {
             group(static fn(Group $group) => $group->spawn(static fn() => delay(sec(1))));
             shield(static fn() => delay(sec(1)));
-            self::thrown(static fn() => group(static fn() => throw new \RuntimeException()));
+            thrown(static fn() => group(static fn() => throw new \RuntimeException()));
         }));
 
         Assert::same($reports, []);
@@ -353,20 +354,6 @@ final class CancellationTrackerTest
     private static function at(string $what, int $line): string
     {
         return $what . ' at ' . __FILE__ . ':' . $line;
-    }
-
-    /**
-     * @param callable(): mixed $fn
-     */
-    private static function thrown(callable $fn): ?\Throwable
-    {
-        try {
-            $fn();
-        } catch (\Throwable $error) {
-            return $error;
-        }
-
-        return null;
     }
 
     private static function cancelled(): Cancelled

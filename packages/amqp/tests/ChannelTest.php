@@ -81,16 +81,12 @@ final class ChannelTest
     public function publishWaitsForTheConfirm(): void
     {
         self::withConfirms(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
-            $confirmed = false;
-            $publish = $group->spawn(static function () use ($channel, &$confirmed) {
-                $channel->publish(new Message('a'));
-                $confirmed = true;
-            });
+            $publish = $group->spawn(static fn() => $channel->publish(new Message('a')));
 
             $peer->expect(BasicPublish::class);
             $peer->expectMessage();
             delay(ms(10));
-            Assert::false($confirmed);
+            Assert::false($publish->isDone);
 
             $peer->send($id, new BasicAck(1, false));
             $publish->await();
@@ -128,13 +124,13 @@ final class ChannelTest
                 $peer->send($id, new BasicAck(1, false));
             });
 
-            try {
-                $channel->publish(new Message('a', headers: ['k' => 'v']), 'events', 'nowhere', mandatory: true);
-                Assert::fail('The message must be returned.');
-            } catch (MessageReturned $returned) {
-                Assert::same($returned->replyCode, ReplyCode::NoRoute);
-                Assert::equals($returned->returnedMessage, new Message('a', headers: ['k' => 'v']));
-            }
+            $message = new Message('a', headers: ['k' => 'v']);
+
+            $returned = thrown(static fn() => $channel->publish($message, 'events', 'nowhere', mandatory: true));
+
+            Assert::instanceOf($returned, MessageReturned::class);
+            Assert::same($returned->replyCode, ReplyCode::NoRoute);
+            Assert::equals($returned->returnedMessage, $message);
         });
     }
 
@@ -161,13 +157,11 @@ final class ChannelTest
                 $peer->send($id, new BasicAck(3, true));
             });
 
-            try {
-                $channel->publishBatch($publishes);
-                Assert::fail('The batch must fail.');
-            } catch (PublishBatchFailed $failed) {
-                Assert::same($failed->nacked, [$publishes[1]]);
-                Assert::same($failed->returned, []);
-            }
+            $failed = thrown(static fn() => $channel->publishBatch($publishes));
+
+            Assert::instanceOf($failed, PublishBatchFailed::class);
+            Assert::same($failed->nacked, [$publishes[1]]);
+            Assert::same($failed->returned, []);
         });
     }
 
@@ -259,12 +253,10 @@ final class ChannelTest
                 $peer->send($id, new BasicAck(16, true));
             });
 
-            try {
-                $channel->publishBatch($publishes);
-                Assert::fail('The batch must fail.');
-            } catch (PublishBatchFailed $failed) {
-                Assert::same($failed->nacked, [$publishes[0]]);
-            }
+            $failed = thrown(static fn() => $channel->publishBatch($publishes));
+
+            Assert::instanceOf($failed, PublishBatchFailed::class);
+            Assert::same($failed->nacked, [$publishes[0]]);
         });
     }
 
@@ -315,14 +307,11 @@ final class ChannelTest
                 $peer->expect(ChannelCloseOk::class);
             });
 
-            try {
-                $channel->queueDeclare('missing', passive: true);
-                Assert::fail('The queue must not be found.');
-            } catch (ChannelClosed $exception) {
-                Assert::same($exception->replyCode, ReplyCode::NotFound);
-                Assert::true($channel->isClosed);
-            }
+            $failure = thrown(static fn() => $channel->queueDeclare('missing', passive: true));
 
+            Assert::instanceOf($failure, ChannelClosed::class);
+            Assert::same($failure->replyCode, ReplyCode::NotFound);
+            Assert::true($channel->isClosed);
             $broker->await();
         });
     }
@@ -332,14 +321,10 @@ final class ChannelTest
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer) {
             $peer->send(0, new ConnectionBlocked('low on memory'));
             delay(ms(10));
-            $published = false;
-            $publish = $group->spawn(static function () use ($channel, &$published) {
-                $channel->publish(new Message('a'));
-                $published = true;
-            });
+            $publish = $group->spawn(static fn() => $channel->publish(new Message('a')));
 
             delay(ms(10));
-            Assert::false($published);
+            Assert::false($publish->isDone);
 
             $peer->send(0, new ConnectionUnblocked());
             $publish->await();
@@ -351,11 +336,11 @@ final class ChannelTest
     {
         self::withConfirms(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
             // Larger than the socket buffers: the first publish holds the mutex while its write waits.
-            $first = $group->spawn(static fn() => failure(static fn() => $channel->publish(
+            $first = $group->spawn(static fn() => thrown(static fn() => $channel->publish(
                 new Message(str_repeat('x', 16_777_216)),
             )));
             delay(ms(10));
-            $second = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('second'))));
+            $second = $group->spawn(static fn() => thrown(static fn() => $channel->publish(new Message('second'))));
             delay(ms(10));
 
             $peer->send($id, new ChannelClose(ReplyCode::NotFound->value, 'NOT_FOUND', 60, 40));
@@ -376,7 +361,7 @@ final class ChannelTest
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
             $peer->send(0, new ConnectionBlocked('low on memory'));
             delay(ms(10));
-            $publish = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('a'))));
+            $publish = $group->spawn(static fn() => thrown(static fn() => $channel->publish(new Message('a'))));
             delay(ms(10));
 
             $peer->send($id, new ChannelClose(ReplyCode::NotFound->value, 'NOT_FOUND', 60, 40));
@@ -392,7 +377,7 @@ final class ChannelTest
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer) {
             $peer->send(0, new ConnectionBlocked('low on memory'));
             delay(ms(10));
-            $publish = $group->spawn(static fn() => failure(static fn() => $channel->publish(new Message('a'))));
+            $publish = $group->spawn(static fn() => thrown(static fn() => $channel->publish(new Message('a'))));
             delay(ms(10));
 
             $peer->send(0, new ConnectionClose(ReplyCode::ConnectionForced->value, 'CONNECTION_FORCED', 0, 0));
