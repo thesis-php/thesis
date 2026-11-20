@@ -69,10 +69,6 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
   - The notes of a GitHub Release against the tag: a missing one is made with the notes of the commit of the run,
     whatever the tag has, and one that exists is never updated. Both are edited by hand on GitHub,
     in the split repository and in the monorepo.
-  - A tag `<name>/vX.Y.Z` of the monorepo made by hand: GitHub makes the release at it, whatever its commit.
-    No ruleset protects the tags of the monorepo.
-  - A release under the top heading that the monorepo lacks: it is made by hand (`time` 0.3.0 and 0.3.1
-    were released before the monorepo repeated the releases).
   - That the package is on Packagist: `github` registers it after its first split (`repositories.md`),
     and Packagist reads the tags made before.
 

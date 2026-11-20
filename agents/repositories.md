@@ -33,10 +33,22 @@ a change made there would be lost on the next split or would diverge from the mo
   derived from `packages/<name>/package.php` and `monorepo.php`: it creates the missing repository, sets
   the description, the topics (`keywords` of the manifest), the homepage (`packages/<name>` in the monorepo),
   the disabled features and the rulesets. Of the monorepo `thesis-php/thesis` it sets only the description
-  and the topics, from `description` and `keywords` of `monorepo.php`: the rest of it is set by hand,
-  private vulnerability reporting included (`SECURITY.md` of every package sends a report there).
+  and the topics, from `description` and `keywords` of `monorepo.php`: the rest of it is set by hand (below).
   GitHub itself is the state, the command is idempotent and deletes nothing.
   CI runs it before the split, so a new package gets its repository with its first push.
+- **The monorepo is set by hand**, once. Three rulesets, which let nobody through, the owners included:
+  - `main is never rewritten`: no force push and no deletion of `main`. The splits copy its history
+    and are never force-pushed, so a rewritten `main` could not be pushed to any package.
+  - `no other branches`: no branch but `main` is created (the rule of the root `AGENTS.md`).
+    A pull request of a fork is not a branch. Delete it once branches are allowed.
+  - `tags of the release only`: tags are made, moved and deleted by the app alone: they repeat the releases
+    (`releases.md`). A release that the monorepo lacks cannot be added by hand.
+
+  They are named unlike the rulesets of a split: a split is told by the names of its rulesets.
+  The settings: private vulnerability reporting (`SECURITY.md` of every package sends a report there),
+  `GITHUB_TOKEN` of a workflow read-only by default and unable to approve a pull request (a job asks
+  for more in `permissions`), secret scanning with push protection, immutable releases (the tag of a release
+  cannot be moved or deleted, its title and notes can still be edited).
 - **Packagist.** `github` also adds the webhook of Packagist to every repository (any webhook to its URL counts:
   the older packages have the one of its GitHub integration) and registers the package once `main` exists,
   by the run after the first split: Packagist reads `composer.json` at once and refuses a repository without it.
@@ -58,6 +70,13 @@ a change made there would be lost on the next split or would diverge from the mo
   of the split or to a name that redirects to a renamed one (`Repositories::isSplit()`).
 
 ## Decisions
+
+- Rejected: the rulesets and the settings of the monorepo by `github`: one repository and constants,
+  not a state derived from the manifests, and a ruleset to drop is deleted by hand anyway.
+- Rejected for now: a required pull request and required checks on `main`. Everyone who pushes commits to `main`
+  directly and would bypass them, and the release waits for the checks itself. With contributors: one job
+  of `check.yaml` that needs the others, since a matrix job is named by its package and changes with the manifests.
+  Required signatures: the commits are not signed.
 
 - Rejected: the split as an exact copy of the directory, with `.gitattributes` leaving the rest out of the archive
   only (`tools/monorepo/AGENTS.md`).
