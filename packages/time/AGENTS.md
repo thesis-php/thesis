@@ -180,7 +180,9 @@ on 64-bit and 32-bit PHP. The API is in `README.md`, the class in https://wiki.p
 - Accepted: at the ends of int64 timestamps (year ±292 billion), on 64-bit too. Within 512 seconds of them
   `roundTimeTo()` may return a time that is not a multiple of the unit: a doubled multiple overflows to the float
   2^63, which is equal to any int that close to `PHP_INT_MAX`. `shiftTime()` beyond them returns a wrong time
-  or fails with the error of `modify()`. Rejected: checks of the range for dates nobody has.
+  or fails with the error of `modify()`. The docblocks and `README.md` say so. Rejected: checks of the range
+  for dates nobody has, with a branch by `PHP_INT_SIZE` (a float is an overflow on 64-bit and a timestamp
+  on 32-bit), while `DateTimeImmutable::add()` itself wraps around there.
 - `WallClock` and `FrozenClock` live here: a clock and a duration go together (`$clock->advance(sec(30))`),
   and `psr/clock` is an interface only. `FrozenClock` moves only when told: an implicit tick makes tests
   depend on the order of calls.

@@ -272,6 +272,10 @@ The multiples are of elapsed time, not of the wall clock: those of `hours(24)` a
 whatever the time zone of the time, which is kept. The unit is positive and of whole microseconds,
 anything else throws `\ValueError`.
 
+The ends of int64 timestamps (the year ±292 billion) are out of reach: `shiftTime()` beyond them gives a wrong time
+or an error, as `DateTimeImmutable::add()` wraps around there, and `roundTimeTo()` within 512 seconds of them
+may give a time that is not a multiple of the unit.
+
 ## [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks
 
 `WallClock` and `FrozenClock` implement

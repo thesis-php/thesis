@@ -425,6 +425,8 @@ function durationBetween(\DateTimeInterface $from, \DateTimeInterface $to): Dura
 /**
  * $time moved by the duration, back if it is negative, whatever the UTC offset (DST) does in between.
  * The nanoseconds below a microsecond are dropped: DateTimeImmutable cannot hold them.
+ * Beyond the int64 timestamps (the year ±292 billion) the result is a wrong time or an error:
+ * DateTimeImmutable::add() wraps around there too.
  *
  * @api
  */
@@ -458,6 +460,7 @@ function shiftTime(\DateTimeImmutable $time, Duration $duration): \DateTimeImmut
  * $time rounded to a multiple of the unit since 1970-01-01 00:00:00 UTC, like Go's Time.Round() and Time.Truncate():
  * roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity) is the start of a window of 5 minutes.
  * The multiples are of elapsed time, whatever the time zone of $time: those of hours(24) are the midnights of UTC.
+ * Within 512 seconds of the ends of int64 timestamps (the year ±292 billion) the result may not be a multiple.
  *
  * @api
  * @param Duration $unit positive, of whole microseconds: DateTimeImmutable cannot hold less
