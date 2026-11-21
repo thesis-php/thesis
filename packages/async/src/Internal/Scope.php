@@ -102,8 +102,8 @@ final class Scope implements Waiter
     }
 
     /**
-     * Runs $fn in the root scope with no scoped values, as the code of the event loop between the fibers runs:
-     * whoever has called {@see Loop::run()} or ended a scope, its state is not that of the callback.
+     * This method runs $fn in the root scope with no scoped values, like event loop code between fibers.
+     * The callback does not inherit state from code that calls {@see Loop::run()} or ends a scope.
      *
      * @template T
      * @param callable(): T $fn
@@ -176,7 +176,8 @@ final class Scope implements Waiter
     }
 
     /**
-     * A no-op if the scope is already cancelled, by its owner or through an ancestor: its subtree is notified then.
+     * This method does nothing if the owner or an ancestor already cancelled the scope.
+     * The earlier cancellation already notified the subtree.
      *
      * @param ?self $by the scope that cancels it, for the trace: null for none
      * @param ?\Throwable $error the failure that cancels it, for the trace: only for {@see CancelCause::Failure}

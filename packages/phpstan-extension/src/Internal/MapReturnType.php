@@ -14,9 +14,8 @@ use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
 
 /**
- * map() of an array keeps what is known of its keys: an array shape gives the same shape of results,
- * a list a list, a non-empty array a non-empty one. The value type is the one of the PHPDoc for every key:
- * $fn is one callable for all items.
+ * When map() receives an array, the extension preserves its keys and its array shape, list or non-empty
+ * array type. Each key has the value type declared in PHPDoc because the same $fn maps every item.
  *
  * @internal
  */

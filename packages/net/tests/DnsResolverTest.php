@@ -332,7 +332,7 @@ final class DnsResolverTest
     }
 
     /**
-     * A UDP port nothing listens on, at least for now: a query to it is refused.
+     * This helper returns a UDP port with no current listener. The port refuses queries.
      */
     private static function closedPort(): InetAddress
     {

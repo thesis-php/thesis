@@ -9,7 +9,7 @@ use Thesis\SourceLocation\Location;
 use Time\Duration;
 
 /**
- * A scope of `timeout()` or `timeoutOr()`.
+ * `timeout()` or `timeoutOr()` created a scope.
  *
  * @api
  */

@@ -40,7 +40,7 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   deep nesting or a chain of temporary variables. A call or two of nesting stays a plain call: `f(g($x))`,
   not `$x |> g(...) |> f(...)`.
 - A `match` over a closed set (the cases of an enum, the types of a union, a `@phpstan-sealed` interface) names
-  every member, the last one too (`$event instanceof Ended`), and has no `default`: a member added later fails
+  every member explicitly, including the last (`$event instanceof Ended`), and has no `default`. A new member fails
   `match.unhandled` in PHPStan instead of falling silently into `default`. `default` is for an open set:
   a code of a protocol, a string, an implementation of an open interface, `mixed`.
 - No return types on closures and arrow functions: `static fn() => new X()`, not `static fn(): X => new X()`.
@@ -64,13 +64,10 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - A comment explains what the code cannot: a non-obvious reason, a constraint, a trap. If it retells the code,
   rename the variable, method or class instead and delete the comment. PHPDoc types are not comments,
   they stay.
-- A comment, an error message and the docs (`README.md`, `CHANGELOG.md`, `AGENTS.md`) are plain English:
-  every sentence names its subject and says the verb. No words left out for the reader to restore
-  and no stand-in for a noun (`one`, `that of`, a trailing `otherwise`): not `as a server has got it otherwise`
-  but `A server builds the URI from the request line and Host`, not `one of a reader only once`
-  but `A body made from a reader can be read only once`, not `the length is that of the body`
-  but `the length comes from the body`. A noun in front beats a chain of `of`: `an HTTP/1.1 request`,
-  not `a request of HTTP/1.1`. Two short sentences beat one long sentence with a colon and three commas.
+- Comments, error messages and docs are plain English, understood on the first read. PHPDoc may start
+  with a verb (`Waits for a free permit.`), a short note may be a phrase (`Requires PHP 8.6+.`).
+  Name the thing, not a stand-in (`one`, `that of`, `the change`), put a condition first (`When X, ...`),
+  prefer `the package's suite` to `the suite of the package`. Split long sentences, cut empty words.
 - No one-letter names except a loop index (`$i`) and the operands of a comparator (`$a`, `$b`):
   `$n`, `$o`, `$v` make the reader look up what they hold.
 - Where the PHP standard library has a name for the same thing, take it: a number of bytes is `$length`

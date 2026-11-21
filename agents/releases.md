@@ -1,7 +1,7 @@
 # Releases
 
 Read before touching the release (`bin/monorepo release`, `make release`, the job `release` of `check.yaml`),
-the tags of the split repositories, their GitHub Releases or those of the monorepo that repeat them.
+split repository tags, their GitHub Releases or the matching monorepo releases.
 The versions are in `versions.md`, the changelogs in `changelogs.md`, the code in `tools/monorepo/AGENTS.md`.
 
 ## Rules
@@ -11,17 +11,17 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
   `[Unreleased]` of every package whose version has no tag in the split repository. A failed release (a flaky test,
   GitHub down) is released by the next push that passes or by a re-run of the failed jobs.
 - **The tag decides.** A heading whose tag `vX.Y.Z` exists is released: only what is missing of it is made,
-  its GitHub Release at the commit of the tag and the one of the monorepo, with the notes of the changelog
-  as it is now. A tag of the version without `v` is of an older package of the same name
-  (`exceptionally` `0.3.0`), whose changelog ends with it: the heading is skipped.
+  the split repository's GitHub Release at the tagged commit and the matching monorepo release,
+  with the notes of the changelog as it is now. A tag of the version without `v` is of an older package
+  of the same name (`exceptionally` `0.3.0`), whose changelog ends with it: the heading is skipped.
 - **A heading without a tag is released only if**
   - it is `## [X.Y.Z] - YYYY-MM-DD` (or `-alphaN`, `-betaN`, `-RCN`) with notes under it,
   - `[Unreleased]` of the package is empty: a change listed after the heading and before its release
     is moved under the heading,
   - the version is in the series of the package and comes right after its highest tag in it (with or without `v`,
-    composer reads them as one): the next patch or its first pre-release, the next pre-release or the stable
-    version of the last one, `X.Y.0` or its first pre-release for a new series. So a typo (`0.1.14` for `0.1.4`)
-    is refused instead of published for good,
+    Composer treats both spellings alike). The heading can name the next patch, its first pre-release,
+    the next pre-release, or the stable version of the latest pre-release. A new series starts at `X.Y.0`
+    or its first pre-release. A typo such as `0.1.14` for `0.1.4` is refused instead of published for good,
   - `[Unreleased]` of every monorepo package in its `require` is empty: the tests ran against the head
     of a dependency, a user installs its tag. So a fix across packages goes out together,
   - the repository is a split under its own name (`Repositories::isSplit()`): a tag pushed to an older package
@@ -30,15 +30,16 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
   releases nothing: the job fails with the reasons of every package, and the push that fixes them releases all.
 - **The steps, per package, dependencies first**: the lightweight tag `vX.Y.Z` at the split of the head, pushed
   to the split repository (it carries the commits, `main` there is left to the split job), then the GitHub Release
-  with `target_commitish` set to that commit (GitHub tags the default branch otherwise). A step that exists counts
-  as made, a tag compared by its commit. Of two runs releasing one heading at once, the second fails on the tag
-  and the next one finds it released. The run stops at the first failed step, since a dependent would require
-  a version that is not there, and a re-run or the next push continues it. The monorepo repeats the releases
+  with `target_commitish` set to that commit (GitHub tags the default branch if the target is omitted).
+  A step that exists counts as made, a tag compared by its commit. Of two runs releasing one heading at once,
+  the second fails on the tag and the next one finds it released. The run stops at the first failed step,
+  since a dependent would require a version that is not there, and a re-run or the next push continues it. The monorepo repeats the releases
   after the steps of every package, so it holds back none.
 - **GitHub Releases are in the split repository**: the source of the package on Packagist, which users watch
   (`releases.atom`) and Dependabot and Renovate take notes from. The name is the tag, the body is the section
-  of the changelog, `prerelease` is set for `-alphaN`, `-betaN`, `-RCN`. `make_latest` is always sent (GitHub takes
-  `true` otherwise), `true` only for the highest stable version of the package.
+  of the changelog. The publisher sets `prerelease` for `-alphaN`, `-betaN` and `-RCN`. GitHub defaults
+  `make_latest` to `true`, so the publisher always sends the flag. It sends `true` only for the package's
+  highest stable version.
 - **The monorepo repeats every release**: a GitHub Release `thesis/<name> X.Y.Z` at the tag `<name>/vX.Y.Z`
   of `thesis-php/thesis`. It is one feed of every package in the repository that is starred, and it names
   the commit of the monorepo of a version, with its tests (`git diff time/v0.3.1 time/v0.4.0`).
@@ -51,7 +52,7 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
     the archives that GitHub attaches are of the whole monorepo. `prerelease` and `make_latest` are those
     of the split repository, so the latest release of the monorepo is the last stable one of any package.
   - The split repository stays the source: nothing reads the tags or the releases of the monorepo.
-  - Trap: GitHub refuses a tag at a commit whose `.github/workflows/` differ from those of `main`
+  - Trap: GitHub refuses a tag at a commit whose `.github/workflows/` differ from the workflows on `main`
     (403 `Resource not accessible by integration`) to a token that may not write workflows. So the app has
     the permission Workflows and the job asks for it (`permission-workflows`). `GITHUB_TOKEN` cannot get it.
 - **The workflow.** The release is a job of the workflow of the checks and `needs` them. A run of `main` has
@@ -64,8 +65,8 @@ The versions are in `versions.md`, the changelogs in `changelogs.md`, the code i
     and a new series of a dependent with a new series of its dependency (`versions.md`).
   - A dependency changed since its tag in what its changelog does not list, a stable version that requires
     a dependency with only pre-releases, a lower bound that no tag meets.
-  - A heading under the top one that was never tagged (its push failed, the next one put a new series on top):
-    merge its notes into the top one.
+  - An older heading can lack a tag if its push failed and a later release added a heading for a new series:
+    merge its notes into the latest heading.
   - The notes of a GitHub Release against the tag: a missing one is made with the notes of the commit of the run,
     whatever the tag has, and one that exists is never updated. Both are edited by hand on GitHub,
     in the split repository and in the monorepo.

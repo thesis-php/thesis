@@ -7,14 +7,15 @@ namespace Thesis\SourceLocation;
 use Composer\InstalledVersions;
 
 /**
- * A line of a file. Not readonly as a class: a hooked property cannot be readonly.
+ * A location identifies a line in a file. The class is not `readonly`: PHP forbids hooks on readonly properties.
  *
  * @api
  */
 final class Location
 {
     /**
-     * The path from the root of the project if the file is under it, the full path otherwise.
+     * The property holds a path relative to the project root for files inside the project.
+     * For files outside the project, it holds the full path.
      *
      * @var non-empty-string
      */
@@ -92,8 +93,8 @@ final class Location
     }
 
     /**
-     * A short path says that the file is in the project, a full one that it is outside. A project in "/" would
-     * shorten every path, those of the system too, so it has no root: every path stays full.
+     * A relative path identifies a file inside the project. A full path identifies a file outside the project.
+     * Using "/" as the project root would shorten even system paths. The method keeps full paths in that case.
      *
      * @return ?non-empty-string with a trailing separator
      */

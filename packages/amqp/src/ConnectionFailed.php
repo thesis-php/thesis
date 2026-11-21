@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Amqp;
 
 /**
- * No host of the config accepted the connection: the previous exception is the failure of the last one.
+ * No configured host accepted the connection. The previous exception records the last host's failure.
  *
  * @api
  */

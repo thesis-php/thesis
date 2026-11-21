@@ -9,15 +9,17 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=dispatcher)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/dispatcher/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Ddispatcher)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=dispatcher)
 
-> A read-only split of [`packages/dispatcher`](https://github.com/thesis-php/thesis/tree/main/packages/dispatcher)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/dispatcher`](https://github.com/thesis-php/thesis/tree/main/packages/dispatcher).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class.
+The dispatcher calls listeners synchronously. It resolves the listeners once for each event class by
+matching the event against their parameter types.
 
 ```php
 use Thesis\Dispatcher;
@@ -74,7 +76,7 @@ $dispatcher = new Dispatcher([
 ```
 
 The parameters after the event are checked by PHPStan, not by the constructor: the second one takes
-`Thesis\Dispatcher`, the ones after it are optional. Only a function of PHP itself that declares one parameter
+`Thesis\Dispatcher`. Any subsequent parameters are optional. Only a function of PHP itself that declares one parameter
 (`$queue->push(...)`) cannot be a listener: unlike a function written in PHP, it rejects an argument
 it does not declare.
 

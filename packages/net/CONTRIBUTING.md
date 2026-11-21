@@ -2,37 +2,37 @@
 
 # Contributing to thesis/net
 
-`thesis/net` is developed in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis),
-in [`packages/net`](https://github.com/thesis-php/thesis/tree/main/packages/net), together with its tests and the other Thesis packages.
-This repository is a read-only split: on every push to `main` of the monorepo, CI copies into it
-what composer installs. Issues and pull requests are disabled here, and a commit made here would be lost
-on the next split.
+The source and tests live in [`packages/net`](https://github.com/thesis-php/thesis/tree/main/packages/net)
+in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
+On each push to `main`, CI copies the files Composer installs to this read-only repository.
+Issues and pull requests are disabled here: open them in the monorepo.
+The next split overwrites commits made here.
 
 ## Issues
 
-[Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) or [request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) in the issues of the monorepo
-and choose `thesis/net` in it. For a bug give its version, the code that reproduces it,
-what you expected and what happened instead. A vulnerability is reported privately, see
-[SECURITY.md](SECURITY.md).
+[Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) or [request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) in the monorepo.
+Choose `thesis/net`. For bugs, include the version, code to reproduce the bug, and the
+expected and actual results. See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ## Pull requests
 
-You need Git, Docker and Make: everything runs in containers, on the PHP version of the monorepo.
+Use Git, Docker and Make. Containers use the monorepo's PHP version.
 
 1. Fork [thesis-php/thesis](https://github.com/thesis-php/thesis) and clone your fork.
 2. Install the dependencies: `make i`.
 3. Change the code in `packages/net/src/` and its tests in `packages/net/tests/`.
-   Every change is covered by a test.
+   Cover each change with a test.
 4. Check the package while you work:
    - `make test P=net` runs its tests and starts the services they need,
    - `make phpstan P=net` runs static analysis,
    - `make fix P=net` applies Rector and the code style.
 5. A change that users of the package can notice gets an entry under `## [Unreleased]`
    of `packages/net/CHANGELOG.md` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
-   Leave the version headings alone: the maintainers release a version by adding one.
+   Leave version headings to the maintainers.
 6. If you changed `packages/net/package.php` (dependencies, description, keywords),
-   run `make sync` and commit the files it generates: CI fails on any difference.
-7. Run `make check`, everything CI runs, and open a pull request to `main` of the monorepo.
+   run `make sync` and commit the generated files: CI fails on any difference.
+7. Run `make check`, which runs everything CI runs, and open a pull request to `main`
+   in the monorepo.
 
 The rules of the code and of the monorepo are in
 [`AGENTS.md`](https://github.com/thesis-php/thesis/blob/main/AGENTS.md) and the files it links.

@@ -40,7 +40,7 @@ final class Connection
     public private(set) ?ConnectionClosed $closed = null;
 
     /**
-     * @var positive-int the size of the body frames: the negotiated maximum, or that of RabbitMQ when there is none
+     * @var positive-int the frame size uses the negotiated maximum or RabbitMQ's maximum if negotiation sets no limit
      */
     public int $bodyFrameMax {
         get => $this->frameMax === 0 ? Frames::DEFAULT_MAX : max(Frames::OVERHEAD + 1, $this->frameMax);

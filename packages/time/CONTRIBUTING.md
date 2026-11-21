@@ -2,37 +2,37 @@
 
 # Contributing to thesis/time
 
-`thesis/time` is developed in the monorepo [thesis-php/thesis](https://github.com/thesis-php/thesis),
-in [`packages/time`](https://github.com/thesis-php/thesis/tree/main/packages/time), together with its tests and the other Thesis packages.
-This repository is a read-only split: on every push to `main` of the monorepo, CI copies into it
-what composer installs. Issues and pull requests are disabled here, and a commit made here would be lost
-on the next split.
+The source and tests live in [`packages/time`](https://github.com/thesis-php/thesis/tree/main/packages/time)
+in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
+On each push to `main`, CI copies the files Composer installs to this read-only repository.
+Issues and pull requests are disabled here: open them in the monorepo.
+The next split overwrites commits made here.
 
 ## Issues
 
-[Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) or [request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) in the issues of the monorepo
-and choose `thesis/time` in it. For a bug give its version, the code that reproduces it,
-what you expected and what happened instead. A vulnerability is reported privately, see
-[SECURITY.md](SECURITY.md).
+[Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) or [request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) in the monorepo.
+Choose `thesis/time`. For bugs, include the version, code to reproduce the bug, and the
+expected and actual results. See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ## Pull requests
 
-You need Git, Docker and Make: everything runs in containers, on the PHP version of the monorepo.
+Use Git, Docker and Make. Containers use the monorepo's PHP version.
 
 1. Fork [thesis-php/thesis](https://github.com/thesis-php/thesis) and clone your fork.
 2. Install the dependencies: `make i`.
 3. Change the code in `packages/time/src/` and its tests in `packages/time/tests/`.
-   Every change is covered by a test.
+   Cover each change with a test.
 4. Check the package while you work:
    - `make test P=time` runs its tests and starts the services they need,
    - `make phpstan P=time` runs static analysis,
    - `make fix P=time` applies Rector and the code style.
 5. A change that users of the package can notice gets an entry under `## [Unreleased]`
    of `packages/time/CHANGELOG.md` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
-   Leave the version headings alone: the maintainers release a version by adding one.
+   Leave version headings to the maintainers.
 6. If you changed `packages/time/package.php` (dependencies, description, keywords),
-   run `make sync` and commit the files it generates: CI fails on any difference.
-7. Run `make check`, everything CI runs, and open a pull request to `main` of the monorepo.
+   run `make sync` and commit the generated files: CI fails on any difference.
+7. Run `make check`, which runs everything CI runs, and open a pull request to `main`
+   in the monorepo.
 
 The rules of the code and of the monorepo are in
 [`AGENTS.md`](https://github.com/thesis-php/thesis/blob/main/AGENTS.md) and the files it links.

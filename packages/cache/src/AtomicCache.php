@@ -32,7 +32,8 @@ use function Thesis\Async\synchronizedKey;
  * and two computations that nest the same two keys in opposite orders.
  *
  * The lock is a {@see KeyedMutex}: by default a {@see LocalKeyedMutex} of this object, which protects one process.
- * A distributed one (Redis) protects every process that shares the inner cache, if they all pass it.
+ * A distributed mutex such as Redis protects every process that shares the inner cache if all processes use
+ * the same mutex.
  *
  * @api
  * @template V
@@ -51,7 +52,7 @@ final readonly class AtomicCache implements Cache
     /**
      * The value of $key, or the result of $compute stored with $ttl if there is none.
      *
-     * A hit takes no lock. On a miss, takes the lock of $key and reads again (another caller may have stored
+     * A cache hit needs no lock. On a miss, this method locks $key and reads again (another caller may have stored
      * the value meanwhile), and only then computes, so concurrent callers of one key wait for the first and get
      * its value. A stored null is a hit.
      *

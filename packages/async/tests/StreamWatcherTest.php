@@ -211,7 +211,8 @@ final class StreamWatcherTest
     }
 
     /**
-     * Two connected sockets. Keep both: once one is freed, the other one reads the end of the stream.
+     * This helper returns two connected sockets. Keep both sockets alive because freeing either socket ends
+     * the peer's stream.
      *
      * @return array{resource, resource}
      */

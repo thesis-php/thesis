@@ -21,7 +21,7 @@ use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 
 /**
- * Every test already runs on virtual time: the ones of virtualTime() itself nest a virtualTime() in it.
+ * Every test already runs on virtual time. The tests of virtualTime() start a nested virtualTime() run.
  */
 #[Test]
 final class VirtualTimeTest

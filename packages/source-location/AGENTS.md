@@ -1,6 +1,7 @@
 # thesis/source-location
 
-Where in the source code: `Location` and `caller()`. The API is described in `README.md`.
+`Location` identifies a place in source code, and `caller()` finds the call site outside a library.
+Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

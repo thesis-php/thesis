@@ -53,7 +53,7 @@ final class Loop
     private const int IDLE_FIBERS = 128;
 
     /**
-     * The loop of the run in progress, or the one of the process: see {@see get()}.
+     * The active loop. See {@see get()} for the fallback.
      */
     private static ?self $current = null;
 
@@ -122,7 +122,9 @@ final class Loop
     private array $microtasks = [];
 
     /**
-     * @var list<\Fiber<mixed, mixed, mixed, mixed>> the fibers of the pool that wait for a task, the last one first
+     * The pool reuses the most recently returned idle fiber first.
+     *
+     * @var list<\Fiber<mixed, mixed, mixed, mixed>>
      */
     private array $idleFibers = [];
 
@@ -215,8 +217,8 @@ final class Loop
     }
 
     /**
-     * The loop that runs now, or the one of the process, created on first use: a wait parks on it,
-     * and `group()` called in {main} runs it.
+     * Returns the active loop. The fallback is the process loop, created on first use.
+     * Waits park on that loop. `group()` runs it from {main}.
      */
     public static function get(): self
     {
@@ -382,7 +384,8 @@ final class Loop
     }
 
     /**
-     * Resumes $fiber in the next tick, or in this one if it has not begun to resume its ready fibers yet.
+     * The loop resumes $fiber in the current tick if it has yet to resume any ready fibers.
+     * After that point, it resumes $fiber in the next tick.
      *
      * @param \Fiber<mixed, mixed, mixed, mixed> $fiber
      */
@@ -401,7 +404,7 @@ final class Loop
     }
 
     /**
-     * A no-op for a waiter that has been woken or was not deferred.
+     * No effect unless the waiter is still deferred.
      */
     public function undefer(Waiter $waiter): void
     {
@@ -430,7 +433,7 @@ final class Loop
     }
 
     /**
-     * A no-op for a timer that has fired or has been cancelled.
+     * No effect after the timer fires or is cancelled.
      */
     public function cancel(Timer $timer): void
     {
@@ -478,7 +481,7 @@ final class Loop
     }
 
     /**
-     * A no-op for a waiter that has been woken or forgotten.
+     * No effect once the waiter wakes or leaves the queue.
      *
      * @param resource $stream
      */
@@ -508,7 +511,8 @@ final class Loop
 
     /**
      * Calls $handler with the signal every time the process receives it, until {@see offSignal()}: instead of its
-     * default action, or the handler of `pcntl_signal()` it had, which comes back once the last one is gone.
+     * default action or the previous `pcntl_signal()` handler. The loop restores the previous behavior
+     * after the last registered handler leaves.
      * A handler is called in {main} between the fibers, so it must not wait.
      *
      * @param positive-int $signal
@@ -532,7 +536,7 @@ final class Loop
     }
 
     /**
-     * A no-op for a handler that is not there.
+     * No effect if the handler is absent.
      *
      * @param positive-int $signal
      * @param \Closure(int): void $handler
@@ -827,7 +831,7 @@ final class Loop
     }
 
     /**
-     * The nearest pending timer, dropping the outdated entries on the way.
+     * Discards stale entries before returning the next timer.
      */
     private function nextTimer(): ?Timer
     {

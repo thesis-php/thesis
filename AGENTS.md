@@ -1,13 +1,15 @@
 # Thesis
 
-An ecosystem of asynchronous PHP on an event loop of its own (`Io\Poll` of PHP 8.6, in thesis/async). It rethinks
-amphp and the older thesis packages from scratch: it is not a wrapper around them and does not depend
-on them. Unix only, 64-bit where a package needs it (`platform.md`).
+Thesis builds asynchronous PHP packages on the thesis/async event loop, which uses PHP 8.6's `Io\Poll`.
+The packages rework ideas from amphp and older Thesis packages from scratch. They use independent
+implementations and have no dependencies on those packages. Thesis runs on Unix. Packages that need
+64-bit PHP declare that requirement (`platform.md`).
 
 ## Layout
 
-- `packages/<name>/` is one package, published as `thesis/<name>` from a read-only repository of its own.
-  `package.php` (the manifest) is the only place of its description and dependencies, see `manifests.md`.
+- Each `packages/<name>/` directory contains one package. A dedicated read-only repository publishes
+  it as `thesis/<name>`. Only the package manifest, `package.php`, declares its description and dependencies.
+  See `manifests.md`.
 - `tools/monorepo/` is the monorepo tooling (`bin/monorepo`): generated files, the repositories of the packages,
   their split and their releases in CI. `tools/php-cs-fixer/` holds our custom PHP CS Fixer rules.
   The configs of the quality tools are in the root, the tools are dev dependencies in `vendor/`.
@@ -21,6 +23,7 @@ on them. Unix only, 64-bit where a package needs it (`platform.md`).
   (invariants) and decisions (what was rejected and why), and describes how things are now: when we rethink
   something, rewrite the existing text instead of appending a correction, the history is in git.
   Every rule is short, current and in the section it belongs to. Delete what became obsolete, merge duplicates.
+- A rule is in the plain English of `php.md`. A rewrite for style keeps every fact, reason and `Rejected:`.
 - An important finding (an invariant, a decision, a trap, a rejected approach) is written in the same change,
   without being asked, to the narrowest file that covers it: `AGENTS.md` of the package or tool if it is about one,
   a topic if it spans several, a new topic with a line in "Topics" if none fits. A topic over about 8 KB is split

@@ -9,7 +9,8 @@ use function Thesis\Time\ns;
 
 /**
  * In-process {@see RateLimiter}: a token bucket. It holds up to $burst tokens and gains $perSecond of them a second;
- * a call takes one. After a pause, $burst calls start at once, then one every 1 / $perSecond seconds.
+ * each call takes a token. After a pause, $burst calls start at once. Then one call starts every
+ * 1 / $perSecond seconds.
  * It bounds the average, not every window: within any T seconds at most $burst + $perSecond * T calls start,
  * and one more after a call the event loop has woken up late by less than a token interval: the schedule catches up,
  * so a real timer, a little late on every call, does not slow the rate down. A wake-up later than that has lost

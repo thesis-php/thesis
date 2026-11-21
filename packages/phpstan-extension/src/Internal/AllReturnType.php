@@ -16,7 +16,7 @@ use PHPStan\Type\TypeCombinator;
 
 /**
  * all() of an array shape of callables returns the shape of their results, where the generics of PHPDoc
- * give one value type for every key. Of a list it returns a list, of a non-empty array a non-empty one.
+ * give one value type for every key. The extension preserves list and non-empty array types.
  *
  * @internal
  */

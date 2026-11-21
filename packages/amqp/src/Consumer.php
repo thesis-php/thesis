@@ -54,7 +54,7 @@ final readonly class Consumer implements \IteratorAggregate
 
     /**
      * Groups the deliveries: a batch is yielded once it has $count deliveries or, when it has at least one,
-     * once $timeout has passed since the first one. Acknowledge it as a whole with {@see Batch::ack()}.
+     * once $timeout has passed since the first delivery. Acknowledge it as a whole with {@see Batch::ack()}.
      *
      * A batch is acknowledged with `multiple`, which covers every consumer of the channel: give the consumer
      * a channel of its own, and a prefetch of at least $count ({@see Channel::qos()}), or no batch fills up.

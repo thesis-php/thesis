@@ -20,10 +20,10 @@ namespace Thesis\Async;
 interface KeyedSemaphore
 {
     /**
-     * Waits until a permit of $key is free and takes it. Not reentrant, like {@see Semaphore::acquire()}:
+     * `acquire()` waits until a permit of $key is free and takes it. Not reentrant, like {@see Semaphore::acquire()}:
      * a second acquire() of the same key by a holder waits for another permit. {@see synchronizedKey()} is reentrant.
      *
-     * The contract for implementations is that of {@see Semaphore::acquire()}.
+     * Implementations follow the {@see Semaphore::acquire()} contract.
      *
      * @param array-key $key an id or a name; as in an array, a numeric string is the same key as its integer
      * @throws Cancelled if the scope is cancelled while waiting

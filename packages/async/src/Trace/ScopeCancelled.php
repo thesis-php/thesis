@@ -18,9 +18,9 @@ final readonly class ScopeCancelled implements Event
     /**
      * @param positive-int $scope what is cancelled: the task, the group (its tasks, everything on a failure,
      *     its daemons), the timeout
-     * @param ?positive-int $by the scope that has cancelled it: the one that has called `Task::cancel()`
-     *     or `cancelTasks()`, the one that has failed, the timeout itself, the group whose daemons it is;
-     *     null for none (a group failed by the event loop)
+     * @param ?positive-int $by The ID identifies the scope that requested cancellation or failed,
+     *     the timeout that expired, or the group that owns the daemons. The ID is null if the event loop
+     *     failed the group.
      * @param list<positive-int> $reached the scopes that are cancelled now and were not before,
      *     in the order of creation
      * @param ?Caller $caller the call that has cancelled, outside the library: `Thesis\Async\Task::cancel`

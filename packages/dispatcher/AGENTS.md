@@ -84,8 +84,8 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
 - Rejected: not caching `listens()` of a class that is not declared yet. Its parameter is a `class-string`,
   and `is_a()` autoloads it, so only a class declared later by `eval()` or a condition is cached wrong:
   a check of `class_exists()` per miss for a case the type already excludes.
-- Rejected: collecting the exceptions of all the listeners: the first one is thrown, the rest are not called,
-  so the failure points at the listener that failed.
+- Rejected: collecting the exceptions of all the listeners. The dispatcher propagates the first exception
+  and skips the remaining listeners, so the error points directly to the listener that threw it.
 - Rejected: stripping `null` from `?A`: the dispatcher never passes `null`, a nullable type is a mistake
   of the listener. Rejected: rejecting intersections and DNF: in the normal form they cost nothing more.
 - Several listeners of one object are given by `Subscriber::listeners()`, and the object goes to the constructor

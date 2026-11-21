@@ -4,9 +4,9 @@
 [![PHP](https://img.shields.io/badge/php-8.6%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-An ecosystem of asynchronous PHP on an event loop of its own, on `Io\Poll` of PHP 8.6:
-structured concurrency for fibers, non-blocking I/O, TCP, TLS and DNS, an AMQP client and the tools around them.
-Unix only, the packages with I/O and time in `int` nanoseconds require 64-bit PHP.
+Thesis provides structured concurrency for PHP fibers on an event loop that uses PHP 8.6's `Io\Poll`.
+It includes non-blocking I/O, TCP, TLS and DNS, a RabbitMQ client and tools for those packages.
+Thesis runs on Unix. Packages that use I/O and store time as integer nanoseconds require 64-bit PHP.
 
 This is the development monorepo. Every package in `packages/` is published as `thesis/<name>`
 from a read-only repository of its own, so issues and pull requests go here.
@@ -35,7 +35,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 
 ## Development
 
-Everything runs in Docker, see `make help`.
+Run the development commands in Docker through Make. `make help` lists the targets.
 
 ```shell
 make i                 # install dependencies

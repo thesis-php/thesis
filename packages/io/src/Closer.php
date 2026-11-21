@@ -10,7 +10,7 @@ namespace Thesis\Io;
 interface Closer
 {
     /**
-     * Releases the underlying resource. Must be idempotent.
+     * `close()` releases the underlying resource. Repeated calls must have no further effect.
      */
     public function close(): void;
 }

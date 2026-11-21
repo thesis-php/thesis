@@ -9,15 +9,16 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=exceptionally)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/exceptionally/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dexceptionally)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=exceptionally)
 
-> A read-only split of [`packages/exceptionally`](https://github.com/thesis-php/thesis/tree/main/packages/exceptionally)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/exceptionally`](https://github.com/thesis-php/thesis/tree/main/packages/exceptionally).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Turns PHP errors into exceptions around a callable. Safe when the callable suspends a fiber.
+`exceptionally()` turns PHP errors into exceptions, even when the callable suspends a fiber.
 
 ```php
 use function Thesis\exceptionally;
@@ -97,5 +98,6 @@ and only from the top. So:
 - Do not restore a handler set before a call while the call runs: `restore_error_handler()` takes off the handler
   of `exceptionally()` instead, its errors are not thrown anymore, and the handler you meant stays.
 - The previous handler must not suspend the fiber: while a handler runs, PHP has none, and if another fiber
-  sets one meanwhile, PHP forgets the running one. This breaks with or without `exceptionally()`.
+  sets a handler in the meantime, PHP forgets the handler that was running. This breaks with or without
+  `exceptionally()`.
 - `exit()` and a fatal error do not finish the call: errors of the shutdown functions at its levels are thrown.

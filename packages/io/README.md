@@ -9,21 +9,22 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=io)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/io/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dio)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=io)
 
-> A read-only split of [`packages/io`](https://github.com/thesis-php/thesis/tree/main/packages/io)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/io`](https://github.com/thesis-php/thesis/tree/main/packages/io).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Fast binary I/O for PHP: an in-memory byte buffer with typed big/little-endian encoding and varints,
-minimal `Reader` / `Writer` / `Closer` interfaces for streams, and the streams themselves: non-blocking
-streams over PHP resources and stdio.
-Streams wait through [thesis/async](https://github.com/thesis-php/async): every wait is cancelled by the task tree.
+This library provides binary I/O for PHP. Its in-memory byte buffer supports typed big-endian and
+little-endian encoding and varints. The package provides `Reader`, `Writer` and `Closer` interfaces for
+non-blocking streams over PHP resources and standard I/O. Streams wait through
+[thesis/async](https://github.com/thesis-php/async), so the task tree controls cancellation.
 
-It is the byte layer for binary protocol implementations (AMQP, Kafka, protobuf, gRPC, NATS, ...):
-codecs work on a `Buffer`, connections move bytes between a `Buffer` and a socket.
+Binary protocol codecs work with a `Buffer`. Connections move bytes between the buffer and a socket.
+These tools support protocols such as AMQP, Kafka, protobuf, gRPC and NATS.
 
 ## Installation
 
@@ -161,12 +162,13 @@ $line->fillUntil(stdin(), "\n");
 stdout()->write(strtoupper($line->readUntil("\n")) . "\n");
 ```
 
-A standard descriptor shares its blocking mode with the shell, the other jobs of the terminal and the children
-that inherit it, so these streams never change it: they read and write only once `stream_select()` says
-the call will not block, and wait through the event loop otherwise. `echo` and the processes that share
-the descriptor keep working: an `echo` while a write of `stdout()` waits for room blocks as usual and may land
-in the middle of that write. A write cancelled after a part leaves `stdout()` open, the next one goes on
-after the half: there are no messages to break.
+The shell, other terminal jobs and child processes can share the same standard descriptor and blocking mode.
+These streams preserve that mode. They read or write when `stream_select()` reports that the operation can proceed.
+If the descriptor is not ready, the operation waits through the event loop.
+
+`echo` still blocks as usual. If `stdout()` is waiting for room, `echo` may insert bytes in the middle of the
+pending write. If cancellation interrupts a write after it sends some bytes, `stdout()` stays open.
+The next write starts after the bytes already sent. Standard output has no message boundaries.
 
 ## Supported types
 

@@ -122,8 +122,8 @@ final readonly class Matrices
     }
 
     /**
-     * The PHP versions on which a package runs and the monorepo does not: from its lowest to the one before
-     * that of the monorepo. Only within a major: the last minor of a major is not known from the numbers.
+     * This method lists PHP minors from the package minimum up to the minor before the monorepo's PHP.
+     * Both versions must share a major because the numbers alone cannot identify the last minor of a major.
      *
      * @param array{int, int} $from
      * @param array{int, int} $to

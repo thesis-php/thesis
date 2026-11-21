@@ -42,7 +42,7 @@ final class Dispatcher
     }
 
     /**
-     * A listener may suspend the fiber: then so does this call. What a listener throws is thrown here,
+     * If a listener suspends the fiber, this call suspends with it. This call propagates the listener's exception,
      * the listeners after it are not called. An event dispatched by a listener goes to its listeners at once,
      * before the next listener of $event is called.
      */

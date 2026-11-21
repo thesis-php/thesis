@@ -9,15 +9,17 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=async)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/async/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dasync)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=async)
 
-> A read-only split of [`packages/async`](https://github.com/thesis-php/thesis/tree/main/packages/async)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/async`](https://github.com/thesis-php/thesis/tree/main/packages/async).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Structured concurrency for PHP fibers on an event loop of its own, on `Io\Poll` of PHP 8.6: cancellation is a property of the task tree, not a function parameter.
+This library provides structured concurrency for PHP fibers. Its event loop uses PHP 8.6's `Io\Poll`.
+The task tree controls cancellation.
 
 > **Experimental.** The API is unstable.
 
@@ -335,7 +337,7 @@ $value = race([
 ]);
 ```
 
-If every contender fails, the other failures are among the `suppressed()` ones of the rethrown one.
+If every task fails, the function rethrows the first failure. Pass that failure to `suppressed()` to get the rest.
 
 ### Quorum: `some()`
 
@@ -353,14 +355,15 @@ $acks = some(2, [
 ]);
 ```
 
-It fails as soon as `$count` successes are no longer possible, not when every task is done: the rest are cancelled,
-the first failure is rethrown, and the others (including those of tasks failing while being cancelled) are its `suppressed()` ones.
+When `$count` successes become impossible, `some()` cancels and joins the remaining tasks and rethrows the
+first failure. Pass that failure to `suppressed()` to get the other failures,
+including failures during cancellation.
 Fewer tasks than `$count` is a `\ValueError`.
 
 ### Every outcome: `allSettled()`
 
-Waits for every task; a failure neither cancels the others nor is rethrown. Results and failures come apart,
-each with the keys of the tasks and in their order:
+`allSettled()` waits for every task. It returns separate results and failures with the original task keys
+and order.
 
 ```php
 use function Thesis\Async\allSettled;
@@ -388,9 +391,9 @@ each($urls, 20, crawl(...));
 $pages = map($urls, 20, static fn(string $url) => fetch($url)); // keys and order of $urls
 ```
 
-Items are processed by at most `concurrency` tasks, not by a task per item: a task takes the next item once it is done
-with the previous one, and a new task is started only when an item finds the running ones busy. So consecutive calls of
-the callable may share a fiber: state kept per fiber (by third-party code, for example) is not reset between items.
+At most `concurrency` tasks process the items. A task takes the next item when it finishes its current item.
+The pool starts a new task only when all running tasks are busy and the pool has room. Consecutive calls
+may share a fiber, so fiber-local state, including state from third-party code, can persist between items.
 
 The tasks iterate the items one at a time, so the iterable may itself wait, for example, for the next page of an API.
 The next item is pulled only once a task is free for it, and none is pulled after a failure.
@@ -421,8 +424,9 @@ try {
 
 ### Shutdown and reload: `awaitSignal()` and `trapSignals()`
 
-A signal does not cancel anything by itself. `awaitSignal()` waits for one of the signals and returns the one received,
-so a graceful shutdown is a group whose body returns once the signal comes: the daemons are cancelled and joined.
+A signal does not cancel anything by itself. `awaitSignal()` waits for any of the requested signals
+and returns the signal it receives.
+For a graceful shutdown, return from the group body when the signal arrives. The group cancels and joins its daemons.
 `trapSignals()` catches signals for as long as its callable runs, for those that come again and again.
 
 ```php
@@ -525,8 +529,8 @@ the failure that cancels the group comes after their code.
 
 ### A value from elsewhere: `Deferred`
 
-A one-shot value that one side completes and any number of fibers await. `await()` is cancellable;
-cancelling one awaiter affects neither the deferred nor the other awaiters.
+A producer completes a `Deferred` once, and any number of fibers can await the result.
+Cancelling an `await()` call leaves the deferred and the other awaiters alone.
 
 ```php
 use Thesis\Async\Deferred;
@@ -650,8 +654,8 @@ each($repositories, 5, static function (Repository $repository) use ($github) { 
 
 After a pause, `$burst` calls start at once, then one every `1 / $perSecond` seconds. No timer refills the bucket:
 it keeps the time at which it would be full again, and a call compares it with the clock. It is fair like the mutex it queues on: tokens go in the order
-callers came, and only the first one sleeps. A caller cancelled while waiting takes no token, so the next one gets it on time;
-`timeout()` around `wait()` bounds how long a call may wait for its turn.
+callers arrived, and only the first caller sleeps. Cancellation takes the waiting caller out of the queue
+without consuming a token. Wrap `wait()` in `timeout()` to limit the wait.
 
 A bucket limits the average, not every window: within any `T` seconds up to `$burst + $perSecond * T` calls start,
 so `perSecond: 10, burst: 10` may start 20 within one second. For a server that rejects more than `N` requests
@@ -804,7 +808,7 @@ and the other is lost. Merge sources by sending into one channel instead.
 
 ### Context of a request: `ScopedValue`
 
-A value that reaches every task of a request without being passed as an argument: a trace id, a logger context, a tenant.
+A scoped value lets every task in a request read a trace ID, logger context or tenant without an argument.
 
 ```php
 use Thesis\Async\ScopedValue;
@@ -823,7 +827,8 @@ whatever it ends with. A task takes the values bound where it is spawned, not wh
 so `with()` around a `spawn()` is visible to the task. Values bound later, in the parent or in the task, do not
 reach the other side. `shield()` does not hide values: it only hides cancellation. `onCancel()` callbacks see only defaults.
 
-Where nothing is bound, `get()` returns the default given to the constructor, `null` unless stated otherwise.
+When no value is bound, `get()` returns the constructor default. The default is `null` unless the caller
+supplies a value.
 A value with a natural default never needs a null check:
 
 ```php

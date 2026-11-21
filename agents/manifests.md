@@ -32,8 +32,10 @@ or changing the public API of a package that others use. How the generator works
   on GitHub (`repositories.md`), so `make sync` checks them by the rules of a topic.
 - **`description` and `keywords` follow the features.** A change that adds, removes or renames what a package does
   (a protocol, a transport, a kind of API) updates the `description` and `keywords` of its manifest
-  in the same change, and those of `monorepo.php` when it changes what the ecosystem offers (a new package).
-  They are how the package is found on Packagist and GitHub: a stale one hides a feature or promises a removed one.
+  in the same change. When a change alters what the ecosystem as a whole offers (a new package), it also updates
+  the `description` and `keywords` of `monorepo.php`.
+  Packagist and GitHub use this metadata to help users find packages. Stale metadata can hide new features
+  or promise features that no longer exist.
 - **No list of packages is written by hand**, in a config, a workflow or a Makefile: what is done per package
   is derived from the manifests and the layout of a package (`tests/`), by the configs through `Tools`
   or by `make sync` into a generated file or a marked part of one. A package takes part or not by a field
@@ -57,11 +59,11 @@ or changing the public API of a package that others use. How the generator works
   the sections "Invariants that must not be broken" and "Decisions" (what was rejected and why).
 - Functions, constants and code run at load (the warning of `async` on Windows) live in eager files:
   PHP files of `src/` and `tests/` without a class, an interface, a trait or an enum.
-  The functions and constants of a namespace are in `api.php`, those of an `Internal` namespace in `internal.php`,
-  test helpers in `tests/helpers.php`. Only code run at load gets a file of its own.
+  A namespace declares functions and constants in `api.php`. An `Internal` namespace uses `internal.php`.
+  Test helpers live in `tests/helpers.php`. Only code run at load gets a file of its own.
   `make sync` finds them (`EagerFiles`) and writes them to `autoload.files` and `autoload-dev.files`,
-  nothing lists them by hand, so CI fails on a new one until `make sync` is run. A deleted one breaks
-  `vendor/autoload.php` and with it `make sync`: remove its line from the `composer.json` files by hand
+  so CI fails if you add an eager file without running `make sync`. Deleting an eager file breaks
+  `vendor/autoload.php` and prevents `make sync` from running: remove its line from the `composer.json` files by hand
   and run `composer dump-autoload` first. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
   is loaded with it by PSR-4. The files are sorted by path and must not depend on each other at load time.
   `files`/`devFiles` of the manifest list eager files outside `src/` and `tests/`: a file that belongs
@@ -90,12 +92,12 @@ or changing the public API of a package that others use. How the generator works
 - `phpstan-extension` gives the types that PHPDoc cannot express (a type per key of `all()`), knowing
   the functions of other packages by name and semantics. The PHPDoc stays the contract and is fixed in the package
   wherever generics can express the type. A change of a function the extension describes changes it too:
-  its `types/` fixtures fail in `make phpstan` otherwise.
+  run `make phpstan` to check the extension's `types/` fixtures.
 
 ## Decisions
 
 - Rejected for the root entry: a free `namespace:` prefix in the manifest (it let `exceptionally` put
-  `Thesis\Internal\` and its test helpers in the root, where they would collide with those of another package),
+  `Thesis\Internal\` and its test helpers in the root, which could cause name collisions with another package),
   and `Thesis\<Name>\` for `src/` with the root class in `classmap` (it saves `src/<Name>/`, but
   `composer dump-autoload -o` of every user warns that the file does not comply with psr-4).
 - Rejected for eager files: one `autoload.files.php` per scope that `require_once`s them (most held

@@ -8,16 +8,18 @@
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=amqp)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/amqp/src)
 
-> A read-only split of [`packages/amqp`](https://github.com/thesis-php/thesis/tree/main/packages/amqp)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/amqp`](https://github.com/thesis-php/thesis/tree/main/packages/amqp).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-An AMQP 0.9.1 client for RabbitMQ on [thesis/async](https://github.com/thesis-php/async): publisher confirms that block
-until the broker has the message, consumers as iterators, reconnects with a backoff.
+This AMQP 0.9.1 client connects to RabbitMQ through [thesis/async](https://github.com/thesis-php/async).
+Publishers can wait for the broker to confirm messages, and consumers can iterate over deliveries.
+The client reconnects with a backoff.
 
 > **Experimental.** The API is unstable.
 

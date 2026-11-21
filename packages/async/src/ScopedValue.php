@@ -12,7 +12,7 @@ use Thesis\Async\Internal\Context;
  *
  * A task takes the values that are bound where {@see Group::spawn()} or {@see Group::daemon()} is called,
  * not where its group was created: `with()` around a spawn() is visible to the task. Binding a value later,
- * in the parent or in the task, does not affect the other one.
+ * in the parent or in the task, does not affect the binding in the other fiber.
  * {@see shield()} does not hide values: it only hides cancellation.
  *
  * The object itself is the key, compared by identity: create one per kind of value, as a constant or a static property.

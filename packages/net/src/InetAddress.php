@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 /**
- * An IP address and a port.
+ * A TCP endpoint has an IP address and a port.
  *
  * @api
  */

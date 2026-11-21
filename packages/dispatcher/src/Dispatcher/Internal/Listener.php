@@ -18,7 +18,8 @@ use function Thesis\Formatter\formatReflectedParameter;
 final readonly class Listener
 {
     /**
-     * A subscriber stands for its listeners, in their order. It is never a listener itself, an invokable one too.
+     * The dispatcher uses the subscriber's listeners in order. It does not call the subscriber itself,
+     * even if the subscriber is invokable.
      *
      * @param iterable<(callable(never, Dispatcher): void)|Subscriber> $listeners
      * @return list<self>

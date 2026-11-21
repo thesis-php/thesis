@@ -35,7 +35,7 @@ Messages and the result share the socket: a frame `[u32 length][u8 type][u64 job
 
 ## The API: blocking calls, concurrency from async
 
-No `Future` and no `Execution`: the call blocks the fiber, `async` makes it concurrent.
+The call blocks the fiber directly. Use `async` to run the call concurrently.
 
 ```php
 $pool = new Pool(limit: 8, bootstrap: __DIR__.'/bootstrap.php'); // no I/O
@@ -97,7 +97,7 @@ In amphp `Execution::await($cancellation)` stops waiting while the task goes on.
 - The parent waits for the answer under `shield()` and `timeout($cancelGrace)`; without one the process gets
   SIGKILL and is replaced. CPU-bound code that never calls `checkpoint()` ends this way.
 - Invariant: **once `execute()` returns or throws, the call no longer runs in the child.**
-- The deadline goes with the call (`remaining()`): the child's scope gets the same one, so
+- The deadline goes with the call (`remaining()`): the child scope inherits the caller's deadline, so
   `timeout(sec(5), fn() => $pool->execute(...))` needs no parameter of its own.
 - Rejected: carrying `ScopedValue`s over: they are not serializable in general.
 

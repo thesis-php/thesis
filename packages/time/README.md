@@ -9,16 +9,17 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=time)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/time/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dtime)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=time)
 
-> A read-only split of [`packages/time`](https://github.com/thesis-php/thesis/tree/main/packages/time)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/time`](https://github.com/thesis-php/thesis/tree/main/packages/time).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-A polyfill of [`Time\Duration`](https://wiki.php.net/rfc/duration_class) of PHP 8.6 for PHP 8.2 to 8.5,
-short functions for it and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
+This library provides PHP 8.6's [`Time\Duration`](https://wiki.php.net/rfc/duration_class) on PHP 8.2 to 8.5.
+It also provides helpers for durations and [PSR-20](https://www.php-fig.org/psr/psr-20/) clocks.
 
 ```php
 use function Thesis\Time\{formatDuration, parseDuration, sec, toMs, toSecFloat};
@@ -38,7 +39,8 @@ $timeout = parseDuration($_ENV['HTTP_TIMEOUT'] ?? '1.5s');
 composer require thesis/time
 ```
 
-Requires PHP 8.2.2+, 64-bit or 32-bit. No extensions. Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
+This package requires PHP 8.2.2+ and runs on 32-bit and 64-bit PHP without extensions.
+Below PHP 8.4 `\RoundingMode` comes from `symfony/polyfill-php84`.
 
 ## Time\Duration polyfill
 
@@ -270,7 +272,7 @@ $now = new DateTimeImmutable('2026-01-01 12:34:56 Europe/Moscow');
 roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity); // 2026-01-01 12:30:00 Europe/Moscow
 ```
 
-The multiples are of elapsed time, not of the wall clock: those of `hours(24)` are the midnights of UTC,
+The functions use multiples of elapsed time. With `hours(24)`, the multiples fall at UTC midnight,
 whatever the time zone of the time, which is kept. The unit is positive and of whole microseconds,
 anything else throws `\ValueError`.
 

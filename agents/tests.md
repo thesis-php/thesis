@@ -72,7 +72,7 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   Infection 0.35.12 sends a report to the project and the branch without `?module=`, so the packages of the matrix
   would overwrite one score, and it reads the branch and the key from the environment of CI, which the container
   of `make` does not have.
-- Rejected: moving the files of the other tools from `var` to `/tmp` of the container, like those of Infection.
+- Rejected: moving the files of the other tools from `var` to the container's `/tmp`, where Infection keeps its files.
   Infection keeps there only the files of one run and deletes them at its end. The caches of PHPStan, Rector
   and PHP CS Fixer (`var/phpstan`, `var/rector`, `var/php-cs-fixer.cache`) live between runs, and `/tmp` dies
   with the container of `--rm`: every run would start cold. Parallel runs only overwrite each other's cache.

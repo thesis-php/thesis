@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async;
 
 /**
- * A {@see Semaphore} with one permit: at most one holder at a time.
+ * A mutex is a {@see Semaphore} with one permit. At most one holder can hold the permit at a time.
  *
  * It adds no methods, only the guarantee. Accept a Mutex where exclusive access is the point
  * (a migration that must not run twice, a resource shared by several objects), so that a semaphore

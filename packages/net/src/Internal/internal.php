@@ -11,7 +11,7 @@ use Thesis\Net\ListenFailed;
 use Thesis\Net\UnixAddress;
 
 /**
- * The message of the error the last suppressed call raised, without the name of the function.
+ * Returns the last suppressed error message without the function name.
  * Call error_clear_last() before that call.
  *
  * @internal

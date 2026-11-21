@@ -7,16 +7,17 @@
 [![License](https://img.shields.io/packagist/l/thesis/phpstan-extension)](https://github.com/thesis-php/phpstan-extension/blob/main/LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
-> A read-only split of [`packages/phpstan-extension`](https://github.com/thesis-php/thesis/tree/main/packages/phpstan-extension)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/phpstan-extension`](https://github.com/thesis-php/thesis/tree/main/packages/phpstan-extension).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-A [PHPStan](https://phpstan.org) extension for the thesis packages: precise types where the generics of PHPDoc
-cannot express them. One extension for all packages: it does nothing for a package you do not use.
+This [PHPStan](https://phpstan.org) extension supplies types that PHPDoc generics cannot express.
+The same extension works with any combination of Thesis packages.
 
 ## Installation
 

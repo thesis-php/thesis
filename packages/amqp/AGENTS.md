@@ -50,7 +50,7 @@ The API and the guarantees are in `README.md` — read it first.
   past it has read the bytes of what holds it.
 - The handshake reads frames of at most `Frames::DEFAULT_MAX` bytes: the peer is not yet known to be a broker.
 - Field tables: an int is written as `I` if it fits 32 bits, else `l`; an empty array is a table, a list an array.
-  A decimal is read as a numeric string. Types are those of RabbitMQ, not of the spec (`s` is a short int).
+  The decoder reads a decimal as a numeric string. It uses RabbitMQ field types, where `s` is a short int.
 
 ## Decisions
 

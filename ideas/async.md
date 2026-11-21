@@ -1,10 +1,10 @@
 # Async: ideas
 
-Models of concurrency that thesis/async may borrow from, left from the prototypes written before it.
-The first prototype, ambient cancel scopes with a nursery (Trio, Kotlin `coroutineScope`), became thesis/async:
-cancellation is a property of the task tree, one `suspend()` for every wait, level-triggered `Cancelled`.
-A draft, not a decision: what is adopted goes to the "Decisions" of `packages/async/AGENTS.md`, what is rejected
-too, and it is deleted from here. The prototypes are in git, removed in the commit that added this file.
+This draft records concurrency models from the prototypes that preceded thesis/async. The first prototype
+used ambient cancellation scopes and a nursery, like Trio and Kotlin's `coroutineScope`. It became thesis/async,
+where the task tree controls cancellation, every wait uses `suspend()` and `Cancelled` is level-triggered.
+Record decisions in `packages/async/AGENTS.md` and remove the corresponding proposals here.
+The Git history before this file contains the prototypes.
 
 ## Lazy tasks (ZIO, Effect-TS, cats-effect)
 

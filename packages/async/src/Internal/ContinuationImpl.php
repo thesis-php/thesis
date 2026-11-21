@@ -86,12 +86,12 @@ final class ContinuationImpl implements Continuation, Waiter
     }
 
     /**
-     * Uncancellable wait. Use `Thesis\Async\suspend()` for a cancellable one.
+     * This method waits without checking cancellation. Use `Thesis\Async\suspend()` for a cancellable wait.
      *
-     * The fiber is suspended, and {@see Loop} resumes the fiber that has returned to it once the continuation
-     * fires: that one may be an outer fiber, which runs this one inside and passes the suspensions through
-     * (Testo runs a test so). The continuation is left in {@see Loop::$parked}, not passed as the value of
-     * `Fiber::suspend()`: a fiber suspended with an object is never collected in a cycle (`agents/fibers.md`).
+     * The method suspends the current fiber. When the continuation fires, {@see Loop} resumes the fiber
+     * that yielded to it. Testo, for example, can run a test in an inner fiber and pass its suspension
+     * through the outer fiber. The continuation stays in {@see Loop::$parked} because PHP cannot collect
+     * a fiber in a cycle if the fiber passed an object to `Fiber::suspend()` (`agents/fibers.md`).
      * Outside a run of the loop, and where the loop runs (in {main}, or in the fiber of an outer loop),
      * nothing could resume it, so a wait there is refused.
      *
@@ -130,7 +130,7 @@ final class ContinuationImpl implements Continuation, Waiter
     }
 
     /**
-     * {@see Loop} has found the continuation parked by $fiber, the fiber it has resumed: it resumes the same one.
+     * {@see Loop} found the continuation parked by $fiber. When the continuation fires, the loop resumes $fiber.
      *
      * @param \Fiber<mixed, mixed, mixed, mixed> $fiber
      */

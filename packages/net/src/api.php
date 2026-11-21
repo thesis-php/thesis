@@ -76,10 +76,10 @@ function connectUnix(string $path): Socket
  * Listens on a TCP port. Accepted sockets have Nagle's algorithm turned off unless $noDelay is false.
  *
  * @api
- * @param non-empty-string $host an IP address: '0.0.0.0' for every IPv4 interface, '::' (or '[::]') for every interface
- *     (IPv4 too, unless the OS is configured otherwise), '127.0.0.1' for local clients only.
- *     A host name is not taken: binding is not the place to depend on DNS
- * @param int<0, 65535> $port 0 for a free one, see {@see Server::$address}
+ * @param non-empty-string $host Pass '0.0.0.0' for all IPv4 interfaces, '::' or '[::]' for all interfaces
+ *     (including IPv4 unless the OS disables it), or '127.0.0.1' for local clients only.
+ *     The function accepts an IP address so binding does not depend on DNS.
+ * @param int<0, 65535> $port Pass 0 to let the OS pick a free port. See {@see Server::$address}.
  * @param positive-int $backlog connections the OS keeps until they are accepted, capped by the OS (somaxconn)
  * @param bool $reusePort lets several processes listen on the same port, the OS spreads the connections (SO_REUSEPORT)
  * @throws ListenFailed

@@ -9,15 +9,17 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=cache)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/cache/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dcache)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=cache)
 
-> A read-only split of [`packages/cache`](https://github.com/thesis-php/thesis/tree/main/packages/cache)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/cache`](https://github.com/thesis-php/thesis/tree/main/packages/cache).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Cache interface with `Time\Duration` TTLs, a local LRU cache and stampede protection by a keyed mutex.
+`Cache` uses `Time\Duration` for TTLs. `LocalCache` evicts by LRU. `AtomicCache` prevents stampedes
+with a keyed mutex.
 
 ```php
 use Thesis\Cache\AtomicCache;
@@ -78,7 +80,7 @@ stores nothing, so the callers compute one after another.
 
 `set()` and `delete()` take the lock too, so an invalidation that comes during a computation wins over it.
 Write through the `AtomicCache`, not to the inner cache, or a stale value may outlive the invalidation.
-An invalidation cancelled while it waits for the lock is not applied, so the one that must happen runs
+Cancellation while an invalidation waits for the lock leaves the cache unchanged. Run a required invalidation
 under `shield()`:
 
 ```php

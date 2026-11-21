@@ -426,8 +426,9 @@ final class Generator
             [![License](https://img.shields.io/packagist/l/{$package->name})]({$license})
             [![PHPStan](https://img.shields.io/badge/PHPStan-level%20{$level}-brightgreen)](https://github.com/{$monorepo}/blob/{$branch}/phpstan.neon){$coverage}{$mutation}
 
-            > A read-only split of [`{$package->path}`](https://github.com/{$monorepo}/tree/{$branch}/{$package->path})
-            > from the [{$monorepo}](https://github.com/{$monorepo}) monorepo: issues and pull requests go there.
+            > This read-only repository mirrors
+            > [`{$package->path}`](https://github.com/{$monorepo}/tree/{$branch}/{$package->path}).
+            > Open issues and pull requests in the [{$monorepo}](https://github.com/{$monorepo}) monorepo.
             >
             > [Report a bug]({$bug}) · [Request a feature]({$feature}) · [Changelog](CHANGELOG.md)
             > · [Contributing](CONTRIBUTING.md)
@@ -453,37 +454,37 @@ final class Generator
 
             # Contributing to {$package->name}
 
-            `{$package->name}` is developed in the monorepo [{$monorepo}](https://github.com/{$monorepo}),
-            in [`{$package->path}`]({$directory}), together with its tests and the other Thesis packages.
-            This repository is a read-only split: on every push to `{$branch}` of the monorepo, CI copies into it
-            what composer installs. Issues and pull requests are disabled here, and a commit made here would be lost
-            on the next split.
+            The source and tests live in [`{$package->path}`]({$directory})
+            in the [{$monorepo}](https://github.com/{$monorepo}) monorepo.
+            On each push to `{$branch}`, CI copies the files Composer installs to this read-only repository.
+            Issues and pull requests are disabled here: open them in the monorepo.
+            The next split overwrites commits made here.
 
             ## Issues
 
-            [Report a bug]({$bug}) or [request a feature]({$feature}) in the issues of the monorepo
-            and choose `{$package->name}` in it. For a bug give its version, the code that reproduces it,
-            what you expected and what happened instead. A vulnerability is reported privately, see
-            [SECURITY.md](SECURITY.md).
+            [Report a bug]({$bug}) or [request a feature]({$feature}) in the monorepo.
+            Choose `{$package->name}`. For bugs, include the version, code to reproduce the bug, and the
+            expected and actual results. See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
             ## Pull requests
 
-            You need Git, Docker and Make: everything runs in containers, on the PHP version of the monorepo.
+            Use Git, Docker and Make. Containers use the monorepo's PHP version.
 
             1. Fork [{$monorepo}](https://github.com/{$monorepo}) and clone your fork.
             2. Install the dependencies: `make i`.
             3. Change the code in `{$package->path}/src/` and its tests in `{$package->path}/tests/`.
-               Every change is covered by a test.
+               Cover each change with a test.
             4. Check the package while you work:
                - `make test P={$package->dir}` runs its tests and starts the services they need,
                - `make phpstan P={$package->dir}` runs static analysis,
                - `make fix P={$package->dir}` applies Rector and the code style.
             5. A change that users of the package can notice gets an entry under `## [Unreleased]`
                of `{$package->path}/CHANGELOG.md` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
-               Leave the version headings alone: the maintainers release a version by adding one.
+               Leave version headings to the maintainers.
             6. If you changed `{$package->path}/package.php` (dependencies, description, keywords),
-               run `make sync` and commit the files it generates: CI fails on any difference.
-            7. Run `make check`, everything CI runs, and open a pull request to `{$branch}` of the monorepo.
+               run `make sync` and commit the generated files: CI fails on any difference.
+            7. Run `make check`, which runs everything CI runs, and open a pull request to `{$branch}`
+               in the monorepo.
 
             The rules of the code and of the monorepo are in
             [`AGENTS.md`](https://github.com/{$monorepo}/blob/{$branch}/AGENTS.md) and the files it links.
@@ -504,9 +505,8 @@ final class Generator
 
             # Security policy of {$package->name}
 
-            Do not report a vulnerability in a public issue. Report it privately:
-            [report a vulnerability](https://github.com/{$monorepo}/security/advisories/new).
-            The report goes to the monorepo `{$monorepo}`, where `{$package->name}` is developed.
+            [Report vulnerabilities privately](https://github.com/{$monorepo}/security/advisories/new)
+            in the `{$monorepo}` monorepo. Do not use public issues for vulnerability reports.
             Name the package and its version, and describe the problem and how to reproduce it.
 
             The [security policy of the monorepo](https://github.com/{$monorepo}/security/policy) says
@@ -573,11 +573,10 @@ final class Generator
     }
 
     /**
-     * The job coverage of check.yaml uploads a report per package with tests, flagged by its directory.
-     * The report of one package lists the src/ of all of them, so a component takes the flag of the package
-     * and the paths of its src/ together: the coverage of a package by its own tests, not by those of its users.
-     * The paths in the report are those of the container (/workspace). Codecov only shows the coverage:
-     * no statuses and no comments on pull requests.
+     * The coverage job in check.yaml uploads a report for each package with tests. It flags each report
+     * with the package directory. Each report lists every package's src/ paths under /workspace.
+     * A Codecov component combines the package flag and its src/ paths to show coverage from its own tests.
+     * Codecov displays coverage without posting pull request statuses or comments.
      */
     private function codecov(): string
     {

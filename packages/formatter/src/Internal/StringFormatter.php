@@ -14,7 +14,7 @@ namespace Thesis\Formatter\Internal;
 final class StringFormatter
 {
     /**
-     * A well-formed UTF-8 character (table 3-7 of the Unicode Standard), otherwise a single byte.
+     * The pattern matches a well-formed UTF-8 character (Unicode Standard, table 3-7) or a single byte.
      */
     private const string CHARACTER = <<<'REGEX'
         /[\x00-\x7F]

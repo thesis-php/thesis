@@ -61,7 +61,7 @@ final class Version
     }
 
     /**
-     * The versions that may come right after the last one of the series: a typo like 0.1.14 for 0.1.4
+     * The versions that may follow the latest release in the series: a typo like 0.1.14 for 0.1.4
      * would publish a version for good.
      *
      * @return non-empty-list<self>

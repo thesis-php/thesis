@@ -18,9 +18,9 @@ use Time\TimeException;
  * Expiry is measured on {@see Instant}, so `virtualTime()` moves it. An expired entry is dropped when it is read
  * or by the next set(), which first drops every entry that has expired by then. There is no timer: the cache needs
  * no owner of background work, and an expired entry that is never read waits for a set() to be freed.
- * An entry that leaves the cache otherwise (deleted, replaced, evicted) is freed at once.
+ * The cache frees an entry as soon as it deletes, replaces or evicts it.
  * With a capacity, a set() of a new key over it evicts the least recently used entry.
- * A TTL beyond the range of the clock (about 292 years) is no expiry.
+ * The entry never expires if its TTL exceeds the clock's range (about 292 years).
  *
  * Never suspends: every method completes within the call, in O(1), or O(log n) for an entry with a TTL.
  *

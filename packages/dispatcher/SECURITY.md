@@ -2,9 +2,8 @@
 
 # Security policy of thesis/dispatcher
 
-Do not report a vulnerability in a public issue. Report it privately:
-[report a vulnerability](https://github.com/thesis-php/thesis/security/advisories/new).
-The report goes to the monorepo `thesis-php/thesis`, where `thesis/dispatcher` is developed.
+[Report vulnerabilities privately](https://github.com/thesis-php/thesis/security/advisories/new)
+in the `thesis-php/thesis` monorepo. Do not use public issues for vulnerability reports.
 Name the package and its version, and describe the problem and how to reproduce it.
 
 The [security policy of the monorepo](https://github.com/thesis-php/thesis/security/policy) says

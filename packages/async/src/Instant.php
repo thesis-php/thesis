@@ -15,9 +15,9 @@ use function Thesis\Time\toNs;
  * which `virtualTime()` replaces. For measuring and for a time kept ahead, such as the expiry of a cached entry:
  * code that keeps times takes them from here, not from `hrtime()`, or virtual time does not move them.
  *
- * Not wall-clock time: only instants of one process and of one `virtualTime()` make sense together.
+ * Compare instants only within the same process and the same `virtualTime()` run.
  * Instants compare with the operators: `$expiresAt <= Instant::now()`.
- * A point in time, not a `Time\Duration`: the difference of two instants is one.
+ * An instant marks a point in time. The difference between two instants is a `Time\Duration`.
  *
  * @api
  */

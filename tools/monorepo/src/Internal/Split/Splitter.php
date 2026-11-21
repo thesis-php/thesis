@@ -49,7 +49,7 @@ final class Splitter
 
     /**
      * Most commits leave most packages as they are: the tree of a split is made once per change of the package.
-     * Only the last one of a package is kept, so the memory does not grow with the history.
+     * The splitter keeps only the latest entry for each package, so memory use stays bounded as history grows.
      *
      * @var array<string, array{package: non-empty-string, split: non-empty-string}> package => its last trees
      */
@@ -200,7 +200,7 @@ final class Splitter
     }
 
     /**
-     * The heads of the parents without repeats and without the ones that are ancestors of another:
+     * The splitter keeps unique parent heads and drops any head that is an ancestor of another head:
      * such a parent adds nothing to a merge, so the history of a package stays linear where only
      * another directory had a branch.
      *

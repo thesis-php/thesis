@@ -1,6 +1,6 @@
 # thesis/formatter
 
-Functions that format values and code for error messages. The API is described in `README.md`.
+This package formats values and code for error messages. Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

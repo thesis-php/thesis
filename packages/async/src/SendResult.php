@@ -17,12 +17,12 @@ enum SendResult
     case Sent;
 
     /**
-     * Not delivered: no receiver is waiting and the buffer is full (or the channel is a rendezvous).
+     * The channel did not deliver the value. No receiver was waiting, and the buffer was full or absent.
      */
     case Full;
 
     /**
-     * Not delivered: the channel is closed.
+     * The channel did not deliver the value because the channel was closed.
      */
     case Closed;
 }

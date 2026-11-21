@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 /**
- * An end of a socket: {@see InetAddress} for TCP, {@see UnixAddress} for Unix sockets.
+ * A socket endpoint uses {@see InetAddress} for TCP or {@see UnixAddress} for a Unix socket.
  *
  * @api
  * @phpstan-sealed InetAddress|UnixAddress

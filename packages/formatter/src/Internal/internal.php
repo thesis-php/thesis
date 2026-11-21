@@ -44,7 +44,7 @@ function name(string $name): string
 }
 
 /**
- * A callable or what a caller took for one: anything that is not formatted as a value.
+ * The function describes a callable or an invalid callable without using the value formatter.
  *
  * @internal
  * @return non-empty-string

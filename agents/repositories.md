@@ -50,7 +50,7 @@ a change made there would be lost on the next split or would diverge from the mo
   for more in `permissions`), secret scanning with push protection, immutable releases (the tag of a release
   cannot be moved or deleted, its title and notes can still be edited).
 - **Packagist.** `github` also adds the webhook of Packagist to every repository (any webhook to its URL counts:
-  the older packages have the one of its GitHub integration) and registers the package once `main` exists,
+  older packages use the Packagist GitHub integration webhook) and registers the package once `main` exists,
   by the run after the first split: Packagist reads `composer.json` at once and refuses a repository without it.
   It needs the main API token of a maintainer of `thesis` (`vars.PACKAGIST_USERNAME`, `secrets.PACKAGIST_TOKEN`):
   Packagist creates no package with the safe one. The app needs the permission of repository webhooks.

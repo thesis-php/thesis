@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Cache\Internal;
 
 /**
- * The default of get() that tells a miss from any stored value, null included.
+ * The cache uses this default for get() to distinguish a miss from any stored value, including null.
  *
  * @internal
  */

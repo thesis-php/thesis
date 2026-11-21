@@ -106,7 +106,8 @@ function hours(int|float $hours): Duration
 }
 
 /**
- * The sum of the parts, each converted like the function of its unit: duration(minutes: 1, sec: 30).
+ * `duration()` converts each part using the matching unit function and adds the results.
+ * For example, `duration(minutes: 1, sec: 30)` returns 90 seconds.
  *
  * @api
  * @throws \ValueError if a part is NAN or INF
@@ -304,7 +305,8 @@ function ratio(Duration $dividend, Duration $divisor): float
 }
 
 /**
- * The duration rounded to a multiple of the unit, like Duration.Round() and Duration.Truncate() of Go:
+ * This function rounds the duration to a multiple of the unit, as Go's Duration.Round() and
+ * Duration.Truncate() do:
  * roundDurationTo($elapsed, ms(1), RoundingMode::HalfAwayFromZero) makes 1.234567891s 1.235s.
  *
  * @api
@@ -360,7 +362,8 @@ function formatDuration(Duration $duration): string
 }
 
 /**
- * The reverse of formatDuration(), in the grammar of time.ParseDuration() of Go: 1h30m, 1.5s, 250ms, -15ns, 0.
+ * This function reverses formatDuration(). It accepts Go's time.ParseDuration() syntax, such as 1h30m,
+ * 1.5s, 250ms, -15ns and 0.
  * Numbers with a unit each (h, m, s, ms, us or µs, ns) after an optional sign, a fraction in any of them,
  * nothing in between. A number is a float converted like the function of its unit: parseDuration('1.5h')
  * is hours(1.5). So a fraction of a nanosecond is rounded, while Go drops it, and a number is as precise
@@ -474,7 +477,7 @@ function shiftTime(\DateTimeImmutable $time, Duration $duration): \DateTimeImmut
 /**
  * $time rounded to a multiple of the unit since 1970-01-01 00:00:00 UTC:
  * roundTimeTo($now, minutes(5), RoundingMode::NegativeInfinity) is the start of a window of 5 minutes.
- * The multiples are of elapsed time, whatever the time zone of $time: those of hours(24) are the midnights of UTC.
+ * The function uses elapsed time in every time zone. With hours(24), it rounds to UTC midnight.
  * Time.Round() and Time.Truncate() of Go count from the year 1: the same result for a unit that divides a day,
  * but a week starts on Thursday here and on Monday there.
  * Within 512 seconds of the ends of int64 timestamps (the year ±292 billion) the result may not be a multiple.

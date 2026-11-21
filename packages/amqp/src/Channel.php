@@ -443,8 +443,8 @@ final class Channel
     }
 
     /**
-     * Publishes many messages with few writes. With confirms, waits for all of them and throws
-     * {@see PublishBatchFailed} with the ones that were nacked or returned: the others are confirmed.
+     * Publishes a batch with few writes. In confirm mode, it waits for every message to settle.
+     * {@see PublishBatchFailed} lists rejected or returned messages. RabbitMQ confirmed the rest.
      * At most 10 000 messages wait for their confirm at once.
      *
      * @param iterable<Publish> $publishes

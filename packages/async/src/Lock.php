@@ -38,7 +38,7 @@ final class Lock
     }
 
     /**
-     * Returns the permit. Works in a cancelled scope.
+     * `release()` returns the permit even in a cancelled scope.
      *
      * @return bool whether this call released the lock, false if it was already released
      */

@@ -1,11 +1,12 @@
 # Testing: ideas
 
-Where the existing code can be tested better: parsers of what a peer sends, resource limits, state machines,
-chaos with a real broker. A backlog, not a decision: an idea that is done is deleted from here, a finding
-(an invariant, a rejected approach) goes to the `AGENTS.md` of its package. Found by reading the code, not run yet.
+This backlog proposes tests for parsers, resource limits, state machines and failure scenarios with a real
+broker. The proposals come from reading the code. Remove each proposal after completing it, and record any
+invariants or rejected approaches in the package's `AGENTS.md`.
 
-Already covered well: `io\Buffer` by a differential fuzz test against `ReferenceBuffer` (`BufferFuzzTest`),
-TLS by tests of the failures (another name, an untrusted certificate, client certificates).
+`BufferFuzzTest` already compares `io\Buffer` with `ReferenceBuffer`. The TLS tests cover name mismatches,
+untrusted certificates and client certificates.
+
 
 ## amqp
 

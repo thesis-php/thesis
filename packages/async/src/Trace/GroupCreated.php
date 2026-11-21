@@ -8,7 +8,7 @@ use Thesis\Async\Instant;
 use Thesis\SourceLocation\Location;
 
 /**
- * A group: `group()`, `all()`, `race()` and the others that run on one.
+ * `group()`, `all()`, `race()` or another function that uses a task group created a group.
  *
  * @api
  */

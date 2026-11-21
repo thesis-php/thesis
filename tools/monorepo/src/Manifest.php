@@ -41,8 +41,8 @@ final readonly class Manifest
      *     Tell the users about them in $suggest
      * @param list<FixerSkip|RectorSkip> $skip files where a rule of a tool does not apply. PHPStan and Infection
      *     are not here: they are told in the code, by a phpstan-ignore or an infection-ignore comment with a reason
-     * @param list<PluginConfigurator> $testoPlugins the plugins of the Testo suite of the package, testo.php adds
-     *     those of every suite
+     * @param list<PluginConfigurator> $testoPlugins These plugins apply to the package's Testo suite.
+     *     testo.php adds plugins that apply to every suite.
      * @param list<non-empty-string> $dist top-level entries of the package that src/ needs at runtime (a polyfill,
      *     resources). The split repository has only them, src/, composer.json, LICENSE, README.md,
      *     CHANGELOG.md, CONTRIBUTING.md, SECURITY.md and skills/
@@ -52,8 +52,8 @@ final readonly class Manifest
      *     outside src/ goes to $dist too
      * @param bool $mutationTesting the job infect of check.yaml runs make infect on the tests/ of the package.
      *     Turned off with a comment on why
-     * @param bool $bit32Testing CI tests the package on 32-bit PHP, which it guarantees: on its lowest PHP
-     *     and on that of the monorepo (agents/platform.md)
+     * @param bool $bit32Testing CI tests the package on 32-bit PHP, which the package then guarantees.
+     *     The tests run on the package's minimum PHP version and on the monorepo's PHP version (agents/platform.md).
      */
     public function __construct(
         public string $description,

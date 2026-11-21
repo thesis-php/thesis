@@ -10,7 +10,7 @@ use Thesis\TestoPlugin\Internal\VirtualTimeInterceptor;
 
 /**
  * Runs the test, its hooks included, on a fresh virtual time: see `Thesis\Async\virtualTime()`.
- * On a class, every test of it; every data set gets a clock of its own.
+ * On a class, the attribute applies to every test. Each data set gets its own clock.
  * For a whole suite, see {@see VirtualTimePlugin}.
  *
  * @api

@@ -1,8 +1,9 @@
 # Memory: ideas
 
-A rule against reference cycles and a way to test it. A draft, not a decision: once accepted, the rules go
-to `agents/memory.md` (a line in "Topics" of `AGENTS.md`) and a short rule to "Classes and state" of `agents/php.md`:
-"No reference cycles: an object is freed by its last reference, never by the cycle collector, and a test proves it".
+This draft proposes a rule against reference cycles and a way to test it. If the project adopts the rule,
+record it in `agents/memory.md`, list the topic in `AGENTS.md` and summarize the rule under "Classes and state"
+in `agents/php.md`. The rule requires PHP to free an object when its last reference goes away, and a test
+must verify that the object does not need the cycle collector.
 
 ## Rules to adopt
 

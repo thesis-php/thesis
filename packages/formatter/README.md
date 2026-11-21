@@ -9,15 +9,16 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=formatter)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/formatter/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dformatter)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=formatter)
 
-> A read-only split of [`packages/formatter`](https://github.com/thesis-php/thesis/tree/main/packages/formatter)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/formatter`](https://github.com/thesis-php/thesis/tree/main/packages/formatter).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Formats PHP values, classes, functions and parameters into short strings for error messages.
+Format PHP values, classes, functions and parameters as short strings for error messages.
 
 ```php
 use function Thesis\Formatter\formatValue;

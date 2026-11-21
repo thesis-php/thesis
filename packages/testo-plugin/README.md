@@ -9,15 +9,16 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=testo-plugin)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/testo-plugin/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dtesto-plugin)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=testo-plugin)
 
-> A read-only split of [`packages/testo-plugin`](https://github.com/thesis-php/thesis/tree/main/packages/testo-plugin)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/testo-plugin`](https://github.com/thesis-php/thesis/tree/main/packages/testo-plugin).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Plugins for [Testo](https://github.com/php-testo/testo) to test code built on thesis packages.
+[Testo](https://github.com/php-testo/testo) plugins for code that uses Thesis packages.
 
 ## Installation
 
@@ -31,7 +32,8 @@ Requires 64-bit PHP 8.6+.
 
 A wait of [thesis/async](https://github.com/thesis-php/async) outside a run of its event loop throws
 `LogicException`. `EventLoopPlugin` and the `#[EventLoop]` attribute run a test as the body of a `Thesis\Async\group()`,
-on the real clock, so the test itself can wait. They are wired as the ones of virtual time below.
+on the real clock, so the test itself can wait. The real-time and virtual-time attributes use the same setup
+described below.
 
 ## Virtual time
 
@@ -40,7 +42,7 @@ of [thesis/async](https://github.com/thesis-php/async): the clock jumps to the n
 so `delay(hours(1))` is over at once and durations can be asserted exactly. How the virtual clock behaves is described
 in the README of thesis/async.
 
-The fibers that are ready in one tick run in an order shuffled by a seed, a random one for every test: a test that
+Fibers ready in the same tick run in a shuffled order. Each test gets a random seed. A test that
 counts on one order fails sooner or later, as it would on a loaded machine. A test that fails prints its seed,
 and `THESIS_SEED` replays it:
 

@@ -9,7 +9,7 @@ on the wall clock.
 
 ## Stages
 
-1. **The numbers of the benchmarks.** `#[Expected]` of async are still those of the loop before ours.
+1. **The numbers of the benchmarks.** The async `#[Expected]` values still reflect the previous loop.
    Instructions and cycles are below them in all five, memory is about 20 KiB above in `CheckpointBench`
    and `TimeoutBench`: the fiber of `Loop::run()` for a `group()` in `{main}`, which could come from the pool
    of the tasks too. Then `make bench-accept P=async`.

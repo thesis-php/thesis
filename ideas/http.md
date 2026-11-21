@@ -121,7 +121,7 @@ The options:
 2. Structured: `send(Request, callable(Response): T): T`, the body is closed after the callable. In the spirit
    of `async`, but awkward when the response is passed on (a proxy).
 
-The proposal: the first one, with the incoming body bound to the scope of the task that called `send()`.
+The proposal uses the first option and ties the incoming body to the scope of the task that called `send()`.
 The scope ends, the body is closed, the connection goes back or is dropped. A proxy works, and a leak lasts
 no longer than the task. To check on `async`: whether such a binding works without cycles (the trap of
 fiber keys in `agents/fibers.md`).

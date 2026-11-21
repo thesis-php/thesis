@@ -1,9 +1,9 @@
 # Roadmap
 
-The packages that replace amphp and rewrite the older thesis packages. Out of scope for now: kafka, grpc, message-bus,
-dic, norm, the modules, and what depends on them (`etcd`, `ydb`, `opentelemetry-grpc-transport`, `schema-registry`,
-the protobuf family). This file is a plan, not a decision: a decision goes to a topic of `agents/`
-or to the `AGENTS.md` of its package, and a step that is done is deleted from here.
+This roadmap lists packages that replace amphp or rewrite older Thesis packages. The current plan excludes
+kafka, grpc, message-bus, dic, norm, the modules and their dependents. These include `etcd`, `ydb`,
+`opentelemetry-grpc-transport`, `schema-registry` and the protobuf family. Record decisions in the relevant
+agent topic or package `AGENTS.md`. Remove steps from the roadmap as they are completed.
 
 ## amphp → thesis
 

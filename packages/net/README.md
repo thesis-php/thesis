@@ -9,16 +9,18 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=net)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/net/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dnet)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=net)
 
-> A read-only split of [`packages/net`](https://github.com/thesis-php/thesis/tree/main/packages/net)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/net`](https://github.com/thesis-php/thesis/tree/main/packages/net).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Non-blocking TCP and Unix sockets for [thesis/async](https://github.com/thesis-php/async): TLS, an async DNS resolver,
-Happy Eyeballs. The transport of protocol clients and servers (HTTP, Postgres, AMQP, NATS, ...).
+This library gives [thesis/async](https://github.com/thesis-php/async) non-blocking TCP and Unix sockets.
+It supports TLS, asynchronous DNS and Happy Eyeballs. Clients and servers for protocols such as HTTP,
+Postgres, AMQP and NATS can use these sockets.
 
 > **Experimental.** The API is unstable.
 
@@ -175,11 +177,12 @@ the client's certificate is then in `$socket->tls->peerCertificate`.
 
 ### DNS
 
-`DnsResolver::system()` is the default resolver of `connect()`: a stub resolver like the one of glibc, configured by
-`/etc/resolv.conf` (`nameserver`, `search`, `ndots`, `timeout`, `attempts`) and `/etc/hosts`. It asks for AAAA and A
-at once, over UDP and over TCP if the answer does not fit, tries the next server if one fails or is silent, and caches
-answers for their TTL, a day at most. `localhost` is always loopback. `gethostbyname()` would block the whole process
-meanwhile.
+`DnsResolver::system()` is the default resolver for `connect()`. This stub resolver follows glibc's lookup
+order and reads `/etc/hosts` and `/etc/resolv.conf` (`nameserver`, `search`, `ndots`, `timeout`, `attempts`).
+It sends AAAA and A queries together over UDP and retries over TCP if a reply does not fit.
+If a server fails or does not reply, the resolver tries the next server. It caches answers for their TTL
+up to one day. It always resolves `localhost` to loopback. A call to `gethostbyname()` would block the whole
+process during the lookup.
 
 A name that does not exist is asked for again every time, never cached: in Docker or Kubernetes a service registers
 its name seconds after its clients start, and they must see it at once.

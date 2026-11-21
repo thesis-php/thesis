@@ -60,7 +60,7 @@ How to use it is in `README.md`.
   and found only what a review finds: a fixture for unpacked arguments, a redundant check in `MapReturnType`.
 - A fixture function is named after what it checks, not after the function of the package: a namespaced `all()`
   would clash with the imported `Thesis\Async\all`.
-- The fixtures of a rule are `types/*Errors.php`, next to those of the types: every error the rule must report
+- The rule fixtures live in `types/*Errors.php` beside the type fixtures. Every error the rule must report
   is ignored by `@phpstan-ignore` on the line before it. PHPStan fails on an error that is not ignored
   and on an ignore that matches no error, so both a missed and an extra error fail `make phpstan`.
 - `PhpParser\` lives inside `phpstan.phar`: `composer-dependency-analyser.php` ignores it as unknown.

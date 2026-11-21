@@ -17,7 +17,7 @@ use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
 
 /**
- * A stream over a descriptor whose open file description is shared with other processes: the standard ones.
+ * Standard streams use descriptors whose open file descriptions are shared with other processes.
  * `O_NONBLOCK` belongs to the description, so it would reach the shell, the jobs of the same terminal and
  * the children that inherit it, and they would get `EAGAIN`. So the mode is never touched: a read or a write
  * happens only once `stream_select()` says that it will not block, and a wait goes through the event loop.
@@ -26,8 +26,8 @@ use Thesis\Io\Writer;
  * or the room in between. A write passes at most {@see PIPE_BUF} bytes per call, the size a pipe that is
  * reported writable on Linux has room for.
  *
- * A write that fails or is cancelled after a part leaves the stream open: stdio has no messages to break,
- * and closing it would leave the process without its stdout.
+ * A write that fails or is cancelled after sending some bytes leaves the stream open. Standard streams
+ * have no message boundaries. Closing the stream would leave the process without its standard output.
  *
  * @internal
  */

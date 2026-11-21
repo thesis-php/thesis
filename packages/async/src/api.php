@@ -407,12 +407,12 @@ function allSettled(array $tasks): array
 }
 
 /**
- * The first $count tasks to succeed win; the rest are cancelled AND joined. For a quorum: two replicas out of three.
- * Returns their results with the keys of $tasks, in the order they succeeded.
+ * Returns the first $count successful results in completion order, with their original keys.
+ * Cancels and joins the remaining tasks. For example, wait for two replicas out of three.
  *
- * Failures are ignored while $count successes are still possible. Once they are not, the rest are cancelled
- * and the first failure is rethrown; every other one is among its `suppressed()` ones,
- * including those of the tasks that fail while being cancelled. After $count successes, failures are dropped.
+ * If $count successes become impossible, cancels and joins the remaining tasks and rethrows
+ * the first failure. Pass it to `suppressed()` for other failures, including failures during cancellation.
+ * On success, failures are discarded.
  *
  * @api
  * @template K of array-key
@@ -428,9 +428,8 @@ function some(int $count, array $tasks): array
 }
 
 /**
- * The first one to succeed wins; the rest are cancelled AND joined: {@see some()} with a count of one.
- * Failures are ignored while there is a chance to win; if every contender fails, the first failure is rethrown,
- * and the others are among its `suppressed()` ones.
+ * Returns the first successful result and cancels and joins the remaining tasks. See {@see some()} with $count = 1.
+ * If all tasks fail, it rethrows the first failure. Use `suppressed()` to get the rest.
  *
  * @api
  * @template T
@@ -596,8 +595,8 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
 }
 
 /**
- * Waits for one of the signals and returns the one received: SIGINT or SIGTERM for a graceful shutdown.
- * Cancellable like any other wait. Needs ext-pcntl.
+ * Returns the first requested signal it receives. Use SIGINT or SIGTERM for graceful shutdown.
+ * The wait is cancellable and requires ext-pcntl.
  *
  * The handlers exist only while it waits: a signal that comes before or after gets the default action,
  * so a second Ctrl+C kills the process even if the shutdown hangs.

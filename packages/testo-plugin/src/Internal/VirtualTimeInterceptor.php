@@ -18,8 +18,8 @@ use function Thesis\Async\virtualTime;
  * the hooks share the test's clock, and every data set starts at zero. Inner to the guards of Testo too,
  * see {@see EventLoopInterceptor}.
  *
- * Every test gets a seed of its own for the order of what is ready together, or the one of the variable
- * {@see self::SEED} for all: a test that has not passed names its seed, which replays it.
+ * Each test uses its own seed to order fibers that are ready together, unless it uses the seed from
+ * {@see self::SEED}. A failing test prints its seed so you can replay the order.
  *
  * One per test: registered by the plugin and by the attribute alike, it is the same class, which conflicts with itself.
  *

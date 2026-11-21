@@ -10,7 +10,7 @@ use function Thesis\Time\ns;
 use function Thesis\Time\toNs;
 
 /**
- * The delays between attempts: from $initial, doubled after each one, up to $max.
+ * The delay starts at $initial and doubles after each attempt until it reaches $max.
  * It only computes them: the caller waits as its attempts require, with `delay()`, `StreamWatcher::delay()`
  * or a `timeoutOr()` that a close ends.
  *
@@ -64,7 +64,7 @@ final class Backoff
     }
 
     /**
-     * The delay before the next attempt.
+     * Returns the delay before the next attempt.
      */
     public function next(): Duration
     {

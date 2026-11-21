@@ -13,7 +13,7 @@ use Thesis\Time\Internal\IsoInterval;
 final readonly class Duration
 {
     /**
-     * On 32-bit PHP the range is that of the int $seconds.
+     * On 32-bit PHP, the integer $seconds sets the range.
      */
     private const MAX_SECONDS = \PHP_INT_SIZE === 4 ? PHP_INT_MAX : 9_223_372_035;
     private const NANOSECONDS_PER_SECOND = 1_000_000_000;

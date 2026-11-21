@@ -211,7 +211,8 @@ final class Handshake
     }
 
     /**
-     * As RabbitMQ: 0 is no limit, so if either side has none, the other one's counts, otherwise the lower one.
+     * RabbitMQ uses 0 to mean no limit. If either peer sends 0, the other peer's limit applies.
+     * If both peers send a limit, the lower limit applies.
      *
      * @param non-negative-int $client
      * @param non-negative-int $server

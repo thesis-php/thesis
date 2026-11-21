@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Async\Internal;
 
 /**
- * Failures that a group could not rethrow because an earlier one is rethrown instead, keyed by that earlier one.
+ * A group rethrows the first failure. This map stores the other failures under the error the group rethrows.
  *
  * The rethrown error itself is not touched: neither its type nor its `previous` changes, so `catch` by type
  * works as before. Its entry goes away with it. Nested groups give a tree by themselves: the error of an inner group
@@ -41,8 +41,8 @@ final class Suppressed
     }
 
     /**
-     * Removes $error from the tree under $root, so that recording $root under $error makes no cycle:
-     * $error is the one rethrown, and everything stays reachable from it. A leaf costs one lookup.
+     * `detach()` removes $error from the tree under $root, so that recording $root under $error makes no cycle.
+     * The caller rethrows $error, and all its suppressed failures stay reachable from $error. A leaf costs one lookup.
      *
      * @param \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed
      */

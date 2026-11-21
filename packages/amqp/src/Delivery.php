@@ -82,7 +82,7 @@ final class Delivery
     }
 
     /**
-     * Settled before the send, so that a second call while the first one waits sends nothing:
+     * The delivery settles before the send. A second call sends nothing while the first call waits:
      * if the send fails, the delivery is not settled.
      *
      * @throws AmqpException

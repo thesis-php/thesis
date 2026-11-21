@@ -1,9 +1,8 @@
 # Public API: ideas
 
-Conventions of naming and of the design of the public API that the packages already follow, and the places
-that break them. A backlog, not a decision: once a convention is agreed, it goes to `agents/php.md`
-and is deleted from here, and so is a deviation once it is fixed or accepted (then into the "Decisions"
-of its package). Found by reading `src/` of every package.
+This backlog records public API naming and design conventions and notes where packages depart from them.
+Move agreed conventions into `agents/php.md`. Remove deviations once the package fixes them or records
+the decision to keep them. The list comes from a review of every package's `src/` directory.
 
 ## Conventions the code follows
 

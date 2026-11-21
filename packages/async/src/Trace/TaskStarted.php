@@ -7,7 +7,7 @@ namespace Thesis\Async\Trace;
 use Thesis\Async\Instant;
 
 /**
- * A task has started: one cancelled before it never starts and only ends.
+ * A task started. A task cancelled before it starts emits only the end event.
  *
  * @api
  */

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 /**
- * A certificate with its private key, in PEM files.
+ * The certificate and its private key are stored in PEM files.
  *
  * @api
  */

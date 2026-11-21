@@ -34,7 +34,7 @@ final class IsoInterval
     public bool $hasPeriod = false;
 
     /**
-     * A start or an end date.
+     * The pattern matches a start or end date.
      */
     public bool $hasDate = false;
 

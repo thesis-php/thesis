@@ -1,7 +1,7 @@
 # tools/php-cs-fixer
 
-Custom rules of PHP CS Fixer for `.php-cs-fixer.php` in the root, autoloaded as `Thesis\PhpCsFixer\`
-(`autoloadDev` of `monorepo.php`).
+The root `.php-cs-fixer.php` config uses these custom PHP CS Fixer rules. The `autoloadDev` setting
+in `monorepo.php` loads them under `Thesis\PhpCsFixer\`.
 
 - A test runs the `php-cs-fixer` binary with the real config over `tests/Fixture/*.php.inc` (the input, `-----`,
   the expected output; no separator means the input must stay as is), all fixtures in one run.

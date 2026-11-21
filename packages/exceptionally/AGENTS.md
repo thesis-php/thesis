@@ -10,10 +10,11 @@
 - The map holds one `int` per fiber, the levels of its innermost running call. A call keeps the levels
   of the outer one in a local variable and puts them back in `finally`: the nested calls of a fiber lie
   on its stack anyway. `null` there means no outer call, the entry is removed.
-- While an `ErrorHandler` is on top, a call sets the same object again. A new one is made only above a handler
-  of other code (or none), which becomes its `$previous`. So `$previous` is never ours, a passed on error makes
-  one hop for any number of suspended calls (1 ms through 1000 handlers otherwise,
-  `passesOnPastTheHandlersOfOtherCalls`), and the copies of one object lie next to each other.
+- If an `ErrorHandler` is already on top, the call installs the same object again. The call creates a new
+  `ErrorHandler` only if the top handler belongs to other code or no handler is active, and the new handler
+  stores that handler in `$previous`. So `$previous` is never ours, and a forwarded error takes one hop
+  regardless of how many calls are suspended. Walking 1000 handlers would take 1 ms
+  (`passesOnPastTheHandlersOfOtherCalls`). Copies of the same object sit next to each other.
 - `finally` never restores blindly: the top may be a handler of other code, or nothing while a handler runs
   (a restore there makes PHP drop the running one). The call increments `$finishedCalls` of its handler,
   then takes the top off while it is ours and has finished calls. Any copy stands for the call's own, and a handler
@@ -27,7 +28,7 @@
   may come between (a method call releases `$this`): the cycle collector may start at any release, destroy
   an abandoned fiber, and its `finally` takes the same copies off (`keepsTheHandlerBelowWhenTheCollectorRunsInside`).
 - An error that is not thrown (another fiber, another level, suppressed) goes to `$previous`, not `return false`:
-  `false` goes straight to the standard handler of PHP and skips the one of the application.
+  `false` sends the error straight to PHP's standard handler and skips the application handler.
 - Suppression is `error_reporting() & $level`: PHP keeps `error_reporting()` per fiber (`@` in a suspended fiber
   does not affect others, `throwsWhileAnotherFiberIsSuspendedInSuppression`), and it respects the ini setting.
   Trap: PHP 8.6.0 starts a fiber with 0 when the ini setting has no value, nothing is thrown there (`agents/errors.md`).
@@ -68,7 +69,7 @@
   or wrappers per function like `thecodingmachine/safe` (one more choice for no gain); rethrowing the last
   error that was not thrown (a record per error, and a guess: an unrelated notice would pass for the reason).
 - Rejected: `exceptional()`, a wrapper that makes a callable exceptional: `static fn() => exceptionally(...)`
-  is as short, and the old one was broken.
+  is just as short, and the old `exceptional()` was broken.
 - One `set_error_handler()` per call, even if ours is on top. Rejected: a global counter that sets the handler
   at 0→1 and restores it at 1→0, or skipping the set when ours is on top: a handler that the function sets
   and keeps (a framework during its `run()`) would be above ours for nested calls and could swallow their errors.
@@ -105,8 +106,9 @@
   to the nearest frame of `exceptionally()` for its `$levels` and stops at a frame of `\Fiber` (below are
   the frames of the code that resumed the fiber). 250 ns for a call, but 1 µs more for every reported error
   at a depth of 5 frames and 5 µs at 50 while any call runs, and it depends on the shape of the backtrace.
-- Rejected: `@` with `error_get_last()`, also for the reason of a `false`: it is empty when the handler
-  of the application returned `true`, after a suspension it may be of another fiber, and it keeps only the last one.
+- Rejected: `@` with `error_get_last()`, also to explain a `false` return. PHP records nothing when the
+  application handler returns `true`. After a suspension, the recorded error may come from another fiber.
+  PHP keeps only the latest error.
 
 ## Tests
 

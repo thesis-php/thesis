@@ -186,7 +186,7 @@ $client->connection(static function (Connection $connection) { /* SET, advisory 
   the notifications of the gap are lost (as in amqp).
 - `COPY` is `copyIn($sql, Reader)` and `copyOut($sql, Writer)` on `io`, named by the protocol.
 - One `QueryFailed` with the fields of ErrorResponse (`$detail`, `$hint`, `$constraint`, ...) and `SqlState`.
-  No classes per error (`UniqueViolation`).
+  The driver uses a shared exception class for errors such as `UniqueViolation`.
 
 Rejected: an ambient transaction in a `ScopedValue` (as `@Transactional`): a query of a library deep in the stack
 joins it silently, and the child tasks inherit it through the group.

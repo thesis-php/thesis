@@ -7,7 +7,7 @@ lives here. The format is described in `README.md`.
 
 - A listener only observes (`observe()` of thesis/async): `NdjsonWriter` and `TextLog` never throw (a failed write
   is counted in `$lost`), never suspend (a synchronous `fwrite()`, no thesis/io), and keep nothing of an event but
-  the `Instant` of the first one: a value, an error and a task are formatted inside the method of the event.
+  the first event's `Instant`. The event method formats values, errors and tasks.
   A tool (`CancellationTracker`) keeps only strings, numbers and `Instant`s, and only of live scopes: a process that
   lives long must not grow with it.
 - The NDJSON is the base every other tool reads, and `README.md` is its specification: a change of the format
@@ -45,7 +45,7 @@ lives here. The format is described in `README.md`.
   Rejected: the writer inside thesis/async (the tools would have to move out later anyway, and async stays only
   the events), `thesis/trace` (it reads as tracing in general, like OpenTelemetry).
 - A header line carries the format, the version and the wall-clock start, the events carry no version.
-  Rejected: `"v":1` on every line, it lengthens every line for what the first one says.
+  Rejected: `"v":1` on every line. It lengthens every line to repeat the version of the header line.
 - The event is named by the short name of its class (`TaskCreated`), the same as in the PHP API.
 - A method per event, given by `listeners()` of a `Subscriber`: each method says what it listens to,
   and the dispatcher routes by the type. The price: an event that the listener does not know is not written,

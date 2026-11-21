@@ -13,7 +13,7 @@ use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 /**
- * A listening socket, created by {@see listen()} or {@see listenUnix()}.
+ * {@see listen()} and {@see listenUnix()} create a listening socket.
  *
  * @api
  */

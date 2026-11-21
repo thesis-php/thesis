@@ -1,9 +1,9 @@
 # Endless runs: ideas
 
-A detector of a run that never ends: code that holds the event loop and does not give it back (an endless loop,
-a huge `preg_match()`, a blocking call that hangs). A draft, not a decision. It fills the gap that `BlockingDetector`
-of thesis/async-trace names ("Not seen: a run that never ends"): that one reports a run when it ends,
-this one while it still runs, with the stack of the code that holds the loop.
+This draft proposes a detector for code that holds the event loop indefinitely. Examples include an endless
+loop, a huge `preg_match()` and a blocking call that hangs. `BlockingDetector` reports a run after it ends.
+The proposed detector would report the run while it is still active and capture the stack of the code
+holding the loop.
 
 ## Why not a thread
 

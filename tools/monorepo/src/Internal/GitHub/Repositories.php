@@ -240,7 +240,7 @@ final class Repositories
     }
 
     /**
-     * Any webhook of Packagist will do: the older packages have the one of its GitHub integration.
+     * Any Packagist webhook works. Older packages use the Packagist GitHub integration webhook.
      *
      * @param array<array-key, mixed> $hooks what GET repos/<name>/hooks returns
      */

@@ -25,7 +25,7 @@ final readonly class Config
      * @param non-empty-list<non-empty-string> $hosts tried in order: `host`, `host:port`, `[::1]:port`.
      *     The port is 5672, or 5671 with TLS
      * @param ?ClientTls $tls for amqps; the host is the default peer name
-     * @param non-empty-list<AuthMechanism> $authMechanisms the first one the server supports is used
+     * @param non-empty-list<AuthMechanism> $authMechanisms the client uses the first mechanism the server supports
      * @param ?Duration $heartbeat 60 seconds if null. The lower of it and the server's is used, zero turns
      *     heartbeats off only if the server agrees. Two intervals without a frame from the server close the connection
      * @param ?Duration $connectTimeout for each attempt to connect to a host and to perform the handshake,
@@ -61,10 +61,10 @@ final readonly class Config
     }
 
     /**
-     * Parses a URI of the RabbitMQ format, with several hosts separated by commas:
+     * `fromUri()` parses a URI of the RabbitMQ format, with several hosts separated by commas:
      * `amqps://user:password@host1:5671,host2:5671/vhost?heartbeat=10&connection_timeout=5000`.
      *
-     * The query parameters are those of RabbitMQ: `heartbeat` (seconds), `connection_timeout` (milliseconds),
+     * The URI accepts RabbitMQ query parameters: `heartbeat` (seconds), `connection_timeout` (milliseconds),
      * `channel_max`, `frame_max`, `auth_mechanism` (repeated for several), `verify` (`verify_none`), `cacertfile`,
      * `certfile`, `keyfile`, `server_name_indication`, and `connection_name`. Others are ignored.
      * The vhost is the path without its first slash, percent-decoded: `/%2F` is `/`, and so is no path.

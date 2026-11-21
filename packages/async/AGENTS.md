@@ -107,11 +107,11 @@ The model, the API and the guarantees are described in `README.md` — read it f
   none), the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the
   clock; `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
 - `Internal\Scope::now()` is the only clock of the library (`Instant`, deadlines, the rate limiters): never call
-  `hrtime()` or `microtime()` elsewhere. Within `virtualTime()`, it reads `Internal\Scope::$virtualClock`, bound by
-  `virtualTime()`, the same clock as that of its loop. The binding
-  is on `Scope`, not on `Internal\VirtualClock`, so that an application that never calls `virtualTime()` never loads
-  the class. The clock is not read in `suspend()`. The virtual clock starts at `Scope::now()` rounded up
-  to a whole second, not at zero: a time captured before `virtualTime()` stays in the past.
+  `hrtime()` or `microtime()` elsewhere. Within `virtualTime()`, it reads `Internal\Scope::$virtualClock`, which
+  `virtualTime()` binds to the clock of its loop. The binding is on `Scope`, not on `Internal\VirtualClock`,
+  so that an application that never calls `virtualTime()` never loads the class. The clock is not read
+  in `suspend()`. The virtual clock starts at `Scope::now()` rounded up to a whole second, not at zero:
+  a time captured before `virtualTime()` stays in the past.
 - `virtualTime()` runs a loop of its own on a `VirtualClock` and releases it at the end (`Loop::release()`):
   what is left in it is dropped. In a fiber (a task, a test of Testo) it is a nested loop that blocks the outer one
   until it ends; the outer clock is restored after its last tick.
@@ -181,8 +181,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 
 ## The event loop
 
-`Internal\Loop` is the scheduler of fibers on `Io\Poll` of PHP 8.6. `Loop::get()` is the one of the run
-in progress, or that of the process; `virtualTime()` runs one of its own.
+`Internal\Loop` schedules fibers on PHP 8.6's `Io\Poll`. `Loop::get()` returns the active run's loop
+or the process loop. `virtualTime()` runs a separate loop.
 
 - It runs in {main} or, nested, in the fiber of an outer loop (`$host`), and the code it runs only in fibers:
   a wait where it runs throws `LogicException`, `run()` refuses itself inside. A run ends when its fiber ends.
@@ -207,7 +207,7 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   `FRAMES` frames only. An idle fiber is not in `$fibers`: a `Deadlock` lists the fibers that wait.
 - A wait allocates nothing in the loop: timers, streams and the deferred hold a `Waiter` (`ContinuationImpl`, `Scope`
   as the timer of a timeout), which puts its fiber to the ready queue. Only a signal handler is a closure.
-- An error that escapes to the loop (a microtask, a wake, a fiber other than the one of `run()`) is thrown into
+- An error that escapes to the loop (a microtask, a wake, a fiber other than the `run()` fiber) is thrown into
   the wait of the fiber of `run()` (`$mainWait`), but only into one that has not fired: a value handed to it
   is never lost, the error waits for its next wait. One left when that fiber ends is thrown from `run()`.
 - Nothing ready and no referenced timer, no stream wait and no signal handler while the fiber of `run()` waits:
@@ -239,10 +239,11 @@ in progress, or that of the process; `virtualTime()` runs one of its own.
   (100 ms), and `pcntl_signal_dispatch()` follows every wait. A signal handled there is an event of the wait
   as a stream is: the virtual clock does not jump past it. `onSignal()` reads the old handler before it opens
   the pipe: a number that is no signal throws `ValueError` with nothing left open. The pipe is drained whenever
-  it is ready or a signal was caught. The previous handler comes back with the last one gone.
+  it is ready or a signal was caught. The loop restores the previous handler after the last registered handler leaves.
 - With a seed (`virtualTime($fn, $seed)`) the loop shuffles the fibers ready at the start of a tick, the only
   place where the order of waking is decided; streams are not shuffled apart, their waiters are fibers that go
-  through the ready queue. Without one, the order is that of waking: timers by deadline and creation.
+  through the ready queue. Without a seed, fibers run in wake order. Timers wake in deadline order.
+  For equal deadlines, timers wake in creation order.
 - On a virtual clock the loop never sleeps for a timer: where it would (nothing ready, `wait(0)` found nothing),
   it jumps the clock to the nearest timer, referenced or not.
 - The timeout of `wait()` is rounded up to whole milliseconds: a timer never fires early, its precision is 1 ms.

@@ -7,7 +7,7 @@ namespace Thesis\Time;
 use Psr\Clock\ClockInterface;
 
 /**
- * The current time of the system, in the given time zone or the default one.
+ * The clock returns the current system time in the requested time zone or the default time zone.
  *
  * @api
  */

@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Amqp;
 
 /**
- * Deliveries of {@see Consumer::batches()}, settled at once with `multiple` on the last one.
+ * {@see Consumer::batches()} groups deliveries into batches. Each batch settles all deliveries at once
+ * with `multiple` on its last delivery.
  *
  * @api
  * @implements \IteratorAggregate<int, Delivery>

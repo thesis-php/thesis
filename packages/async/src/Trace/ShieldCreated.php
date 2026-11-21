@@ -8,7 +8,7 @@ use Thesis\Async\Instant;
 use Thesis\SourceLocation\Location;
 
 /**
- * A scope of `shield()`.
+ * `shield()` created a scope.
  *
  * @api
  */

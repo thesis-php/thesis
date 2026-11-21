@@ -21,7 +21,8 @@ use function Thesis\Net\Internal\lastError;
 use function Thesis\Time\sec;
 
 /**
- * A stub resolver, like the one of glibc, that never blocks the event loop: /etc/hosts first, then A and AAAA queries
+ * This stub resolver follows glibc's lookup order without blocking the event loop. It checks /etc/hosts first,
+ * then sends A and AAAA queries
  * to the name servers, over UDP and over TCP if the answer does not fit. Answers are cached for their TTL.
  *
  * @api
@@ -97,7 +98,7 @@ final class DnsResolver implements Resolver
     }
 
     /**
-     * IPv6 addresses come first: {@see connect()} alternates the families anyway, starting with the first one.
+     * The resolver returns IPv6 addresses first. {@see connect()} alternates address families, starting with IPv6.
      * An internationalized name is asked for in its ASCII form (UTS #46), which needs ext-intl.
      */
     public function resolve(string $host): array

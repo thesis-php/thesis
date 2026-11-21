@@ -9,17 +9,18 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=async-trace)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/async-trace/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dasync-trace)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=async-trace)
 
-> A read-only split of [`packages/async-trace`](https://github.com/thesis-php/thesis/tree/main/packages/async-trace)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/async-trace`](https://github.com/thesis-php/thesis/tree/main/packages/async-trace).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Tools around the trace of [thesis/async](https://github.com/thesis-php/async): its events written as NDJSON,
-one line per event, and as lines of text for tests, who has cancelled a scope, code that blocks the others,
-and waits that last too long.
+These tools read trace events from [thesis/async](https://github.com/thesis-php/async). They write one JSON
+object per line or record text lines for tests. They also report what cancelled a scope, what blocked
+the event loop and which waits exceeded a threshold.
 
 ```php
 use Thesis\Dispatcher;
@@ -147,10 +148,10 @@ observe(new Dispatcher([new BlockingDetector(threshold: ms(50)), $print]), $main
 A run begins when a task starts, a wait or the join of a group is over, or a group, a `timeout()` or a `shield()`
 is created in the root scope. It ends at the next wait of any scope, at the join of a group, at the end of a task
 or of a scope created in the root: `from` and `to` of the report say which. The report has `scope`, `what`, `at`
-(the beginning of the run) and `duration` too. The time is that of the events: under `virtualTime()`
+(the beginning of the run) and `duration` too. The detector uses event timestamps. Under `virtualTime()`
 code takes no time, and a test makes a run long by `burnCpu()`.
 
-Not seen: a run that never ends (an endless loop), code outside the scope tree. The root scope is not in the trace,
+The detector cannot see a run that never ends or code outside the scope tree. The root scope is not in the trace,
 its waits have no events: code that runs in the callable of `observe()` itself, outside a group, a `timeout()`
 and a `shield()`, is never reported. Run the program in a task:
 

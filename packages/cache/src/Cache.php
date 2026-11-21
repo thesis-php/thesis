@@ -21,7 +21,7 @@ use Time\Duration;
  * (Memcached: 250 bytes without spaces and control characters) encodes them, never rejects.
  *
  * There is no has(): between has() and get() another fiber may delete the entry.
- * A stored null is told from a miss by a default of its own: `$cache->get($key, $missing) === $missing`.
+ * Pass a distinct default value to tell a stored null from a cache miss: `$cache->get($key, $missing) === $missing`.
  *
  * @api
  * @template V
@@ -38,7 +38,7 @@ interface Cache
     public function get(string $key, mixed $default = null): mixed;
 
     /**
-     * Stores $value under $key, replacing the previous one and its TTL.
+     * `set()` stores $value under $key, replacing the previous value and TTL.
      *
      * Any positive TTL is accepted. One below the resolution of the store is rounded up to it, never down to zero;
      * one beyond what the store can represent keeps the entry as long as the store can.

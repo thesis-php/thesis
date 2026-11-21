@@ -15,7 +15,7 @@ use Thesis\Monorepo\Internal\MonorepoException;
 interface Packagist
 {
     /**
-     * Every webhook of Packagist starts with it: the one of its GitHub integration has no username.
+     * Every Packagist webhook starts with this prefix. GitHub integration webhooks have no username.
      */
     public const string HOOK_URL = 'https://packagist.org/api/github';
 

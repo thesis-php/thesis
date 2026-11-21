@@ -11,7 +11,7 @@ use Time\Duration;
  * (`users:`, `orders:`) do not see each other's keys.
  *
  * The prefix is prepended as is, so end it with a separator that no other prefix of the store starts with:
- * `user` and `users` collide on the key `s1` of the first one.
+ * Without a separator, `user` with the key `s1` collides with `users` with the key `1`.
  *
  * Over it, an {@see AtomicCache} locks the key without the prefix: AtomicCaches that share a distributed mutex
  * over different prefixes wait for each other on equal keys. Give each one a mutex of its own, or put the prefix

@@ -1,7 +1,7 @@
 # Trace: ideas
 
-The tools around `Trace\observe()` of thesis/async: what to build on its events, for whom and in what order.
-A draft, not a decision. It expands "Observability of the task tree" of `roadmap.md`.
+This draft expands "Observability of the task tree" in `roadmap.md`. It proposes tools that consume
+`Trace\observe()` events from thesis/async and describes their users and implementation order.
 
 ## The base: two things every tool builds on
 

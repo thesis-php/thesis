@@ -1,6 +1,7 @@
 # thesis/testo-plugin
 
-Plugins for Testo that the tests of thesis packages and of their users need. The API is described in `README.md`.
+These Testo plugins support tests for Thesis packages and applications that use them.
+Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

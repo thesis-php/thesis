@@ -64,7 +64,7 @@ final class StreamWatcher
     }
 
     /**
-     * A sleep like the function `delay()`, which {@see close()} ends too: a backoff of the stream's owner
+     * This method waits like `delay()` and {@see close()} can end the wait: a backoff of the stream's owner
      * between attempts, which must not outlive the stream.
      *
      * @return bool true once the time has passed, false if {@see close()} has ended the wait or was called before
@@ -139,7 +139,7 @@ final class StreamWatcher
     }
 
     /**
-     * A no-op for a wait that {@see close()} has ended.
+     * This method does nothing if {@see close()} has already ended the wait.
      */
     private function forget(int $id): void
     {

@@ -165,7 +165,7 @@ Decisions:
   A commit where `packages` is a file or a link has no packages, it does not break the splits after it.
 - A package is split by the name of its directory, renames are not followed: a renamed `packages/<name>` starts
   a new root, which cannot fast-forward the history of the old name. So a package is renamed together with
-  a new repository: delete the old one (`github` creates it again), do not rename it on GitHub
+  a new repository: delete the old repository (`github` creates it again), do not rename it on GitHub
   (`testo` → `testo-plugin` was rejected by the next split).
 - A parent that is an ancestor of another parent is dropped and a repeated one is kept once, so a merge
   is kept only where both sides changed the package. A commit is reused when its only parent has the same tree.
@@ -174,7 +174,7 @@ Decisions:
 - The tree of a split is written like its commits, as a loose object made of the entries of the package
   byte for byte (a mode is `40000` or `040000` as it was). `keepsOnlyEntriesThatListOfPackageNames` checks
   that it is the object git writes for the same files. The tree is made once per change of the package,
-  and only the last one of a package is remembered: the memory does not grow with the history.
+  and it remembers only the latest entry for each package. Memory use stays bounded as history grows.
 - Rejected for the list: `package.php` of the commit (code, not data: it cannot be run with the classes
   of the head, the same as for the release below, and the list is also the rules of `Generator` of that commit);
   an incremental split that adds a commit on top of the split repository (a state to fetch, and the release
@@ -235,6 +235,6 @@ Decisions:
   with the classes of the head, and parsing PHP by hand breaks on the first refactoring.
 - Rejected: fetching the tags of every split repository into the monorepo: `ls-remote` answers the same questions
   without writing refs that a later run would have to prune.
-- Rejected: telling our tags from those of an older package by the history (`merge-base --is-ancestor`
+- Rejected: telling our tags from an older package's tags by the history (`merge-base --is-ancestor`
   with the split of every head of `main`, fetched first): a clone has only the splits it computes, and each
   shape of a checkout in CI was a bug of its own. The `v` tells them apart.

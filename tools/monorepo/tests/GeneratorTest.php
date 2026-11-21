@@ -239,8 +239,9 @@ final readonly class GeneratorTest
             [![License](https://img.shields.io/packagist/l/thesis/bytes)](https://github.com/thesis-php/bytes/blob/main/LICENSE)
             [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/thesis-php/thesis/blob/main/phpstan.neon)
 
-            > A read-only split of [`packages/bytes`](https://github.com/thesis-php/thesis/tree/main/packages/bytes)
-            > from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+            > This read-only repository mirrors
+            > [`packages/bytes`](https://github.com/thesis-php/thesis/tree/main/packages/bytes).
+            > Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
             >
             > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
             > · [Contributing](CONTRIBUTING.md)
@@ -263,7 +264,7 @@ final readonly class GeneratorTest
             [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=bytes)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/bytes/src)
             [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dbytes)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=bytes)
 
-            > A read-only split
+            > This read-only repository mirrors
             MD);
     }
 
@@ -280,7 +281,7 @@ final readonly class GeneratorTest
         Assert::string($files['packages/bytes/README.md'] ?? '')->contains(<<<'MD'
             [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=bytes)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/bytes/src)
 
-            > A read-only split
+            > This read-only repository mirrors
             MD);
     }
 
@@ -369,7 +370,7 @@ final readonly class GeneratorTest
             ->contains('`make test P=bytes`')
             ->contains('`packages/bytes/CHANGELOG.md`')
             ->contains('https://github.com/thesis-php/thesis/issues/new?template=bug.yml')
-            ->contains('choose `thesis/bytes`')
+            ->contains('Choose `thesis/bytes`')
         ;
     }
 

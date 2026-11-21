@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+This changelog records notable changes to the package.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `NdjsonWriter`: a listener of `Trace\observe()` of thesis/async that writes every event as a line of JSON.
-- `TextLog`: a listener that keeps every event as a line of text, for tests on virtual time.
-- `CancellationTracker`: a `CancelOrigin` report for each scope that ends as cancelled, with the deadline, the call
-  or the failure that has cancelled it.
-- `BlockingDetector`: a `BlockingRun` report for each run of code longer than a threshold, with the waits around it.
-- `LongWaitDetector`: a `LongWait` report for each wait that lasts a threshold, while it still waits.
+- `NdjsonWriter` writes each `Trace\observe()` event as a JSON line.
+- `TextLog` stores each event as a text line for tests on virtual time.
+- `CancellationTracker` reports the deadline, call or failure that cancelled a scope in a `CancelOrigin`.
+- `BlockingDetector` reports code that blocks the event loop past a threshold and records the surrounding waits.
+- `LongWaitDetector` reports a wait when it reaches a threshold, while the wait is still pending.

@@ -728,9 +728,8 @@ final class Buffer implements \Countable
     }
 
     /**
-     * Writes all unread bytes to $writer and clears the buffer. If the write throws, the bytes are back
-     * at the start, before those written meanwhile (by another fiber while it waited): a writer that wrote
-     * nothing may be flushed again, and one that wrote a part is unusable anyway.
+     * Writes all unread bytes and clears the buffer. On failure, it restores the bytes ahead of
+     * anything another fiber added during the wait. Retry only if the writer wrote nothing.
      *
      * @throws IoException of the writer
      */

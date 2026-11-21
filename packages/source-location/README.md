@@ -9,15 +9,16 @@
 [![Coverage](https://codecov.io/gh/thesis-php/thesis/branch/main/graph/badge.svg?component=source-location)](https://app.codecov.io/gh/thesis-php/thesis/tree/main/packages/source-location/src)
 [![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fthesis-php%2Fthesis%2Fmain%3Fmodule%3Dsource-location)](https://dashboard.stryker-mutator.io/reports/github.com/thesis-php/thesis/main?module=source-location)
 
-> A read-only split of [`packages/source-location`](https://github.com/thesis-php/thesis/tree/main/packages/source-location)
-> from the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo: issues and pull requests go there.
+> This read-only repository mirrors
+> [`packages/source-location`](https://github.com/thesis-php/thesis/tree/main/packages/source-location).
+> Open issues and pull requests in the [thesis-php/thesis](https://github.com/thesis-php/thesis) monorepo.
 >
 > [Report a bug](https://github.com/thesis-php/thesis/issues/new?template=bug.yml) · [Request a feature](https://github.com/thesis-php/thesis/issues/new?template=feature.yml) · [Changelog](CHANGELOG.md)
 > · [Contributing](CONTRIBUTING.md)
 
 <!-- head:end -->
 
-Where in the source code: a file and a line, the caller outside a library, the code of `eval()` resolved.
+Find source lines and call sites outside library code, including locations in `eval()` code.
 
 ```php
 use function Thesis\SourceLocation\caller;
