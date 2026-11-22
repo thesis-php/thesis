@@ -155,6 +155,9 @@ foreach ($channel->consume('events')->batches(count: 500, timeout: ms(100)) as $
 and `queueDelete()` map to the methods of AMQP. `transactional($fn)` commits if `$fn` returns and rolls back
 if it throws.
 
+Concurrent calls to `confirmSelect()` or `txSelect()` for the same mode share one broker acknowledgement.
+Once the broker accepts a mode, a caller asking for the other gets a local `LogicException`. The channel stays open.
+
 ### Errors and reconnects
 
 Every error of the broker or of the connection is an `AmqpException`. `ChannelClosed` and `ConnectionClosed`

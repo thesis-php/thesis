@@ -14,3 +14,8 @@ and [thesis/net](https://github.com/thesis-php/net): the API of 1.x is gone, see
 ### Changed
 
 - **BC break:** The package now requires 64-bit PHP 8.5+.
+
+### Fixed
+
+- Concurrent calls to `confirmSelect()` and `txSelect()` send one mode selection. A conflicting call throws
+  `LogicException` locally and the channel stays open.

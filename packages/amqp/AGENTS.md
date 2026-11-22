@@ -17,6 +17,8 @@ The API and the guarantees are in `README.md` — read it first.
 - A synchronous method holds `callMutex` until its reply arrives, even if the caller is cancelled meanwhile:
   the reply still comes, and the next call must not take it for its own. The reader releases the lock
   (`Internal\PendingCall`).
+- Both mode selectors hold the same channel mutex from checking the current mode through recording the broker's
+  reply. The RPC mutex alone would serialize the requests after both callers had already checked the mode.
 - Confirm tags are assigned (`Internal\Confirms`) and the frames written under `publishMutex` of `Channel`,
   in one order, after `ensureOpen()` inside the mutex: the wait for it may outlive the channel.
   The `Deferred` of each confirm is taken when its tag is assigned, never looked up after the write:

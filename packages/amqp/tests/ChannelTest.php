@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Amqp;
 
 use Testo\Assert;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Amqp\Internal\Protocol\BasicAck;
@@ -18,6 +19,8 @@ use Thesis\Amqp\Internal\Protocol\BasicGetEmpty;
 use Thesis\Amqp\Internal\Protocol\BasicGetOk;
 use Thesis\Amqp\Internal\Protocol\BasicNack;
 use Thesis\Amqp\Internal\Protocol\BasicPublish;
+use Thesis\Amqp\Internal\Protocol\BasicQos;
+use Thesis\Amqp\Internal\Protocol\BasicQosOk;
 use Thesis\Amqp\Internal\Protocol\BasicReturn;
 use Thesis\Amqp\Internal\Protocol\ChannelClose;
 use Thesis\Amqp\Internal\Protocol\ChannelCloseOk;
@@ -35,6 +38,7 @@ use Thesis\Amqp\Internal\Protocol\TxSelect;
 use Thesis\Amqp\Internal\Protocol\TxSelectOk;
 use Thesis\Async\Group;
 use function Thesis\Amqp\Internal\properties;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Time\ms;
@@ -75,6 +79,37 @@ final class ChannelTest
             Assert::same($publish->exchange, 'events');
             Assert::same($publish->routingKey, 'user.created');
             Assert::equals($peer->expectMessage(), $message);
+        });
+    }
+
+    #[DataSet([true], 'confirms selected first')]
+    #[DataSet([false], 'transactions selected first')]
+    public function concurrentModeSelectorsShareTheBrokerReply(bool $confirms): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) use ($confirms) {
+            $select = $confirms ? $channel->confirmSelect(...) : $channel->txSelect(...);
+            $incompatible = $confirms ? $channel->txSelect(...) : $channel->confirmSelect(...);
+
+            $first = $group->spawn($select);
+            $peer->expect($confirms ? ConfirmSelect::class : TxSelect::class);
+            $same = $group->spawn($select);
+            $other = $group->spawn(static fn() => thrown($incompatible));
+            checkpoint();
+            Assert::false($same->isDone);
+            Assert::false($other->isDone);
+
+            $peer->send($id, $confirms ? new ConfirmSelectOk() : new TxSelectOk());
+            $verified = $group->spawn(static function () use ($first, $same, $other, $channel) {
+                $first->await();
+                $same->await();
+                Assert::instanceOf($other->await(), \LogicException::class);
+                $channel->qos(prefetchCount: 1);
+            });
+
+            // Any second select would reach the peer before this call.
+            $peer->expect(BasicQos::class);
+            $peer->send($id, new BasicQosOk());
+            $verified->await();
         });
     }
 

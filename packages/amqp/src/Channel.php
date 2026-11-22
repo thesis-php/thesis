@@ -117,9 +117,9 @@ final class Channel
      */
     private int $settledUpTo = 0;
 
-    private bool $confirming = false;
+    private null|ConfirmSelect|TxSelect $mode = null;
 
-    private bool $transactional = false;
+    private readonly LocalMutex $modeMutex;
 
     private readonly LocalMutex $publishMutex;
 
@@ -135,6 +135,7 @@ final class Channel
         public readonly int $id,
     ) {
         $this->callMutex = new LocalMutex();
+        $this->modeMutex = new LocalMutex();
         $this->publishMutex = new LocalMutex();
         $this->confirms = new Confirms();
         $this->content = new Content($id);
@@ -398,17 +399,7 @@ final class Channel
      */
     public function confirmSelect(): void
     {
-        if ($this->transactional) {
-            throw new \LogicException("Channel {$this->id} is transactional: it cannot confirm publishes.");
-        }
-
-        if ($this->confirming) {
-            return;
-        }
-
-        // Shielded: a mode the broker has turned on and the channel does not know of would break every publish.
-        shield(fn() => $this->call(new ConfirmSelect(nowait: false), ConfirmSelectOk::class));
-        $this->confirming = true;
+        shield(fn() => $this->selectMode(new ConfirmSelect(nowait: false)));
     }
 
     /**
@@ -516,17 +507,7 @@ final class Channel
      */
     public function txSelect(): void
     {
-        if ($this->confirming) {
-            throw new \LogicException("Channel {$this->id} confirms publishes: it cannot be transactional.");
-        }
-
-        if ($this->transactional) {
-            return;
-        }
-
-        // Shielded, as confirmSelect().
-        shield(fn() => $this->call(new TxSelect(), TxSelectOk::class));
-        $this->transactional = true;
+        shield(fn() => $this->selectMode(new TxSelect()));
     }
 
     /**
@@ -782,7 +763,7 @@ final class Channel
      */
     private function writePublishes(string $bytes, array $chunk): array
     {
-        if (!$this->confirming) {
+        if (!$this->mode instanceof ConfirmSelect) {
             $this->ensureOpen();
             $this->connection->write($bytes);
 
@@ -943,7 +924,7 @@ final class Channel
         $returnId = null;
 
         if ($publish->mandatory) {
-            if (!$this->confirming) {
+            if (!$this->mode instanceof ConfirmSelect) {
                 throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
             }
 
@@ -967,12 +948,34 @@ final class Channel
         }
     }
 
+    private function selectMode(ConfirmSelect|TxSelect $mode): void
+    {
+        synchronized($this->modeMutex, function () use ($mode) {
+            $this->ensureOpen();
+
+            if ($this->mode instanceof $mode) {
+                return;
+            }
+
+            if ($this->mode instanceof ConfirmSelect) {
+                throw new \LogicException("Channel {$this->id} confirms publishes: it cannot be transactional.");
+            }
+
+            if ($this->mode instanceof TxSelect) {
+                throw new \LogicException("Channel {$this->id} is transactional: it cannot confirm publishes.");
+            }
+
+            $this->call($mode, $mode instanceof ConfirmSelect ? ConfirmSelectOk::class : TxSelectOk::class);
+            $this->mode = $mode;
+        });
+    }
+
     /**
      * @throws \LogicException
      */
     private function ensureTransactional(): void
     {
-        if (!$this->transactional) {
+        if (!$this->mode instanceof TxSelect) {
             throw new \LogicException("Channel {$this->id} is not transactional: call txSelect() first.");
         }
     }
