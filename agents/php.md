@@ -146,6 +146,18 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - State that only one function needs (a memoized value, a cache, a lazily created instance) is a `static` variable
   inside that function, not a static property: it sits next to the only code that uses it, and since PHP 8.3
   it is initialized with any expression. A static property is only for state shared by several methods.
+- Choose how callers create an `@api` object by what the call tells them. Use public `__construct` when the class
+  name and arguments make the operation clear. `new Dispatcher($listeners)` checks and prepares its listeners.
+  `new Stream($resource)` takes ownership of an open resource and sets it up for non-blocking use.
+  Use a named constructor when its name adds information, such as the source of the data, the resource it opens,
+  or the mode it selects. A class can offer both forms. Make `__construct` private when callers should
+  always use a named constructor. For internal classes and `@internal` constructors, choose the form that suits
+  their callers.
+- Promote a constructor parameter stored directly as a property only when the parameter and the property have the
+  same type, including PHPDoc types. When the types differ, declare the property separately and assign it in
+  `__construct`. For example, `Stream` takes a `resource` but stores a `?resource` so it can clear it on close.
+  Document promoted properties with `@param` on `__construct`. When a named constructor prepares the property values,
+  pass them to `__construct` in their final form.
 - Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
   not the promoted properties (`$x`, not `$this->x`) where possible.
 
