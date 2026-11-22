@@ -14,26 +14,6 @@ use Composer\InstalledVersions;
 final class Location
 {
     /**
-     * The property holds a path relative to the project root for files inside the project.
-     * For files outside the project, it holds the full path.
-     *
-     * @var non-empty-string
-     */
-    public string $shortFile {
-        get {
-            /** @var ?non-empty-string $root */
-            static $root = self::projectRoot();
-
-            if ($root !== null && str_starts_with($this->file, $root) && \strlen($this->file) > \strlen($root)) {
-                /** @var non-empty-string */
-                return substr($this->file, \strlen($root));
-            }
-
-            return $this->file;
-        }
-    }
-
-    /**
      * The code of eval() is in a file like "/app/src/foo.php(12) : eval()'d code", nested eval() appends more:
      * its location is the line of the outermost eval().
      *
@@ -69,6 +49,26 @@ final class Location
         }
 
         return self::of($file, $line);
+    }
+
+    /**
+     * The property holds a path relative to the project root for files inside the project.
+     * For files outside the project, it holds the full path.
+     *
+     * @var non-empty-string
+     */
+    public string $shortFile {
+        get {
+            /** @var ?non-empty-string $root */
+            static $root = self::projectRoot();
+
+            if ($root !== null && str_starts_with($this->file, $root) && \strlen($this->file) > \strlen($root)) {
+                /** @var non-empty-string */
+                return substr($this->file, \strlen($root));
+            }
+
+            return $this->file;
+        }
     }
 
     /**

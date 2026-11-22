@@ -18,18 +18,6 @@ final readonly class BasicGetOk implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 71;
 
-    /**
-     * @param non-negative-int $deliveryTag
-     * @param int<0, 4294967295> $messageCount
-     */
-    public function __construct(
-        public int $deliveryTag,
-        public bool $redelivered,
-        public string $exchange,
-        public string $routingKey,
-        public int $messageCount,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $deliveryTag = $buffer->readUint64();
@@ -46,6 +34,18 @@ final readonly class BasicGetOk implements Method
             messageCount: $messageCount,
         );
     }
+
+    /**
+     * @param non-negative-int $deliveryTag
+     * @param int<0, 4294967295> $messageCount
+     */
+    public function __construct(
+        public int $deliveryTag,
+        public bool $redelivered,
+        public string $exchange,
+        public string $routingKey,
+        public int $messageCount,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

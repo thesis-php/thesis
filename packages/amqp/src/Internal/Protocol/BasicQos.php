@@ -18,16 +18,6 @@ final readonly class BasicQos implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 10;
 
-    /**
-     * @param int<0, 4294967295> $prefetchSize
-     * @param int<0, 65535> $prefetchCount
-     */
-    public function __construct(
-        public int $prefetchSize,
-        public int $prefetchCount,
-        public bool $global,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $prefetchSize = $buffer->readUint32();
@@ -40,6 +30,16 @@ final readonly class BasicQos implements Method
             global: ($bit & 0b00000001) !== 0,
         );
     }
+
+    /**
+     * @param int<0, 4294967295> $prefetchSize
+     * @param int<0, 65535> $prefetchCount
+     */
+    public function __construct(
+        public int $prefetchSize,
+        public int $prefetchCount,
+        public bool $global,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

@@ -18,16 +18,16 @@ final readonly class BasicCancelOk implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 31;
 
-    public function __construct(
-        public string $consumerTag,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $consumerTag = Fields::readShortString($buffer);
 
         return new self(consumerTag: $consumerTag);
     }
+
+    public function __construct(
+        public string $consumerTag,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

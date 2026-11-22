@@ -53,6 +53,15 @@ final class Loop
     private const int IDLE_FIBERS = 128;
 
     /**
+     * Returns the active loop. The fallback is the process loop, created on first use.
+     * Waits park on that loop. `group()` runs it from {main}.
+     */
+    public static function get(): self
+    {
+        return self::$current ??= new self();
+    }
+
+    /**
      * The active loop. See {@see get()} for the fallback.
      */
     private static ?self $current = null;
@@ -214,15 +223,6 @@ final class Loop
     ) {
         $this->timers = new \SplMinHeap();
         $this->shuffle = $seed === null ? null : new Randomizer(new Xoshiro256StarStar($seed));
-    }
-
-    /**
-     * Returns the active loop. The fallback is the process loop, created on first use.
-     * Waits park on that loop. `group()` runs it from {main}.
-     */
-    public static function get(): self
-    {
-        return self::$current ??= new self();
     }
 
     /**

@@ -18,16 +18,16 @@ final readonly class ChannelFlow implements Method
     public const int CLASS_ID = 20;
     public const int METHOD_ID = 20;
 
-    public function __construct(
-        public bool $active,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $bit = $buffer->readUint8();
 
         return new self(active: ($bit & 0b00000001) !== 0);
     }
+
+    public function __construct(
+        public bool $active,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

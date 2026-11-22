@@ -18,10 +18,6 @@ final readonly class ConnectionOpen implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 40;
 
-    public function __construct(
-        public string $virtualHost,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $virtualHost = Fields::readShortString($buffer);
@@ -30,6 +26,10 @@ final readonly class ConnectionOpen implements Method
 
         return new self(virtualHost: $virtualHost);
     }
+
+    public function __construct(
+        public string $virtualHost,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

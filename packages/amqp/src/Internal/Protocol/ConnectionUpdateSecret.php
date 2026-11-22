@@ -18,11 +18,6 @@ final readonly class ConnectionUpdateSecret implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 70;
 
-    public function __construct(
-        public string $newSecret,
-        public string $reason,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $newSecret = Fields::readLongString($buffer);
@@ -33,6 +28,11 @@ final readonly class ConnectionUpdateSecret implements Method
             reason: $reason,
         );
     }
+
+    public function __construct(
+        public string $newSecret,
+        public string $reason,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

@@ -18,20 +18,6 @@ final readonly class ExchangeDeclare implements Method
     public const int CLASS_ID = 40;
     public const int METHOD_ID = 10;
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    public function __construct(
-        public string $exchange,
-        public string $type,
-        public bool $passive,
-        public bool $durable,
-        public bool $autoDelete,
-        public bool $internal,
-        public bool $noWait,
-        public array $arguments,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -51,6 +37,20 @@ final readonly class ExchangeDeclare implements Method
             arguments: $arguments,
         );
     }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    public function __construct(
+        public string $exchange,
+        public string $type,
+        public bool $passive,
+        public bool $durable,
+        public bool $autoDelete,
+        public bool $internal,
+        public bool $noWait,
+        public array $arguments,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

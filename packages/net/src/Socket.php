@@ -74,6 +74,11 @@ final class Socket implements Reader, Writer, Closer
      */
     public private(set) ?TlsInfo $tls = null;
 
+    /**
+     * @var ?resource
+     */
+    private mixed $stream;
+
     private readonly Pacer $pacer;
 
     /**
@@ -90,16 +95,17 @@ final class Socket implements Reader, Writer, Closer
     private ?LocalMutex $writeMutex = null;
 
     /**
-     * @param ?resource $stream
+     * @param resource $stream
      * @param ?non-empty-string $host
      */
     private function __construct(
-        private mixed $stream,
+        mixed $stream,
         private readonly StreamWatcher $watcher,
         public readonly Address $localAddress,
         public readonly Address $remoteAddress,
         private readonly ?string $host,
     ) {
+        $this->stream = $stream;
         $this->pacer = new Pacer(self::OPS_PER_TICK);
     }
 

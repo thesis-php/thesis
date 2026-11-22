@@ -18,17 +18,6 @@ final readonly class ConnectionTune implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 30;
 
-    /**
-     * @param int<0, 65535> $channelMax
-     * @param int<0, 4294967295> $frameMax
-     * @param int<0, 65535> $heartbeat
-     */
-    public function __construct(
-        public int $channelMax,
-        public int $frameMax,
-        public int $heartbeat,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $channelMax = $buffer->readUint16();
@@ -41,6 +30,17 @@ final readonly class ConnectionTune implements Method
             heartbeat: $heartbeat,
         );
     }
+
+    /**
+     * @param int<0, 65535> $channelMax
+     * @param int<0, 4294967295> $frameMax
+     * @param int<0, 65535> $heartbeat
+     */
+    public function __construct(
+        public int $channelMax,
+        public int $frameMax,
+        public int $heartbeat,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

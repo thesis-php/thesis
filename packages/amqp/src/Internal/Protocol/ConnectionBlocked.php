@@ -18,16 +18,16 @@ final readonly class ConnectionBlocked implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 60;
 
-    public function __construct(
-        public string $reason,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $reason = Fields::readShortString($buffer);
 
         return new self(reason: $reason);
     }
+
+    public function __construct(
+        public string $reason,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

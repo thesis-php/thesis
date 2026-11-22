@@ -18,19 +18,19 @@ final readonly class QueuePurgeOk implements Method
     public const int CLASS_ID = 50;
     public const int METHOD_ID = 31;
 
-    /**
-     * @param int<0, 4294967295> $messageCount
-     */
-    public function __construct(
-        public int $messageCount,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $messageCount = $buffer->readUint32();
 
         return new self(messageCount: $messageCount);
     }
+
+    /**
+     * @param int<0, 4294967295> $messageCount
+     */
+    public function __construct(
+        public int $messageCount,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

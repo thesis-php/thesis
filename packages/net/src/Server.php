@@ -51,21 +51,25 @@ final class Server
         get => $this->stream === null;
     }
 
+    /**
+     * @var ?resource
+     */
+    private mixed $stream;
+
     private readonly Pacer $pacer;
 
     /**
-     * @param ?resource $stream
+     * @param resource $stream
+     * @param Address $address where the server listens, with the port the OS chose if the requested port was 0
      * @param ?non-empty-string $unixPath
      */
     private function __construct(
-        private mixed $stream,
+        mixed $stream,
         private readonly StreamWatcher $watcher,
-        /**
-         * Where the server listens, with the port the OS has chosen if it was 0.
-         */
         public readonly Address $address,
         private readonly ?string $unixPath,
     ) {
+        $this->stream = $stream;
         $this->pacer = new Pacer(self::ACCEPTS_PER_TICK);
     }
 

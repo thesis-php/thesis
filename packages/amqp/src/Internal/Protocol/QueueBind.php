@@ -18,17 +18,6 @@ final readonly class QueueBind implements Method
     public const int CLASS_ID = 50;
     public const int METHOD_ID = 20;
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    public function __construct(
-        public string $queue,
-        public string $exchange,
-        public string $routingKey,
-        public bool $noWait,
-        public array $arguments,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -46,6 +35,17 @@ final readonly class QueueBind implements Method
             arguments: $arguments,
         );
     }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    public function __construct(
+        public string $queue,
+        public string $exchange,
+        public string $routingKey,
+        public bool $noWait,
+        public array $arguments,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

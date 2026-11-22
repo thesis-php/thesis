@@ -18,12 +18,6 @@ final readonly class ExchangeDelete implements Method
     public const int CLASS_ID = 40;
     public const int METHOD_ID = 20;
 
-    public function __construct(
-        public string $exchange,
-        public bool $ifUnused,
-        public bool $noWait,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -36,6 +30,12 @@ final readonly class ExchangeDelete implements Method
             noWait: ($bits & 0b00000010) !== 0,
         );
     }
+
+    public function __construct(
+        public string $exchange,
+        public bool $ifUnused,
+        public bool $noWait,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

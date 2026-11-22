@@ -18,16 +18,16 @@ final readonly class ConfirmSelect implements Method
     public const int CLASS_ID = 85;
     public const int METHOD_ID = 10;
 
-    public function __construct(
-        public bool $nowait,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $bit = $buffer->readUint8();
 
         return new self(nowait: ($bit & 0b00000001) !== 0);
     }
+
+    public function __construct(
+        public bool $nowait,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

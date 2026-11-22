@@ -31,6 +31,22 @@ final class IsoInterval
     private const SKIPPED = " .,\t/\n";
     private const MAX_NUMBER_DIGITS = 12;
 
+    /**
+     * @return ?self null if timelib reports an error
+     */
+    public static function parse(string $string): ?self
+    {
+        if ($string === '') {
+            return null;
+        }
+
+        // timelib trims C isspace() characters, but keeps the last one of a string made of them only.
+        $trimmed = trim($string, " \t\n\v\f\r");
+        $interval = new self();
+
+        return $interval->scan($trimmed === '' ? substr($string, -1) : $trimmed) ? $interval : null;
+    }
+
     public bool $hasPeriod = false;
 
     /**
@@ -73,22 +89,6 @@ final class IsoInterval
     public int|float $seconds = 0;
 
     private function __construct() {}
-
-    /**
-     * @return ?self null if timelib reports an error
-     */
-    public static function parse(string $string): ?self
-    {
-        if ($string === '') {
-            return null;
-        }
-
-        // timelib trims C isspace() characters, but keeps the last one of a string made of them only.
-        $trimmed = trim($string, " \t\n\v\f\r");
-        $interval = new self();
-
-        return $interval->scan($trimmed === '' ? substr($string, -1) : $trimmed) ? $interval : null;
-    }
 
     private function scan(string $string): bool
     {

@@ -29,13 +29,6 @@ final class Changelog
     private const string FENCE = '/^ {0,3}(```|~~~)/';
 
     /**
-     * The version right under [Unreleased], null if there is none yet.
-     */
-    public ?string $topVersion {
-        get => $this->top['version'] ?? null;
-    }
-
-    /**
      * @param non-empty-string $path for errors
      */
     public static function parse(string $content, string $path): self
@@ -88,6 +81,13 @@ final class Changelog
                 'notes' => trim(implode("\n", $top['lines'])),
             ],
         );
+    }
+
+    /**
+     * The version right under [Unreleased], null if there is none yet.
+     */
+    public ?string $topVersion {
+        get => $this->top['version'] ?? null;
     }
 
     /**

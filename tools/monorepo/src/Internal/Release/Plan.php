@@ -30,26 +30,6 @@ final class Plan
     private const string COMPOSER = 'composer.json';
 
     /**
-     * @var list<Release> dependencies first, none if there are errors
-     */
-    public private(set) array $releases = [];
-
-    /**
-     * @var list<string> every reason not to release
-     */
-    public private(set) array $errors = [];
-
-    /**
-     * @var array<string, string> package => the changes that its changelog lists under [Unreleased]
-     */
-    private array $unreleased = [];
-
-    /**
-     * @var array<string, non-empty-string> split commit => the commit of the monorepo it was made from
-     */
-    private array $origins = [];
-
-    /**
      * @param non-empty-string $commit the resolved ID of a commit on main
      */
     public static function of(Git $git, Api $api, Remote $remote, string $commit): self
@@ -95,6 +75,26 @@ final class Plan
 
         return $plan;
     }
+
+    /**
+     * @var list<Release> dependencies first, none if there are errors
+     */
+    public private(set) array $releases = [];
+
+    /**
+     * @var list<string> every reason not to release
+     */
+    public private(set) array $errors = [];
+
+    /**
+     * @var array<string, string> package => the changes that its changelog lists under [Unreleased]
+     */
+    private array $unreleased = [];
+
+    /**
+     * @var array<string, non-empty-string> split commit => the commit of the monorepo it was made from
+     */
+    private array $origins = [];
 
     /**
      * @param non-empty-string $commit

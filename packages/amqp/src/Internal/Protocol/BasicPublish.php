@@ -18,13 +18,6 @@ final readonly class BasicPublish implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 40;
 
-    public function __construct(
-        public string $exchange,
-        public string $routingKey,
-        public bool $mandatory,
-        public bool $immediate,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -39,6 +32,13 @@ final readonly class BasicPublish implements Method
             immediate: ($bits & 0b00000010) !== 0,
         );
     }
+
+    public function __construct(
+        public string $exchange,
+        public string $routingKey,
+        public bool $mandatory,
+        public bool $immediate,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

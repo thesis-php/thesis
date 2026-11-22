@@ -18,11 +18,6 @@ final readonly class BasicGet implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 70;
 
-    public function __construct(
-        public string $queue,
-        public bool $noAck,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -34,6 +29,11 @@ final readonly class BasicGet implements Method
             noAck: ($bit & 0b00000001) !== 0,
         );
     }
+
+    public function __construct(
+        public string $queue,
+        public bool $noAck,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

@@ -220,9 +220,9 @@ function methodClass(string $name, string $label, int $classId, int $methodId, a
         final readonly class {$name} implements Method
         {
             public const int CLASS_ID = {$classId};
-            public const int METHOD_ID = {$methodId};{$constructor}
+            public const int METHOD_ID = {$methodId};
 
-        {$decodeMethod}
+        {$decodeMethod}{$constructor}
 
             public function encode(Buffer \$buffer): void
             {
@@ -423,13 +423,6 @@ function propertiesClass(array $fields): string
         ' */',
         'final readonly class BasicProperties',
         '{',
-        '    /**',
-        ...$phpdoc,
-        '     */',
-        '    public function __construct(',
-        ...$promoted,
-        '    ) {}',
-        '',
         '    public static function decode(Buffer $buffer): self',
         '    {',
         '        $flags = $buffer->readUint16();',
@@ -439,6 +432,13 @@ function propertiesClass(array $fields): string
         ...$arguments,
         '        );',
         '    }',
+        '',
+        '    /**',
+        ...$phpdoc,
+        '     */',
+        '    public function __construct(',
+        ...$promoted,
+        '    ) {}',
         '',
         '    public function encode(Buffer $buffer): void',
         '    {',

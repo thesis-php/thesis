@@ -21,6 +21,26 @@ final class Version
      */
     private const array STAGES = ['alpha', 'beta', 'RC'];
 
+    public static function parse(string $version): ?self
+    {
+        if (preg_match(self::PATTERN, $version, $match, PREG_UNMATCHED_AS_NULL) !== 1) {
+            return null;
+        }
+
+        return new self(
+            major: (int) $match[1],
+            minor: (int) $match[2],
+            patch: (int) $match[3],
+            stage: $match[4] ?? null,
+            number: (int) ($match[5] ?? 0),
+        );
+    }
+
+    private static function stable(int $major, int $minor, int $patch): self
+    {
+        return new self($major, $minor, $patch, stage: null, number: 0);
+    }
+
     public readonly bool $preRelease;
 
     /**
@@ -43,21 +63,6 @@ final class Version
 
             return $first;
         }
-    }
-
-    public static function parse(string $version): ?self
-    {
-        if (preg_match(self::PATTERN, $version, $match, PREG_UNMATCHED_AS_NULL) !== 1) {
-            return null;
-        }
-
-        return new self(
-            major: (int) $match[1],
-            minor: (int) $match[2],
-            patch: (int) $match[3],
-            stage: $match[4] ?? null,
-            number: (int) ($match[5] ?? 0),
-        );
     }
 
     /**
@@ -85,11 +90,6 @@ final class Version
         }
 
         return $next;
-    }
-
-    private static function stable(int $major, int $minor, int $patch): self
-    {
-        return new self($major, $minor, $patch, stage: null, number: 0);
     }
 
     private function __construct(

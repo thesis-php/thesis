@@ -11,6 +11,7 @@ Read `README.md` for the API and its guarantees.
   Only DNS has timeouts of its own (`timeoutOr()` per server), because the protocol defines them.
 - A wait on a stream goes through the `StreamWatcher` of its owner, and `close()` calls `StreamWatcher::close()`
   before `fclose()`: the kernel drops a closed descriptor, and the waiting fiber would never wake up.
+  `Socket` and `Server` take an open stream and clear the stored resource on close.
   After any wait, re-read `$this->stream`: it may have been closed meanwhile, even if the wait returned true.
 - Read first, wait only on an empty read, never the other way round. TLS keeps decrypted bytes inside OpenSSL
   where the event loop cannot see them, so waiting for readability first would hang with data pending.

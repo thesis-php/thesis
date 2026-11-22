@@ -18,16 +18,6 @@ final readonly class BasicReturn implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 50;
 
-    /**
-     * @param int<0, 65535> $replyCode
-     */
-    public function __construct(
-        public int $replyCode,
-        public string $replyText,
-        public string $exchange,
-        public string $routingKey,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $replyCode = $buffer->readUint16();
@@ -42,6 +32,16 @@ final readonly class BasicReturn implements Method
             routingKey: $routingKey,
         );
     }
+
+    /**
+     * @param int<0, 65535> $replyCode
+     */
+    public function __construct(
+        public int $replyCode,
+        public string $replyText,
+        public string $exchange,
+        public string $routingKey,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

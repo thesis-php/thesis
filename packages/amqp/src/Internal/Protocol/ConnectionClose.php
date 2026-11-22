@@ -18,18 +18,6 @@ final readonly class ConnectionClose implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 50;
 
-    /**
-     * @param int<0, 65535> $replyCode
-     * @param int<0, 65535> $classId
-     * @param int<0, 65535> $methodId
-     */
-    public function __construct(
-        public int $replyCode,
-        public string $replyText,
-        public int $classId,
-        public int $methodId,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $replyCode = $buffer->readUint16();
@@ -44,6 +32,18 @@ final readonly class ConnectionClose implements Method
             methodId: $methodId,
         );
     }
+
+    /**
+     * @param int<0, 65535> $replyCode
+     * @param int<0, 65535> $classId
+     * @param int<0, 65535> $methodId
+     */
+    public function __construct(
+        public int $replyCode,
+        public string $replyText,
+        public int $classId,
+        public int $methodId,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

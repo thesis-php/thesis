@@ -18,14 +18,6 @@ final readonly class BasicAck implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 80;
 
-    /**
-     * @param non-negative-int $deliveryTag
-     */
-    public function __construct(
-        public int $deliveryTag,
-        public bool $multiple,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $deliveryTag = $buffer->readUint64();
@@ -36,6 +28,14 @@ final readonly class BasicAck implements Method
             multiple: ($bit & 0b00000001) !== 0,
         );
     }
+
+    /**
+     * @param non-negative-int $deliveryTag
+     */
+    public function __construct(
+        public int $deliveryTag,
+        public bool $multiple,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

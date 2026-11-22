@@ -84,11 +84,6 @@ final readonly class Fixture
         return Monorepo::load($this->root);
     }
 
-    public function __destruct()
-    {
-        self::remove($this->root);
-    }
-
     public static function remove(string $dir): void
     {
         if (!is_dir($dir)) {
@@ -104,5 +99,10 @@ final readonly class Fixture
         }
 
         rmdir($dir);
+    }
+
+    public function __destruct()
+    {
+        self::remove($this->root);
     }
 }

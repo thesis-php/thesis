@@ -18,19 +18,6 @@ final readonly class ConnectionStart implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 10;
 
-    /**
-     * @param int<0, 255> $versionMajor
-     * @param int<0, 255> $versionMinor
-     * @param array<string, mixed> $serverProperties
-     */
-    public function __construct(
-        public int $versionMajor,
-        public int $versionMinor,
-        public array $serverProperties,
-        public string $mechanisms,
-        public string $locales,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $versionMajor = $buffer->readUint8();
@@ -47,6 +34,19 @@ final readonly class ConnectionStart implements Method
             locales: $locales,
         );
     }
+
+    /**
+     * @param int<0, 255> $versionMajor
+     * @param int<0, 255> $versionMinor
+     * @param array<string, mixed> $serverProperties
+     */
+    public function __construct(
+        public int $versionMajor,
+        public int $versionMinor,
+        public array $serverProperties,
+        public string $mechanisms,
+        public string $locales,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

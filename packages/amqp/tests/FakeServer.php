@@ -15,14 +15,14 @@ use function Thesis\Time\sec;
  */
 final readonly class FakeServer
 {
-    private function __construct(
-        private Server $server,
-    ) {}
-
     public static function listen(): self
     {
         return new self(listen('127.0.0.1', 0));
     }
+
+    private function __construct(
+        private Server $server,
+    ) {}
 
     public function config(bool $reconnect = false, ?Duration $heartbeat = null): Config
     {

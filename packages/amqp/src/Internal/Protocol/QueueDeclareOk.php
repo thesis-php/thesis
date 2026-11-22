@@ -18,16 +18,6 @@ final readonly class QueueDeclareOk implements Method
     public const int CLASS_ID = 50;
     public const int METHOD_ID = 11;
 
-    /**
-     * @param int<0, 4294967295> $messageCount
-     * @param int<0, 4294967295> $consumerCount
-     */
-    public function __construct(
-        public string $queue,
-        public int $messageCount,
-        public int $consumerCount,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $queue = Fields::readShortString($buffer);
@@ -40,6 +30,16 @@ final readonly class QueueDeclareOk implements Method
             consumerCount: $consumerCount,
         );
     }
+
+    /**
+     * @param int<0, 4294967295> $messageCount
+     * @param int<0, 4294967295> $consumerCount
+     */
+    public function __construct(
+        public string $queue,
+        public int $messageCount,
+        public int $consumerCount,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

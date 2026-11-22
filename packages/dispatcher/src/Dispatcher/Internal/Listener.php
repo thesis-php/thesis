@@ -18,29 +18,6 @@ use function Thesis\Formatter\formatReflectedParameter;
 final readonly class Listener
 {
     /**
-     * The dispatcher uses the subscriber's listeners in order. It does not call the subscriber itself,
-     * even if the subscriber is invokable.
-     *
-     * @param iterable<(callable(never, Dispatcher): void)|Subscriber> $listeners
-     * @return list<self>
-     * @throws \InvalidArgumentException
-     */
-    public static function all(iterable $listeners): array
-    {
-        $all = [];
-
-        foreach ($listeners as $listener) {
-            $callables = $listener instanceof Subscriber ? $listener->listeners() : [$listener];
-
-            foreach ($callables as $callable) {
-                $all[] = self::of($callable);
-            }
-        }
-
-        return $all;
-    }
-
-    /**
      * @param callable(never, Dispatcher): void $listener
      */
     private static function of(callable $listener): self
@@ -81,6 +58,29 @@ final readonly class Listener
         }
 
         return new self($fn, self::types($event));
+    }
+
+    /**
+     * The dispatcher uses the subscriber's listeners in order. It does not call the subscriber itself,
+     * even if the subscriber is invokable.
+     *
+     * @param iterable<(callable(never, Dispatcher): void)|Subscriber> $listeners
+     * @return list<self>
+     * @throws \InvalidArgumentException
+     */
+    public static function all(iterable $listeners): array
+    {
+        $all = [];
+
+        foreach ($listeners as $listener) {
+            $callables = $listener instanceof Subscriber ? $listener->listeners() : [$listener];
+
+            foreach ($callables as $callable) {
+                $all[] = self::of($callable);
+            }
+        }
+
+        return $all;
     }
 
     /**

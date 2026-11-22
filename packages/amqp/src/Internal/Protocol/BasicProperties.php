@@ -15,28 +15,6 @@ use Thesis\Io\Buffer;
  */
 final readonly class BasicProperties
 {
-    /**
-     * @param ?array<string, mixed> $headers
-     * @param ?int<0, 255> $deliveryMode
-     * @param ?int<0, 255> $priority
-     * @param ?non-negative-int $timestamp
-     */
-    public function __construct(
-        public ?string $contentType = null,
-        public ?string $contentEncoding = null,
-        public ?array $headers = null,
-        public ?int $deliveryMode = null,
-        public ?int $priority = null,
-        public ?string $correlationId = null,
-        public ?string $replyTo = null,
-        public ?string $expiration = null,
-        public ?string $messageId = null,
-        public ?int $timestamp = null,
-        public ?string $type = null,
-        public ?string $userId = null,
-        public ?string $appId = null,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $flags = $buffer->readUint16();
@@ -73,6 +51,28 @@ final readonly class BasicProperties
             appId: $appId,
         );
     }
+
+    /**
+     * @param ?array<string, mixed> $headers
+     * @param ?int<0, 255> $deliveryMode
+     * @param ?int<0, 255> $priority
+     * @param ?non-negative-int $timestamp
+     */
+    public function __construct(
+        public ?string $contentType = null,
+        public ?string $contentEncoding = null,
+        public ?array $headers = null,
+        public ?int $deliveryMode = null,
+        public ?int $priority = null,
+        public ?string $correlationId = null,
+        public ?string $replyTo = null,
+        public ?string $expiration = null,
+        public ?string $messageId = null,
+        public ?int $timestamp = null,
+        public ?string $type = null,
+        public ?string $userId = null,
+        public ?string $appId = null,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

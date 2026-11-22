@@ -18,16 +18,16 @@ final readonly class ConnectionSecureOk implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 21;
 
-    public function __construct(
-        public string $response,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $response = Fields::readLongString($buffer);
 
         return new self(response: $response);
     }
+
+    public function __construct(
+        public string $response,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

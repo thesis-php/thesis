@@ -18,11 +18,6 @@ final readonly class BasicCancel implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 30;
 
-    public function __construct(
-        public string $consumerTag,
-        public bool $noWait,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $consumerTag = Fields::readShortString($buffer);
@@ -33,6 +28,11 @@ final readonly class BasicCancel implements Method
             noWait: ($bit & 0b00000001) !== 0,
         );
     }
+
+    public function __construct(
+        public string $consumerTag,
+        public bool $noWait,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

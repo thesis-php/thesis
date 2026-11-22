@@ -18,16 +18,16 @@ final readonly class ConnectionSecure implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 20;
 
-    public function __construct(
-        public string $challenge,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $challenge = Fields::readLongString($buffer);
 
         return new self(challenge: $challenge);
     }
+
+    public function __construct(
+        public string $challenge,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

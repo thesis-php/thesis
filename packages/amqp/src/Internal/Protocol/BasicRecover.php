@@ -18,16 +18,16 @@ final readonly class BasicRecover implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 110;
 
-    public function __construct(
-        public bool $requeue,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $bit = $buffer->readUint8();
 
         return new self(requeue: ($bit & 0b00000001) !== 0);
     }
+
+    public function __construct(
+        public bool $requeue,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

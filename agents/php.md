@@ -158,8 +158,8 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   `__construct`. For example, `Stream` takes a `resource` but stores a `?resource` so it can clear it on close.
   Document promoted properties with `@param` on `__construct`. When a named constructor prepares the property values,
   pass them to `__construct` in their final form.
-- Static constructors go first in a class, the destructor goes last. The constructor body uses its parameters,
-  not the promoted properties (`$x`, not `$this->x`) where possible.
+- Static constructors go before property declarations and other methods. The destructor goes last.
+  The constructor body uses its parameters, not the promoted properties (`$x`, not `$this->x`) where possible.
 
 ## Decisions
 

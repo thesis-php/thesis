@@ -18,16 +18,6 @@ final readonly class ConnectionStartOk implements Method
     public const int CLASS_ID = 10;
     public const int METHOD_ID = 11;
 
-    /**
-     * @param array<string, mixed> $clientProperties
-     */
-    public function __construct(
-        public array $clientProperties,
-        public string $mechanism,
-        public string $response,
-        public string $locale,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $clientProperties = Fields::readTable($buffer);
@@ -42,6 +32,16 @@ final readonly class ConnectionStartOk implements Method
             locale: $locale,
         );
     }
+
+    /**
+     * @param array<string, mixed> $clientProperties
+     */
+    public function __construct(
+        public array $clientProperties,
+        public string $mechanism,
+        public string $response,
+        public string $locale,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

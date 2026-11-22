@@ -18,13 +18,6 @@ final readonly class QueueDelete implements Method
     public const int CLASS_ID = 50;
     public const int METHOD_ID = 40;
 
-    public function __construct(
-        public string $queue,
-        public bool $ifUnused,
-        public bool $ifEmpty,
-        public bool $noWait,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -38,6 +31,13 @@ final readonly class QueueDelete implements Method
             noWait: ($bits & 0b00000100) !== 0,
         );
     }
+
+    public function __construct(
+        public string $queue,
+        public bool $ifUnused,
+        public bool $ifEmpty,
+        public bool $noWait,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

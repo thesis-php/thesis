@@ -24,17 +24,16 @@ final class Cancelled extends \Error
      */
     public static function create(): self
     {
-        $cancelled = new self();
-        // Where the library throws it, not this line: with the trace, it points at the wait that was interrupted.
-        $caller = $cancelled->getTrace()[0] ?? [];
-        $cancelled->file = $caller['file'] ?? $cancelled->file;
-        $cancelled->line = $caller['line'] ?? $cancelled->line;
-
-        return $cancelled;
+        return new self();
     }
 
     private function __construct()
     {
         parent::__construct('The scope is cancelled.');
+
+        // Report the call to create() so the exception points at the interrupted wait.
+        $caller = $this->getTrace()[0] ?? [];
+        $this->file = $caller['file'] ?? $this->file;
+        $this->line = $caller['line'] ?? $this->line;
     }
 }

@@ -14,14 +14,6 @@ use Thesis\Io\Buffer;
  */
 final readonly class ContentHeader
 {
-    /**
-     * @param non-negative-int $bodySize
-     */
-    public function __construct(
-        public int $bodySize,
-        public BasicProperties $properties,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         // The class id is always basic, and the weight is unused.
@@ -30,4 +22,12 @@ final readonly class ContentHeader
 
         return new self($bodySize, BasicProperties::decode($buffer));
     }
+
+    /**
+     * @param non-negative-int $bodySize
+     */
+    public function __construct(
+        public int $bodySize,
+        public BasicProperties $properties,
+    ) {}
 }

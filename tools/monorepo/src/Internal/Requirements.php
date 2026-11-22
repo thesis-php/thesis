@@ -19,33 +19,6 @@ use Composer\Semver\VersionParser;
 final class Requirements
 {
     /**
-     * @var array<non-empty-string, non-empty-string>
-     */
-    public private(set) array $require = [];
-
-    /**
-     * @var array<non-empty-string, non-empty-string>
-     */
-    public private(set) array $requireDev = [];
-
-    /**
-     * @var list<string>
-     */
-    private array $errors = [];
-
-    /**
-     * Not keyed by constraint: an integer-like constraint ("1") would become an integer key.
-     *
-     * @var array<non-empty-string, non-empty-list<array{constraint: non-empty-string, where: string}>>
-     */
-    private array $usages = [];
-
-    /**
-     * @var array<non-empty-string, true> dependencies required outside of require-dev
-     */
-    private array $runtime = [];
-
-    /**
      * @throws MonorepoException if any dependency constraints are invalid or cannot be reconciled.
      *     The exception message lists each error on its own line.
      */
@@ -81,6 +54,33 @@ final class Requirements
 
         return $requirements;
     }
+
+    /**
+     * @var array<non-empty-string, non-empty-string>
+     */
+    public private(set) array $require = [];
+
+    /**
+     * @var array<non-empty-string, non-empty-string>
+     */
+    public private(set) array $requireDev = [];
+
+    /**
+     * @var list<string>
+     */
+    private array $errors = [];
+
+    /**
+     * Not keyed by constraint: an integer-like constraint ("1") would become an integer key.
+     *
+     * @var array<non-empty-string, non-empty-list<array{constraint: non-empty-string, where: string}>>
+     */
+    private array $usages = [];
+
+    /**
+     * @var array<non-empty-string, true> dependencies required outside of require-dev
+     */
+    private array $runtime = [];
 
     private function __construct() {}
 

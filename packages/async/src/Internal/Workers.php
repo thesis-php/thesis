@@ -23,16 +23,6 @@ use function Thesis\Async\synchronized;
  */
 final class Workers
 {
-    /**
-     * @var \Generator<K, T>
-     */
-    private readonly \Generator $items;
-
-    /**
-     * null for an array: taking an item of it never suspends, so no other worker can come in between.
-     */
-    private readonly ?LocalMutex $mutex;
-
     private bool $started = false;
 
     private int $workers = 0;
@@ -57,25 +47,31 @@ final class Workers
         \Closure $fn,
         callable $traced,
     ): void {
-        new self(group: $group, items: $items, concurrency: $concurrency, fn: $fn, traced: $traced)->spawn();
+        new self(
+            group: $group,
+            items: (static fn() => yield from $items)(),
+            mutex: \is_array($items) ? null : new LocalMutex(),
+            concurrency: $concurrency,
+            fn: $fn,
+            traced: $traced,
+        )->spawn();
     }
 
     /**
-     * @param iterable<K, T> $items
+     * @param \Generator<K, T> $items
+     * @param ?LocalMutex $mutex guards advancing the iterator, or null for an array that cannot suspend
      * @param positive-int $concurrency
      * @param \Closure(T, K): mixed $fn
      * @param callable(T): mixed $traced
      */
     private function __construct(
         private readonly GroupImpl $group,
-        iterable $items,
+        private readonly \Generator $items,
+        private readonly ?LocalMutex $mutex,
         private readonly int $concurrency,
         private readonly \Closure $fn,
         private readonly mixed $traced,
-    ) {
-        $this->items = (static fn() => yield from $items)();
-        $this->mutex = \is_array($items) ? null : new LocalMutex();
-    }
+    ) {}
 
     private function spawn(): void
     {

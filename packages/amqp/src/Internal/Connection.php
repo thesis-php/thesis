@@ -35,6 +35,37 @@ use function Thesis\Time\ms;
 final class Connection
 {
     /**
+     * Performs the {@see Handshake} on a connected socket. Closes the socket if it fails.
+     *
+     * @throws ConnectionClosed
+     */
+    public static function open(Socket $socket, Config $config): self
+    {
+        try {
+            [$in, $tune] = Handshake::perform($socket, $config);
+        } catch (IoException|ProtocolError $exception) {
+            $socket->close();
+
+            throw new ConnectionClosed(
+                message: "The handshake failed: {$exception->getMessage()}",
+                previous: $exception,
+            );
+        } catch (\Throwable $exception) {
+            $socket->close();
+
+            throw $exception;
+        }
+
+        return new self(
+            socket: $socket,
+            in: $in,
+            channelMax: $tune->channelMax === 0 ? 0xFFFF : $tune->channelMax,
+            frameMax: $tune->frameMax,
+            heartbeat: $tune->heartbeat,
+        );
+    }
+
+    /**
      * Why the connection is closed, null while it is open.
      */
     public private(set) ?ConnectionClosed $closed = null;
@@ -92,37 +123,6 @@ final class Connection
         public readonly int $frameMax,
         private readonly int $heartbeat,
     ) {}
-
-    /**
-     * Performs the {@see Handshake} on a connected socket. Closes the socket if it fails.
-     *
-     * @throws ConnectionClosed
-     */
-    public static function open(Socket $socket, Config $config): self
-    {
-        try {
-            [$in, $tune] = Handshake::perform($socket, $config);
-        } catch (IoException|ProtocolError $exception) {
-            $socket->close();
-
-            throw new ConnectionClosed(
-                message: "The handshake failed: {$exception->getMessage()}",
-                previous: $exception,
-            );
-        } catch (\Throwable $exception) {
-            $socket->close();
-
-            throw $exception;
-        }
-
-        return new self(
-            socket: $socket,
-            in: $in,
-            channelMax: $tune->channelMax === 0 ? 0xFFFF : $tune->channelMax,
-            frameMax: $tune->frameMax,
-            heartbeat: $tune->heartbeat,
-        );
-    }
 
     /**
      * Reads and dispatches frames, and sends heartbeats, until the connection is closed or lost.

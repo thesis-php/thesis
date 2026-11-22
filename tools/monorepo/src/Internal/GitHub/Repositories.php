@@ -37,16 +37,6 @@ final class Repositories
      */
     public const array HELD_BACK = ['amqp'];
 
-    /**
-     * @var list<non-empty-string> what was changed, or would be with
-     */
-    public private(set) array $changes = [];
-
-    /**
-     * @var list<string> one per repository that could not be synced
-     */
-    public private(set) array $errors = [];
-
     public static function sync(Monorepo $monorepo, Api $api, Packagist $packagist, bool $dryRun): self
     {
         $repositories = new self($api, $packagist, $dryRun);
@@ -71,6 +61,16 @@ final class Repositories
 
         return $repositories;
     }
+
+    /**
+     * @var list<non-empty-string> what was changed, or would be with
+     */
+    public private(set) array $changes = [];
+
+    /**
+     * @var list<string> one per repository that could not be synced
+     */
+    public private(set) array $errors = [];
 
     /**
      * Whether thesis-php/<dir> is a split, so the split may push to it. An older package of the same name has

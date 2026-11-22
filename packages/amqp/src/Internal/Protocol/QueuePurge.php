@@ -18,11 +18,6 @@ final readonly class QueuePurge implements Method
     public const int CLASS_ID = 50;
     public const int METHOD_ID = 30;
 
-    public function __construct(
-        public string $queue,
-        public bool $noWait,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $buffer->skip(2);
@@ -34,6 +29,11 @@ final readonly class QueuePurge implements Method
             noWait: ($bit & 0b00000001) !== 0,
         );
     }
+
+    public function __construct(
+        public string $queue,
+        public bool $noWait,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

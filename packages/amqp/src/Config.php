@@ -17,50 +17,6 @@ use function Thesis\Time\sec;
  */
 final readonly class Config
 {
-    public Duration $heartbeat;
-
-    public Duration $connectTimeout;
-
-    /**
-     * @param non-empty-list<non-empty-string> $hosts tried in order: `host`, `host:port`, `[::1]:port`.
-     *     The port is 5672, or 5671 with TLS
-     * @param ?ClientTls $tls for amqps; the host is the default peer name
-     * @param non-empty-list<AuthMechanism> $authMechanisms the client uses the first mechanism the server supports
-     * @param ?Duration $heartbeat the requested heartbeat interval, or 60 seconds if null. When the client and
-     *     server both propose positive intervals, they use the shorter interval. If either proposes zero, they
-     *     use the other proposal. The client closes the connection after two intervals without a server frame.
-     * @param ?Duration $connectTimeout for each attempt to connect to a host and to perform the handshake,
-     *     30 seconds if null. The first connection is bounded by the caller of {@see Client::run()} too
-     * @param int<0, 65535> $channelMax 0 to take the limit of the server
-     * @param int<0, 4294967295> $frameMax 0 to take the limit of the server
-     * @param ?string $connectionName shown in the management UI of RabbitMQ
-     * @param bool $reconnect whether a lost connection is opened again, with a backoff from 100 ms to 30 s
-     * @throws \InvalidArgumentException if a host is malformed
-     */
-    public function __construct(
-        public array $hosts = ['localhost'],
-        #[\SensitiveParameter]
-        public string $user = 'guest',
-        #[\SensitiveParameter]
-        public string $password = 'guest',
-        public string $vhost = '/',
-        public ?ClientTls $tls = null,
-        public array $authMechanisms = [AuthMechanism::Plain, AuthMechanism::AmqPlain],
-        ?Duration $heartbeat = null,
-        ?Duration $connectTimeout = null,
-        public int $channelMax = 0,
-        public int $frameMax = 0,
-        public ?string $connectionName = null,
-        public bool $reconnect = true,
-    ) {
-        // Checked now, not on a reconnect in a daemon, where it would fail the group of the application.
-        foreach ($hosts as $host) {
-            address($host, 0);
-        }
-        $this->heartbeat = $heartbeat ?? sec(60);
-        $this->connectTimeout = $connectTimeout ?? sec(30);
-    }
-
     /**
      * `fromUri()` parses a URI of the RabbitMQ format, with several hosts separated by commas:
      * `amqps://user:password@host1:5671,host2:5671/vhost?heartbeat=10&connection_timeout=5000`.
@@ -115,6 +71,50 @@ final readonly class Config
             frameMax: min(0xFF_FF_FF_FF, self::int($query, 'frame_max')),
             connectionName: $query['connection_name'][0] ?? null,
         );
+    }
+
+    public Duration $heartbeat;
+
+    public Duration $connectTimeout;
+
+    /**
+     * @param non-empty-list<non-empty-string> $hosts tried in order: `host`, `host:port`, `[::1]:port`.
+     *     The port is 5672, or 5671 with TLS
+     * @param ?ClientTls $tls for amqps; the host is the default peer name
+     * @param non-empty-list<AuthMechanism> $authMechanisms the client uses the first mechanism the server supports
+     * @param ?Duration $heartbeat the requested heartbeat interval, or 60 seconds if null. When the client and
+     *     server both propose positive intervals, they use the shorter interval. If either proposes zero, they
+     *     use the other proposal. The client closes the connection after two intervals without a server frame.
+     * @param ?Duration $connectTimeout for each attempt to connect to a host and to perform the handshake,
+     *     30 seconds if null. The first connection is bounded by the caller of {@see Client::run()} too
+     * @param int<0, 65535> $channelMax 0 to take the limit of the server
+     * @param int<0, 4294967295> $frameMax 0 to take the limit of the server
+     * @param ?string $connectionName shown in the management UI of RabbitMQ
+     * @param bool $reconnect whether a lost connection is opened again, with a backoff from 100 ms to 30 s
+     * @throws \InvalidArgumentException if a host is malformed
+     */
+    public function __construct(
+        public array $hosts = ['localhost'],
+        #[\SensitiveParameter]
+        public string $user = 'guest',
+        #[\SensitiveParameter]
+        public string $password = 'guest',
+        public string $vhost = '/',
+        public ?ClientTls $tls = null,
+        public array $authMechanisms = [AuthMechanism::Plain, AuthMechanism::AmqPlain],
+        ?Duration $heartbeat = null,
+        ?Duration $connectTimeout = null,
+        public int $channelMax = 0,
+        public int $frameMax = 0,
+        public ?string $connectionName = null,
+        public bool $reconnect = true,
+    ) {
+        // Checked now, not on a reconnect in a daemon, where it would fail the group of the application.
+        foreach ($hosts as $host) {
+            address($host, 0);
+        }
+        $this->heartbeat = $heartbeat ?? sec(60);
+        $this->connectTimeout = $connectTimeout ?? sec(30);
     }
 
     private static function orDefault(string $value, string $default): string

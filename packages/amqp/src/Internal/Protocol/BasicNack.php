@@ -18,15 +18,6 @@ final readonly class BasicNack implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 120;
 
-    /**
-     * @param non-negative-int $deliveryTag
-     */
-    public function __construct(
-        public int $deliveryTag,
-        public bool $multiple,
-        public bool $requeue,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $deliveryTag = $buffer->readUint64();
@@ -38,6 +29,15 @@ final readonly class BasicNack implements Method
             requeue: ($bits & 0b00000010) !== 0,
         );
     }
+
+    /**
+     * @param non-negative-int $deliveryTag
+     */
+    public function __construct(
+        public int $deliveryTag,
+        public bool $multiple,
+        public bool $requeue,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

@@ -17,20 +17,6 @@ final class Series
 {
     private const string PATTERN = '/^(0|[1-9]\d*)\.(0|[1-9]\d*)$/D';
 
-    /**
-     * @var non-empty-string the versions compatible with the series: below 1.0 a minor is a break, above it a major
-     */
-    public string $range {
-        get => $this->major === 0 ? '^0.' . $this->minor : '^' . $this->major . '.0';
-    }
-
-    /**
-     * @var non-empty-string
-     */
-    public string $alias {
-        get => $this->major . '.' . $this->minor . '.x-dev';
-    }
-
     public static function of(Package $package): self
     {
         return self::parse($package->manifest->version) ?? throw new MonorepoException(\sprintf(
@@ -64,6 +50,20 @@ final class Series
         return \is_string($alias) && preg_match('/^(.+)\.x-dev$/D', $alias, $series) === 1
             ? self::parse($series[1])
             : null;
+    }
+
+    /**
+     * @var non-empty-string the versions compatible with the series: below 1.0 a minor is a break, above it a major
+     */
+    public string $range {
+        get => $this->major === 0 ? '^0.' . $this->minor : '^' . $this->major . '.0';
+    }
+
+    /**
+     * @var non-empty-string
+     */
+    public string $alias {
+        get => $this->major . '.' . $this->minor . '.x-dev';
     }
 
     /**

@@ -18,14 +18,6 @@ final readonly class BasicReject implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 90;
 
-    /**
-     * @param non-negative-int $deliveryTag
-     */
-    public function __construct(
-        public int $deliveryTag,
-        public bool $requeue,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $deliveryTag = $buffer->readUint64();
@@ -36,6 +28,14 @@ final readonly class BasicReject implements Method
             requeue: ($bit & 0b00000001) !== 0,
         );
     }
+
+    /**
+     * @param non-negative-int $deliveryTag
+     */
+    public function __construct(
+        public int $deliveryTag,
+        public bool $requeue,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

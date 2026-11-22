@@ -43,6 +43,15 @@ final class Tracer
      */
     private const int FRAMES = 32;
 
+    public static function attach(Dispatcher $dispatcher): self
+    {
+        $tracer = Scope::$tracer ??= new self();
+        $tracer->dispatchers[] = $dispatcher;
+        $tracer->listens = [];
+
+        return $tracer;
+    }
+
     /**
      * @var list<Dispatcher>
      */
@@ -79,15 +88,6 @@ final class Tracer
      * @var non-negative-int
      */
     private int $lastId = 0;
-
-    public static function attach(Dispatcher $dispatcher): self
-    {
-        $tracer = Scope::$tracer ??= new self();
-        $tracer->dispatchers[] = $dispatcher;
-        $tracer->listens = [];
-
-        return $tracer;
-    }
 
     private function __construct()
     {

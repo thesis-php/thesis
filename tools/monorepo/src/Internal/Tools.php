@@ -19,6 +19,36 @@ use Thesis\Monorepo\RectorSkip;
 final class Tools
 {
     /**
+     * @throws MonorepoException a skipped path does not exist
+     */
+    public static function of(Monorepo $monorepo): self
+    {
+        // The tools have no manifests: a tool has a suite when it has tests.
+        /** @var list<non-empty-string>|false $toolTests */
+        $toolTests = glob($monorepo->root . '/tools/*/tests', GLOB_ONLYDIR);
+        \assert($toolTests !== false);
+        $tools = new self($monorepo, $toolTests);
+        $errors = [];
+
+        foreach ($tools->skips() as [, $path, $package, $file]) {
+            if (!file_exists($path)) {
+                $errors[] = \sprintf(
+                    '%s/%s: the skipped path %s does not exist, fix or remove the skip.',
+                    $package->path,
+                    Monorepo::MANIFEST,
+                    $file,
+                );
+            }
+        }
+
+        if ($errors !== []) {
+            throw new MonorepoException(implode("\n", $errors));
+        }
+
+        return $tools;
+    }
+
+    /**
      * @var list<non-empty-string> files that PHP CS Fixer does not touch
      */
     public array $fixerSkips {
@@ -91,36 +121,6 @@ final class Tools
 
             return $suites;
         }
-    }
-
-    /**
-     * @throws MonorepoException a skipped path does not exist
-     */
-    public static function of(Monorepo $monorepo): self
-    {
-        // The tools have no manifests: a tool has a suite when it has tests.
-        /** @var list<non-empty-string>|false $toolTests */
-        $toolTests = glob($monorepo->root . '/tools/*/tests', GLOB_ONLYDIR);
-        \assert($toolTests !== false);
-        $tools = new self($monorepo, $toolTests);
-        $errors = [];
-
-        foreach ($tools->skips() as [, $path, $package, $file]) {
-            if (!file_exists($path)) {
-                $errors[] = \sprintf(
-                    '%s/%s: the skipped path %s does not exist, fix or remove the skip.',
-                    $package->path,
-                    Monorepo::MANIFEST,
-                    $file,
-                );
-            }
-        }
-
-        if ($errors !== []) {
-            throw new MonorepoException(implode("\n", $errors));
-        }
-
-        return $tools;
     }
 
     /**

@@ -18,17 +18,6 @@ final readonly class BasicDeliver implements Method
     public const int CLASS_ID = 60;
     public const int METHOD_ID = 60;
 
-    /**
-     * @param non-negative-int $deliveryTag
-     */
-    public function __construct(
-        public string $consumerTag,
-        public int $deliveryTag,
-        public bool $redelivered,
-        public string $exchange,
-        public string $routingKey,
-    ) {}
-
     public static function decode(Buffer $buffer): self
     {
         $consumerTag = Fields::readShortString($buffer);
@@ -45,6 +34,17 @@ final readonly class BasicDeliver implements Method
             routingKey: $routingKey,
         );
     }
+
+    /**
+     * @param non-negative-int $deliveryTag
+     */
+    public function __construct(
+        public string $consumerTag,
+        public int $deliveryTag,
+        public bool $redelivered,
+        public string $exchange,
+        public string $routingKey,
+    ) {}
 
     public function encode(Buffer $buffer): void
     {

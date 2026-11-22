@@ -27,47 +27,6 @@ final readonly class Duration
     private const ONLY_PERIOD_ALLOWED = 'The ISO 8601 duration string may only contain the period (P) aspect';
     private const DAYS_FOUND = 'The ISO 8601 duration string may only contain the time (T) aspect';
 
-    /**
-     * First on purpose: PHP compares objects property by property in declaration order, so `<`, `<=>` and `==`
-     * compare the signed seconds, then the signed nanoseconds, as the C class does. Two ints: nanoseconds alone
-     * do not fit in int on 32-bit PHP.
-     */
-    private int $signedSeconds;
-
-    private int $signedNanoseconds;
-
-    /**
-     * Up to 9_223_372_035, on 32-bit PHP up to PHP_INT_MAX.
-     *
-     * @var non-negative-int
-     */
-    public int $seconds;
-
-    /**
-     * @var int<0, 999999999>
-     */
-    public int $nanoseconds;
-
-    public bool $negative;
-
-    /**
-     * @param non-negative-int|float $seconds
-     * @param int<0, 999999999> $nanoseconds
-     */
-    private function __construct(int|float $seconds, int $nanoseconds, bool $negative)
-    {
-        if (\is_float($seconds) || $seconds > self::MAX_SECONDS) {
-            throw new TimeException(self::OUT_OF_RANGE);
-        }
-
-        $negative = $negative && ($seconds !== 0 || $nanoseconds !== 0);
-        $this->signedSeconds = $negative ? -$seconds : $seconds;
-        $this->signedNanoseconds = $negative ? -$nanoseconds : $nanoseconds;
-        $this->seconds = $seconds;
-        $this->nanoseconds = $nanoseconds;
-        $this->negative = $negative;
-    }
-
     public static function fromSeconds(int $seconds, int $nanoseconds = 0): self
     {
         if ($seconds < 0) {
@@ -171,6 +130,47 @@ final readonly class Duration
             + $interval->seconds;
 
         return new self($seconds, 0, false);
+    }
+
+    /**
+     * First on purpose: PHP compares objects property by property in declaration order, so `<`, `<=>` and `==`
+     * compare the signed seconds, then the signed nanoseconds, as the C class does. Two ints: nanoseconds alone
+     * do not fit in int on 32-bit PHP.
+     */
+    private int $signedSeconds;
+
+    private int $signedNanoseconds;
+
+    /**
+     * Up to 9_223_372_035, on 32-bit PHP up to PHP_INT_MAX.
+     *
+     * @var non-negative-int
+     */
+    public int $seconds;
+
+    /**
+     * @var int<0, 999999999>
+     */
+    public int $nanoseconds;
+
+    public bool $negative;
+
+    /**
+     * @param non-negative-int|float $seconds
+     * @param int<0, 999999999> $nanoseconds
+     */
+    private function __construct(int|float $seconds, int $nanoseconds, bool $negative)
+    {
+        if (\is_float($seconds) || $seconds > self::MAX_SECONDS) {
+            throw new TimeException(self::OUT_OF_RANGE);
+        }
+
+        $negative = $negative && ($seconds !== 0 || $nanoseconds !== 0);
+        $this->signedSeconds = $negative ? -$seconds : $seconds;
+        $this->signedNanoseconds = $negative ? -$nanoseconds : $nanoseconds;
+        $this->seconds = $seconds;
+        $this->nanoseconds = $nanoseconds;
+        $this->negative = $negative;
     }
 
     public static function compare(self $a, self $b): int
