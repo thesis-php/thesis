@@ -1,13 +1,14 @@
 {
     "name": "thesis/async",
-    "description": "Structured concurrency for PHP fibers on an event loop of its own: cancellation is a property of the task tree.",
+    "description": "Structured concurrency for PHP fibers with its own event loop, task-tree cancellation and lazy initialization.",
     "keywords": [
         "php",
         "async",
         "fibers",
         "structured-concurrency",
         "cancellation",
-        "event-loop"
+        "event-loop",
+        "lazy-initialization"
     ],
     "license": "MIT",
     "type": "library",

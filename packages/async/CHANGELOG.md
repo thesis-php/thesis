@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `delay()` waits on a timer, and `checkpoint()` yields to the event loop and checks cancellation.
 - `suspend()` lets callers build their own waiting primitives. `onCancel()` and `isCancelled()` work without a wait.
 - `Deferred`, `Channel` and `ScopedValue` let tasks share results, send values and read scoped state.
+- `Once` shares a lazily computed value or error and can retry after cancellation.
 - `suppressed()` retrieves failures that a group did not rethrow.
 - `Mutex`, `Semaphore` and their keyed variants coordinate tasks. The package also provides
   `synchronized()`, rate limiters and `Backoff`.

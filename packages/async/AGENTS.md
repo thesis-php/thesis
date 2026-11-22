@@ -276,15 +276,10 @@ or the process loop. `virtualTime()` runs a separate loop.
   where it is created), events from inside `notify()` (user code in the middle of the walk), a null check per event
   in `suspend()` (the traced wait is a separate method instead), a full backtrace per wait (`caller()` of
   thesis/source-location takes the first frame outside this library, and names the call that waits).
-- Rejected: `Once` (a lazy value computed once for concurrent callers, `Sync\Once` of the old thesis).
-  Under structured concurrency it has no single meaning: the init runs either in the scope of the first caller,
-  so cancelling that caller must make the next one retry, or in a group of an owner, so no caller's cancellation
-  reaches it. Both are a few lines already: `synchronized($mutex, fn() => $this->value ??= $this->init())`
-  (a cancelled caller releases the lock, the next one retries), or a `Task` of the owner's group kept in a property
-  and awaited by everyone. A `Once` would have to pick one of them and invites the lazy connect of a client
-  that `agents/clients.md` rejects. Shared DNS queries in thesis/net need the second meaning,
-  dic singletons are dic's own.
-  Revisit when two packages repeat the same pattern with the same meaning of cancellation.
+- `Once::await()` runs the callback in the first caller's scope. All callers share its result or ordinary failure.
+  Only `Cancelled` escaping the callback can reopen a `Once` constructed with `retryOnCancel: true`.
+  A waiter cancelled in its own scope leaves the attempt alone. Work owned by a group (such as a shared DNS query)
+  belongs in a task of that group. Rejected: starting the callback in a background task from the constructor.
 - `Backoff` computes the delays and does not wait: the wait of each user ends differently (`StreamWatcher::delay()`
   that `close()` ends in thesis/net, a `timeoutOr()` that `Client::close()` ends in thesis/amqp).
   Rejected: a `retry(callable, Backoff)`, it would fix the wait and which failures are retried.

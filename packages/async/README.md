@@ -550,6 +550,22 @@ its awaiters are not cancelled, so fail it with a regular exception.
 Awaiting a deferred that is already done returns at once, without suspending: it is not a cancellation point then
 and does not yield to the event loop.
 
+### Lazy initialization with `Once`
+
+The first `await()` runs the callback in the caller's scope. Concurrent callers wait for that attempt.
+Every caller receives the same result (including `null`) or the same ordinary exception.
+
+```php
+use Thesis\Async\Once;
+
+$config = new Once($loader->load(...), retryOnCancel: true);
+$value = $config->await();
+```
+
+If the callback throws `Cancelled`, its caller receives that cancellation. By default other callers receive
+`OnceCancelled`. Set `retryOnCancel: true` when it is safe to repeat interrupted work. One waiting or later
+caller can then run the callback again. Cancelling a waiter only ends its own wait.
+
 ### Exclusive access: `Mutex` and `Semaphore`
 
 Fibers switch only at waits, so a critical section that never waits needs no lock.
@@ -1166,6 +1182,7 @@ all([user, orders])              orders fails after 50 ms
 | `remaining(): ?Duration` | time left until the nearest deadline, `null` if there is none |
 | `Instant`: `now()`, `elapsed(callable): Duration`, `add(Duration)`, `since(Instant): Duration`, `<`, `==` | a point on the monotonic clock of deadlines |
 | `shield(callable(): T): T` | protect from outer cancellation and outer deadlines |
+| `Once<T>(callable(): T $fn, bool $retryOnCancel = false)`, `await(): T` | lazy result shared by callers |
 | `Deferred<T>`: `complete(T): bool`, `fail(\Throwable): bool`, `await(): T`, `$isDone` | one-shot value awaited by many |
 | `Mutex extends Semaphore`: `acquire(): Lock`; `LocalMutex`, `LocalSemaphore(int $permits)` | exclusive access, fair |
 | `synchronized(Semaphore, callable(): T): T` | run holding a permit, reentrant within a fiber |

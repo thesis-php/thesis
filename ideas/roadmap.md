@@ -54,7 +54,8 @@ What amphp has, then what thesis makes of it.
 ## Older thesis → thesis
 
 - Merged: `byte-*`, `endian`, `varint`, `amp-bridge` into `io`; `time-span`, `clock` into `time`.
-- Not needed: `sync-once` (see "Decisions" of `async`), `package-version` (`Composer\InstalledVersions`).
+- `Thesis\Async\Once` in `thesis/async` replaces `sync-once`.
+- Not needed: `package-version` (`Composer\InstalledVersions`).
 - Rewritten: `exceptionally`, `formatter`, `dispatcher`.
 - Later, with message-bus and norm: `message`, `transaction`, `serde`.
 - Rewritten on the new stack: see the phases below.

@@ -8,10 +8,10 @@ use Thesis\Monorepo\RectorSkip;
 use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
-    description: 'Structured concurrency for PHP fibers on an event loop of its own: cancellation is a property of the task tree.',
+    description: 'Structured concurrency for PHP fibers with its own event loop, task-tree cancellation and lazy initialization.',
     licenseSince: 2026,
     version: '0.1',
-    keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop'],
+    keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop', 'lazy-initialization'],
     require: [
         // Time is int nanoseconds of hrtime() (Instant, timers), on 32-bit hrtime() is a float.
         'php-64bit' => '*',

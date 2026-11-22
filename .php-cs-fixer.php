@@ -74,6 +74,8 @@ return new Config()
         'no_redundant_readonly_property' => true,
         'no_superfluous_phpdoc_tags' => ['remove_inheritdoc' => true],
         'no_trailing_whitespace_in_string' => false,
+        // A non-nullable property can be unset to release its value. Assigning null would throw TypeError.
+        'no_unset_on_property' => false,
         'nullable_type_declaration_for_default_null_value' => true,
         'ordered_class_elements' => ['order' => ['use_trait']],
         'ordered_imports' => ['imports_order' => ['class', 'function', 'const']],
