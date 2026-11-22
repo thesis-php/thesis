@@ -552,15 +552,37 @@ and does not yield to the event loop.
 
 ### Lazy initialization with `Once`
 
-The first `await()` runs the callback in the caller's scope. Concurrent callers wait for that attempt.
-Every caller receives the same result (including `null`) or the same ordinary exception.
+Keep one `Once` in a property when an object needs a value whose initialization can suspend.
+For example, a configuration provider can read its configuration on first use. Its constructor stores
+the loader, so constructing the provider does no I/O.
 
 ```php
 use Thesis\Async\Once;
+use function Thesis\Async\all;
 
-$config = new Once($loader->load(...), retryOnCancel: true);
-$value = $config->await();
+final readonly class ConfigProvider
+{
+    /** @var Once<Config> */
+    private Once $config;
+
+    public function __construct(ConfigLoader $loader)
+    {
+        $this->config = new Once($loader->load(...), retryOnCancel: true);
+    }
+
+    public function get(): Config
+    {
+        return $this->config->await();
+    }
+}
+
+$provider = new ConfigProvider($loader);
+[$first, $second] = all([$provider->get(...), $provider->get(...)]);
 ```
+
+The first `get()` runs `load()` in its fiber. If the load suspends, the other caller waits. Both calls
+receive the same `Config` instance, and later calls on this provider return it immediately.
+`Once` also remembers a `null` result or an ordinary exception.
 
 If the callback throws `Cancelled`, its caller receives that cancellation. By default other callers receive
 `OnceCancelled`. Set `retryOnCancel: true` when it is safe to repeat interrupted work. One waiting or later
