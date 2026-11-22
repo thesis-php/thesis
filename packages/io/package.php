@@ -6,11 +6,11 @@ use Thesis\Monorepo\Manifest;
 use Thesis\TestoPlugin\EventLoopPlugin;
 
 return new Manifest(
-    description: 'Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio.',
+    description: 'Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader.',
     licenseSince: 2026,
     version: '0.1',
     title: 'Thesis IO',
-    keywords: ['php', 'async', 'fibers', 'io', 'non-blocking-io', 'streams', 'buffer', 'binary'],
+    keywords: ['php', 'async', 'fibers', 'io', 'non-blocking-io', 'streams', 'buffer', 'binary', 'string-reader'],
     require: [
         // int64 and uint64 of Buffer are a native int (pack('J')), uint32 fits in int only on 64-bit.
         'php-64bit' => '*',

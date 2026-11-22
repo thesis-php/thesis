@@ -141,6 +141,11 @@ if ($line === null) {
 }
 ```
 
+### Reading a string
+
+`new StringReader($bytes)` reads a string in memory without suspending the fiber. It implements `SizedReader`,
+whose `$size` gives the total number of bytes, including bytes already read.
+
 ### Streams over resources and stdio
 
 `Stream` adapts a PHP stream resource that the process owns (a pipe of `proc_open()`, a file, a socket without TLS)

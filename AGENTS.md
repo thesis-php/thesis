@@ -94,7 +94,7 @@ the whole monorepo is for the final check.
 - `dispatcher`: Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
-- `io`: Fast binary I/O: byte buffer with typed encoding, non-blocking streams and stdio. Requires: async, time.
+- `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.

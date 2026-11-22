@@ -1,8 +1,9 @@
 # thesis/io
 
 `Buffer` supports typed big-endian and little-endian encoding and varints. The package defines `Reader`,
-`Writer` and `Closer` interfaces. `Stream` wraps a non-blocking PHP resource, while `stdin()`, `stdout()`
-and `stderr()` expose the standard streams. Streams wait through thesis/async.
+`SizedReader`, `Writer` and `Closer` interfaces. `StringReader` reads a string in memory. `Stream` wraps a
+non-blocking PHP resource, while `stdin()`, `stdout()` and `stderr()` expose the standard streams.
+Streams wait through thesis/async.
 Read `README.md` for the API and design decisions.
 
 ## Invariants that must not be broken
@@ -20,6 +21,8 @@ Read `README.md` for the API and design decisions.
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
   on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
   `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
+- `SizedReader::$size` is the total size in bytes, including bytes already read. `StringReader` advances an
+  offset into the original string and reads without suspending the fiber.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.
   A decorator keeps it too: it changes its state only after the inner read has returned.
   A write that throws after writing a part leaves its writer unusable (`Stream` closes itself):
