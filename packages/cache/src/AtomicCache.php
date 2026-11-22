@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Cache;
 
-use Thesis\Async\Cancelled;
 use Thesis\Async\KeyedMutex;
 use Thesis\Async\LocalKeyedMutex;
 use Thesis\Async\shield;
@@ -65,7 +64,6 @@ final readonly class AtomicCache implements Cache
      *
      * @param callable(string): V $compute gets the key
      * @return V
-     * @throws Cancelled if the scope is cancelled while waiting for the lock or computing
      */
     public function getOrCompute(string $key, callable $compute, ?Duration $ttl = null): mixed
     {
@@ -94,21 +92,11 @@ final readonly class AtomicCache implements Cache
         return $this->cache->get($key, $default);
     }
 
-    /**
-     * Under the lock of $key: waits for a computation of $key in progress, then replaces its value.
-     *
-     * @throws Cancelled if the scope is cancelled while waiting for the lock
-     */
     public function set(string $key, mixed $value, ?Duration $ttl = null): void
     {
         synchronizedKey($this->mutex, $key, fn() => $this->cache->set($key, $value, $ttl));
     }
 
-    /**
-     * Under the lock of $key: waits for a computation of $key in progress, then deletes its value.
-     *
-     * @throws Cancelled if the scope is cancelled while waiting for the lock
-     */
     public function delete(string $key): void
     {
         synchronizedKey($this->mutex, $key, fn() => $this->cache->delete($key));

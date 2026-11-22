@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
-use Thesis\Async\Cancelled;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
@@ -110,16 +109,8 @@ final class Socket implements Reader, Writer, Closer
     }
 
     /**
-     * Returns the bytes that have arrived, waiting only if there are none. A read that throws {@see Cancelled}
-     * has taken nothing. Reads that find bytes every time still yield to the event loop now and then,
+     * Reads that find bytes every time still yield to the event loop now and then,
      * so a peer that never pauses does not starve the other tasks.
-     *
-     * @param positive-int $max
-     * @return non-empty-string
-     * @throws UnexpectedEof when no bytes remain after the peer closes the connection or shuts down writes
-     * @throws ReadFailed if the connection is broken (reset by the peer, a TLS error)
-     * @throws SocketClosed if close() was called on this socket before the read or while the read was waiting
-     * @throws \LogicException if another fiber is reading
      */
     public function read(int $max): string
     {
@@ -163,15 +154,8 @@ final class Socket implements Reader, Writer, Closer
     }
 
     /**
-     * Returns once every byte is handed to the OS, waiting while its buffer is full.
+     * Returns once every byte is handed to the OS.
      * Concurrent writes go one after another, in the order they came.
-     *
-     * If a write fails or is cancelled after a part of its bytes has been sent, the socket is closed:
-     * the peer has got half a message, and nothing written afterwards would make sense to it.
-     * A write cancelled before sending anything leaves the socket as it was.
-     *
-     * @throws WriteFailed if the connection is broken
-     * @throws SocketClosed if this socket was closed before a non-empty write or while the write was waiting
      */
     public function write(string $bytes): void
     {
@@ -292,8 +276,7 @@ final class Socket implements Reader, Writer, Closer
     }
 
     /**
-     * Closes the socket at once. Reads and writes waiting in other fibers throw {@see SocketClosed}.
-     * Idempotent.
+     * Closes the socket immediately.
      */
     public function close(): void
     {

@@ -18,7 +18,7 @@ interface Resolver
      * @param non-empty-string $host
      * @return non-empty-list<non-empty-string> IP addresses in the order of preference, IPv6 without brackets
      * @throws DnsFailed
-     * @throws Cancelled
+     * @throws Cancelled if cancellation of the scope interrupts host resolution
      */
     public function resolve(string $host): array;
 }

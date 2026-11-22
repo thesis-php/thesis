@@ -104,6 +104,8 @@ $buffer->readVarint();
 `Reader::read(int $max)` returns from 1 to `$max` bytes, throws `UnexpectedEof` at the end of the stream
 and `ReadFailed` if the read fails otherwise (a connection reset),
 `Writer::write(string $bytes)` writes all the bytes. Both may suspend the fiber while they wait.
+Wait for each read to finish before starting another one on the same reader. An overlapping read may
+throw `LogicException`.
 A read that throws, `Cancelled` included, has taken nothing, so a `timeout()` around a read loses no bytes.
 `Buffer` turns them into exact, buffered reads and batched writes:
 

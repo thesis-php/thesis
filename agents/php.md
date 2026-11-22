@@ -70,10 +70,8 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   prefer `the package's suite` to `the suite of the package`. Split long sentences, cut empty words.
 - Name the object or actor wherever the reference could be ambiguous. For I/O, name the stream whose
   `close()` method ran or the peer that closed its end of the connection.
-- Write each PHPDoc tag description so it makes sense on its own. For `@throws`, give the condition or call
-  that raises the exception (`if close() was called on this reader`, `if $reader->read() fails`). For `@param`
-  and `@return`, name the value and say what special values mean (`the peer's certificate, or null if the peer
-  sent none`). Put a longer explanation in the docblock above the tags.
+- For `@param` and `@return`, name the value and say what special values mean (`the peer's certificate, or null
+  if the peer sent none`). Put a longer explanation in the docblock above the tags.
 - No one-letter names except a loop index (`$i`) and the operands of a comparator (`$a`, `$b`):
   `$n`, `$o`, `$v` make the reader look up what they hold.
 - Where the PHP standard library has a name for the same thing, take it: a number of bytes is `$length`
@@ -95,6 +93,10 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
+- Document a method or property in the interface or parent class that defines its contract. An override inherits
+  that PHPDoc. Keep only details specific to the override and type annotations that PHPStan needs there. For
+  example, it needs the type arguments on a concrete `Generator` when the inherited return type is `Traversable`.
+  An override accepts every input and state the contract allows.
 - A function or method with a variadic parameter whose values are a list, not options by name
   (`awaitSignal(SIGINT, SIGTERM)`), is marked `@no-named-arguments`: PHP would put
   a named argument into the array under its name as a key, and PHPStan then reports such a call.
@@ -111,6 +113,24 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   later but not narrowed. Inside, time is `int` nanoseconds: exact like `Duration` (`ns()`/`toNs()` convert
   without a loss) and as cheap as a float, while a `Duration` object costs an allocation per operation.
   Convert at the boundary to what the underlying API takes (float seconds: `$ns / 1e9`).
+
+### Exceptions
+
+- Put `@throws` on the declaration that owns the contract. Name the failure a caller can handle and the
+  condition or call that raises it (`if close() was called on this reader`, `if $reader->read() fails`).
+  For an error passed through from a callback, say whose error the caller gets.
+- An override only lets exceptions escape that its contract allows for that call. Translate a failure to an
+  allowed exception if it has the same meaning. If callers through the interface need to handle a new failure,
+  change the shared contract and check its callers.
+- `Thesis\Async\Cancelled` is an `\Error` that signals cancellation of the current scope. A call that waits,
+  yields to the loop or runs a callback can propagate it. Omit `@throws Cancelled` for ordinary propagation.
+  Use the tag for an explicit cancellation check that belongs to the method's contract, or when PHPStan
+  would reject a valid catch of `Cancelled` based on the other `@throws` types.
+- Describe operation-specific cancellation guarantees in prose. Say whether a fast path checks cancellation
+  and whether a cancelled operation can have committed work. Exceptions such as `TimedOut`, `TaskCancelled`
+  and `OnceCancelled` name distinct outcomes that belong in `@throws`.
+- For a method that yields, describe failures during iteration in prose. Calling the method only creates the
+  generator. Iteration runs the body.
 
 ### Classes and state
 

@@ -28,6 +28,7 @@ use function Thesis\Time\toNs;
  * so it must be harmless for a source that has already fired. Anything but a closure is ignored,
  * a callable string too: an arrow function that resumes at once returns what it has called.
  *
+ * If the scope is already cancelled, the wait throws before calling $register.
  * If the source fires first, cancellation loses: the value is returned (a received message must not be dropped)
  * and {@see Cancelled} is thrown at the next suspension point.
  *
@@ -35,7 +36,7 @@ use function Thesis\Time\toNs;
  * @template T
  * @param callable(Continuation<T>): ((\Closure(): void)|void) $register
  * @return T
- * @throws Cancelled
+ * @throws Cancelled if the scope is cancelled before registration or cancellation interrupts the wait
  */
 function suspend(callable $register): mixed
 {
@@ -79,7 +80,6 @@ function suspend(callable $register): mixed
  * It costs a full wait, so in a hot loop call it every N iterations, not on every one.
  *
  * @api
- * @throws Cancelled
  */
 function checkpoint(): void
 {
@@ -173,7 +173,6 @@ function remaining(): ?Duration
  * so other tasks run meanwhile, and it is a cancellation point.
  *
  * @api
- * @throws Cancelled
  */
 function delay(Duration $duration): void
 {
@@ -527,7 +526,6 @@ function map(iterable $items, int $concurrency, callable $fn): array
  * @template T
  * @param callable(): T $fn
  * @return T
- * @throws Cancelled if the scope is cancelled while waiting for the lock
  */
 function synchronized(Semaphore $semaphore, callable $fn): mixed
 {
@@ -562,7 +560,6 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
  * @template T
  * @param callable(): T $fn
  * @return T
- * @throws Cancelled if the scope is cancelled while waiting for the lock
  */
 function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $fn): mixed
 {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Io;
 
+use Thesis\Async\Cancelled;
+
 /**
  * @api
  */
@@ -18,9 +20,10 @@ interface Writer
      * Only writers without message boundaries may continue after a partial write. Such writers document
      * that behavior, as `stdout()` does.
      *
-     * @throws WriteFailed
+     * @throws WriteFailed on a write error such as a broken pipe
      * @throws IoException if the writer was closed before a non-empty write or while the write was waiting.
      *         {@see Stream} throws {@see StreamClosed}. A thesis/net socket throws `SocketClosed`.
+     * @throws Cancelled if the scope is cancelled at a suspension point during the write
      */
     public function write(string $bytes): void;
 }

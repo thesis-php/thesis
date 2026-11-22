@@ -166,7 +166,7 @@ final class Scope implements Waiter
     /**
      * Only checks the flag. Unlike `Thesis\Async\checkpoint()`, it does not yield to the event loop.
      *
-     * @throws Cancelled
+     * @throws Cancelled if this scope is cancelled
      */
     public function throwIfCancelled(): void
     {

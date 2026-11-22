@@ -29,8 +29,6 @@ interface Semaphore
      * - wait through {@see suspend()} or primitives built on it, so that the wait is cancellable;
      * - once a permit is taken, return the lock, even if the scope has been cancelled meanwhile:
      *   a taken permit must not be lost; if it cannot be returned, release it before throwing.
-     *
-     * @throws Cancelled if the scope is cancelled while waiting
      */
     public function acquire(): Lock;
 }

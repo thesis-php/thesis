@@ -62,7 +62,6 @@ final class Deferred
      * so it is not a cancellation point then, and it does not yield to the event loop.
      *
      * @return T
-     * @throws Cancelled if the awaiting scope is cancelled
      * @throws \Throwable the error passed to {@see fail()}
      */
     public function await(): mixed

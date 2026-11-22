@@ -112,7 +112,6 @@ final class SignalTrapImpl implements SignalTrap
 
     /**
      * @return ?int null if the trap is released
-     * @throws Cancelled
      */
     private function wait(): ?int
     {

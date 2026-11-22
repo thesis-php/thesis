@@ -29,7 +29,6 @@ interface SignalTrap extends \IteratorAggregate
      * Receives the signals as they come, and ends once {@see trapSignals()} has returned and nothing is pending.
      *
      * @return \Traversable<int, int>
-     * @throws Cancelled if the scope is cancelled while waiting
      */
     public function getIterator(): \Traversable;
 }

@@ -10,9 +10,9 @@ use Time\Duration;
 /**
  * A key-value store whose entries may expire.
  *
- * Every method may suspend the fiber (a remote cache does I/O) and throws {@see Cancelled}
- * if the scope is cancelled meanwhile. If the storage fails, the cache throws an exception specific to the
- * cache implementation. The application can wrap the cache in a decorator that hides storage failures.
+ * A remote cache may wait for I/O in any operation, so any operation may propagate {@see Cancelled}.
+ * If the storage fails, the cache throws an exception specific to the cache implementation. The application
+ * can wrap the cache in a decorator that hides storage failures.
  *
  * A cancelled set() or delete() of a remote cache may or may not have been applied: the request may have reached
  * the store before the cancellation.

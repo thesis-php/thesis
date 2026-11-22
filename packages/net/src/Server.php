@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 use Thesis\Async\Backoff;
-use Thesis\Async\Cancelled;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
@@ -83,8 +82,6 @@ final class Server
      *
      * No TLS handshake happens here, so that a slow client does not hold up the others:
      * call {@see Socket::enableTls()} in the task of the connection.
-     *
-     * @throws Cancelled
      */
     public function accept(): ?Socket
     {

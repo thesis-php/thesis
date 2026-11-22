@@ -57,8 +57,6 @@ final class Buffer implements \Countable
 
     /**
      * Number of unread bytes.
-     *
-     * @return non-negative-int
      */
     public function count(): int
     {

@@ -45,7 +45,6 @@ final readonly class Consumer implements \IteratorAggregate
 
     /**
      * @return \Generator<int, Delivery>
-     * @throws AmqpException
      */
     public function getIterator(): \Generator
     {
@@ -55,13 +54,13 @@ final readonly class Consumer implements \IteratorAggregate
     /**
      * Groups the deliveries: a batch is yielded once it has $count deliveries or, when it has at least one,
      * once $timeout has passed since the first delivery. Acknowledge it as a whole with {@see Batch::ack()}.
+     * Batch iteration ends or throws for the same reasons as delivery iteration.
      *
      * A batch is acknowledged with `multiple`, which covers every consumer of the channel: give the consumer
      * a channel of its own, and a prefetch of at least $count ({@see Channel::qos()}), or no batch fills up.
      *
      * @param positive-int $count
      * @return \Generator<int, Batch>
-     * @throws AmqpException
      */
     public function batches(int $count, Duration $timeout): \Generator
     {

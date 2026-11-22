@@ -22,8 +22,6 @@ interface RateLimiter
      * - wait through {@see suspend()} or primitives built on it, so that the wait is cancellable;
      * - a wait that throws {@see Cancelled} has not counted a call: its turn goes to the next caller;
      * - once a call is counted, return, even if the scope has been cancelled meanwhile.
-     *
-     * @throws Cancelled if the scope is cancelled while waiting
      */
     public function wait(): void;
 }

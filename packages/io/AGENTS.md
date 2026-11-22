@@ -20,7 +20,8 @@ Read `README.md` for the API and design decisions.
 - `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
   on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
-  `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
+  `SocketClosed`). Callers keep at most one read in progress per reader. A reader can reject an overlapping read
+  with `LogicException`. `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
 - `SizedReader::$size` is the total size in bytes, including bytes already read. `StringReader` advances an
   offset into the original string and reads without suspending the fiber.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.

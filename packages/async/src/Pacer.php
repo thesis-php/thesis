@@ -38,8 +38,6 @@ final class Pacer
     /**
      * Yields before the operation, so if it throws {@see Cancelled}, the operation has not happened.
      * A cancellation point only when it yields: the other calls only count.
-     *
-     * @throws Cancelled
      */
     public function pace(): void
     {

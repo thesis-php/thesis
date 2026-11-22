@@ -45,7 +45,6 @@ final class StreamWatcher
      * Read before waiting: TLS keeps decrypted bytes where the event loop does not see them.
      *
      * @return bool true once readable, false if {@see close()} has ended the wait or was called before
-     * @throws Cancelled
      */
     public function readable(): bool
     {
@@ -56,7 +55,6 @@ final class StreamWatcher
      * Waits until a write would not block: the buffer of the OS has room, or the connection has failed.
      *
      * @return bool true once writable, false if {@see close()} has ended the wait or was called before
-     * @throws Cancelled
      */
     public function writable(): bool
     {
@@ -68,7 +66,6 @@ final class StreamWatcher
      * between attempts, which must not outlive the stream.
      *
      * @return bool true once the time has passed, false if {@see close()} has ended the wait or was called before
-     * @throws Cancelled
      */
     public function delay(Duration $duration): bool
     {

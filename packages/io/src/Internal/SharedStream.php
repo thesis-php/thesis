@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Io\Internal;
 
-use Thesis\Async\Cancelled;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
@@ -72,15 +71,6 @@ final class SharedStream implements Reader, Writer, Closer
         $this->writeMutex = new LocalMutex();
     }
 
-    /**
-     * @param positive-int $max
-     * @return non-empty-string
-     * @throws UnexpectedEof
-     * @throws ReadFailed
-     * @throws StreamClosed
-     * @throws Cancelled
-     * @throws \LogicException if another fiber is reading
-     */
     public function read(int $max): string
     {
         if ($this->reading) {
@@ -123,11 +113,6 @@ final class SharedStream implements Reader, Writer, Closer
         }
     }
 
-    /**
-     * @throws WriteFailed
-     * @throws StreamClosed
-     * @throws Cancelled
-     */
     public function write(string $bytes): void
     {
         if ($bytes === '') {

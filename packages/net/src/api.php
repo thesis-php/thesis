@@ -26,7 +26,7 @@ use function Thesis\Net\Internal\lastError;
  * @param ?Resolver $resolver {@see DnsResolver::system()} if null
  * @throws ConnectFailed
  * @throws TlsFailed
- * @throws Cancelled
+ * @throws Cancelled if cancellation of the scope interrupts the connection attempt
  */
 function connect(
     string $host,

@@ -11,9 +11,6 @@ namespace Thesis\Io;
  */
 final class StringReader implements SizedReader
 {
-    /**
-     * @var non-negative-int
-     */
     public readonly int $size;
 
     private int $offset = 0;

@@ -407,6 +407,10 @@ which waits for `each()` — a deadlock.
 
 ### Cleanup: `shield()`
 
+A scope observes cancellation at a cancellation point, such as a wait or `checkpoint()`. An operation can
+propagate `Cancelled` from a wait or callback even when its PHPDoc omits the tag. A fast path can finish without
+checking cancellation, for example when `Deferred::await()` already has a result.
+
 Once a scope is cancelled, every further wait in it fails immediately. Cleanup that has to wait runs under a shield:
 
 ```php

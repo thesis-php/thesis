@@ -31,7 +31,6 @@ interface Task
      * of another task it awaited and let through, as with Kotlin's and Java's cancellation exceptions.
      *
      * @return T
-     * @throws Cancelled if the awaiting scope is cancelled
      * @throws TaskCancelled if the task was cancelled
      * @throws \Throwable the task failure
      */
