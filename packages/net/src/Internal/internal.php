@@ -52,7 +52,7 @@ function asciiHost(string $host): ?string
 
 /**
  * @internal
- * @return ?non-empty-string the IP address without brackets, null if $host is not one
+ * @return ?non-empty-string the IP address without brackets, or null if $host is not an IP address
  */
 function ip(string $host): ?string
 {
@@ -67,7 +67,7 @@ function ip(string $host): ?string
 
 /**
  * @internal
- * @param string|false $name of stream_socket_get_name()
+ * @param string|false $name the address returned by stream_socket_get_name(), or false if it could not get the address
  */
 function address(string|false $name, bool $unix): Address
 {
@@ -88,7 +88,7 @@ function address(string|false $name, bool $unix): Address
 /**
  * @internal
  * @param non-empty-string $uri
- * @param array<non-empty-string, mixed> $options of the socket context
+ * @param array<non-empty-string, mixed> $options the stream context options for the listening socket
  * @return resource
  * @throws ListenFailed
  */

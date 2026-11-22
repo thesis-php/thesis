@@ -50,7 +50,7 @@ final class Plan
     private array $origins = [];
 
     /**
-     * @param non-empty-string $commit of main, resolved
+     * @param non-empty-string $commit the resolved ID of a commit on main
      */
     public static function of(Git $git, Api $api, Remote $remote, string $commit): self
     {

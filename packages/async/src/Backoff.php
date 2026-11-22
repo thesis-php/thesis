@@ -40,8 +40,8 @@ final class Backoff
     /**
      * @param Duration $initial the first delay, positive
      * @param Duration $max no less than $initial
-     * @param ?Randomizer $randomizer of the jitter, a seeded one in tests
-     * @throws \ValueError if $initial is not positive or $max is less than it
+     * @param ?Randomizer $randomizer the random number generator for jitter. Tests can pass a seeded generator.
+     * @throws \ValueError if $initial is not positive or $max is less than $initial
      */
     public function __construct(
         Duration $initial,

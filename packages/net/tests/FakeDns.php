@@ -20,8 +20,8 @@ final class FakeDns
     private const int CNAME = 5;
 
     /**
-     * @param Group $group the daemons of the server are cancelled once its body returns
-     * @param array<string, Zone> $zone by lower-case name
+     * @param Group $group the group that runs the server daemons. The group cancels the daemons when its body returns.
+     * @param array<string, Zone> $zone DNS zones keyed by lowercase name
      */
     public static function start(Group $group, array $zone): self
     {

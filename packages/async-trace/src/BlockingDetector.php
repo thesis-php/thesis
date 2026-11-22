@@ -86,7 +86,7 @@ final class BlockingDetector implements Subscriber
     private ?Run $run = null;
 
     /**
-     * @param Duration $threshold a run longer than it is reported
+     * @param Duration $threshold the detector reports runs longer than this duration
      */
     public function __construct(Duration $threshold)
     {

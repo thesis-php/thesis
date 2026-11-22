@@ -22,8 +22,8 @@ use function Thesis\Time\sec;
  *     }
  *
  * Values are strings, so a cache that serializes (`Cache<string>` of a remote store) passes as is.
- * What only some implementations do (null, objects kept as they are, an exact TTL, eviction) is tested
- * by the test of the implementation.
+ * Test implementation-specific behavior in that cache's test class, including support for null values, object
+ * identity, an exact TTL and eviction.
  */
 abstract class CacheContract
 {

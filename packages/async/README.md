@@ -824,8 +824,9 @@ $requestId->with($request->id, static fn() => all([
 
 There is no `set()`: `with()` binds the value while the callable runs and restores the previous one
 whatever it ends with. A task takes the values bound where it is spawned, not where its group was created,
-so `with()` around a `spawn()` is visible to the task. Values bound later, in the parent or in the task, do not
-reach the other side. `shield()` does not hide values: it only hides cancellation. `onCancel()` callbacks see only defaults.
+so `with()` around a `spawn()` is visible to the task. Later bindings in the parent are invisible to the task.
+The task's bindings are local to the task and any tasks it spawns. Scoped values remain visible inside `shield()`.
+`onCancel()` callbacks see only defaults.
 
 When no value is bound, `get()` returns the constructor default. The default is `null` unless the caller
 supplies a value.

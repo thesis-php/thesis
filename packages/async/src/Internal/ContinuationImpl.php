@@ -96,7 +96,7 @@ final class ContinuationImpl implements Continuation, Waiter
      * nothing could resume it, so a wait there is refused.
      *
      * @return T
-     * @throws \LogicException outside a run of the loop: only code in its fibers can wait
+     * @throws \LogicException if the continuation is already parked or the wait would suspend outside the loop's fibers
      */
     public function park(): mixed
     {

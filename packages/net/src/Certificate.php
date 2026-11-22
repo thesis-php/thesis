@@ -31,7 +31,7 @@ final class Certificate
     /**
      * @param non-empty-string $certFile the certificate followed by its intermediate CAs, may contain the key too
      * @param ?non-empty-string $keyFile the private key, if it is not in $certFile
-     * @param ?non-empty-string $passphrase of an encrypted private key
+     * @param ?non-empty-string $passphrase the passphrase for an encrypted private key
      */
     public function __construct(
         public readonly string $certFile,

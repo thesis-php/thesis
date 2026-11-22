@@ -66,7 +66,8 @@ final class Confirms
      * after the write: the reader may settle one while the write waits.
      *
      * @template T
-     * @param non-empty-list<array{T, ?string}> $publishes with the return id of a mandatory message
+     * @param non-empty-list<array{T, ?string}> $publishes pairs of a publish and its return ID. The ID is null
+     *     for a non-mandatory message.
      * @return non-empty-list<array{T, Deferred<null>}>
      */
     public function expect(array $publishes): array

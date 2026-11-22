@@ -94,9 +94,9 @@ final class Stream implements Reader, Writer, Closer
      *
      * @param positive-int $max
      * @return non-empty-string
-     * @throws UnexpectedEof once the other side has closed the stream and every byte has been read
+     * @throws UnexpectedEof when the stream reaches its end and no bytes remain to be read
      * @throws ReadFailed
-     * @throws StreamClosed if this side has closed the stream, during the wait too
+     * @throws StreamClosed if close() was called on this stream before the read or while the read was waiting
      * @throws \LogicException if another fiber is reading
      */
     public function read(int $max): string
@@ -146,11 +146,11 @@ final class Stream implements Reader, Writer, Closer
      * Returns once every byte is handed to the OS, waiting while its buffer is full.
      * Concurrent writes go one after another, in the order they came.
      *
-     * If a write fails or is cancelled after a part of its bytes has been written, the stream is closed:
-     * the other side has got half a message. A write cancelled before writing anything leaves the stream as it was.
+     * If a write fails or is cancelled after writing some bytes, the stream closes because the receiver may have
+     * only part of a message. A write cancelled before writing anything leaves the stream as it was.
      *
      * @throws WriteFailed
-     * @throws StreamClosed if this side has closed the stream, during the wait too
+     * @throws StreamClosed if this stream was closed before a non-empty write or while the write was waiting
      */
     public function write(string $bytes): void
     {
@@ -199,8 +199,10 @@ final class Stream implements Reader, Writer, Closer
     }
 
     /**
-     * @param int $written by the fast path, which a writer only takes while there are no others:
-     *     the mutex is then free and is taken without a wait, before another write can start
+     * When no other writes are pending, the fast path can write some bytes and take the free mutex
+     * before another write starts.
+     *
+     * @param int $written bytes already written by the fast path, or 0 if the write skipped the fast path
      */
     private function finishWrite(string $bytes, int $written): void
     {

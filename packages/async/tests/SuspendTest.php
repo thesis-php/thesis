@@ -187,7 +187,7 @@ final class SuspendTest
 
         $exception = thrown(static function () use (&$calls) {
             suspend(static function (Continuation $_) use (&$calls) {
-                // The loop throws it into the wait of its own fiber, that of the test: this one.
+                // The event loop delivers the callback's exception to the test fiber waiting in suspend().
                 later(sec(0), static function () {
                     throw new \RuntimeException('foreign');
                 });

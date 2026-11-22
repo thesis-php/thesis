@@ -145,9 +145,9 @@ final readonly class Publisher
     /**
      * @param non-empty-string $repository
      * @param non-empty-string $tag
-     * @param non-empty-string $commit of the tag
+     * @param non-empty-string $commit the ID of the commit the release tag points to
      * @param non-empty-string $name
-     * @return bool false if the GitHub Release of the tag exists, made by another run meanwhile too
+     * @return bool true if this call created the GitHub Release, or false if the release already exists
      */
     private function make(
         string $repository,

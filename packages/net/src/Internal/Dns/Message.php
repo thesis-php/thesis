@@ -65,7 +65,7 @@ final readonly class Message
     }
 
     /**
-     * @param string $query as {@see query()} has encoded it
+     * @param string $query the DNS request encoded by {@see query()}
      * @return ?Response null if $bytes answer another query: another id or another question
      * @throws DnsFailed if the response is malformed
      */

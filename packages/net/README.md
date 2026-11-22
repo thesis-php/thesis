@@ -73,8 +73,9 @@ and Nagle would hold back the last packet of every request.
 ### Reading and writing
 
 - `read(int $max)` returns the bytes that have arrived, 1 to `$max`, and waits only if there are none.
-  It throws `UnexpectedEof` once the peer has closed its side and everything is read, `ReadFailed` if the connection is
-  broken (reset, TLS error), `SocketClosed` if this side has closed it. A cancelled read has taken nothing.
+  It throws `UnexpectedEof` once the peer closes the connection or shuts down writes and all received bytes have
+  been read. A read error such as a connection reset or a TLS error throws `ReadFailed`. Calling `close()` on the
+  socket makes pending and subsequent reads throw `SocketClosed`. A cancelled read consumes no bytes.
   A peer that sends without a pause does not starve the process: after a few reads that found bytes at once,
   `read()` lets the other tasks run for a tick.
 - `write(string $bytes)` returns once every byte is handed to the OS. Any number of fibers may write: writes go

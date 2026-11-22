@@ -172,7 +172,7 @@ final readonly class Connector
      * @param non-empty-string $address
      * @param array<string, array<string, mixed>> $context
      * @param ?non-empty-string $host
-     * @return Socket|non-empty-string the reason of a failure
+     * @return Socket|non-empty-string the connected socket, or an error message if the connection failed
      */
     private static function attempt(string $scheme, string $address, array $context, ?string $host): Socket|string
     {

@@ -34,9 +34,9 @@ final readonly class TlsInfo
     /**
      * @param string $protocol `TLSv1.3`, `TLSv1.2`
      * @param string $cipher `TLS_AES_256_GCM_SHA384`
-     * @param ?string $alpnProtocol null if the sides have not agreed on one
-     * @param ?\OpenSSLCertificate $peerCertificate of the server on the client side; of the client on the server side
-     *     if {@see ServerTls::$clientCaFile} requires one
+     * @param ?string $alpnProtocol the protocol negotiated with the peer, or null if ALPN selected no protocol
+     * @param ?\OpenSSLCertificate $peerCertificate the server certificate on clients. On servers, the client
+     *     certificate if {@see ServerTls::$clientCaFile} requires one, otherwise null.
      */
     public function __construct(
         public string $protocol,

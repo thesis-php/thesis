@@ -144,9 +144,9 @@ final class Channel implements \IteratorAggregate, \Countable
      * Waits until there is a value.
      *
      * @return T
-     * @throws ChannelClosed if the channel is closed and there are no values left
-     * @throws \Throwable the reason of {@see close()} instead, if there is one
-     * @throws Cancelled if the scope is cancelled while waiting: then no value has been taken
+     * @throws ChannelClosed if the channel was closed without a reason and no values remain
+     * @throws \Throwable if the channel closed with an exception and no values remain. Throws the same exception.
+     * @throws Cancelled if the scope is cancelled while waiting. The receive consumes no value.
      */
     public function receive(): mixed
     {
@@ -227,11 +227,11 @@ final class Channel implements \IteratorAggregate, \Countable
     }
 
     /**
-     * Receives until the channel is closed and drained, then ends normally, or throws the reason of {@see close()}.
+     * Yields values until the channel is closed and the buffer is empty.
      *
      * @return \Generator<int, T, void, void>
      * @throws Cancelled if the scope is cancelled while waiting
-     * @throws \Throwable the reason of {@see close()}, if there is one
+     * @throws \Throwable if the channel closed with an exception and no values remain. Throws the same exception.
      */
     public function getIterator(): \Generator
     {

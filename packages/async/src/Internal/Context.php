@@ -31,7 +31,7 @@ final class Context
 
     /**
      * @template R
-     * @param Values $values from {@see capture()}
+     * @param Values $values the bindings returned by {@see capture()}
      * @param callable(): R $fn
      * @return R
      */

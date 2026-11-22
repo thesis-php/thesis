@@ -62,7 +62,8 @@ final class Package
      * @param non-empty-string $dir
      * @param list<non-empty-string> $files autoload files, relative to the package: those of src/ without classes
      *     (EagerFiles), then those of the manifest
-     * @param list<non-empty-string> $devFiles the same, of tests/ and devFiles of the manifest
+     * @param list<non-empty-string> $devFiles autoload-dev files relative to the package. Includes eager files
+     *     detected in tests/ by EagerFiles, followed by the manifest's devFiles.
      */
     public function __construct(
         public readonly string $dir,

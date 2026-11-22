@@ -110,9 +110,9 @@ final class Socket implements Reader, Writer, Closer
      *
      * @param positive-int $max
      * @return non-empty-string
-     * @throws UnexpectedEof once the peer has closed its side and every byte has been read
+     * @throws UnexpectedEof when no bytes remain after the peer closes the connection or shuts down writes
      * @throws ReadFailed if the connection is broken (reset by the peer, a TLS error)
-     * @throws SocketClosed if this side has closed the socket, during the wait too
+     * @throws SocketClosed if close() was called on this socket before the read or while the read was waiting
      * @throws \LogicException if another fiber is reading
      */
     public function read(int $max): string
@@ -165,7 +165,7 @@ final class Socket implements Reader, Writer, Closer
      * A write cancelled before sending anything leaves the socket as it was.
      *
      * @throws WriteFailed if the connection is broken
-     * @throws SocketClosed if this side has closed the socket, during the wait too
+     * @throws SocketClosed if this socket was closed before a non-empty write or while the write was waiting
      */
     public function write(string $bytes): void
     {
@@ -199,11 +199,12 @@ final class Socket implements Reader, Writer, Closer
     }
 
     /**
-     * Shuts down the sending side: the peer reads the end of the stream, while this side can still read
-     * what the peer sends. Waits for the writes in progress.
+     * Waits for pending writes and shuts down writes on this socket. The peer reads to the end of the stream,
+     * and this socket can still read what the peer sends.
+     * PHP cannot send a TLS close_notify without turning off TLS.
      *
      * @throws SocketClosed
-     * @throws \LogicException over TLS: PHP cannot send its close_notify without turning TLS off
+     * @throws \LogicException if TLS is enabled on the socket
      */
     public function closeWrite(): void
     {
@@ -302,8 +303,10 @@ final class Socket implements Reader, Writer, Closer
     }
 
     /**
-     * @param int $written by the fast path, which a writer only takes while there are no others:
-     *     the mutex is then free and is taken without a wait, before another write can start
+     * When no other writes are pending, the fast path can write some bytes and take the free mutex
+     * before another write starts.
+     *
+     * @param int $written bytes already written by the fast path, or 0 if the write skipped the fast path
      */
     private function finishWrite(string $bytes, int $written): void
     {

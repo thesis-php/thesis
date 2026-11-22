@@ -13,15 +13,17 @@ interface Reader
 {
     /**
      * Reads at least 1 and at most $max bytes, waiting (suspending the fiber) while there are none.
-     * A read that throws, {@see Cancelled} included, has taken nothing: {@see Buffer::fill()}
-     * relies on it, so a cancelled fill loses no bytes.
+     * A read that throws consumes no bytes, even if the exception is {@see Cancelled}.
+     * This lets {@see Buffer::fill()} keep all bytes it has read if a later read is cancelled.
+     *
+     * Catch {@see IoException} to handle all I/O failures.
      *
      * @param positive-int $max
      * @return non-empty-string
-     * @throws UnexpectedEof at the end of the stream
-     * @throws ReadFailed if the read fails for another reason
-     * @throws IoException of the implementation if this side has closed it ({@see StreamClosed},
-     *         `SocketClosed` of thesis/net): catch IoException to handle every failure of the stream
+     * @throws UnexpectedEof when the stream reaches its end and no bytes remain to be read
+     * @throws ReadFailed on a read error such as a connection reset
+     * @throws IoException if close() was called on this reader before the read or while the read was waiting.
+     *         {@see Stream} throws {@see StreamClosed}. A thesis/net socket throws `SocketClosed`.
      */
     public function read(int $max): string;
 }

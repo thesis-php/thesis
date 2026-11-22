@@ -52,7 +52,7 @@ const NUMBER_WITH_UNIT = '/([0-9]++\.?[0-9]*+|\.[0-9]++)(ns|us|' . "\u{B5}s|\u{3
  * @internal
  * @param positive-int $perSecond a divisor of a billion
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function fromFractions(int|float $value, int $perSecond): Duration
 {
@@ -71,7 +71,7 @@ function fromFractions(int|float $value, int $perSecond): Duration
  * @internal
  * @param positive-int $secondsPerUnit
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function fromMultiples(int|float $value, int $secondsPerUnit): Duration
 {
@@ -90,7 +90,7 @@ function fromMultiples(int|float $value, int $secondsPerUnit): Duration
  *
  * @internal
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function fromFloat(float $value, int|float $nanosecondsPerUnit): Duration
 {
@@ -142,8 +142,8 @@ function roundHalfAwayFromZero(float $value): float
  * @internal
  * @param int|float $seconds a float is an int that overflowed in the arithmetic of the caller: a whole number,
  *     exact on 32-bit PHP, where a step back may return it into the range
- * @param int $nanoseconds of the sign of $seconds, less than a second
- * @throws TimeException out of the range of Duration
+ * @param int $nanoseconds a fraction of a second in nanoseconds, with the same sign as $seconds
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function fromParts(int|float $seconds, int $nanoseconds): Duration
 {

@@ -26,8 +26,9 @@ final readonly class Config
      *     The port is 5672, or 5671 with TLS
      * @param ?ClientTls $tls for amqps; the host is the default peer name
      * @param non-empty-list<AuthMechanism> $authMechanisms the client uses the first mechanism the server supports
-     * @param ?Duration $heartbeat 60 seconds if null. The lower of it and the server's is used, zero turns
-     *     heartbeats off only if the server agrees. Two intervals without a frame from the server close the connection
+     * @param ?Duration $heartbeat the requested heartbeat interval, or 60 seconds if null. When the client and
+     *     server both propose positive intervals, they use the shorter interval. If either proposes zero, they
+     *     use the other proposal. The client closes the connection after two intervals without a server frame.
      * @param ?Duration $connectTimeout for each attempt to connect to a host and to perform the handshake,
      *     30 seconds if null. The first connection is bounded by the caller of {@see Client::run()} too
      * @param int<0, 65535> $channelMax 0 to take the limit of the server
@@ -71,7 +72,7 @@ final readonly class Config
      *
      * @see https://www.rabbitmq.com/docs/uri-spec
      * @see https://www.rabbitmq.com/docs/uri-query-parameters
-     * @throws \InvalidArgumentException if the URI is not one of AMQP
+     * @throws \InvalidArgumentException if the URI is malformed, uses an unsupported scheme or has invalid options
      */
     public static function fromUri(#[\SensitiveParameter] string $uri): self
     {

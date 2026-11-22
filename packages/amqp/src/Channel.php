@@ -418,12 +418,12 @@ final class Channel
      *
      * Waits while the server blocks the connection for lack of memory or disk (connection.blocked).
      *
-     * @param bool $mandatory return the message if no queue gets it: requires confirms, so that it is reported
-     *     as {@see MessageReturned}. The message then carries the header `x-thesis-return-id`
+     * @param bool $mandatory true to ask RabbitMQ to return the message if no queue accepts it. Requires confirms
+     *     so the publisher can throw {@see MessageReturned}. The message carries the `x-thesis-return-id` header.
      * @throws AmqpException
      * @throws PublishNacked
      * @throws MessageReturned
-     * @throws \LogicException if mandatory without confirms
+     * @throws \LogicException if $mandatory is true and confirms are disabled
      * @throws \ValueError if the exchange, the routing key or a property does not fit the protocol
      */
     public function publish(
@@ -775,7 +775,8 @@ final class Channel
     /**
      * The tags are assigned and the bytes written under the mutex, in one order. Its wait may outlive the channel.
      *
-     * @param non-empty-list<array{Publish, ?string}> $chunk with the return id of a mandatory message
+     * @param non-empty-list<array{Publish, ?string}> $chunk pairs of a publish and its return ID. The ID is null
+     *     for a non-mandatory message.
      * @return list<array{Publish, Deferred<null>}> empty without confirms
      * @throws AmqpException
      */
@@ -932,8 +933,8 @@ final class Channel
     }
 
     /**
-     * @return ?string the return id of a mandatory message
-     * @throws \LogicException if mandatory without confirms
+     * @return ?string the message's return ID if mandatory, or null otherwise
+     * @throws \LogicException if the message is mandatory and confirms are disabled
      * @throws \ValueError
      */
     private function encodePublish(Buffer $buffer, Publish $publish): ?string

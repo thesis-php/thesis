@@ -657,7 +657,7 @@ final class Buffer implements \Countable
      * before stay buffered: nothing is lost, as a read that throws has taken nothing.
      *
      * @throws UnexpectedEof
-     * @throws IoException of the reader: {@see ReadFailed}, a closed stream
+     * @throws IoException if $reader->read() fails, for example with {@see ReadFailed} or {@see StreamClosed}
      */
     public function fill(Reader $reader, int $length): void
     {
@@ -687,7 +687,7 @@ final class Buffer implements \Countable
      * @param non-empty-string $delimiter
      * @param positive-int $maxLength max number of unread bytes to buffer while searching
      * @throws UnexpectedEof
-     * @throws IoException of the reader: {@see ReadFailed}, a closed stream
+     * @throws IoException if $reader->read() fails, for example with {@see ReadFailed} or {@see StreamClosed}
      * @throws \OverflowException if the delimiter is not found within $maxLength bytes
      */
     public function fillUntil(Reader $reader, string $delimiter, int $maxLength = 64 * 1024): void
@@ -731,7 +731,7 @@ final class Buffer implements \Countable
      * Writes all unread bytes and clears the buffer. On failure, it restores the bytes ahead of
      * anything another fiber added during the wait. Retry only if the writer wrote nothing.
      *
-     * @throws IoException of the writer
+     * @throws IoException if $writer->write() fails
      */
     public function flush(Writer $writer): void
     {

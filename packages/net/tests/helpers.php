@@ -10,7 +10,8 @@ use function Thesis\Async\group;
 
 /**
  * A self-signed certificate that is its own CA, valid for $name, localhost and 127.0.0.1.
- * Pass its $certFile as the CA file of the other side. Generated once per process.
+ * Pass the returned certificate's $certFile as the CA file for the TLS peer that verifies the certificate.
+ * Generated once per process.
  *
  * @param non-empty-string $name
  */

@@ -33,7 +33,7 @@ use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
  * Unlike Duration::fromNanoseconds(), takes a negative value.
  *
  * @api
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function ns(int $nanoseconds): Duration
 {
@@ -46,7 +46,7 @@ function ns(int $nanoseconds): Duration
  *
  * @api
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function us(int|float $microseconds): Duration
 {
@@ -59,7 +59,7 @@ function us(int|float $microseconds): Duration
  *
  * @api
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function ms(int|float $milliseconds): Duration
 {
@@ -72,7 +72,7 @@ function ms(int|float $milliseconds): Duration
  *
  * @api
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function sec(int|float $seconds): Duration
 {
@@ -85,7 +85,7 @@ function sec(int|float $seconds): Duration
  *
  * @api
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function minutes(int|float $minutes): Duration
 {
@@ -98,7 +98,7 @@ function minutes(int|float $minutes): Duration
  *
  * @api
  * @throws \ValueError if the value is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function hours(int|float $hours): Duration
 {
@@ -111,7 +111,7 @@ function hours(int|float $hours): Duration
  *
  * @api
  * @throws \ValueError if a part is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function duration(
     int|float $hours = 0,
@@ -134,7 +134,7 @@ function duration(
  * Exact: on 64-bit PHP every Duration fits in int nanoseconds.
  *
  * @api
- * @throws TimeException on 32-bit PHP, above PHP_INT_MAX nanoseconds (2.1 seconds)
+ * @throws TimeException if the duration's magnitude exceeds PHP_INT_MAX nanoseconds on 32-bit PHP (about 2.1 seconds)
  */
 function toNs(Duration $duration): int
 {
@@ -150,7 +150,7 @@ function toNs(Duration $duration): int
  * Whole microseconds.
  *
  * @api
- * @throws TimeException on 32-bit PHP, above PHP_INT_MAX microseconds (35 minutes)
+ * @throws TimeException if the rounded magnitude exceeds PHP_INT_MAX microseconds on 32-bit PHP (about 35 minutes)
  */
 function toUs(Duration $duration, \RoundingMode $rounding): int
 {
@@ -161,7 +161,7 @@ function toUs(Duration $duration, \RoundingMode $rounding): int
  * Whole milliseconds.
  *
  * @api
- * @throws TimeException on 32-bit PHP, above PHP_INT_MAX milliseconds (24 days)
+ * @throws TimeException if the rounded magnitude exceeds PHP_INT_MAX milliseconds on 32-bit PHP (about 24 days)
  */
 function toMs(Duration $duration, \RoundingMode $rounding): int
 {
@@ -172,7 +172,7 @@ function toMs(Duration $duration, \RoundingMode $rounding): int
  * Whole seconds, see toSecFloat() for a fraction.
  *
  * @api
- * @throws TimeException on 32-bit PHP, if the last second of the range is rounded away from zero
+ * @throws TimeException if the rounded magnitude exceeds PHP_INT_MAX seconds on 32-bit PHP
  */
 function toSec(Duration $duration, \RoundingMode $rounding): int
 {
@@ -274,7 +274,7 @@ function isZero(Duration $duration): bool
  *
  * @api
  * @throws \ValueError if the factor is NAN or INF
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function multiply(Duration $duration, int|float $factor): Duration
 {
@@ -312,7 +312,7 @@ function ratio(Duration $dividend, Duration $divisor): float
  * @api
  * @param Duration $unit positive, of any length: 1ms, 1.5s, 5m
  * @throws \ValueError if the unit is not positive
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function roundDurationTo(Duration $duration, Duration $unit, \RoundingMode $rounding): Duration
 {
@@ -420,7 +420,7 @@ function parseDuration(string $string): Duration
  * so a change of the UTC offset (DST) between them does not count.
  *
  * @api
- * @throws TimeException out of the range of Duration
+ * @throws TimeException if the resulting duration is outside the range of `Time\Duration`
  */
 function durationBetween(\DateTimeInterface $from, \DateTimeInterface $to): Duration
 {

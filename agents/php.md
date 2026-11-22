@@ -68,6 +68,12 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   with a verb (`Waits for a free permit.`), a short note may be a phrase (`Requires PHP 8.6+.`).
   Name the thing, not a stand-in (`one`, `that of`, `the change`), put a condition first (`When X, ...`),
   prefer `the package's suite` to `the suite of the package`. Split long sentences, cut empty words.
+- Name the object or actor wherever the reference could be ambiguous. For I/O, name the stream whose
+  `close()` method ran or the peer that closed its end of the connection.
+- Write each PHPDoc tag description so it makes sense on its own. For `@throws`, give the condition or call
+  that raises the exception (`if close() was called on this reader`, `if $reader->read() fails`). For `@param`
+  and `@return`, name the value and say what special values mean (`the peer's certificate, or null if the peer
+  sent none`). Put a longer explanation in the docblock above the tags.
 - No one-letter names except a loop index (`$i`) and the operands of a comparator (`$a`, `$b`):
   `$n`, `$o`, `$v` make the reader look up what they hold.
 - Where the PHP standard library has a name for the same thing, take it: a number of bytes is `$length`

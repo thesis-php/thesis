@@ -207,7 +207,7 @@ final class CancellationTracker implements Subscriber
     }
 
     /**
-     * @param non-empty-string $callee the call of the cause if the event does not know where it is written
+     * @param non-empty-string $callee the name of the call that caused cancellation, used when the call site is unknown
      * @return non-empty-string
      */
     private static function call(string $callee, ScopeCancelled $event): string

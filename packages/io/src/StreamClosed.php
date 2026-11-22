@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Io;
 
 /**
- * The stream was closed by this side: an operation after close(), or a wait that close() interrupted.
+ * A stream operation started after close() was called on the stream or was waiting when close() was called.
  *
  * @api
  */

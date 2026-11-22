@@ -98,7 +98,7 @@ Read `README.md` for the API and its guarantees.
   and the other sees EOF.
 - ClientTls and ServerTls cannot stop at TLS 1.2, so the tests of TLS 1.2 (ciphers, the cipher order, the version
   methods) talk to a peer of plain PHP streams in `TlsTest`, polled with `delay()`: a blocking accept or handshake
-  would stop the event loop and the other side with it.
+  would stop the event loop and prevent the async peer from running.
 - A stale error is planted with `@trigger_error('unrelated', E_USER_WARNING)` right before the call whose
   `error_clear_last()` it tests: a later suspension lets other fibers replace it.
 - A test of leaked sockets counts `get_resources('stream')` with `gc_disable()`: the cycle collector frees

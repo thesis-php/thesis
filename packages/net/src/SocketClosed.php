@@ -7,7 +7,7 @@ namespace Thesis\Net;
 use Thesis\Io\IoException;
 
 /**
- * The socket was closed by this side: an operation after close(), or a wait that close() interrupted.
+ * A socket operation started after {@see Socket::close()} or was waiting when close() was called on the socket.
  *
  * @api
  */

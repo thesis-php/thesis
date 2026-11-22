@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 /**
- * TLS of the side that connects. The defaults verify the server against the system CA store.
+ * TLS settings for the client. The defaults verify the server against the system CA store.
  *
  * @api
  */
@@ -19,7 +19,7 @@ final readonly class ClientTls
      * @param bool $verifyPeerName whether the certificate must be issued for $peerName
      * @param ?non-empty-string $caFile PEM file of the trusted CAs instead of the system store
      * @param ?non-empty-string $caPath directory of the trusted CAs (hashed names, see `openssl rehash`)
-     * @param ?Certificate $certificate of the client, for servers that require one (mutual TLS)
+     * @param ?Certificate $certificate the client certificate for servers that require mutual TLS
      * @param list<non-empty-string> $alpnProtocols in the order of preference, e.g. ['h2', 'http/1.1']
      * @param ?non-empty-string $ciphers OpenSSL cipher list for TLS 1.2, the OpenSSL default if null
      */

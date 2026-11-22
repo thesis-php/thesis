@@ -46,7 +46,8 @@ final class Requirements
     private array $runtime = [];
 
     /**
-     * @throws MonorepoException with every constraint that cannot be reconciled, one per line
+     * @throws MonorepoException if any dependency constraints are invalid or cannot be reconciled.
+     *     The exception message lists each error on its own line.
      */
     public static function resolve(Monorepo $monorepo): self
     {

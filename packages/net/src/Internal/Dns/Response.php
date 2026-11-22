@@ -11,8 +11,9 @@ final readonly class Response
 {
     /**
      * @param int<0, 15> $rcode
-     * @param list<non-empty-string> $addresses of the type asked for, CNAME chains followed by the server
-     * @param non-negative-int $ttl the smallest of $addresses in seconds, as on the wire; 0 if there are none
+     * @param list<non-empty-string> $addresses the addresses of the requested record type, after the server
+     *     follows CNAME chains
+     * @param non-negative-int $ttl the smallest TTL across the addresses, in seconds, or 0 if there are no addresses
      */
     public function __construct(
         public bool $truncated,

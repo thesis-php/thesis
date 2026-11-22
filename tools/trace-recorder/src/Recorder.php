@@ -124,7 +124,7 @@ final class Recorder
      * @param positive-int $scope
      * @param non-empty-string $label
      * @param ?positive-int $parent
-     * @param null|int|float $t null for a task: it starts later, if it does
+     * @param null|int|float $t milliseconds since the first event, or null for a newly created task
      * @return array{non-empty-string, non-empty-string}
      */
     private function created(int $scope, string $label, ?int $parent, bool $cancelled, null|int|float $t): array

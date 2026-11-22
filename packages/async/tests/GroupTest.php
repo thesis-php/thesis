@@ -650,7 +650,7 @@ final class GroupTest
                         $events[] = 'task cleaned up';
                     }
                 });
-                // The loop throws it into the wait of its own fiber, that of the test: the join.
+                // The event loop delivers the callback's exception to the test fiber while it waits for the group.
                 later(sec(0), static function () {
                     throw new \RuntimeException('foreign');
                 });

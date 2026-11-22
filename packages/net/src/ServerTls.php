@@ -42,12 +42,12 @@ final class ServerTls
 
     /**
      * @param Certificate $certificate presented to a client that asks for no name of $sniCertificates
-     * @param array<non-empty-string, Certificate> $sniCertificates by host name (SNI). ALPN is not negotiated
-     *     on a connection that gets one of them: PHP loses it when it switches the certificate, so such a client
-     *     falls back to its default protocol (HTTP/1.1 for HTTP). Prefer one certificate for several names.
+     * @param array<non-empty-string, Certificate> $sniCertificates certificates keyed by SNI host name.
+     *     PHP skips ALPN when it switches certificates, so the client falls back to its default protocol
+     *     (HTTP/1.1 for HTTP). Prefer one certificate for several names.
      * @param list<non-empty-string> $alpnProtocols in the order of preference, e.g. ['h2', 'http/1.1']
      * @param ?non-empty-string $clientCaFile if set, a client must present a certificate signed by these CAs
-     *     (mutual TLS); it is then in {@see TlsInfo::$peerCertificate}
+     *     (mutual TLS). {@see TlsInfo::$peerCertificate} holds the client certificate.
      * @param ?non-empty-string $ciphers OpenSSL cipher list for TLS 1.2, the OpenSSL default if null
      */
     public function __construct(

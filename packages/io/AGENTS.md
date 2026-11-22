@@ -17,9 +17,9 @@ Read `README.md` for the API and design decisions.
 - `readUint64()` throws `\OverflowException` above `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
 - Marks of `reserve()` are absolute positions, invalidated by `fill()`, `flush()` and `drain()`.
 - `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
-  (a reset is not an end: a protocol may treat an EOF between messages as a clean close) and an `IoException`
-  of its own once this side has closed it (`StreamClosed`, `SocketClosed`). `Writer::write()` writes all bytes,
-  `Closer::close()` is idempotent.
+  (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
+  on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
+  `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.
   A decorator keeps it too: it changes its state only after the inner read has returned.
   A write that throws after writing a part leaves its writer unusable (`Stream` closes itself):
