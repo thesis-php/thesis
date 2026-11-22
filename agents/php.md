@@ -166,6 +166,12 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 - State that only one function needs (a memoized value, a cache, a lazily created instance) is a `static` variable
   inside that function, not a static property: it sits next to the only code that uses it, and since PHP 8.3
   it is initialized with any expression. A static property is only for state shared by several methods.
+- When memoizing a value or changing other state shared by fibers, synchronize the whole operation if it can
+  suspend between checking the state and storing the result. For example, keep one `Thesis\Async\Once` per
+  lazily initialized value and have every caller await it. For competing state changes, use the same mutex
+  from the first check through the update. AMQP's `confirmSelect()` and `txSelect()` share a mutex across the
+  mode check, the wait for the broker's reply and the assignment. The RPC mutex alone let both fibers check
+  the old mode before either recorded the new one.
 - Choose how callers create an `@api` object by what the call tells them. Use public `__construct` when the class
   name and arguments make the operation clear. `new Dispatcher($listeners)` checks and prepares its listeners.
   `new Stream($resource)` takes ownership of an open resource and sets it up for non-blocking use.
