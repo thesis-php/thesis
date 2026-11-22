@@ -552,36 +552,38 @@ and does not yield to the event loop.
 
 ### Lazy initialization with `Once`
 
-Keep one `Once` in a property when an object needs a value whose initialization can suspend.
-For example, a configuration provider can read its configuration on first use. Its constructor stores
-the loader, so constructing the provider does no I/O.
+Keep one `Once` in a property to share a lazily initialized value across fibers.
+For example, a product catalog can fetch a snapshot on the first read of its `snapshot` property.
+The constructor stores the fetch callback. Reading `snapshot` can suspend.
 
 ```php
 use Thesis\Async\Once;
 use function Thesis\Async\all;
 
-final readonly class ConfigProvider
+final class ProductCatalog
 {
-    /** @var Once<Config> */
-    private Once $config;
+    /** @var Once<CatalogSnapshot> */
+    private readonly Once $snapshotOnce;
 
-    public function __construct(ConfigLoader $loader)
-    {
-        $this->config = new Once($loader->load(...), retryOnCancel: true);
+    public CatalogSnapshot $snapshot {
+        get => $this->snapshotOnce->await();
     }
 
-    public function get(): Config
+    public function __construct(CatalogSource $source)
     {
-        return $this->config->await();
+        $this->snapshotOnce = new Once($source->fetchSnapshot(...), retryOnCancel: true);
     }
 }
 
-$provider = new ConfigProvider($loader);
-[$first, $second] = all([$provider->get(...), $provider->get(...)]);
+$catalog = new ProductCatalog($source);
+[$first, $second] = all([
+    static fn() => $catalog->snapshot,
+    static fn() => $catalog->snapshot,
+]);
 ```
 
-The first `get()` runs `load()` in its fiber. If the load suspends, the other caller waits. Both calls
-receive the same `Config` instance, and later calls on this provider return it immediately.
+The first read starts `fetchSnapshot()` in its fiber. If the fetch suspends, the other reader waits.
+Both reads return the same `CatalogSnapshot` instance, and later reads return it immediately.
 `Once` also remembers a `null` result or an ordinary exception.
 
 If the callback throws `Cancelled`, its caller receives that cancellation. By default other callers receive
