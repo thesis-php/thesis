@@ -33,6 +33,7 @@ jobs:
 
   # A package that runs on an older PHP than the monorepo (thesis/time on 8.2 with the polyfill of Time\Duration)
   # is installed alone and tested on every older PHP it allows: the matrices are of the manifests.
+  # Temporarily use the checkout on PHP 8.4 until the compatible dependencies are published.
   test-alone:
     runs-on: ubuntu-latest
     strategy:
@@ -58,7 +59,7 @@ jobs:
       PHP_VERSION: ${{ matrix.php }}
     steps:
       - uses: actions/checkout@v6
-      - run: make test-alone P=${{ matrix.package }}
+      - run: make test-alone P=${{ matrix.package }} CHECKOUT_DEPS=${{ matrix.php == '8.4' && '1' || '0' }}
 
   # A package with bit32Testing in its manifest on 32-bit PHP, on its lowest PHP and on that of the monorepo
   # (thesis/time: the polyfill and the functions against the class of PHP 8.6).
