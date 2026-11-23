@@ -68,6 +68,8 @@ final class Series
 
     /**
      * The branch that the alias names: main of every split repository.
+     *
+     * @return non-empty-string
      */
     public static function branch(): string
     {

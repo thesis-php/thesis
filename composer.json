@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1 server, AMQP, PSR-3 logging. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, and a runnable demo. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -18,7 +18,8 @@
         "sockets",
         "dns",
         "http-server",
-        "logging"
+        "logging",
+        "demo"
     ],
     "authors": [
         {
@@ -39,6 +40,7 @@
         "php-64bit": "*",
         "ext-filter": "*",
         "ext-openssl": "*",
+        "ext-pcntl": "*",
         "ext-uri": "*",
         "composer-runtime-api": "^2.1",
         "internal/container": "^1.1",
@@ -51,7 +53,6 @@
     },
     "require-dev": {
         "ext-intl": "*",
-        "ext-pcntl": "*",
         "ext-posix": "*",
         "ext-simplexml": "*",
         "ext-sockets": "*",
@@ -83,6 +84,7 @@
         "thesis/async": "0.1.x-dev",
         "thesis/async-trace": "0.1.x-dev",
         "thesis/cache": "0.1.x-dev",
+        "thesis/demo": "0.1.x-dev",
         "thesis/dispatcher": "0.4.x-dev",
         "thesis/exceptionally": "0.4.x-dev",
         "thesis/formatter": "0.2.x-dev",
@@ -107,6 +109,7 @@
             "Thesis\\AsyncTrace\\": "packages/async-trace/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Cache\\": "packages/cache/src/",
+            "Thesis\\Demo\\": "packages/demo/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
             "Thesis\\HttpClient\\": "packages/http-client/src/",
             "Thesis\\HttpServer\\": "packages/http-server/src/",

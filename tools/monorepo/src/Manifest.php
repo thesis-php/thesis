@@ -50,6 +50,8 @@ final readonly class Manifest
      *     CHANGELOG.md, CONTRIBUTING.md, SECURITY.md and skills/
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
      *     installs by its type
+     * @param bool $devMain pins the runtime Thesis dependencies of a Composer project to dev-main,
+     *     including transitive dependencies
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names
      *     outside src/ goes to $dist too
      * @param bool $mutationTesting the job infect of infection.yaml runs make infect on the tests/ of the package.
@@ -75,6 +77,7 @@ final readonly class Manifest
         public array $testoPlugins = [],
         public array $dist = [],
         public string $type = 'library',
+        public bool $devMain = false,
         public array $extra = [],
         public bool $mutationTesting = true,
         public bool $bit32Testing = false,

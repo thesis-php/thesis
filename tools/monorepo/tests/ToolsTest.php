@@ -72,8 +72,11 @@ final readonly class ToolsTest
         $fixture = new Fixture()
             ->file('packages/async/src/Bridge.php', "<?php\n")
             ->file('packages/bytes/src/Bytes.php', "<?php\n")
-            ->package('async', "optional: ['amphp/amp', 'ext-pcntl']")
-            ->package('bytes')
+            ->package('async', <<<'PHP'
+                requireDev: ['amphp/amp' => '^3.0', 'ext-filter' => '*', 'ext-pcntl' => '*'],
+                optional: ['amphp/amp', 'ext-filter', 'ext-pcntl'],
+                PHP)
+            ->package('bytes', "require: ['ext-filter' => '*']")
         ;
 
         $ignores = Tools::of($fixture->load())->ignoreOptionalDependencies(new Configuration())->getIgnoreList();
@@ -87,10 +90,11 @@ final readonly class ToolsTest
             actual: [
                 $ignored('packages/async/src/Bridge.php', 'amphp/amp'),
                 $ignored('packages/async/src/Bridge.php', 'ext-pcntl'),
+                $ignored('packages/async/src/Bridge.php', 'ext-filter'),
                 $ignored('packages/async/src/Bridge.php', 'psr/clock'),
                 $ignored('packages/bytes/src/Bytes.php', 'amphp/amp'),
             ],
-            expected: [true, true, false, false],
+            expected: [true, true, false, false, false],
         );
     }
 

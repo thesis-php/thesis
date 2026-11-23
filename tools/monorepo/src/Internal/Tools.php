@@ -136,10 +136,16 @@ final class Tools
      */
     public function ignoreOptionalDependencies(Configuration $config): Configuration
     {
+        $runtime = Requirements::resolve($this->monorepo)->require;
+
         foreach ($this->monorepo->packages as $package) {
             $src = $this->monorepo->root . '/' . $package->path . '/src';
 
             foreach ($package->manifest->optional as $dependency) {
+                if (isset($runtime[$dependency])) {
+                    continue;
+                }
+
                 if (str_starts_with($dependency, 'ext-')) {
                     $config->ignoreErrorsOnExtensionAndPath($dependency, $src, [ErrorType::DEV_DEPENDENCY_IN_PROD]);
                 } else {

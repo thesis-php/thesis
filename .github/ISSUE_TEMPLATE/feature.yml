@@ -11,6 +11,7 @@ body:
         - thesis/async
         - thesis/async-trace
         - thesis/cache
+        - thesis/demo
         - thesis/dispatcher
         - thesis/exceptionally
         - thesis/formatter

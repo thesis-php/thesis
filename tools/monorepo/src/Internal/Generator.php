@@ -159,6 +159,15 @@ final class Generator
             ));
         }
 
+        $require = $this->versioned($package, $manifest->require);
+        if ($manifest->devMain) {
+            if ($manifest->type !== 'project') {
+                throw new MonorepoException("{$package->path}/package.php: devMain requires type: 'project'.");
+            }
+
+            $require = $this->pinDevMain($require);
+        }
+
         $composer = [
             'name' => $package->name,
             'description' => $manifest->description,
@@ -169,7 +178,7 @@ final class Generator
             'support' => self::support($package),
             'require' => self::sortRequire([
                 'php' => $config->php,
-                ...$this->versioned($package, $manifest->require),
+                ...$require,
             ]),
             'require-dev' => self::sortRequire($this->versioned($package, $manifest->requireDev)),
             'conflict' => self::sortRequire($manifest->conflict),
@@ -189,6 +198,31 @@ final class Generator
         ];
 
         return array_filter($composer, static fn(mixed $value) => $value !== []);
+    }
+
+    /**
+     * Composer only lets the root project opt into dev versions. Pin every Thesis package the project installs.
+     *
+     * @param array<non-empty-string, non-empty-string> $require
+     * @return array<non-empty-string, non-empty-string>
+     */
+    private function pinDevMain(array $require): array
+    {
+        $branch = Series::branch();
+        $pending = array_keys($require);
+
+        while ($pending !== []) {
+            $name = array_pop($pending);
+            $dependency = $this->monorepo->package($name);
+            if ($dependency === null || ($require[$name] ?? null) === $branch) {
+                continue;
+            }
+
+            $require[$name] = $branch;
+            array_push($pending, ...array_keys($dependency->manifest->require));
+        }
+
+        return $require;
     }
 
     /**

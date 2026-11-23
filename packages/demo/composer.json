@@ -1,0 +1,57 @@
+{
+    "name": "thesis/demo",
+    "description": "A small HTTP server with console logging that shows how concurrent requests overlap.",
+    "keywords": [
+        "php",
+        "async",
+        "demo",
+        "http",
+        "http-server",
+        "logging"
+    ],
+    "license": "MIT",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/thesis-php/thesis/issues",
+        "source": "https://github.com/thesis-php/thesis/tree/main/packages/demo",
+        "security": "https://github.com/thesis-php/thesis/security/policy"
+    },
+    "require": {
+        "php": "^8.6",
+        "ext-pcntl": "*",
+        "thesis/async": "dev-main",
+        "thesis/dispatcher": "dev-main",
+        "thesis/formatter": "dev-main",
+        "thesis/http": "dev-main",
+        "thesis/http-server": "dev-main",
+        "thesis/io": "dev-main",
+        "thesis/log": "dev-main",
+        "thesis/net": "dev-main",
+        "thesis/source-location": "dev-main",
+        "thesis/time": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Demo\\": "src/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}

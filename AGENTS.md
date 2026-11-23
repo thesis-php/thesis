@@ -91,6 +91,7 @@ the whole monorepo is for the final check.
 - `async`: Structured concurrency for PHP fibers with its own event loop, task-tree cancellation and lazy initialization. Requires: dispatcher, source-location, time.
 - `async-trace`: Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long. Requires: async, dispatcher, formatter, source-location, time.
 - `cache`: Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex. Requires: async, time.
+- `demo`: A small HTTP server with console logging that shows how concurrent requests overlap. Requires: async, http, http-server, io, log, time.
 - `dispatcher`: Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.

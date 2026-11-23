@@ -33,11 +33,15 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   that the configs `require` (`tools/manifests.php`, while the tools came from the Docker image without our autoloader):
   PHP CS Fixer and Rector had to skip it, or they would fight with `sync` over its imports and their order. `optional`
   covers the whole `src/` of the package, not single files: precise paths are bookkeeping that only shields a forgotten
-  check. PHPStan is not modelled: `@phpstan-ignore` in the code is precise and reports itself when it is no longer
+  check. Skip the ignore when another package makes the dependency a runtime requirement of the root.
+  PHPStan is not modelled: `@phpstan-ignore` in the code is precise and reports itself when it is no longer
   needed. A fixer skip excludes the whole file: the fixer cannot turn off one rule for one file.
 - `Monorepo::load()` reads the manifests, `Generator` builds every derived file, `sync` writes the changed ones.
 - `Series` is the only place that turns `Manifest::$version` into a range (`^0.Y`, `^X.0`) and an alias
   (`X.Y.x-dev`), for `sync` and for the release alike (`agents/versions.md`).
+- A Composer project can set `devMain: true` to install every runtime Thesis dependency from `dev-main`.
+  The generator walks the runtime dependencies and pins their branches in the project's `require`. Composer
+  only accepts stability overrides from the root project. External requirements keep their declared constraints.
 - No validator and no `check` command: a second source of truth. An error is whatever keeps `sync` from
   generating the files, thrown as `MonorepoException` (one line per problem, with a path and what to do)
   before anything is written. CI runs `make sync` and fails on any change in git.

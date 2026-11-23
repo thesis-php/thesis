@@ -60,6 +60,35 @@ final readonly class GeneratorTest
         );
     }
 
+    public static function pinsTheProjectsRuntimeDependencyTreeToDevMain(): void
+    {
+        $fixture = new Fixture()
+            ->package('time')
+            ->package('io', "require: ['thesis/time' => '*']")
+            ->package('net', "require: ['thesis/io' => '*']")
+            ->package('other')
+            ->package('async', "require: ['thesis/net' => '*'], requireDev: ['thesis/other' => '*']")
+            ->package('demo', <<<'PHP'
+                require: ['psr/log' => '^3.0', 'thesis/async' => '*', 'thesis/io' => '*'],
+                type: 'project',
+                devMain: true,
+                PHP)
+        ;
+
+        $files = Generator::generate($fixture->load());
+
+        $project = Json::decode($files['packages/demo/composer.json'] ?? '', 'demo');
+        Assert::same($project['type'] ?? null, 'project');
+        Assert::same($project['require'] ?? null, [
+            'php' => '^8.5',
+            'psr/log' => '^3.0',
+            'thesis/async' => 'dev-main',
+            'thesis/io' => 'dev-main',
+            'thesis/net' => 'dev-main',
+            'thesis/time' => 'dev-main',
+        ]);
+    }
+
     #[DataSet(['^0.3.5'])]
     #[DataSet(['~0.3.5'])]
     #[DataSet(['>=0.3.2 <0.4'])]
