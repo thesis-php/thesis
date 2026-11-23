@@ -14,6 +14,7 @@ use Thesis\Http\Http1\ResponseHead;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpClient\Internal\ConnectionPool;
 use Thesis\HttpClient\Internal\ResponseBody;
 use Thesis\HttpClient\Internal\SizedResponseBody;
 use Thesis\HttpClient\Internal\UntilCloseReader;
@@ -31,9 +32,13 @@ use function Thesis\Net\connect;
  */
 final readonly class Client
 {
+    private ConnectionPool $pool;
+
     public function __construct(
         private ClientTls $tls = new ClientTls(),
-    ) {}
+    ) {
+        $this->pool = new ConnectionPool();
+    }
 
     /**
      * Returns after reading the final response head. Close the body to abandon the download.
@@ -45,18 +50,19 @@ final readonly class Client
             throw new \ValueError('The client requires an HTTP or HTTPS request without tunneling.');
         }
 
-        $head = RequestHead::of($request, isPersistent: false);
+        $head = RequestHead::of($request);
         $host = $request->uri->getRawHost();
         \assert($host !== null && $host !== '');
         $port = $request->uri->getPort() ?? ($scheme === 'https' ? 443 : 80);
         \assert($port >= 0 && $port <= 65535);
-        $socket = connect($host, $port, $scheme === 'https' ? $this->tls : null);
+        $origin = $scheme . '://' . strtolower($host) . ':' . $port;
+        $socket = $this->pool->take($origin) ?? connect($host, $port, $scheme === 'https' ? $this->tls : null);
 
         try {
             $socket->write($head->toString());
             self::writeBody($socket, $request, $head);
 
-            return self::readResponse($socket, $head->method);
+            return $this->readResponse($socket, $head->method, $origin);
         } catch (\Throwable $error) {
             $socket->close();
 
@@ -112,7 +118,7 @@ final readonly class Client
     /**
      * @param non-empty-string $method
      */
-    private static function readResponse(Socket $socket, string $method): Response
+    private function readResponse(Socket $socket, string $method, string $origin): Response
     {
         $buffer = new Buffer();
         do {
@@ -132,10 +138,6 @@ final readonly class Client
             }
         } while ($head->status < 200);
 
-        if ($head->framing === Framing::None || ($head->framing === Framing::Length && $head->length === 0)) {
-            $socket->close();
-        }
-
         $reader = match ($head->framing) {
             Framing::None => new FixedLengthReader($buffer, $socket, 0),
             Framing::Length => new FixedLengthReader($buffer, $socket, $head->length ?? throw new \LogicException()),
@@ -143,12 +145,21 @@ final readonly class Client
             Framing::UntilClose => new UntilCloseReader($buffer, $socket),
         };
 
+        $pool = \WeakReference::create($this->pool);
+        $release = static function (Socket $socket) use ($pool, $origin, $buffer, $head) {
+            $owner = $pool->get();
+            if ($owner !== null && $head->isPersistent && $buffer->count() === 0) {
+                $owner->release($origin, $socket);
+            } else {
+                $socket->close();
+            }
+        };
+        $body = new ResponseBody($reader, $socket, $release);
+
         return new Response(
             status: $head->status,
             headers: $head->headers,
-            body: $reader instanceof FixedLengthReader
-                ? new SizedResponseBody($reader, $socket)
-                : new ResponseBody($reader, $socket),
+            body: $reader instanceof FixedLengthReader ? new SizedResponseBody($body, $reader->size) : $body,
             trailers: $reader instanceof ChunkedReader ? static fn() => $reader->trailers : new Headers(),
         );
     }

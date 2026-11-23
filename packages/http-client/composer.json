@@ -1,6 +1,6 @@
 {
     "name": "thesis/http-client",
-    "description": "Asynchronous HTTP/1 client for HTTP and HTTPS with streaming request and response bodies and trailers.",
+    "description": "Asynchronous HTTP/1 client for HTTP and HTTPS with connection pooling, streaming bodies and trailers.",
     "keywords": [
         "php",
         "async",
@@ -8,6 +8,7 @@
         "http1",
         "http-client",
         "streaming",
+        "keep-alive",
         "tcp",
         "tls"
     ],

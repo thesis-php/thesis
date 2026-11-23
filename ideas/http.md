@@ -3,8 +3,8 @@
 The shared messages and HTTP/1 codec are implemented in [thesis/http](../packages/http/README.md).
 Its [package notes](../packages/http/AGENTS.md) record the decisions behind them.
 The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
-binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The first [HTTP/1 client](../packages/http-client/README.md) opens a connection per exchange and
-transfers it to the returned response body. Pooling and the server extensions below remain proposals.
+binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http-client/README.md) pools
+persistent connections by origin once the response body is complete. The server extensions below remain proposals.
 
 ## One set of messages for both directions
 

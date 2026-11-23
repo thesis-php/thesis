@@ -21,20 +21,30 @@ final class ResponseBody implements Reader, Closer
 
     private ?IoException $failure = null;
 
+    /**
+     * @param \Closure(Socket): void $release called once at the message boundary
+     */
     public function __construct(
         private readonly Reader $reader,
         private readonly Socket $socket,
-    ) {}
+        private ?\Closure $release,
+    ) {
+        if ($reader instanceof FixedLengthReader && $reader->remaining === 0) {
+            $this->finish();
+        }
+    }
+
+    private function __clone() {}
 
     public function __destruct()
     {
-        $this->socket->close();
+        $this->abort();
     }
 
     public function close(): void
     {
         $this->isClosed = true;
-        $this->socket->close();
+        $this->abort();
     }
 
     public function read(int $max): string
@@ -47,27 +57,44 @@ final class ResponseBody implements Reader, Closer
             throw $this->failure;
         }
 
-        if ($this->socket->isClosed) {
+        if ($this->release === null) {
             throw new UnexpectedEof();
         }
 
         try {
             $bytes = $this->reader->read($max);
         } catch (UnexpectedEof $eof) {
-            $this->socket->close();
+            $this->finish();
 
             throw $eof;
         } catch (IoException $failure) {
             $this->failure = $failure;
-            $this->socket->close();
+            $this->abort();
 
             throw $failure;
         }
 
         if ($this->reader instanceof FixedLengthReader && $this->reader->remaining === 0) {
-            $this->socket->close();
+            $this->finish();
         }
 
         return $bytes;
+    }
+
+    private function finish(): void
+    {
+        $release = $this->release;
+        $this->release = null;
+        if ($release !== null) {
+            $release($this->socket);
+        }
+    }
+
+    private function abort(): void
+    {
+        if ($this->release !== null) {
+            $this->socket->close();
+            $this->release = null;
+        }
     }
 }

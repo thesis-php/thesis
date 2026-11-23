@@ -6,12 +6,12 @@ use Thesis\Monorepo\Manifest;
 use Thesis\TestoPlugin\EventLoopPlugin;
 
 return new Manifest(
-    description: 'Asynchronous HTTP/1 client for HTTP and HTTPS with streaming request and response bodies '
+    description: 'Asynchronous HTTP/1 client for HTTP and HTTPS with connection pooling, streaming bodies '
         . 'and trailers.',
     licenseSince: 2026,
     version: '0.1',
     title: 'Thesis HTTP Client',
-    keywords: ['php', 'async', 'http', 'http1', 'http-client', 'streaming', 'tcp', 'tls'],
+    keywords: ['php', 'async', 'http', 'http1', 'http-client', 'streaming', 'keep-alive', 'tcp', 'tls'],
     require: [
         'thesis/http' => '*',
         'thesis/io' => '*',
