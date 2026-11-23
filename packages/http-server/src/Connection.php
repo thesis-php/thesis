@@ -319,7 +319,9 @@ final class Connection
     private static function readBody(Reader $reader, ?int $remaining): string
     {
         try {
-            return $reader->read(min(8192, $remaining ?? 8192));
+            $max = $reader instanceof StringReader ? 64 * 1024 : 8192;
+
+            return $reader->read(min($max, $remaining ?? $max));
         } catch (UnexpectedEof $eof) {
             if ($remaining !== null) {
                 throw new ReadFailed('The response body ended before its declared length.', previous: $eof);

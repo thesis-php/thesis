@@ -114,6 +114,20 @@ final class ConnectionTest
         );
     }
 
+    public function writesLargeStringBodiesInBoundedBlocks(): void
+    {
+        $body = str_repeat('a', 65536) . 'tail';
+        $output = new RecordingWriter();
+        Connection::serve(
+            input: new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n"),
+            output: $output,
+            handler: static fn() => new Response(body: new StringReader($body)),
+        );
+
+        Assert::same($output->writes, 3);
+        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 65540\r\n\r\n{$body}");
+    }
+
     public function partiallyReadStringBodyCommitsOnlyTheAvailableBytes(): void
     {
         $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
