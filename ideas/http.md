@@ -1,7 +1,8 @@
-# HTTP messages: ideas
+# HTTP client and server design
 
-A draft for phase 1 of the roadmap, not a decision. What survives the discussion goes to a topic
-of `agents/` (the messages span `http`, `http-client` and `http-server`), and this file is deleted.
+The shared messages and HTTP/1 codec are implemented in [thesis/http](../packages/http/README.md).
+Its [package notes](../packages/http/AGENTS.md) record the decisions behind them.
+The client and server APIs below are proposals for the next phase.
 
 ## One set of messages for both directions
 
@@ -15,26 +16,21 @@ The rule: **a message holds the semantics of HTTP only, the transport goes besid
 
 ```php
 // thesis/http, shared by the client and the server
-final readonly class Request
-{
-    public function __construct(
-        public string $method,              // not an enum: methods are extensible (WebDAV, PURGE)
-        public Url $uri,
-        public Headers $headers = new Headers(),
-        public Body $body = ...,            // empty
-        // trailers, see below
-    ) {}
-}
+// Request properties
+string $method;
+Uri $uri;
+Headers $headers;
+Reader $reader;
+?Headers $trailers;
 
-final readonly class Response
-{
-    public int $status;                     // an int: codes are extensible, `Status` gives names only
-    public Headers $headers;
-    public Body $body;
-}
+// Response properties
+int $status;
+Headers $headers;
+Reader $reader;
+?Headers $trailers;
 ```
 
-What the server knows about the connection comes to the handler as a second argument:
+The proposed server passes connection information to the handler as a second argument:
 
 ```php
 // thesis/http-server, the server only
@@ -49,7 +45,7 @@ final readonly class Context
 HttpServer\listen(
     address: '0.0.0.0:8080',
     handler: static function (Request $request, Context $context): Response {
-        return new Response(status: 200, body: Body::fromString("hello {$context->remoteAddress}"));
+        return new Response(status: 200, reader: new StringReader("hello {$context->remoteAddress}"));
     },
 );
 ```
@@ -59,14 +55,15 @@ silently, so the simple handler stays `static fn(Request $request) => new Respon
 
 ## The client and the handler have one shape
 
-The client is `callable(Request): Response`, the handler of the server is `callable(Request, Context): Response`
+The proposed client is `callable(Request): Response`, the handler of the server is `callable(Request, Context): Response`
 (the server as a function, as in Finagle). Then:
 
-- middleware of the server and interceptors of the client are the same thing, `callable(Request, next): Response`:
-  logging, compression, retries are written once;
+- middleware that only needs messages can use `callable(Request, next): Response`:
+  a header transformation or message logger can serve both sides. Retries need client-side attempt state;
+  server access logs need connection context and the outcome of writing the response;
 - a proxy is almost one line:
   ```php
-  handler: static fn(Request $request) => $client->send(
+  handler: static fn(Request $request) => $client(
       clone($request, ['uri' => $request->uri->withHost('backend')]),
   ),
   ```
@@ -80,20 +77,28 @@ The body is where the two directions differ:
 |---|---|---|
 | Created by | the user | the parser of the connection |
 | Length | often known | from the headers, may be unknown |
-| Replay | needed (redirect 307/308, a retry on a stale keep-alive connection) | impossible |
-| Lifetime | free | tied to the connection: it is not back in the pool until the body is read or closed |
+| Replay | a new body is needed for a redirect (307/308) or a safe retry | the connection stream can be read once |
+| Lifetime | free | tied to the connection: it is not back in the pool until the owner reaches the message boundary or discards the connection |
 
-`Body extends Io\Reader` with `?int $length`. Implementations:
+Messages expose `Io\Reader` directly.
+`Http1\FixedLengthReader` enforces a declared length, and `Http1\ChunkedReader` consumes the terminating
+chunk and its trailers. The connection owner manages the lifetime of readers that borrow it.
 
-- `Body::fromString()`: replayable, the length is known;
-- `Body::fromReader($reader, length: ...)`: one-shot;
-- replayable from a factory `callable(): Reader`, like `GetBody` in Go. The client replays a request only
-  if its body is replayable;
-- the incoming body (internal): a `Reader` over the parser or the in-memory pipe of the roadmap, with a limit
-  on its size; `close()` frees or drops the connection.
+Amp has four body APIs. An outgoing client request uses `HttpContent`, whose `getContent()` returns a fresh
+stream for each attempt or throws. An incoming client response exposes a final `Payload`. A server request
+exposes a final `RequestBody` with a size-limit control. A server response exposes `ReadableStream`.
+For Thesis, a shared body lets a proxy pass an incoming stream directly to an outgoing message.
 
-A trap: `clone($request, [...])` shares one streaming body between the copies. A body is a stream, not a value:
-this goes to the invariants of `http`.
+A message and its clone share the body's read position. Revisit how the client obtains a fresh body when it
+supports redirects or retries that resend a body. One option is a factory that the client calls during
+attempt preparation, so opening the reader can suspend there.
+
+Consider an `IterableReader` in `thesis/io` for generators and other iterables of byte strings.
+`new IterableReader($chunks)` would consume an iterable once. Each new attempt would need
+a fresh iterable and reader.
+Amp's `ReadableIterableStream` can return a whole yielded string. Thesis promises at most `$max` bytes:
+keep the current string and offset, advance the iterable only when the next read needs another chunk,
+skip empty strings and signal exhaustion with `UnexpectedEof`. A read that throws must lose no bytes.
 
 A streaming response of the server (SSE, a large file) is a `Response` whose body is a pipe, and the writer
 runs as a child task. Cancellation comes from the task tree: the client disconnected, the scope of the request
@@ -103,39 +108,155 @@ is cancelled.
 
 A message is the same for HTTP/1.1 and HTTP/2, otherwise grpc rewrites it:
 
-- **the codec owns the framing headers, the message does not.** `Content-Length`, `Transfer-Encoding`,
-  `Connection`, `Keep-Alive`, `Upgrade` are not in `Headers`, the length comes from `Body::$length`.
-  A header and a body then cannot disagree, which closes request smuggling at the level of the model;
-- `Host` and `:authority` are the authority of `$uri`, not a header;
-- **trailers are in the model from the first version**, grpc needs them. Incoming trailers exist only after
-  the end of the body, so they are not a value but something that becomes available after reading
-  (a method of the body or a wait). Outgoing trailers are a `callable(): Headers` that the codec calls
-  after the body.
+- The HTTP/1 codec derives body framing from the reader and trailers. A response to `HEAD` or a 304 can
+  carry `Content-Length` as representation metadata. Status 1xx and 204 always forbid the field.
+- The request URI supplies the authority for `Host` and, in a future HTTP/2 codec, `:authority`.
+- **trailers are in the model from the first version**, gRPC needs them. On a message, `$trailers` holds ready
+  fields or reports that they are pending. A callback may read the current reader's state without I/O or suspension.
+
+### Choosing HTTP/1 framing when sending trailers
+
+HTTP/1.1 uses chunked framing when trailers are nonempty, pending or announced by `Trailer`, including when
+the reader has a known size. The sender can read the trailer state after finishing the body and pass the
+ready fields to `encodeLastChunk()`. HTTP/1.0 and responses without a body reject trailers.
+
+### How the connection owner learns that an incoming body ended
+
+The client needs to know when it can return an HTTP/1 connection to the pool. The server needs to know
+when it can parse the next request. The framing determines when the incoming message is complete:
+
+- A fixed-length body ends on the read that delivers its last byte. A zero-length body is complete
+  as soon as the head is parsed, even if the application never calls `read()`.
+- A chunked body ends once the decoder consumes the zero chunk and the entire trailer section.
+- A close-delimited response ends at connection EOF. That connection has already closed.
+
+If the application stops reading early, the owner can drain the remaining body within a limit or close
+the connection. The body readers expose only `read()` for I/O. A framing error or premature EOF makes
+the connection unusable. How the exchange observes completion and abandonment is still open.
+The [two-message test](#two-messages-on-one-http1-connection) below exercises this choice.
+
+### Who reads the request body on an HTTP/1 server?
+
+In Amp's `http-server` 3.4.9, `Driver/Http1Driver.php` owns the socket for the whole connection.
+Once it has the request head, it starts the handler with `async()` and feeds decoded payload to a
+`Queue` behind `RequestBody`. A handler reading an empty queue waits. The driver pushing to the
+default zero-capacity queue can also wait until the consumer takes the chunk. If the consumer disposes
+the queue early, the driver can continue reading and discarding the remaining body within its limits.
+After completing the body it waits for the response before parsing the next request.
+
+For Thesis HTTP/1, start with demand-driven reads. The handler's `$request->reader->read()` asks the decoder for
+bytes from the connection buffer and, when necessary, the socket. A slow handler naturally sets the
+pace. A slow peer suspends the fiber doing the read. This avoids a per-request queue and producer task.
+
+```mermaid
+sequenceDiagram
+    participant D as HTTP/1 driver
+    participant H as Handler
+    participant F as Body decoder
+    participant S as Connection buffer and socket
+    D->>S: Read the request head
+    Note over S: Bytes beyond the head stay in the buffer
+    D->>H: Call handler with the request
+    H->>F: request.reader.read(max)
+    F->>S: Use buffered bytes, read the socket as needed
+    S-->>F: Wire bytes
+    F-->>H: Decoded payload
+    H-->>D: Return response
+```
+
+The server driver owns cleanup. If the handler returns early, first account for any response that
+still consumes the request body (an echo response can share that reader). Let that consumer finish or close the connection if transmission fails. Before draining, revoke application reads through the old body and settle any read in flight.
+The driver can then resume the same decoder at its current position, including bytes already buffered,
+and discard the remainder within a byte budget and a deadline. Only a clean message boundary permits
+parsing the next request. Close the connection if exclusive ownership or bounded draining fails.
+
+```mermaid
+flowchart TD
+    returned["Handler returns a response"] --> uses{"Does the response still use the request body?"}
+    uses -->|Yes| stream["Stream the response using the request reader"]
+    stream --> boundary{"Has the decoder reached the message boundary?"}
+    uses -->|No| boundary
+    boundary -->|Yes| reuse["After sending the response, reuse the connection if keep-alive permits"]
+    boundary -->|No| take{"Can the driver revoke application reads and settle any read in flight?"}
+    take -->|No| close["Close the connection"]
+    take -->|Yes| drain["Drain with the same decoder within the byte budget and deadline"]
+    drain -->|Message boundary reached| reuse
+    drain -->|Failure or limit reached| close
+```
+
+The existing `Thesis\Http\Http1` codec lives in `thesis/http`. The client formats request heads and
+parses response heads. The server does the reverse. Both need the same framing rules. For example, a response
+to HEAD ends after the fields even when Content-Length describes the size of the representation.
+
+The head parsers accept a complete head as a string. `FixedLengthReader` reads the declared number of bytes.
+`ChunkedReader` decodes chunks and trailers.
+Reading a whole message still requires finding the end of the head within a byte limit, preserving any body
+bytes already in the buffer, and constructing the appropriate body reader. The HTTP/1 implementation could
+share this work between client and server. Timeouts, pooling and the choice to drain or close a connection
+belong to its owner.
+
+If HTTP/2 is planned, consider extracting `thesis/http1` when the first client or server uses it.
+Both `thesis/http1` and a future `thesis/http2` could depend on the shared messages in `thesis/http`.
+An HTTP/2 implementation needs connection-wide HPACK state, flow control and dispatch of interleaved frames
+to individual streams. Applications can still read each stream through the same `Reader`. Defer a common codec
+interface until both implementations have callers that need one.
+
+## Comparison with the installed Amp stack
+
+The reference versions are `amphp/http` 2.1.2, `amphp/http-client` 5.3.8 and `amphp/http-server` 3.4.9.
+
+- **Common HTTP.** Amp shares abstract message classes, header and query helpers, status codes,
+  and request and response cookie syntax. Its HTTP/1 helper parses and formats header fields.
+  Its HTTP/2 parser sends frame events to a processor implemented on each side. In Thesis the shared
+  package already has concrete messages, immutable multi-value headers, and HTTP/1
+  request and response heads, framing and chunked bodies. Cookie field parsing could also be shared:
+  each Set-Cookie field is a separate value. Cookie storage and selection for an outgoing request
+  would be client policy.
+- **Client.** Amp owns concrete messages, upload content and multipart forms, connection factories and pools,
+  HTTP/1 response parsing, the HTTP/2 connection processor, interceptors, and transfer events.
+  See `Connection/ConnectionPool.php`, `ApplicationInterceptor.php`, `NetworkInterceptor.php`
+  and `Interceptor/RetryRequests.php` in its source.
+- **Server.** Amp owns concrete messages, handler and middleware contracts, socket acceptance and limits,
+  HTTP/1 and HTTP/2 drivers, upgrades, error handling and lifecycle. Its middleware includes access logs,
+  compression, trusted forwarding and handler concurrency limits. See `SocketHttpServer.php`,
+  `Driver/Http1Driver.php` and `Middleware/ConcurrencyLimitingMiddleware.php` in its source.
+
+### Ideas for the first client and server
+
+1. Have the client pool reserve capacity for one exchange. With HTTP/1 that can occupy the connection
+   until the response body ends. With HTTP/2 other streams can still use the connection. An early body
+   close should release or discard the corresponding resource according to the protocol.
+2. Distinguish one application request from each network attempt. Redirects and retries can create several
+   attempts, while a cache hit can create none. A retry needs both permission to repeat the operation
+   (idempotence or evidence the peer did not process it) and a body available for the new attempt.
+   A cross-origin redirect needs an explicit policy for credentials. Keep this state in the client.
+3. Treat receiving the response head and finishing the response body as separate observable events.
+   A response returned by the client can still fail during reading. The same distinction matters to a
+   server access log when a handler returns a streaming response and the peer disconnects during writing.
+4. Budget accepted connections and active requests separately on the server. HTTP/2 lets a single
+   connection occupy many handlers. Consider how stopping the listener drains active exchanges under
+   a deadline, including handlers that already returned a streaming body.
 
 ## The client and the lifetime of a response
 
 If `send()` just returns a `Response`, a user who does not read the body to the end keeps the connection.
 The options:
 
-1. `send(Request): Response`, the body is closed by `close()` or the destructor. Familiar, but it leaks.
-2. Structured: `send(Request, callable(Response): T): T`, the body is closed after the callable. In the spirit
+1. `send(Request): Response`. The client must reclaim the connection when the caller abandons an unread body.
+2. Structured: `send(Request, callable(Response): T): T`, the client reclaims the connection after the callback. In the spirit
    of `async`, but awkward when the response is passed on (a proxy).
 
 The proposal uses the first option and ties the incoming body to the scope of the task that called `send()`.
-The scope ends, the body is closed, the connection goes back or is dropped. A proxy works, and a leak lasts
+When the scope ends, the client returns a reusable connection to the pool or closes it. A proxy works, and a leak lasts
 no longer than the task. To check on `async`: whether such a binding works without cycles (the trap of
 fiber keys in `agents/fibers.md`).
 
 ## Smaller points to settle early
 
-- **URI.** `Uri\WhatWg\Url` suits the client: strings from users, lenient parsing. But HTTP is defined by
-  RFC 3986, and WhatWG normalizes (percent-encoding, dot segments): the server and request signing (SigV4)
-  lose the original request-target. `OPTIONS *` and the authority-form of CONNECT are not URLs either.
-  `http` probably needs `Uri\Rfc3986\Uri`, or at least the raw `$target` beside it. This goes against the rule
-  of `agents/php.md`, which would then need refining.
-- **`Headers`** come from the old `thesis/headers`: immutable, names case-insensitive, several values per name.
-  Typed headers later, as functions.
-- **1xx.** The server sends `100 Continue` by itself on the first read of the body, `103 Early Hints`
+- **URI.** Thesis uses `Uri\Rfc3986\Uri`; client input normalization belongs at the client boundary.
+  Whether a proxy or request signer also needs the exact original request-target remains worth testing.
+- **Headers.** The shared immutable `Headers` supports case-insensitive names and repeated string values.
+- **1xx.** The server sends `100 Continue` by itself on the first read of a body for which the client requested `100-continue`, `103 Early Hints`
   goes through `Context`.
 - **Upgrade (WebSocket)** goes through `Context` too: the handler takes the connection over, the message
   knows nothing about it.
@@ -148,13 +269,11 @@ fall almost all into the classes below.
 
 ### Principles
 
-- **Strict, not Postel.** "Be liberal in what you accept" gave most of request smuggling. RFC 9112 lets
-  a recipient reject malformed input almost everywhere ("MAY reject"), and we always do: any ambiguity is `400`
-  and a closed connection. No guessing what the peer meant, no resync after a parse error.
-- **A sans-IO parser**, like h11 of Python: a state machine from bytes to events, without sockets and fibers.
-  It can be fuzzed, run on corpora and compared with other implementations. The client parses responses with
-  the same codec, so it lives in `http`.
-- **Limits are on by default** with safe values, turning one off is explicit.
+- On malformed input the codec throws `MalformedMessage`. The server should use its status
+  (400, 431, 501 or 505) and close the connection.
+- Head parsers take bytes and return a head. Body readers take a shared buffer and a `Reader`.
+  Both can run against in-memory inputs. The client uses the same codec to parse responses.
+- The planned server needs default limits on head and body bytes and deadlines for connection I/O.
 
 ### Request smuggling (desync)
 
@@ -162,8 +281,8 @@ The server and a proxy in front of it disagree on where a request ends. Rejected
 
 - `Content-Length` together with `Transfer-Encoding`;
 - several `Content-Length` fields or a list (`5, 5`); a value of anything but digits (no `+`, spaces, `0x`)
-  or longer than 18 digits (PHP overflows to a float);
-- `Transfer-Encoding` that does not end with exactly `chunked`, and any `Transfer-Encoding` in HTTP/1.0;
+  or longer than 18 digits (all accepted lengths fit in a signed 64-bit integer);
+- `Transfer-Encoding` other than a single `chunked` coding, and any `Transfer-Encoding` in HTTP/1.0;
 - in chunked: a size that is not hex or has too many digits, chunk extensions over a limit (CVEs of Go and Node
   in 2023), anything but `\r\n` after the data;
 - a bare `\n` or `\r` instead of `\r\n`, obs-fold (a header continued on a line starting with a space),
@@ -173,8 +292,8 @@ The server and a proxy in front of it disagree on where a request ends. Rejected
 - fields of trailers are never merged into the headers, and framing and routing fields (`Content-Length`,
   `Host`, `Transfer-Encoding`, ...) are forbidden there.
 
-The codec owns the framing headers (see above), so a user cannot send a response whose `Content-Length`
-disagrees with its body.
+The codec chooses the framing. The sender must count bytes for a fixed-length response and close the
+connection if the reader ends before it has sent the declared length.
 
 Pipelining and an unread body: the next request is parsed strictly after the end of the body of the previous one.
 When the handler answers without reading the body, the server drains the rest within a limit or closes
@@ -183,8 +302,8 @@ the connection. A broken body closes the connection as well.
 ### Response splitting
 
 User data ends up in headers (`Location` from the query string and the like). `Headers` validates names and
-values when it is created: CR, LF or NUL in a value is a `\ValueError`, a mistake of the caller. The reason phrase
-is checked the same way. With this invariant there is no "escape it later": a string with CRLF cannot get into
+values when it is created: CR, LF or NUL in a value is a `\ValueError`, a mistake of the caller. The response parser checks the incoming reason phrase for control characters.
+The formatter supplies its own reason phrase from the status code. With this invariant there is no "escape it later": a string with CRLF cannot get into
 `Headers` at all.
 
 ### Denial of service
@@ -217,28 +336,67 @@ A decoded body is limited by the reader that feeds `inflate_add()` 8 KiB at a ti
   and `%00` are rejected, nothing is decoded twice, `..` is not silently normalized. Static content depends
   on it (path traversal).
 - `Host` and `X-Forwarded-*` are not trusted: `X-Forwarded-*` only from configured proxies. Host header poisoning
-  (links in password reset emails) is the level of the application, the README warns about it.
+  (links in password reset emails) is the level of the application, document trusted host configuration when the server is implemented.
 
 ### Errors and leaks
 
 - An exception of the handler is a `500` without the message and the trace, the details go to the log only.
 - A handler that fails after the response has started closes the connection: the client must not take
   a truncated response for a complete one.
-- No body for `HEAD`, `1xx`, `204`, `304`. A handler that returns one there is an error, not a silent drop.
+- No body for `HEAD`, `1xx`, `204`, `304` or a successful `CONNECT`. A handler that returns one there is an error, not a silent drop.
 - Request data is escaped in logs (log injection).
 
-### How to check
+### RFC conformance tests
 
-1. Corpora of known attacks: the tests of llhttp (Node), h11, PortSwigger's smuggling cases. Every known CVE
-   becomes a test on bytes.
-2. Differential testing: [HTTP Garden](https://github.com/narfindustries/http-garden) runs the same bytes through
-   different servers and proxies and finds where they disagree; in 2024 it found dozens of CVEs. Our server
-   belongs there.
-3. Fuzzing the sans-IO parser ([nikic/php-fuzzer](https://github.com/nikic/PHP-Fuzzer)). The invariant: the parser
-   either yields events or rejects the input; it never crashes, hangs or uses memory over the limits.
-4. A property of the codec shared with the client: parse, serialize, parse again gives the same.
-5. Slowloris, a slow body and the timeouts are tested deterministically on the virtual time of `async`,
-   without sleeping.
+For each supported rule, record the RFC section, the role (sender or recipient), the input and the observable
+outcome. Where an RFC permits several outcomes, identify the policy Thesis chooses.
+Use [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html) for shared semantics and
+[RFC 9112 §6.3](https://www.rfc-editor.org/rfc/rfc9112.html#section-6.3) for HTTP/1 body length.
+
+For the future sender, check the complete wire output of a known-length body with trailers.
+Check that HTTP/1.1 uses chunked framing and calls the trailer producer after reading the payload. Give the
+decoder a hand-written message and check the body, trailers and unread bytes separately. For HTTP/1.0, assert that sending fails before the first write. Keep round trips as a further check:
+an encoder and decoder can agree on the same mistake. See
+[RFC 9112 §7.1](https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1).
+
+#### Two messages on one HTTP/1 connection
+
+Start with a chunked message with trailers immediately followed by a second message in the same input buffer.
+On the server use two requests. On the client supply responses for two outstanding requests in order.
+Check the exact payload and trailers the application receives and the bytes remaining at the next head.
+Run the exchange with each single split position, one byte per read, and the whole input in one read.
+
+| First incoming message | Observable completion |
+|---|---|
+| Zero-length body | Complete when the head is parsed, even if the application never reads. |
+| Fixed-length body | Complete on delivery of the last byte, without an extra read. |
+| Chunked body | Complete after the zero chunk and the entire trailer section. |
+| Response to HEAD with Content-Length | Complete at the head. The length describes the representation. |
+| Application stops reading early | Reuse requires a successful bounded drain. Otherwise the owner closes the connection. |
+| Premature EOF in a fixed-length or chunked body | Reading fails and the owner discards the connection. |
+
+Observe the server through delivery of the second request to its handler. For the client pool, also run two
+sequential exchanges with a single connection slot: check when the next request can acquire it, and whether
+it gets the same connection or a fresh one. Completing an exchange must release its slot only once.
+A close-delimited response gets a separate case since EOF completes the body and ends the connection.
+
+#### Resource limits, cancellation and interoperability
+
+- Exercise each configured byte or field limit just below, at and above the boundary. Check how much the reader
+  requested or buffered before rejection, including when draining an abandoned body.
+- Use virtual time to distinguish a deadline for the entire head from an idle timeout on the body. After a
+  retryable cancelled read, check exact byte delivery. After a terminal framing error, check disposal and that
+  the server dispatches no further request on that connection.
+- Keep deterministic regression fixtures for relevant parser failures, including cases from llhttp and h11.
+  Supplement them with bounded fuzzing of the in-memory codec using [PHP-Fuzzer](https://github.com/nikic/PHP-Fuzzer). Save the seed and minimized input of a failure.
+  Check termination, resource bounds and the unread suffix as well as decoded output.
+- In CI, exercise the Thesis client against an independent local server, an independent client against the
+  Thesis server, and Thesis against itself. Amp is one candidate. Cover streaming, HEAD, trailers, interim
+  responses and connection reuse. [HTTP Garden](https://github.com/narfindustries/http-garden) is a candidate
+  for differential testing. Resolve discrepancies against the applicable RFC and the chosen policy.
+- Reuse the semantic tests for HTTP/2. Add separate tests for stream state, flow control, and stream versus
+  connection errors. Closing one response body early should allow an independent stream to finish. See
+  [RFC 9113 §5](https://www.rfc-editor.org/rfc/rfc9113.html#section-5).
 
 ### Out of scope here
 
@@ -246,16 +404,28 @@ HTTP/2 brings a class of its own (Rapid Reset, HPACK bombs, the CONTINUATION flo
 separately. TLS is the concern of `net`. At the level of the application (CSRF, XSS, CORS) the server can only
 stay out of the way and give safe defaults.
 
-## For a topic of agents
-
-1. One `Request`/`Response` in `http` for the client and the server, the transport in `Context`.
-2. The client and the handler are functions of one shape, middleware is shared.
-3. `Body` is a `Reader` with a length and (non-)replayability. The codec owns the framing headers.
-4. Trailers are in the model from day one.
-5. A strict sans-IO codec in `http`, shared by the client and the server: any ambiguity is a `400` and a closed
-   connection. `Headers` rejects CR, LF and NUL on creation. Limits and timeouts are on by default.
-
 ## Open questions
 
-1. The URI: RFC 3986 or WhatWG, or both (a URL for the client, the raw target on the server)?
+1. Which proxy or signing use cases require preserving the exact request-target alongside the RFC 3986 URI?
 2. The lifetime of a response body in the client: a plain return bound to the scope, or a callable?
+
+## Reading and viewing guide
+
+1. **h11.** Trace one response from socket bytes through `Data` and `EndOfMessage`. Use the client and server
+   diagrams to see when both sides are ready for `start_next_cycle()`.
+   [Writing your own HTTP/1.1 client](https://h11.readthedocs.io/en/latest/basic-usage.html) ·
+   [State diagrams](https://h11.readthedocs.io/en/latest/api.html#the-state-machine)
+2. **James Marshall.** Read “Sample HTTP Exchange”, “Chunked Transfer-Encoding” and “Persistent Connections”.
+   Follow the chunk sizes on the wire and find where the body ends while the socket stays open. Use RFC 9112
+   below for current parsing rules. [HTTP Made Really Easy](https://www.jmarshall.com/easy/http/)
+3. **RFC 9112.** Compare the ordered body-length rules with `ResponseHead::parse()`, then trace the end of
+   the trailer section. The security discussion explains why peers must agree on the message boundary.
+   [§6.3 Body length](https://www.rfc-editor.org/rfc/rfc9112.html#section-6.3) ·
+   [§7.1 Chunked coding](https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1) ·
+   [§11.2 Request smuggling](https://www.rfc-editor.org/rfc/rfc9112.html#section-11.2)
+4. **MDN (in Russian).** Compare the HTTP/1.x message diagrams with the HTTP/2 framing diagram. Identify
+   which parts of a request the application sees in both versions.
+   [Сообщения HTTP](https://developer.mozilla.org/ru/docs/Web/HTTP/Guides/Messages)
+5. **HTTP/2 video.** Watch the multiplexing demonstration. Follow two responses on one connection and
+   consider who routes an incoming frame when the application is reading the other response.
+   [How HTTP/2 Works, Performance, Pros & Cons and More](https://www.youtube.com/watch?v=fVKPrDrEwTI)

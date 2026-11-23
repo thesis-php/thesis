@@ -17,7 +17,7 @@ agent topic or package `AGENTS.md`. Remove steps from the roadmap as they are co
 | `parser` | `io` | — (`Buffer::readUntil()`) |
 | `socket` | `net` | UDP, passing sockets between processes (for `cluster`); pools live in their packages |
 | `dns` | `net` | Check the hosts file and `resolv.conf` |
-| `uri` | `Uri\WhatWg\Url` | — |
+| `uri` | PHP URI classes | HTTP uses `Uri\Rfc3986\Uri` to preserve raw paths and queries |
 | `cache` | `cache` | A Redis cache, with `redis` |
 | `phpunit-util` | Testo, `testo` | — |
 
@@ -25,7 +25,7 @@ agent topic or package `AGENTS.md`. Remove steps from the roadmap as they are co
 
 What amphp has, then what thesis makes of it.
 
-- HTTP (`http`, `hpack`, `http-client`, `http-server`, `http-tunnel`): `http`, `http-client`, `http-server`;
+- HTTP on top of the shared `http` package: `http-server` and `http-client`;
   HPACK inside HTTP/2, CONNECT inside the client.
 - HTTP client extensions (`http-client-cookies`, `http-client-cache`, `http-client-psr7`): cookies and cache
   as interceptors of the client, a PSR-18 bridge.
@@ -66,15 +66,16 @@ The order follows an application to be written on thesis without amphp: an HTTP 
 and static files, an HTTP client for checks, postgres with `LISTEN`/`NOTIFY`, password hashing in workers.
 A pool of connections is written in each package that needs it (`agents/clients.md`).
 
-1. **HTTP.** Ideas for the messages: [http.md](http.md). `http` (messages, headers from the old
-   `thesis/headers`, bodies as `io\Reader`, cookies), `http-server` (graceful shutdown by `trapSignals()`,
-   middleware, streamed responses for SSE, static files), `http-client` (HTTP/1.1, keep-alive, its own pool,
-   redirects, CONNECT), then HTTP/2 with HPACK (needed by grpc; ALPN is in `net`), then `websocket`.
+1. **HTTP.** [`http`](../packages/http/README.md) provides the shared messages, headers, body readers and HTTP/1 codec.
+   Next comes `http-server` (graceful shutdown with `trapSignals()`, middleware, streamed responses for SSE and static files),
+   then `http-client` (HTTP/1.1, keep-alive, its own pool, redirects and CONNECT). Cookie support,
+   HTTP/2 with HPACK for grpc, and WebSocket are planned. See the [client and server design](http.md).
    `Content-Encoding` needs zlib streams (decorators of `Reader`/`Writer`, in `io` or `http`). A first version
    found: `deflate_add()` ignores a flush with empty input, so a writer keeps the last bytes to flush them with;
    the output of one `inflate_add()` cannot be limited, so a reader feeds it 8 KiB at a time (deflate expands
    up to ~1032 times); a reader stops at the end of the compressed stream, not reading the inner one further.
-   A request body needs an in-memory pipe from the parser to the handler. A first version found: a write waits
+   The proposed HTTP/1 handler reads directly from the body decoder. An in-memory pipe could connect
+   an SSE producer to a response reader. A first version found: a write waits
    for room *before* it buffers, then buffers the whole write (a cancelled write delivers nothing, writes never
    interleave); `closeWrite($error)` gives the reader `ReadFailed`, so a body cut short does not look complete;
    `close()` by the reader stops the writer.

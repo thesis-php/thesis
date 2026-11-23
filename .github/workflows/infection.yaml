@@ -26,6 +26,7 @@ jobs:
           - dispatcher
           - exceptionally
           - formatter
+          - http
           - io
           - net
           - source-location

@@ -14,6 +14,7 @@ body:
         - thesis/dispatcher
         - thesis/exceptionally
         - thesis/formatter
+        - thesis/http
         - thesis/io
         - thesis/net
         - thesis/phpstan-extension

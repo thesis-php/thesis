@@ -52,6 +52,12 @@ component_management:
         - packages/formatter/src/**
       flag_regexes:
         - '^formatter$'
+    - component_id: http
+      name: thesis/http
+      paths:
+        - packages/http/src/**
+      flag_regexes:
+        - '^http$'
     - component_id: io
       name: thesis/io
       paths:
