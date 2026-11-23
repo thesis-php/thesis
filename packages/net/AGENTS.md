@@ -60,7 +60,9 @@ Read `README.md` for the API and its guarantees.
   (case-insensitively: DNS 0x20); a stray datagram is skipped and the wait goes on.
 - DNS caches no negative answers (NXDOMAIN, no records), although RFC 2308 allows it: in Docker and Kubernetes
   a service registers after its clients start, and a cached "not found" would hide it for minutes.
-  A positive TTL is capped at a day. An absolute name (`db.`) is cached under its trailing dot:
+  Each positive answer expires from when it arrived, capped at a day. The combined A and AAAA entry takes
+  the earliest expiry because one query may still be waiting while the other answer ages.
+  An absolute name (`db.`) is cached under its trailing dot:
   it skips the search domains, so `db` and `db.` may resolve to different hosts.
 - DNS follows glibc: SERVFAIL and REFUSED move to the next server instead of failing the lookup; a name with
   at least `ndots` dots is asked as is first, then with the search domains, a shorter one the other way round.

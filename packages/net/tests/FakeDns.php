@@ -172,7 +172,7 @@ final class FakeDns
         $this->queries[] = "{$transport} {$name} " . ($type === Message::A ? 'A' : 'AAAA');
         $zone = $this->zone[$name] ?? new Zone(rcode: Message::NXDOMAIN);
 
-        if ($zone->silent) {
+        if ($zone->silent || ($zone->silentA && $type === Message::A)) {
             return [null, $zone];
         }
 

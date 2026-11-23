@@ -13,6 +13,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Async\virtualTime;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -237,6 +238,22 @@ final class DnsResolverTest
 
         Assert::same($message, "Failed to resolve \"db.test\": db.test: 127.0.0.1:%d: {$said}");
         Assert::same(\count($queries), 4);
+    }
+
+    public function anAnswerCanExpireWhileWaitingForTheOtherFamily(): void
+    {
+        virtualTime(static function () {
+            timeout(sec(10), static fn() => group(static function (Group $group) {
+                $zone = new Zone(aaaa: ['fd00::1'], ttl: 1, silentA: true);
+                $dns = FakeDns::start($group, ['db.test' => $zone]);
+                $resolver = new DnsResolver([$dns->address], timeout: sec(2), attempts: 1);
+                Assert::same($resolver->resolve('db.test'), ['fd00::1']);
+                $dns->queries = [];
+
+                Assert::same($resolver->resolve('db.test'), ['fd00::1']);
+                Assert::contains($dns->queries, 'udp db.test AAAA');
+            }));
+        });
     }
 
     public function cachesForTheTtl(): void

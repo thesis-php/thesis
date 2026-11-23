@@ -30,5 +30,6 @@ final readonly class Zone
         public bool $silent = false,
         public bool $byteByByte = false,
         public bool $anotherId = false,
+        public bool $silentA = false,
     ) {}
 }

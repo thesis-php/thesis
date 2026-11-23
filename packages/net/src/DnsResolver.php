@@ -142,17 +142,21 @@ final class DnsResolver implements Resolver
             ]);
 
             $addresses = [];
-            $ttl = PHP_INT_MAX;
+            $expiresAt = null;
 
-            foreach ($responses as $response) {
+            foreach ($responses as [$response, $expiry]) {
                 if ($response->addresses !== []) {
                     $addresses = [...$addresses, ...$response->addresses];
-                    $ttl = min($ttl, $response->ttl);
+                    $expiresAt = $expiresAt === null ? $expiry : min($expiresAt, $expiry);
                 }
             }
 
             if ($addresses !== []) {
-                $this->store($cacheKey, $addresses, $ttl);
+                \assert($expiresAt !== null);
+
+                if ($expiresAt > Instant::now()) {
+                    $this->store($cacheKey, $addresses, $expiresAt);
+                }
 
                 return $addresses;
             }
@@ -193,10 +197,10 @@ final class DnsResolver implements Resolver
     /**
      * @param non-empty-string $name
      * @param Message::A|Message::AAAA $type
-     * @return Response with no addresses if the name or the record does not exist
+     * @return array{Response, Instant} the answer and when its records expire
      * @throws DnsFailed if no server has answered
      */
-    private function query(string $name, int $type): Response
+    private function query(string $name, int $type): array
     {
         $errors = [];
 
@@ -221,7 +225,7 @@ final class DnsResolver implements Resolver
                 if ($response === null) {
                     $errors[] = "{$nameserver}: timed out";
                 } elseif ($response->rcode === Message::NOERROR || $response->rcode === Message::NXDOMAIN) {
-                    return $response;
+                    return [$response, Instant::now()->add(sec(min($response->ttl, self::MAX_TTL)))];
                 } else {
                     $errors[] = $nameserver . ': ' . self::rcodeName($response->rcode);
                 }
@@ -340,19 +344,14 @@ final class DnsResolver implements Resolver
      * @param non-empty-string $key the name, with a trailing dot if it was asked for as absolute
      * @param non-empty-list<non-empty-string> $addresses
      */
-    private function store(string $key, array $addresses, int $ttl): void
+    private function store(string $key, array $addresses, Instant $expiresAt): void
     {
-        if ($ttl <= 0) {
-            return;
-        }
-
         unset($this->cache[$key]);
 
         if (\count($this->cache) >= self::MAX_CACHED) {
             unset($this->cache[array_key_first($this->cache)]);
         }
 
-        $expiresAt = Instant::now()->add(sec(min($ttl, self::MAX_TTL)));
         $this->cache[$key] = new Cached(addresses: $addresses, expiresAt: $expiresAt);
     }
 }

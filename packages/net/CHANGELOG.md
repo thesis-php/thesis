@@ -11,3 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The package provides non-blocking TCP and Unix sockets, TLS and asynchronous DNS.
   The task tree controls cancellation.
+- DNS cache entries expire when their earliest A or AAAA answer expires.
