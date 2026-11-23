@@ -11,6 +11,7 @@ use Thesis\Async\Trace\CancelCause;
 use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
+use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskCreated;
@@ -25,6 +26,58 @@ use function Thesis\Time\sec;
 #[Test]
 final class TraceTest
 {
+    public function observerSeesAlreadyParkedTaskResume(): void
+    {
+        $resumed = [];
+        $finished = null;
+        $dispatcher = new Dispatcher([
+            static function (Resumed $event) use (&$resumed) {
+                $resumed[] = $event->scope;
+            },
+            static function (Ended $event) use (&$finished) {
+                if ($event->value === 'work') {
+                    $finished = $event->scope;
+                }
+            },
+        ]);
+        group(static function (Group $group) use ($dispatcher) {
+            /** @var Deferred<string> $gate */
+            $gate = new Deferred();
+            $task = $group->spawn($gate->await(...));
+            checkpoint();
+            observe($dispatcher, static function () use ($gate, $task) {
+                $gate->complete('work');
+                timeout(sec(1), static function () use ($task) {
+                    $task->await();
+                });
+            });
+        });
+        Assert::notNull($finished);
+        Assert::contains($resumed, $finished);
+    }
+
+    public function cleanupBelongsToLastObservationOfDispatcher(): void
+    {
+        $dispatcher = new Dispatcher();
+        $events = [];
+        $cleanup = static function () use (&$events) {
+            $events[] = 'detached';
+        };
+        Trace\onDetach($dispatcher, $cleanup);
+        observe($dispatcher, static function () use ($dispatcher, $cleanup, &$events) {
+            observe($dispatcher, static function () use ($dispatcher, $cleanup) {
+                Trace\onDetach($dispatcher, $cleanup);
+                $unsubscribe = Trace\onDetach($dispatcher, $cleanup);
+                $unsubscribe();
+                $unsubscribe();
+            });
+            $events[] = 'inner returned';
+        });
+        observe($dispatcher, static fn() => null);
+
+        Assert::same($events, ['inner returned', 'detached']);
+    }
+
     public function tracesTaskFromCreationToResult(): void
     {
         $log = self::record(static fn() => group(static function (Group $group) {

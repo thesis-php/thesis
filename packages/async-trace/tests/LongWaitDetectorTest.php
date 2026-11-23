@@ -17,8 +17,10 @@ use Thesis\Async\Trace\Suspended;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Dispatcher;
 use function Thesis\Async\burnCpu;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Async\virtualTime;
@@ -29,6 +31,44 @@ use function Thesis\Time\toNs;
 #[Test]
 final class LongWaitDetectorTest
 {
+    public function duplicateObservationLeavesNoTimerAfterResume(): void
+    {
+        $reports = [];
+        $dispatcher = new Dispatcher([
+            new LongWaitDetector(sec(2)),
+            static function (LongWait $report) use (&$reports) {
+                $reports[] = $report->scope;
+            },
+        ]);
+        observe($dispatcher, static function () use ($dispatcher) {
+            observe($dispatcher, static fn() => group(static fn() => delay(sec(1))));
+        });
+        delay(sec(3));
+        Assert::same($reports, []);
+    }
+
+    public function detachingWhileTaskWaitsCancelsItsWatchdog(): void
+    {
+        $reports = [];
+        $dispatcher = new Dispatcher([
+            new LongWaitDetector(sec(2)),
+            static function (LongWait $report) use (&$reports) {
+                $reports[] = $report->scope;
+            },
+        ]);
+        group(static function (Group $group) use ($dispatcher) {
+            $task = observe($dispatcher, static function () use ($group) {
+                $task = $group->spawn(static fn() => delay(sec(1)));
+                checkpoint();
+
+                return $task;
+            });
+            timeout(sec(2), $task->await(...));
+            delay(sec(3));
+        });
+        Assert::same($reports, []);
+    }
+
     public function reportsWaitLongerThanThresholdWhileItWaits(): void
     {
         $line = __LINE__ + 2;

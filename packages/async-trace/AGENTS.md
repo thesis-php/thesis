@@ -107,7 +107,8 @@ lives here. The format is described in `README.md`.
   Trap: a run that begins while another is open has lost its end to a wait outside the tree (in the root scope):
   it is dropped, not reported with a wrong end.
 - `LongWaitDetector` reports from a timer of the event loop: a hang brings no event. A `watchdog()` per wait
-  not reported yet, armed in the loop of that wait and cancelled when it is resumed, so nothing is left
+  not reported yet per dispatcher and scope, armed in the loop of that wait and cancelled when it resumes or the
+  last observation of the dispatcher ends. Duplicate deliveries share that timer, so nothing is left
   in the loop after `observe()`. Not one timer for all: a nested loop (`virtualTime()` in a task) runs on a clock
   of its own and blocks the outer one, whose timer would neither fire nor measure the inner waits.
   The timers of the loop never fire early, so a due timer reports without checking again. A wait that ends exactly

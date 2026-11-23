@@ -49,15 +49,14 @@ function suspend(callable $register): mixed
     // After $register: if it has cancelled the scope (say, through a task handle), the wait is interrupted right away.
     $scope->subscribe($continuation);
 
-    // The only check of tracing on the hot path: the traced wait is the rest of this function with events.
-    $tracer = Scope::$tracer;
-
-    if ($tracer !== null) {
-        return $tracer->park($scope, $continuation, $unregister);
-    }
+    // Observers may attach or detach while the continuation is parked.
+    Scope::$tracer?->suspended($scope);
+    $error = null;
 
     try {
         return $continuation->park();
+    } catch (\Throwable $error) {
+        throw $error;
     } finally {
         $scope->unsubscribe($continuation);
 
@@ -66,6 +65,7 @@ function suspend(callable $register): mixed
         if ($unregister instanceof \Closure) {
             $unregister();
         }
+        Scope::$tracer?->resumed($scope, $error);
     }
 }
 
@@ -94,21 +94,17 @@ function checkpoint(): void
     // To the next tick, not to the microtasks: they run before the timers, a loop of them would starve a deadline.
     $loop->defer($continuation);
     $scope->subscribe($continuation);
-    $tracer = Scope::$tracer;
-
-    if ($tracer !== null) {
-        $tracer->park($scope, $continuation, static function () use ($loop, $continuation) {
-            $loop->undefer($continuation);
-        });
-
-        return;
-    }
+    Scope::$tracer?->suspended($scope);
+    $error = null;
 
     try {
         $continuation->park();
+    } catch (\Throwable $error) {
+        throw $error;
     } finally {
         $scope->unsubscribe($continuation);
         $loop->undefer($continuation);
+        Scope::$tracer?->resumed($scope, $error);
     }
 }
 
@@ -185,21 +181,17 @@ function delay(Duration $duration): void
     $loop = Loop::get();
     $timer = $loop->delay(toNs($duration), $continuation);
     $scope->subscribe($continuation);
-    $tracer = Scope::$tracer;
-
-    if ($tracer !== null) {
-        $tracer->park($scope, $continuation, static function () use ($loop, $timer) {
-            $loop->cancel($timer);
-        });
-
-        return;
-    }
+    Scope::$tracer?->suspended($scope);
+    $error = null;
 
     try {
         $continuation->park();
+    } catch (\Throwable $error) {
+        throw $error;
     } finally {
         $scope->unsubscribe($continuation);
         $loop->cancel($timer);
+        Scope::$tracer?->resumed($scope, $error);
     }
 }
 

@@ -118,20 +118,17 @@ final class StreamWatcher
         $id = spl_object_id($continuation);
         $this->waits[$id] = [$continuation, $loop, $registered];
         $scope->subscribe($continuation);
-        $tracer = Scope::$tracer;
-
-        if ($tracer !== null) {
-            /** @var bool */
-            return $tracer->park($scope, $continuation, function () use ($id) {
-                $this->forget($id);
-            });
-        }
+        Scope::$tracer?->suspended($scope);
+        $error = null;
 
         try {
             return $continuation->park();
+        } catch (\Throwable $error) {
+            throw $error;
         } finally {
             $scope->unsubscribe($continuation);
             $this->forget($id);
+            Scope::$tracer?->resumed($scope, $error);
         }
     }
 

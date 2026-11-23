@@ -58,6 +58,33 @@ final class Tracer
     private array $dispatchers = [];
 
     /**
+     * @var array<int, \ArrayObject<int, \Closure(): void>> cleanup by dispatcher id and registration
+     */
+    private array $cleanup = [];
+
+    private int $nextCleanup = 0;
+
+    /**
+     * @param callable(): void $callback
+     * @return \Closure(): void
+     */
+    public function onDetach(Dispatcher $dispatcher, callable $callback): \Closure
+    {
+        if (!\in_array($dispatcher, $this->dispatchers, true)) {
+            return static function () {};
+        }
+
+        $id = spl_object_id($dispatcher);
+        $callbacks = $this->cleanup[$id] ??= new \ArrayObject();
+        $key = ++$this->nextCleanup;
+        $callbacks[$key] = $callback(...);
+
+        return static function () use ($callbacks, $key) {
+            unset($callbacks[$key]);
+        };
+    }
+
+    /**
      * Whether any attached dispatcher listens to an event class, reset when the dispatchers change.
      *
      * @var array<class-string<Event>, bool>
@@ -112,6 +139,20 @@ final class Tracer
         // a new one is created only once the dispatchers are gone, so an older tracer never unbinds a newer one.
         if ($this->dispatchers === [] && Scope::$tracer === $this) {
             Scope::$tracer = null;
+        }
+
+        $id = spl_object_id($dispatcher);
+
+        if (isset($this->cleanup[$id]) && !\in_array($dispatcher, $this->dispatchers, true)) {
+            $callbacks = $this->cleanup[$id];
+            unset($this->cleanup[$id]);
+
+            foreach (array_keys($callbacks->getArrayCopy()) as $key) {
+                // Another cleanup may already have unregistered this one.
+                $callback = $callbacks[$key] ?? null;
+                unset($callbacks[$key]);
+                $callback?->__invoke();
+            }
         }
     }
 
@@ -206,46 +247,22 @@ final class Tracer
         }
     }
 
-    /**
-     * The wait of `Thesis\Async\suspend()` once the continuation is subscribed: it is the same as there,
-     * with the events around {@see ContinuationImpl::park()}. The root scope is not a scope of the model,
-     * its waits are not reported.
-     *
-     * @template T
-     * @param ContinuationImpl<T> $continuation
-     * @return T
-     */
-    public function park(Scope $scope, ContinuationImpl $continuation, mixed $unregister): mixed
+    public function suspended(Scope $scope): void
     {
         $id = $this->idOrNull($scope);
 
         if ($id !== null && $this->listens(Suspended::class)) {
             $this->emit(new Suspended($id, Instant::now(), self::publicCaller()));
         }
+    }
 
-        $value = null;
-        $error = null;
-
-        try {
-            $value = $continuation->park();
-        } catch (\Throwable $error) {
-        }
-
-        $scope->unsubscribe($continuation);
-
-        if ($unregister instanceof \Closure) {
-            $unregister();
-        }
+    public function resumed(Scope $scope, ?\Throwable $error): void
+    {
+        $id = $this->idOrNull($scope);
 
         if ($id !== null && $this->listens(Resumed::class)) {
             $this->emit(new Resumed($id, Instant::now(), $error));
         }
-
-        if ($error !== null) {
-            throw $error;
-        }
-
-        return $value;
     }
 
     /**

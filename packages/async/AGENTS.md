@@ -8,7 +8,7 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Every wait goes through `suspend()` or parks an `Internal\ContinuationImpl` registered in the loop
   (`delay()`, `checkpoint()`, `StreamWatcher`). Nothing else calls `\Fiber::suspend()`. Those of the loop take
   the steps of `suspend()` in its order (the check of cancellation, the registration, the subscription, the park
-  through `Tracer::park()` if traced, the unregistration in `finally`) without its closures, a fifth of such a wait
+  with a trace event before and after, the unregistration in `finally`) without its closures, a fifth of such a wait
   (`delay()`, `checkpoint()`, `StreamWatcher::wait()`). A wait on a queue
   of the library (`Deferred`, `Channel`, the semaphores) still goes through `suspend()`: `ideas/loop.md`.
 - The `$unregister` returned from `suspend()`'s `$register` is always called once the wait is over, whatever ended it.
@@ -154,8 +154,9 @@ The model, the API and the guarantees are described in `README.md` — read it f
   Never let such an exception skip the join or `$bodyScope->close()`.
 - Tracing (`Trace\observe()`) only observes and costs nothing without an observation: every hook is
   `Scope::$tracer?->...`, which evaluates no arguments while it is null, and `suspend()` reads `Scope::$tracer`
-  once and hands the rest of the wait to `Internal\Tracer::park()`, so the untraced wait is the code it was;
-  the waits of the loop do the same.
+  before the park and after cleanup. An observer attached during a wait sees its resumption, with the scope id
+  assigned by the tracer that is active then. A tool releases pending resources through `Trace\onDetach()` when
+  the last observation using that dispatcher ends.
   A hook goes where the outcome is decided (the task callback of `GroupImpl::start()`, after `join()`, `Expired::run()`,
   `shield()`), never into `Scope::run()` or `ContinuationImpl`. `ScopeCancelled` is emitted after `notify()`, so the
   listener never runs in the middle of the walk, and the tracer finds the scopes it reached by `$isCancelled`
@@ -274,8 +275,7 @@ or the process loop. `virtualTime()` runs a separate loop.
   The events are a closed set (`@phpstan-sealed`): only the library creates them, and a tool that handles each one
   learns of a new one from PHPStan. Rejected: a list of the classes in a constant, a second list next to the sealed.
   Rejected: hooks on `Scope::__construct()` (the kind of a scope is known only
-  where it is created), events from inside `notify()` (user code in the middle of the walk), a null check per event
-  in `suspend()` (the traced wait is a separate method instead), a full backtrace per wait (`caller()` of
+  where it is created), events from inside `notify()` (user code in the middle of the walk), a full backtrace per wait (`caller()` of
   thesis/source-location takes the first frame outside this library, and names the call that waits).
 - `Once::await()` runs the callback in the first caller's scope. All callers share its result or ordinary failure.
   Only `Cancelled` escaping the callback can reopen a `Once` constructed with `retryOnCancel: true`.

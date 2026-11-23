@@ -25,5 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Instant` reads monotonic time. `virtualTime()` and `burnCpu()` control time in tests, and a seed shuffles
   the fibers ready in each tick.
 - `Trace\observe()` dispatches scope events. The events record cancellation causes, spawn and wait sites,
-  and task and group names from explicit arguments, task keys or the group-creating function.
+  and task and group names from explicit arguments, task keys or the group-creating function. A wait reports
+  its resumption to current observers. `Trace\onDetach()` releases resources when their observation ends.
 - `Trace\watchdog()` schedules a callback without keeping the event loop alive.

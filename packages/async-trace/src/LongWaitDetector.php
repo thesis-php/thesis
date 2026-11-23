@@ -17,6 +17,7 @@ use Thesis\AsyncTrace\Internal\Wait;
 use Thesis\Dispatcher;
 use Thesis\Dispatcher\Subscriber;
 use Time\Duration;
+use function Thesis\Async\Trace\onDetach;
 use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ns;
 use function Thesis\Time\toNs;
@@ -50,9 +51,9 @@ final class LongWaitDetector implements Subscriber
     /**
      * The waits not reported yet: what cancels the timer of each, by scope.
      *
-     * @var array<positive-int, \Closure(): void>
+     * @var \WeakMap<Dispatcher, \ArrayObject<positive-int, \Closure(): void>>
      */
-    private array $timers = [];
+    private readonly \WeakMap $timers;
 
     /**
      * @param Duration $threshold a wait that lasts so long is reported: one that ends exactly then may be or not,
@@ -61,6 +62,7 @@ final class LongWaitDetector implements Subscriber
     public function __construct(Duration $threshold)
     {
         $this->threshold = toNs($threshold);
+        $this->timers = new \WeakMap();
     }
 
     #[\Override]
@@ -97,6 +99,12 @@ final class LongWaitDetector implements Subscriber
 
     private function onSuspended(Suspended $event, Dispatcher $dispatcher): void
     {
+        $timers = $this->timers[$dispatcher] ??= new \ArrayObject();
+
+        if (isset($timers[$event->scope])) {
+            return;
+        }
+
         $wait = new Wait(
             scope: $event->scope,
             what: $this->scopes[$event->scope] ?? '#' . $event->scope,
@@ -105,8 +113,10 @@ final class LongWaitDetector implements Subscriber
         );
         // A listener before this one may have taken time: the wait may be overdue already.
         $left = max(0, $this->threshold - toNs(Instant::now()->since($wait->at)));
-        $this->timers[$event->scope] = watchdog(ns($left), function () use ($wait, $dispatcher) {
-            unset($this->timers[$wait->scope]);
+        $cancel = watchdog(ns($left), static function () use ($timers, $wait, $dispatcher) {
+            $forget = $timers[$wait->scope];
+            \assert($forget !== null);
+            $forget();
             $dispatcher->dispatch(new LongWait(
                 scope: $wait->scope,
                 what: $wait->what,
@@ -115,14 +125,22 @@ final class LongWaitDetector implements Subscriber
                 wait: $wait->wait,
             ));
         });
+        $forget = static function () use ($timers, $wait, $cancel) {
+            unset($timers[$wait->scope]);
+            $cancel();
+        };
+        $unsubscribe = onDetach($dispatcher, $forget);
+        $timers[$wait->scope] = static function () use ($forget, $unsubscribe) {
+            $unsubscribe();
+            $forget();
+        };
     }
 
-    private function onResumed(Resumed $event): void
+    private function onResumed(Resumed $event, Dispatcher $dispatcher): void
     {
-        $cancel = $this->timers[$event->scope] ?? null;
+        $cancel = $this->timers[$dispatcher][$event->scope] ?? null;
 
         if ($cancel !== null) {
-            unset($this->timers[$event->scope]);
             $cancel();
         }
     }
