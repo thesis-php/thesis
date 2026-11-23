@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Formatter;
+namespace Thesis\Logger\Formatter;
 
-use Thesis\Log\Formatter;
-use Thesis\Log\Record;
+use Thesis\Logger\Formatter;
+use Thesis\Logger\Record;
 
 /**
  * Formats each record as one UTF-8 JSON object (RFC 8259 and ECMA-404) with an RFC 3339 timestamp.

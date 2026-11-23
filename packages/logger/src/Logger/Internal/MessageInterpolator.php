@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Internal;
+namespace Thesis\Logger\Internal;
 
-use Thesis\Log\Record;
+use Thesis\Logger\Record;
 
 /**
  * Replaces PSR-3 message placeholders with matching values from the normalized context.

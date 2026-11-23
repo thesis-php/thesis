@@ -40,7 +40,7 @@
         "thesis/http-protocol": "dev-main",
         "thesis/http-server": "dev-main",
         "thesis/io": "dev-main",
-        "thesis/log": "dev-main",
+        "thesis/logger": "dev-main",
         "thesis/net": "dev-main",
         "thesis/source-location": "dev-main",
         "thesis/time": "dev-main"

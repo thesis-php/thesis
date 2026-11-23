@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Stub;
+namespace Thesis\Logger\Stub;
 
-use Thesis\Log\Formatter;
-use Thesis\Log\Record;
+use Thesis\Logger\Formatter;
+use Thesis\Logger\Record;
 
 final readonly class CallbackFormatter implements Formatter
 {

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Formatter;
+namespace Thesis\Logger\Formatter;
 
 use Psr\Log\LogLevel;
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Test;
-use Thesis\Log\Record;
+use Thesis\Logger\Record;
 
 #[Test]
 #[Covers(Console::class)]

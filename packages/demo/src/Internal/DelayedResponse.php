@@ -6,7 +6,7 @@ namespace Thesis\Demo\Internal;
 
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Thesis\Log\Logger;
+use Thesis\Logger;
 use function Thesis\Async\delay;
 use function Thesis\Time\ms;
 

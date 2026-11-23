@@ -82,12 +82,12 @@ component_management:
         - packages/io/src/**
       flag_regexes:
         - '^io$'
-    - component_id: log
-      name: thesis/log
+    - component_id: logger
+      name: thesis/logger
       paths:
-        - packages/log/src/**
+        - packages/logger/src/**
       flag_regexes:
-        - '^log$'
+        - '^logger$'
     - component_id: net
       name: thesis/net
       paths:

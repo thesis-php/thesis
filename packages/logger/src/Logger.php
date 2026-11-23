@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log;
+namespace Thesis;
 
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
@@ -15,8 +15,10 @@ use Thesis\Async\SendResult;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
 use Thesis\Io\Writer;
-use Thesis\Log\Formatter\Json;
-use Thesis\Log\Internal\RecordFactory;
+use Thesis\Logger\Formatter;
+use Thesis\Logger\Formatter\Json;
+use Thesis\Logger\Internal\RecordFactory;
+use Thesis\Logger\Record;
 use Thesis\Time\WallClock;
 
 /**

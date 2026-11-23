@@ -15,7 +15,7 @@ return new Manifest(
         'thesis/http' => '*',
         'thesis/http-server' => '*',
         'thesis/io' => '*',
-        'thesis/log' => '*',
+        'thesis/logger' => '*',
         'thesis/time' => '*',
     ],
     dist: ['run.php'],

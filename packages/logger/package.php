@@ -27,5 +27,6 @@ return new Manifest(
         'thesis/dispatcher' => '*',
         'thesis/testo-plugin' => '*',
     ],
+    rootEntry: true,
     testoPlugins: [new VirtualTimePlugin()],
 );

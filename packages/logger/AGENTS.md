@@ -1,4 +1,4 @@
-# thesis/log
+# thesis/logger
 
 ## Invariants that must not be broken
 
@@ -19,8 +19,11 @@
 
 ## Decisions
 
-- Use `psr/log` for callers and `Thesis\Log\Formatter` for the output. Built-in implementations live under
-  `Thesis\Log\Formatter\`. NDJSON is the default. Rejected: a second logger interface and classes for every event.
+- The package exposes `Thesis\Logger` through `rootEntry`. Its formatters and record type live in
+  `Thesis\Logger\`.
+
+- Use `psr/log` for callers and `Thesis\Logger\Formatter` for the output. Built-in implementations live under
+  `Thesis\Logger\Formatter\`. NDJSON is the default. Rejected: a second logger interface and classes for every event.
   Applications can give recurring records typed helpers around PSR-3.
 - The clock controls the timezone. Both built-in formatters preserve its offset.
 - Select console colors explicitly with the formatter. A `Writer` can represent any destination, so its terminal

@@ -91,7 +91,7 @@ the whole monorepo is for the final check.
 - `async`: Structured concurrency for PHP fibers with its own event loop, task-tree cancellation and lazy initialization. Requires: dispatcher, source-location, time.
 - `async-trace`: Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long. Requires: async, dispatcher, formatter, source-location, time.
 - `cache`: Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex. Requires: async, time.
-- `demo`: A small HTTP server with console logging that shows how concurrent requests overlap. Requires: async, http, http-server, io, log, time.
+- `demo`: A small HTTP server with console logging that shows how concurrent requests overlap. Requires: async, http, http-server, io, logger, time.
 - `dispatcher`: Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
@@ -100,7 +100,7 @@ the whole monorepo is for the final check.
 - `http-protocol`: HTTP wire protocols for clients and servers, with a strict HTTP/1 codec for heads, bodies and trailers. Requires: http, io.
 - `http-server`: Asynchronous HTTP/1 server for TCP and Unix sockets with streaming bodies, trailers, TLS and graceful shutdown. Requires: async, http, http-protocol, io, net, time.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
-- `log`: PSR-3 logger with a configurable clock, bounded buffering, and asynchronous JSON and colored console output. Requires: async, io, time.
+- `logger`: PSR-3 logger with a configurable clock, bounded buffering, and asynchronous JSON and colored console output. Requires: async, io, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.

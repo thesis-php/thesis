@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Stub;
+namespace Thesis\Logger\Stub;
 
 use Thesis\Io\Writer;
 

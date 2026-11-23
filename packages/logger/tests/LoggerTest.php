@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log;
+namespace Thesis;
 
 use Monolog\Handler\TestHandler;
 use Monolog\Logger as MonologLogger;
@@ -17,19 +17,20 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\TaskCancelled;
 use Thesis\Async\Trace\Ended;
-use Thesis\Dispatcher;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
-use Thesis\Log\Formatter\Json;
-use Thesis\Log\Internal\MessageInterpolator;
-use Thesis\Log\Internal\RecordFactory;
-use Thesis\Log\Stub\CallbackFormatter;
-use Thesis\Log\Stub\RecordingWriter;
+use Thesis\Logger\Formatter\Json;
+use Thesis\Logger\Internal\MessageInterpolator;
+use Thesis\Logger\Internal\RecordFactory;
+use Thesis\Logger\Record;
+use Thesis\Logger\Stub\CallbackFormatter;
+use Thesis\Logger\Stub\RecordingWriter;
 use Thesis\Time\FrozenClock;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\Logger\thrown;
 use function Thesis\Time\ms;
 
 #[Test]

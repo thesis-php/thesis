@@ -93,7 +93,7 @@
         "thesis/http-protocol": "0.1.x-dev",
         "thesis/http-server": "0.1.x-dev",
         "thesis/io": "0.1.x-dev",
-        "thesis/log": "0.1.x-dev",
+        "thesis/logger": "0.1.x-dev",
         "thesis/net": "0.1.x-dev",
         "thesis/phpstan-extension": "0.1.x-dev",
         "thesis/source-location": "0.1.x-dev",
@@ -104,7 +104,8 @@
         "psr-4": {
             "Thesis\\": [
                 "packages/dispatcher/src/",
-                "packages/exceptionally/src/"
+                "packages/exceptionally/src/",
+                "packages/logger/src/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/src/",
             "Thesis\\AsyncTrace\\": "packages/async-trace/src/",
@@ -117,7 +118,6 @@
             "Thesis\\HttpServer\\": "packages/http-server/src/",
             "Thesis\\Http\\": "packages/http/src/",
             "Thesis\\Io\\": "packages/io/src/",
-            "Thesis\\Log\\": "packages/log/src/",
             "Thesis\\Net\\": "packages/net/src/",
             "Thesis\\PhpstanExtension\\": "packages/phpstan-extension/src/",
             "Thesis\\SourceLocation\\": "packages/source-location/src/",
@@ -151,7 +151,8 @@
         "psr-4": {
             "Thesis\\": [
                 "packages/dispatcher/tests/",
-                "packages/exceptionally/tests/"
+                "packages/exceptionally/tests/",
+                "packages/logger/tests/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/tests/",
             "Thesis\\AsyncTrace\\": "packages/async-trace/tests/",
@@ -165,7 +166,6 @@
             "Thesis\\HttpServer\\Benchmarks\\": "packages/http-server/benchmarks/",
             "Thesis\\Http\\": "packages/http/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
-            "Thesis\\Log\\": "packages/log/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
@@ -187,7 +187,7 @@
             "packages/http/tests/helpers.php",
             "packages/http-protocol/tests/Http1/helpers.php",
             "packages/io/tests/helpers.php",
-            "packages/log/tests/helpers.php",
+            "packages/logger/tests/Logger/helpers.php",
             "packages/net/tests/helpers.php",
             "packages/time/tests/helpers.php"
         ]

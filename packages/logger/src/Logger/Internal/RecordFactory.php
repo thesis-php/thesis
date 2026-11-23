@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log\Internal;
+namespace Thesis\Logger\Internal;
 
 use Psr\Log\LogLevel;
-use Thesis\Log\Record;
+use Thesis\Logger\Record;
 
 /**
  * Builds a record with normalized PSR-3 context, including an exception under the `exception` key.

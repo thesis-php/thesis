@@ -31,7 +31,7 @@ jobs:
           - http-protocol
           - http-server
           - io
-          - log
+          - logger
           - net
           - source-location
           - testo-plugin

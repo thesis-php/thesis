@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Log;
+namespace Thesis\Logger;
 
 use Testo\Assert;
 
