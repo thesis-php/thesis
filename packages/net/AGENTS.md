@@ -24,15 +24,13 @@ Read `README.md` for the API and its guarantees.
   Otherwise the certificate in the shared context may be another connection's.
 - A write that has sent a part of its bytes and then fails or is cancelled closes the socket. A write that has sent
   nothing leaves it intact. A failed or cancelled handshake closes the socket.
-- Writes never interleave: the fast path (`fwrite()` without the mutex) is taken only while `$writers === 0`;
-  anything that has to wait goes through `$writeMutex`. A fast path that wrote partially takes the free mutex
-  without a wait, so no other write can slip in. After an `fwrite()` that sent nothing, the retry begins
-  with the same bytes: OpenSSL has made a record of them and sends it first. PHP turns on
-  `SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER` and `SSL_MODE_ENABLE_PARTIAL_WRITE`, so the retry may be another string
-  and shorter, as long as it holds the record: a chunk of `WRITE_CHUNK` from the same offset does.
+- Writes and half-closes take their turn before pacing or touching the socket. The current writer hands its
+  turn to the next waiting fiber so a new caller cannot overtake either one. After an `fwrite()` that sent
+  nothing, the retry begins with the same bytes: OpenSSL has made a record of them and sends it first.
+  PHP turns on `SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER` and `SSL_MODE_ENABLE_PARTIAL_WRITE`, so a retry
+  can use another buffer or a shorter chunk that holds the record.
 - An `fwrite()` that returns 0 *with* an error has failed: OpenSSL reports a broken pipe this way, not as `false`,
-  and waiting for writability then would spin forever. The fast path of `write()` leaves it to `finishWrite()`,
-  whose retry fails the same way.
+  and waiting for writability then would spin forever.
 - `read()`, `write()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch
   the stream: it yields for a tick after 16 calls in one tick, so a peer that never pauses, one that reads faster
   than we write (another process on the same host), or a flood of connections does not starve the event loop.

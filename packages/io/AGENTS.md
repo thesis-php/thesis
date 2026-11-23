@@ -50,7 +50,8 @@ Read `README.md` for the API and design decisions.
 - `Stream` reads first and waits only on an empty read, never the other way round: a regular file or php://memory
   never has to wait, and the event loop cannot watch them at all (`Io\Poll` rejects a file). Its PHP read buffer
   is off for the same reason. Both `Stream` and thesis/net's `Socket` close the `StreamWatcher` before
-  `fclose()`. Only writes that wait take the write mutex. When you fix either class, check the other class too.
+  `fclose()`. A write takes its turn before pacing or calling a stream wrapper, which can suspend
+  inside `fwrite()`. When you fix either class, check the other class too.
 - stdio is `Internal\SharedStream`, which never touches the mode of the descriptor: `O_NONBLOCK` belongs
   to the open file description, shared with the shell, the jobs of the same terminal, the children that inherit it
   and the next commands of a pipeline, and they would get `EAGAIN` while it is on (or `echo` of our own process

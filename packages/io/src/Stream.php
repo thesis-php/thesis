@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Io;
 
-use Thesis\Async\LocalMutex;
+use Thesis\Async\Channel;
 use Thesis\Async\Pacer;
+use Thesis\Async\SendResult;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Io\Internal\lastError;
 
@@ -56,13 +57,14 @@ final class Stream implements Reader, Writer, Closer
      */
     private bool $reading = false;
 
-    /**
-     * Fibers inside a write that has to wait, holding or waiting for {@see $writeMutex}.
-     * While there are none, a write goes to the stream without the mutex.
-     */
-    private int $writers = 0;
+    private bool $writing = false;
 
-    private ?LocalMutex $writeMutex = null;
+    /**
+     * Only allocated on contention. A rendezvous hands ownership directly to the first waiting writer.
+     *
+     * @var ?Channel<true>
+     */
+    private ?Channel $waitingWriters = null;
 
     /**
      * @param resource $stream
@@ -140,28 +142,52 @@ final class Stream implements Reader, Writer, Closer
             return;
         }
 
-        $this->pacer->pace();
-        $written = 0;
-
-        if ($this->writers === 0) {
-            $stream = $this->stream ?? throw new StreamClosed('The stream is closed.');
-            // the last error is replaced anyway, see read()
-            // @infection-ignore FunctionCallRemoval
-            error_clear_last();
-            $written = @fwrite($stream, $bytes);
-
-            if ($written === \strlen($bytes)) {
-                // Without it the write takes the lock and writes nothing more.
-                // @infection-ignore ReturnRemoval
-                return;
-            }
-
-            if ($written === false) {
-                throw new WriteFailed(lastError('Failed to write to the stream.'));
-            }
+        if ($this->stream === null) {
+            throw new StreamClosed('The stream is closed.');
         }
 
-        $this->finishWrite($bytes, $written);
+        if ($this->writing) {
+            ($this->waitingWriters ??= new Channel(0))->receive();
+        }
+
+        $this->writing = true;
+        $chunk = $bytes;
+        $length = \strlen($bytes);
+        $written = 0;
+
+        try {
+            $this->pacer->pace();
+
+            while (true) {
+                $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
+                error_clear_last();
+                $sent = @fwrite($stream, $chunk);
+
+                if ($sent === false) {
+                    throw new WriteFailed(lastError('Failed to write to the stream.'));
+                }
+
+                $written += $sent;
+
+                if ($written === $length) {
+                    return;
+                }
+
+                if ($sent === 0 && !$this->watcher->writable()) {
+                    throw new StreamClosed('The stream was closed while writing.');
+                }
+
+                $chunk = substr($bytes, $written, self::WRITE_CHUNK);
+            }
+        } catch (\Throwable $error) {
+            if ($written > 0) {
+                $this->close();
+            }
+
+            throw $error;
+        } finally {
+            $this->writing = $this->waitingWriters?->trySend(true) === SendResult::Sent;
+        }
     }
 
     /**
@@ -178,58 +204,5 @@ final class Stream implements Reader, Writer, Closer
         $this->stream = null;
         $this->watcher->close();
         @fclose($stream);
-    }
-
-    /**
-     * When no other writes are pending, the fast path can write some bytes and take the free mutex
-     * before another write starts.
-     *
-     * @param int $written bytes already written by the fast path, or 0 if the write skipped the fast path
-     */
-    private function finishWrite(string $bytes, int $written): void
-    {
-        $length = \strlen($bytes);
-        // The number of writers only decides whether a write may take the fast path without the lock:
-        // a write that takes the lock instead is slower, with the same bytes in the same order.
-        // @infection-ignore Increment
-        ++$this->writers;
-
-        // the number of writers, see above
-        // @infection-ignore Finally_, UnwrapFinally
-        try {
-            // released by its destructor once the method returns or throws
-            $lock = ($this->writeMutex ??= new LocalMutex())->acquire();
-
-            while ($written < $length) {
-                $stream = $this->stream ?? throw new StreamClosed('The stream was closed while writing.');
-                // the last error is replaced anyway, see read()
-                // @infection-ignore FunctionCallRemoval
-                error_clear_last();
-                $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
-
-                if ($sent === false) {
-                    throw new WriteFailed(lastError('Failed to write to the stream.'));
-                }
-
-                if ($sent > 0) {
-                    $written += $sent;
-                } elseif (!$this->watcher->writable()) {
-                    // The watcher ends a wait with false only after close(), so the loop would throw the same
-                    // at its start: the throw says it where the wait ends, as in read().
-                    // @infection-ignore Throw_
-                    throw new StreamClosed('The stream was closed while writing.');
-                }
-            }
-        } catch (\Throwable $error) {
-            if ($written > 0) {
-                $this->close();
-            }
-
-            throw $error;
-        } finally {
-            // the number of writers, see above
-            // @infection-ignore Decrement
-            --$this->writers;
-        }
     }
 }

@@ -11,6 +11,7 @@ use Testo\Lifecycle\AfterTest;
 use Testo\Test;
 use Thesis\Async\Group;
 use Thesis\Async\Task;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
@@ -29,6 +30,46 @@ final class StreamTest
     {
         if ($this->file !== null && file_exists($this->file)) {
             unlink($this->file);
+        }
+    }
+
+    public function aPacedWriteKeepsItsPlace(): void
+    {
+        $handle = self::open('php://memory', 'w+');
+        $stream = new Stream($handle);
+        timeout(sec(1), static fn() => group(static function (Group $group) use ($stream) {
+            $group->spawn(static function () use ($stream) {
+                checkpoint();
+                $stream->write('B');
+            });
+
+            $group->spawn(static function () use ($stream) {
+                for ($i = 0; $i < 16; ++$i) {
+                    $stream->write('.');
+                }
+
+                $stream->write('A');
+            });
+        }));
+        rewind($handle);
+
+        Assert::same(stream_get_contents($handle), str_repeat('.', 16) . 'AB');
+    }
+
+    public function writesStayWholeWhenAStreamWrapperSuspends(): void
+    {
+        stream_wrapper_register('pausing-write', PausingWriteStream::class);
+
+        try {
+            $stream = new Stream(self::open('pausing-write://test', 'w'));
+            timeout(sec(1), static fn() => group(static function (Group $group) use ($stream) {
+                $group->spawn(static fn() => $stream->write('AA'));
+                $group->spawn(static fn() => $stream->write('B'));
+            }));
+
+            Assert::same(PausingWriteStream::$bytes, 'AAB');
+        } finally {
+            stream_wrapper_unregister('pausing-write');
         }
     }
 

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Net;
 
-use Thesis\Async\LocalMutex;
+use Thesis\Async\Channel;
 use Thesis\Async\Pacer;
+use Thesis\Async\SendResult;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Closer;
 use Thesis\Io\ConcurrentRead;
@@ -86,13 +87,14 @@ final class Socket implements Reader, Writer, Closer
      */
     private bool $reading = false;
 
-    /**
-     * Fibers inside a write that has to wait, holding or waiting for {@see $writeMutex}.
-     * While there are none, a write goes to the socket without the mutex.
-     */
-    private int $writers = 0;
+    private bool $writing = false;
 
-    private ?LocalMutex $writeMutex = null;
+    /**
+     * Only allocated on contention. A rendezvous hands ownership directly to the first waiting writer.
+     *
+     * @var ?Channel<true>
+     */
+    private ?Channel $waitingWriters = null;
 
     /**
      * Whether {@see enableTls()} is in progress: a second handshake would interleave its records with the first.
@@ -169,29 +171,48 @@ final class Socket implements Reader, Writer, Closer
             return;
         }
 
-        $this->pacer->pace();
-        $written = 0;
-
-        if ($this->writers === 0) {
-            $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
-            // A failed fwrite() of a socket reports its own warning, which replaces the last error.
-            // @infection-ignore FunctionCallRemoval
-            error_clear_last();
-            $written = @fwrite($stream, $bytes);
-
-            if ($written === \strlen($bytes)) {
-                // Without it the write takes the mutex and writes nothing more.
-                // @infection-ignore ReturnRemoval
-                return;
-            }
-
-            // 0 bytes with an error (a broken pipe of TLS) fails in finishWrite(), which passes the same bytes again.
-            if ($written === false) {
-                throw new WriteFailed(lastError('Failed to write to the socket.'));
-            }
+        if ($this->stream === null) {
+            throw new SocketClosed('The socket is closed.');
         }
 
-        $this->finishWrite($bytes, $written);
+        $this->beginWrite();
+        $chunk = $bytes;
+        $length = \strlen($bytes);
+        $written = 0;
+
+        try {
+            $this->pacer->pace();
+
+            while (true) {
+                $stream = $this->stream ?? throw new SocketClosed('The socket was closed while writing.');
+                error_clear_last();
+                $sent = @fwrite($stream, $chunk);
+
+                if ($sent === false || ($sent === 0 && error_get_last() !== null)) {
+                    throw new WriteFailed(lastError('Failed to write to the socket.'));
+                }
+
+                $written += $sent;
+
+                if ($written === $length) {
+                    return;
+                }
+
+                if ($sent === 0 && !$this->watcher->writable()) {
+                    throw new SocketClosed('The socket was closed while writing.');
+                }
+
+                $chunk = substr($bytes, $written, self::WRITE_CHUNK);
+            }
+        } catch (\Throwable $error) {
+            if ($written > 0) {
+                $this->close();
+            }
+
+            throw $error;
+        } finally {
+            $this->endWrite();
+        }
     }
 
     /**
@@ -208,10 +229,14 @@ final class Socket implements Reader, Writer, Closer
             throw new \LogicException('A TLS socket cannot be half-closed.');
         }
 
-        $this->exclusively(function () {
+        $this->beginWrite();
+
+        try {
             $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
             stream_socket_shutdown($stream, STREAM_SHUT_WR);
-        });
+        } finally {
+            $this->endWrite();
+        }
     }
 
     /**
@@ -238,7 +263,7 @@ final class Socket implements Reader, Writer, Closer
             throw new \LogicException('TLS is already being enabled.');
         }
 
-        if ($this->reading || $this->writers > 0) {
+        if ($this->reading || $this->writing) {
             throw new \LogicException('TLS cannot be enabled while another fiber reads or writes.');
         }
 
@@ -303,69 +328,17 @@ final class Socket implements Reader, Writer, Closer
         @fclose($stream);
     }
 
-    /**
-     * When no other writes are pending, the fast path can write some bytes and take the free mutex
-     * before another write starts.
-     *
-     * @param int $written bytes already written by the fast path, or 0 if the write skipped the fast path
-     */
-    private function finishWrite(string $bytes, int $written): void
+    private function beginWrite(): void
     {
-        $length = \strlen($bytes);
-
-        try {
-            $this->exclusively(function () use ($bytes, $length, &$written) {
-                while ($written < $length) {
-                    $stream = $this->stream ?? throw new SocketClosed('The socket was closed while writing.');
-                    // Only a write that sends nothing once the socket is writable could read an error of another
-                    // call, and no test can make the OS do that.
-                    // @infection-ignore FunctionCallRemoval
-                    error_clear_last();
-                    // After a write that sent nothing, TLS sends the record it has made of the first bytes,
-                    // so a retry begins with the same bytes. PHP lets the buffer move and be shorter
-                    // (SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE): a chunk holds the record.
-                    $sent = @fwrite($stream, substr($bytes, $written, self::WRITE_CHUNK));
-
-                    // OpenSSL reports a broken pipe as 0 bytes written with a warning: waiting for writability
-                    // would spin.
-                    if ($sent === false || ($sent === 0 && error_get_last() !== null)) {
-                        throw new WriteFailed(lastError('Failed to write to the socket.'));
-                    }
-
-                    if ($sent > 0) {
-                        $written += $sent;
-                    } elseif (!$this->watcher->writable()) {
-                        // The watcher ends a wait with false only after close(), so the loop would throw the same
-                        // at its start: the throw says it where the wait ends, as in read().
-                        // @infection-ignore Throw_
-                        throw new SocketClosed('The socket was closed while writing.');
-                    }
-                }
-            });
-        } catch (\Throwable $error) {
-            if ($written > 0) {
-                $this->close();
-            }
-
-            throw $error;
+        if ($this->writing) {
+            ($this->waitingWriters ??= new Channel(0))->receive();
         }
+
+        $this->writing = true;
     }
 
-    /**
-     * Runs $fn holding the write mutex.
-     *
-     * @param callable(): void $fn
-     */
-    private function exclusively(callable $fn): void
+    private function endWrite(): void
     {
-        ++$this->writers;
-
-        try {
-            // released by its destructor once the method returns or throws
-            $lock = ($this->writeMutex ??= new LocalMutex())->acquire();
-            $fn();
-        } finally {
-            --$this->writers;
-        }
+        $this->writing = $this->waitingWriters?->trySend(true) === SendResult::Sent;
     }
 }

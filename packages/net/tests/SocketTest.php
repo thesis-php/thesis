@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 use Testo\Assert;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Group;
@@ -12,6 +13,7 @@ use Thesis\Io\ConcurrentRead;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
@@ -51,6 +53,36 @@ final class SocketTest
 
         Assert::true($receivedUp === $up);
         Assert::true($receivedDown === $down);
+    }
+
+    #[DataSet([false], 'another write')]
+    #[DataSet([true], 'half-close')]
+    public function aPacedWriteKeepsItsPlace(bool $halfClose): void
+    {
+        [$left, $right] = socketPair();
+        timeout(sec(1), static function () use ($left, $right, $halfClose) {
+            group(static function (Group $group) use ($left, $halfClose) {
+                $group->spawn(static function () use ($left, $halfClose) {
+                    checkpoint();
+
+                    if ($halfClose) {
+                        $left->closeWrite();
+                    } else {
+                        $left->write('B');
+                    }
+                });
+                $group->spawn(static function () use ($left) {
+                    for ($i = 0; $i < 16; ++$i) {
+                        $left->write('.');
+                    }
+
+                    $left->write('A');
+                });
+            });
+
+            $expected = str_repeat('.', 16) . ($halfClose ? 'A' : 'AB');
+            Assert::same(readExactly($right, \strlen($expected)), $expected);
+        });
     }
 
     public function writesOfConcurrentFibersDoNotInterleave(): void
