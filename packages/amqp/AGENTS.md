@@ -17,18 +17,17 @@ The API and the guarantees are in `README.md` — read it first.
 - A synchronous method holds `callMutex` until its reply arrives, even if the caller is cancelled meanwhile:
   the reply still comes, and the next call must not take it for its own. The reader releases the lock
   (`Internal\PendingCall`).
-- Both mode selectors hold the same channel mutex from checking the current mode through recording the broker's
-  reply. The RPC mutex alone would serialize the requests after both callers had already checked the mode.
-- Confirm tags are assigned (`Internal\Confirms`) and the frames written under `publishMutex` of `Channel`,
-  in one order, after `ensureOpen()` inside the mutex: the wait for it may outlive the channel.
-  The `Deferred` of each confirm is taken when its tag is assigned, never looked up after the write:
-  the reader may settle and forget it while a large write waits.
-  A write that throws with the connection intact (nothing went out) gives its tags back; once a byte went out,
-  net closes the socket.
-- `$settledUpTo` is the highest tag settled with `multiple`: a later ack of a lower tag is dropped,
-  otherwise RabbitMQ closes the channel with PRECONDITION_FAILED (unknown delivery tag). It and
-  `Delivery::$isSettled` are set before the send, so that a concurrent second ack sends nothing,
-  and restored if the send throws.
+- The channel writer orders mode selection through its reply, publish tags and bytes, and settlements.
+  A managed transaction reserves the channel for its callback and the tasks it starts until commit or rollback.
+  Check the current owner after acquiring the writer: a child that waited may outlive its transaction.
+- The publisher keeps the `Deferred` it obtained when reserving its confirm tag: the reader may already have
+  settled the tag by the time a large write finishes. If a write sends nothing, give the tags back and finish
+  their deferreds: a graceful close may already be waiting for them.
+- A resource alarm stops only publishes. Wait for it with the writers free, check it again after obtaining the
+  socket writer, and wake the blocked publishers of a channel when it closes. A new alarm can arrive before
+  the publisher resumes, even in the same socket read as the unblock.
+- Record the highest delivery tag settled with `multiple` after its frame was written, under the channel writer.
+  Otherwise an individual ack can see a higher tag whose write is cancelled and drop its own frame.
 - Consumer handles identify their registration as well as its tag, which another consumer can reuse.
   Check the registration after obtaining the RPC lock to send a cancel and when processing its reply.
 - A mandatory message carries the header `x-thesis-return-id`: basic.return names no delivery tag, the header

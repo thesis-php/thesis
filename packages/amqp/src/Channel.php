@@ -66,10 +66,10 @@ use Thesis\Async\Channel as AsyncChannel;
 use Thesis\Async\Deferred;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Lock;
+use Thesis\Async\ScopedValue;
 use Thesis\Io\Buffer;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\shield;
-use function Thesis\Async\synchronized;
 
 /**
  * A channel of a connection, opened by {@see Client::channel()}. Any number of fibers may use it at once:
@@ -120,9 +120,17 @@ final class Channel
 
     private null|ConfirmSelect|TxSelect $mode = null;
 
-    private readonly LocalMutex $modeMutex;
+    private readonly LocalMutex $writeMutex;
 
-    private readonly LocalMutex $publishMutex;
+    /**
+     * @var ?Deferred<null> completed after the transaction commits or rolls back
+     */
+    private ?Deferred $activeTransaction = null;
+
+    /**
+     * @var ScopedValue<?Deferred<null>> inherited by tasks started inside the transaction callback
+     */
+    private readonly ScopedValue $transaction;
 
     private readonly Confirms $confirms;
 
@@ -136,8 +144,10 @@ final class Channel
         public readonly int $id,
     ) {
         $this->callMutex = new LocalMutex();
-        $this->modeMutex = new LocalMutex();
-        $this->publishMutex = new LocalMutex();
+        $this->writeMutex = new LocalMutex();
+        /** @var ScopedValue<?Deferred<null>> $transaction */
+        $transaction = new ScopedValue(null);
+        $this->transaction = $transaction;
         $this->confirms = new Confirms();
         $this->content = new Content($id);
         $connection->register($id, $this->handle(...), $this->terminate(...), $this->drain(...));
@@ -147,7 +157,9 @@ final class Channel
             // and opening it again is a connection error.
             shield(fn() => $this->call(new ChannelOpen(), ChannelOpenOk::class));
         } catch (\Throwable $exception) {
-            $connection->unregister($id);
+            if (!$this->isClosed) {
+                $connection->unregister($id);
+            }
 
             throw $exception;
         }
@@ -431,7 +443,6 @@ final class Channel
         $publish = new Publish($message, $exchange, $routingKey, $mandatory);
         $buffer = new Buffer();
         $returnId = $this->encodePublish($buffer, $publish);
-        $this->connection->awaitUnblocked();
         // Without confirms there is none.
         $confirm = $this->writePublishes($buffer->drain(), [[$publish, $returnId]])[0][1] ?? null;
         $confirm?->await();
@@ -451,7 +462,6 @@ final class Channel
     public function publishBatch(iterable $publishes): void
     {
         $this->ensureOpen();
-        $this->connection->awaitUnblocked();
 
         /** @var \SplQueue<array{Publish, Deferred<null>}> $pending */
         $pending = new \SplQueue();
@@ -520,8 +530,10 @@ final class Channel
      */
     public function txCommit(): void
     {
-        $this->ensureTransactional();
-        $this->call(new TxCommit(), TxCommitOk::class);
+        $this->writing(function () {
+            $this->ensureTransactional();
+            $this->call(new TxCommit(), TxCommitOk::class);
+        });
     }
 
     /**
@@ -530,8 +542,10 @@ final class Channel
      */
     public function txRollback(): void
     {
-        $this->ensureTransactional();
-        $this->call(new TxRollback(), TxRollbackOk::class);
+        $this->writing(function () {
+            $this->ensureTransactional();
+            $this->call(new TxRollback(), TxRollbackOk::class);
+        });
     }
 
     /**
@@ -544,6 +558,33 @@ final class Channel
      * @throws AmqpException
      */
     public function transactional(callable $fn): mixed
+    {
+        $lock = $this->acquireWrite();
+
+        if ($this->activeTransaction !== null) {
+            $lock->release();
+
+            throw new \LogicException('AMQP transactions cannot be nested on one channel.');
+        }
+
+        /** @var Deferred<null> $transaction */
+        $transaction = $this->activeTransaction = new Deferred();
+        $lock->release();
+
+        try {
+            return $this->transaction->with($transaction, fn() => $this->runTransaction($fn));
+        } finally {
+            $this->activeTransaction = null;
+            $transaction->complete();
+        }
+    }
+
+    /**
+     * @template T
+     * @param callable(self): T $fn
+     * @return T
+     */
+    private function runTransaction(callable $fn): mixed
     {
         $this->txSelect();
 
@@ -562,7 +603,7 @@ final class Channel
             throw $exception;
         }
 
-        $this->txCommit();
+        shield($this->txCommit(...));
 
         return $result;
     }
@@ -783,30 +824,41 @@ final class Channel
      */
     private function writePublishes(string $bytes, array $chunk): array
     {
-        if (!$this->mode instanceof ConfirmSelect) {
-            $this->ensureOpen();
-            $this->connection->write($bytes);
+        do {
+            $this->connection->awaitUnblocked($this->id, $this->ensureOpen(...));
+            $written = $this->writing(fn() => $this->tryPublish($bytes, $chunk));
+        } while ($written === null);
 
-            return [];
+        return $written;
+    }
+
+    /**
+     * @param non-empty-list<array{Publish, ?string}> $chunk
+     * @return ?list<array{Publish, Deferred<null>}> null if a new resource alarm prevented the write
+     * @throws AmqpException
+     */
+    private function tryPublish(string $bytes, array $chunk): ?array
+    {
+        $this->ensureOpen();
+
+        if (!$this->mode instanceof ConfirmSelect) {
+            return $this->connection->tryPublish($bytes, $this->ensureOpen(...)) ? [] : null;
         }
 
-        return synchronized($this->publishMutex, function () use ($bytes, $chunk) {
-            $this->ensureOpen();
-            $confirms = $this->confirms->expect($chunk);
+        $confirms = $this->confirms->expect($chunk);
 
-            try {
-                $this->connection->write($bytes);
-            } catch (\Throwable $exception) {
-                // Nothing reached the server: the next publish takes the tags.
-                if ($this->connection->isIntact()) {
-                    $this->confirms->giveBack(\count($confirms));
-                }
+        $written = false;
 
-                throw $exception;
+        try {
+            $written = $this->connection->tryPublish($bytes, $this->ensureOpen(...));
+        } finally {
+            // A failed or blocked write that sent no bytes leaves its tags for the next publisher.
+            if (!$written && $this->connection->isIntact()) {
+                $this->confirms->giveBack(\count($confirms));
             }
+        }
 
-            return $confirms;
-        });
+        return $written ? $confirms : null;
     }
 
     /**
@@ -814,25 +866,19 @@ final class Channel
      */
     private function settle(BasicAck|BasicNack|BasicReject $method): void
     {
-        $this->ensureOpen();
+        $this->writing(function () use ($method) {
+            $this->ensureOpen();
 
-        if ($method->deliveryTag <= $this->settledUpTo) {
-            return;
-        }
+            if ($method->deliveryTag <= $this->settledUpTo) {
+                return;
+            }
 
-        $settledUpTo = $this->settledUpTo;
-
-        if (!$method instanceof BasicReject && $method->multiple) {
-            $this->settledUpTo = $method->deliveryTag;
-        }
-
-        try {
             $this->connection->send($this->id, $method);
-        } catch (\Throwable $exception) {
-            $this->settledUpTo = $settledUpTo;
 
-            throw $exception;
-        }
+            if (!$method instanceof BasicReject && $method->multiple) {
+                $this->settledUpTo = $method->deliveryTag;
+            }
+        });
     }
 
     /**
@@ -949,7 +995,12 @@ final class Channel
 
         if ($publish->mandatory) {
             if (!$this->mode instanceof ConfirmSelect) {
-                throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
+                // A confirm.select may already be on the wire.
+                $this->writing(function () {
+                    if (!$this->mode instanceof ConfirmSelect) {
+                        throw new \LogicException('A mandatory message needs confirms: call confirmSelect() first.');
+                    }
+                });
             }
 
             [$message, $returnId] = Confirms::returnable($message);
@@ -972,9 +1023,45 @@ final class Channel
         }
     }
 
+    /**
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    private function writing(callable $fn): mixed
+    {
+        $lock = $this->acquireWrite();
+
+        try {
+            return $fn();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Publish, settle and mode changes must agree on the order of the wire. While a managed transaction
+     * is active only its callback and the tasks it started may write. Check the owner after acquiring the mutex:
+     * a waiting child can outlive the callback that started it.
+     */
+    private function acquireWrite(): Lock
+    {
+        while (true) {
+            $lock = $this->writeMutex->acquire();
+            $transaction = $this->activeTransaction;
+
+            if ($transaction === null || $transaction === $this->transaction->get()) {
+                return $lock;
+            }
+
+            $lock->release();
+            $transaction->await();
+        }
+    }
+
     private function selectMode(ConfirmSelect|TxSelect $mode): void
     {
-        synchronized($this->modeMutex, function () use ($mode) {
+        $this->writing(function () use ($mode) {
             $this->ensureOpen();
 
             if ($this->mode instanceof $mode) {

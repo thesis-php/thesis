@@ -13,8 +13,12 @@ use Thesis\Amqp\Message;
 use Thesis\Amqp\MessageReturned;
 use Thesis\Amqp\Publish;
 use Thesis\Amqp\ReplyCode;
+use Thesis\Async\Deferred;
+use Thesis\Async\Group;
 use function Thesis\Amqp\thrown;
 use function Thesis\Amqp\withRabbitMq;
+use function Thesis\Async\delay;
+use function Thesis\Async\timeout;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -168,6 +172,29 @@ final class RabbitMqTest
 
             Assert::same($channel->get($queue->name, noAck: true)?->message->body, 'committed');
             Assert::null($channel->get($queue->name));
+        });
+    }
+
+    public function overlappingTransactionsCommitOnlyTheirOwnMessages(): void
+    {
+        withRabbitMq(static function (Client $client, Group $group) {
+            $channel = $client->channel();
+            $queue = $channel->queueDeclare(exclusive: true)->name;
+            /** @var Deferred<null> $started */
+            $started = new Deferred();
+            $first = $group->spawn(static fn() => thrown(static fn() => $channel->transactional(
+                static function () use ($channel, $queue, $started) {
+                    $channel->publish(new Message('rolled back'), routingKey: $queue);
+                    $started->complete();
+                    delay(ms(100));
+
+                    throw new \RuntimeException();
+                },
+            )));
+            timeout(sec(3), $started->await(...));
+            $channel->transactional(static fn() => $channel->publish(new Message('committed'), routingKey: $queue));
+            timeout(sec(3), $first->await(...));
+            Assert::same($channel->get($queue, noAck: true)?->message->body, 'committed');
         });
     }
 

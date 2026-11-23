@@ -153,7 +153,10 @@ foreach ($channel->consume('events')->batches(count: 500, timeout: ms(100)) as $
 
 `exchangeDeclare()`, `queueDeclare()` (it returns a `Queue` with the name and the counts), the bindings, `queuePurge()`
 and `queueDelete()` map to the methods of AMQP. `transactional($fn)` commits if `$fn` returns and rolls back
-if it throws.
+if it throws. Calls on the same channel run one transaction at a time. Other callers' publishes,
+acknowledgements and transaction control wait for the callback and its commit or rollback. Tasks started by the
+callback inherit its transaction: join them inside the callback to include their work. Nesting `transactional()`
+on the same channel throws `LogicException`.
 
 Concurrent calls to `confirmSelect()` or `txSelect()` for the same mode share one broker acknowledgement.
 Once the broker accepts a mode, a caller asking for the other gets a local `LogicException`. The channel stays open.

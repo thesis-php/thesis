@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Amqp\Internal\Frames;
 use Thesis\Amqp\Internal\Protocol\BasicAck;
 use Thesis\Amqp\Internal\Protocol\BasicCancel;
 use Thesis\Amqp\Internal\Protocol\BasicCancelOk;
@@ -24,6 +25,8 @@ use Thesis\Amqp\Internal\Protocol\BasicQosOk;
 use Thesis\Amqp\Internal\Protocol\BasicReturn;
 use Thesis\Amqp\Internal\Protocol\ChannelClose;
 use Thesis\Amqp\Internal\Protocol\ChannelCloseOk;
+use Thesis\Amqp\Internal\Protocol\ChannelFlow;
+use Thesis\Amqp\Internal\Protocol\ChannelFlowOk;
 use Thesis\Amqp\Internal\Protocol\ConfirmSelect;
 use Thesis\Amqp\Internal\Protocol\ConfirmSelectOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionBlocked;
@@ -37,11 +40,14 @@ use Thesis\Amqp\Internal\Protocol\TxCommitOk;
 use Thesis\Amqp\Internal\Protocol\TxSelect;
 use Thesis\Amqp\Internal\Protocol\TxSelectOk;
 use Thesis\Async\Group;
+use Thesis\Io\Buffer;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Time\ms;
+use function Thesis\Time\sec;
 
 #[Test]
 final class ChannelTest
@@ -353,7 +359,12 @@ final class ChannelTest
 
     public function publishWaitsWhileTheServerBlocksTheConnection(): void
     {
-        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer) {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $get = $group->spawn(static fn() => $channel->get('q'));
+            $peer->expect(BasicGet::class);
+            $peer->sendContent($id, new BasicGetOk(1, false, '', 'q', 0), 'delivered');
+            $delivery = $get->await();
+            Assert::notNull($delivery);
             $peer->send(0, new ConnectionBlocked('low on memory'));
             delay(ms(10));
             $publish = $group->spawn(static fn() => $channel->publish(new Message('a')));
@@ -361,6 +372,8 @@ final class ChannelTest
             delay(ms(10));
             Assert::false($publish->isDone);
 
+            $delivery->ack();
+            Assert::same($peer->expect(BasicAck::class)->deliveryTag, 1);
             $peer->send(0, new ConnectionUnblocked());
             $publish->await();
             $peer->expect(BasicPublish::class);
@@ -401,9 +414,8 @@ final class ChannelTest
 
             $peer->send($id, new ChannelClose(ReplyCode::NotFound->value, 'NOT_FOUND', 60, 40));
             $peer->expect(ChannelCloseOk::class);
-            $peer->send(0, new ConnectionUnblocked());
 
-            Assert::instanceOf($publish->await(), ChannelClosed::class);
+            Assert::instanceOf(timeout(sec(2), $publish->await(...)), ChannelClosed::class);
         });
     }
 
@@ -474,7 +486,7 @@ final class ChannelTest
     }
 
     /**
-     * @param callable(Group, Channel, FakePeer, int<1, 65535>): void $test
+     * @param callable(Group, Channel, FakePeer, int<1, 65535>, Client): void $test
      */
     private static function withChannel(callable $test): void
     {
@@ -485,7 +497,7 @@ final class ChannelTest
             [$channel, $id] = openChannel($group, $client, $peer);
 
             try {
-                $test($group, $channel, $peer, $id);
+                timeout(sec(10), static fn() => $test($group, $channel, $peer, $id, $client));
             } finally {
                 $peer->socket->close();
             }
@@ -508,6 +520,29 @@ final class ChannelTest
         });
     }
 
+    public function publishesDuringConfirmSelectionReceiveTheRightTags(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $select = $group->spawn($channel->confirmSelect(...));
+            $peer->expect(ConfirmSelect::class);
+            $first = $group->spawn(static fn() => $channel->publish(new Message('a')));
+            checkpoint();
+            $peer->send($id, new ConfirmSelectOk());
+            $select->await();
+            $peer->expect(BasicPublish::class);
+            $peer->expectMessage();
+            $peer->send($id, new BasicAck(1, false));
+            $peer->send($id, new ChannelFlow(true));
+            $peer->expect(ChannelFlowOk::class);
+            $first->await();
+            $second = $group->spawn(static fn() => $channel->publish(new Message('b')));
+            $peer->expect(BasicPublish::class);
+            $peer->expectMessage();
+            $peer->send($id, new BasicAck(2, false));
+            timeout(ms(500), $second->await(...));
+        });
+    }
+
     public function concurrentCancellationsSendOneCancel(): void
     {
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
@@ -525,6 +560,104 @@ final class ChannelTest
             $peer->expect(BasicQos::class);
             $peer->send($id, new BasicQosOk());
             $two->await();
+        });
+    }
+
+    public function batchChecksForAnAlarmAfterReadingItsIterator(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $items = static function () use ($channel, $peer) {
+                $peer->send(0, new ConnectionBlocked('alarm'));
+                yield new Publish(new Message('a'));
+                // This reply is read after connection.blocked on the same socket.
+                $channel->qos(1);
+            };
+            $task = $group->spawn(static fn() => $channel->publishBatch($items()));
+            $peer->expect(BasicQos::class);
+            $peer->send($id, new BasicQosOk());
+            delay(ms(50));
+            $doneWhileBlocked = $task->isDone;
+            $peer->send(0, new ConnectionUnblocked());
+            $task->await();
+            Assert::false($doneWhileBlocked);
+        });
+    }
+
+    public function cancelledMultipleAckLeavesTheIndividualAckToSend(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $deliveries = [];
+
+            foreach ([1, 2] as $tag) {
+                $take = $group->spawn(static fn() => $channel->get('q'));
+                $peer->expect(BasicGet::class);
+                $peer->sendContent($id, new BasicGetOk($tag, false, '', 'q', 0), 'a');
+                $delivery = $take->await();
+                Assert::notNull($delivery);
+                $deliveries[$tag] = $delivery;
+            }
+            $writer = $group->spawn(static fn() => $channel->publish(new Message(str_repeat('x', 16_777_216))));
+            $peer->expect(BasicPublish::class);
+            $multiple = $group->spawn(static fn() => $deliveries[2]->ack(multiple: true));
+            checkpoint();
+            $individual = $group->spawn($deliveries[1]->ack(...));
+            checkpoint();
+            $multiple->cancel();
+            $peer->expectMessage();
+            $writer->await();
+            $individual->await();
+            $group->spawn(static fn() => $channel->qos(1));
+            $ack = $peer->expect(BasicAck::class);
+            Assert::same($ack->deliveryTag, 1);
+            $peer->expect(BasicQos::class);
+            $peer->send($id, new BasicQosOk());
+        });
+    }
+
+    public function closeFinishesWhenAnUnsentConfirmedPublishIsCancelled(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id, Client $client) {
+            $select = $group->spawn($channel->confirmSelect(...));
+            $peer->expect(ConfirmSelect::class);
+            $peer->send($id, new ConfirmSelectOk());
+            $select->await();
+            $open = $group->spawn(static fn() => $client->channel());
+            $peer->openChannel();
+            $other = $open->await();
+            $busy = $group->spawn(static fn() => $other->publish(new Message(str_repeat('x', 16_777_216))));
+            $peer->expect(BasicPublish::class);
+            $unsent = $group->spawn(static fn() => $channel->publish(new Message('unsent')));
+            checkpoint();
+            $close = $group->spawn($client->close(...));
+            checkpoint();
+            $unsent->cancel();
+            $peer->expectMessage();
+            $busy->await();
+            timeout(ms(500), $peer->acceptClose(...));
+            $close->await();
+        });
+    }
+
+    public function publishKeepsWaitingWhenAnotherAlarmFollowsUnblocked(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $peer->send(0, new ConnectionBlocked('first'));
+            $peer->send($id, new ChannelFlow(true));
+            $peer->expect(ChannelFlowOk::class);
+            $job = $group->spawn(static fn() => $channel->publish(new Message('m')));
+            checkpoint();
+            $frames = new Buffer();
+            foreach ([new ConnectionUnblocked(), new ConnectionBlocked('second')] as $frame) {
+                Frames::method($frames, 0, $frame);
+            }
+            Frames::method($frames, $id, new ChannelFlow(true));
+            $peer->socket->write($frames->drain());
+            $peer->expect(ChannelFlowOk::class);
+            delay(ms(50));
+            $done = $job->isDone;
+            $peer->send(0, new ConnectionUnblocked());
+            $job->await();
+            Assert::false($done);
         });
     }
 }

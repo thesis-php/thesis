@@ -19,4 +19,8 @@ and [thesis/net](https://github.com/thesis-php/net): the API of 1.x is gone, see
 
 - Concurrent calls to `confirmSelect()` and `txSelect()` send one mode selection. A conflicting call throws
   `LogicException` locally and the channel stays open.
+- `publish()` and `publishBatch()` honour resource alarms, channel closure and concurrent confirm selection.
+  Deliveries can still be acknowledged during an alarm.
+- Concurrent `transactional()` calls isolate their publications and acknowledgements. Cancelling a multiple
+  acknowledgement before its write allows an individual acknowledgement to proceed.
 - `Consumer::cancel()` sends one cancellation for concurrent callers. Reusing a consumer tag leaves old handles inert.

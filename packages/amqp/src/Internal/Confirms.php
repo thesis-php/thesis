@@ -100,6 +100,8 @@ final class Confirms
         $first = $this->lastTag - $count + 1;
 
         for ($tag = $first; $tag <= $this->lastTag; ++$tag) {
+            // A close already draining this tag can finish: the cancelled publish never reached the broker.
+            ($this->unconfirmed[$tag] ?? null)?->complete();
             $this->forget($tag);
         }
 

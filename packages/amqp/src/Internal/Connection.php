@@ -19,11 +19,13 @@ use Thesis\Amqp\Internal\Protocol\ProtocolError;
 use Thesis\Amqp\ReplyCode;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
+use Thesis\Async\LocalMutex;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Net\Socket;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\synchronized;
 use function Thesis\Time\ms;
 
 /**
@@ -99,12 +101,16 @@ final class Connection
      */
     private int $writing = 0;
 
+    private bool $blocked = false;
+
     /**
-     * Set while the server blocks publishing (a resource alarm): publishes wait for it.
+     * Each channel also wakes its publishers when it closes, even during a resource alarm.
      *
-     * @var ?Deferred<null>
+     * @var array<int, Deferred<null>>
      */
-    private ?Deferred $unblocked = null;
+    private array $blockedChannels = [];
+
+    private readonly LocalMutex $writeMutex;
 
     /**
      * @var ?Deferred<null>
@@ -122,7 +128,9 @@ final class Connection
         public readonly int $channelMax,
         public readonly int $frameMax,
         private readonly int $heartbeat,
-    ) {}
+    ) {
+        $this->writeMutex = new LocalMutex();
+    }
 
     /**
      * Reads and dispatches frames, and sends heartbeats, until the connection is closed or lost.
@@ -178,7 +186,9 @@ final class Connection
 
     public function unregister(int $channel): void
     {
-        unset($this->channels[$channel]);
+        $waiter = $this->blockedChannels[$channel] ?? null;
+        unset($this->channels[$channel], $this->blockedChannels[$channel]);
+        $waiter?->complete();
     }
 
     /**
@@ -210,7 +220,12 @@ final class Connection
      *
      * @throws ConnectionClosed
      */
-    public function write(string $bytes): void
+    private function write(string $bytes): void
+    {
+        synchronized($this->writeMutex, fn() => $this->writeBytes($bytes));
+    }
+
+    private function writeBytes(string $bytes): void
     {
         $this->ensureOpen();
         ++$this->writing;
@@ -240,14 +255,47 @@ final class Connection
     }
 
     /**
-     * Waits while the server blocks publishing.
+     * Wait with every writer lock free: an alarm stops publishes alone.
      *
-     * @throws ConnectionClosed
+     * @param callable(): void $ensureOpen checks the publishing channel, whose ID the connection might have reused
+     * @throws AmqpException
      */
-    public function awaitUnblocked(): void
+    public function awaitUnblocked(int $channel, callable $ensureOpen): void
     {
-        $this->unblocked?->await();
-        $this->ensureOpen();
+        while ($this->blocked) {
+            $ensureOpen();
+            if (!isset($this->blockedChannels[$channel])) {
+                /** @var Deferred<null> $waiter */
+                $waiter = new Deferred();
+                $this->blockedChannels[$channel] = $waiter;
+            }
+
+            $this->blockedChannels[$channel]->await();
+        }
+
+        $ensureOpen();
+    }
+
+    /**
+     * The broker may block the connection while the publisher waits for the socket writer.
+     *
+     * @param callable(): void $ensureOpen
+     * @return bool false if the caller must release the channel locks and wait for the alarm
+     * @throws AmqpException
+     */
+    public function tryPublish(string $bytes, callable $ensureOpen): bool
+    {
+        return synchronized($this->writeMutex, function () use ($bytes, $ensureOpen) {
+            $ensureOpen();
+
+            if ($this->blocked) {
+                return false;
+            }
+
+            $this->writeBytes($bytes);
+
+            return true;
+        });
     }
 
     /**
@@ -310,8 +358,7 @@ final class Connection
             ($handler->terminate)($reason);
         }
 
-        $this->unblocked?->complete();
-        $this->unblocked = null;
+        $this->unblock();
         $this->closeOk?->complete();
     }
 
@@ -323,7 +370,7 @@ final class Connection
             $frame instanceof ConnectionCloseOk => $this->terminate(
                 new ConnectionClosed('The connection is closed by the client.', ReplyCode::ReplySuccess),
             ),
-            $frame instanceof ConnectionBlocked => $this->unblocked ??= new Deferred(),
+            $frame instanceof ConnectionBlocked => $this->blocked = true,
             $frame instanceof ConnectionUnblocked => $this->unblock(),
             default => throw new ProtocolError(ReplyCode::UnexpectedFrame, Frames::describe($frame) . ' on channel 0.'),
         };
@@ -345,8 +392,13 @@ final class Connection
 
     private function unblock(): void
     {
-        $this->unblocked?->complete();
-        $this->unblocked = null;
+        $this->blocked = false;
+        $waiters = $this->blockedChannels;
+        $this->blockedChannels = [];
+
+        foreach ($waiters as $waiter) {
+            $waiter->complete();
+        }
     }
 
     /**
