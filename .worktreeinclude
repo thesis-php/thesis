@@ -1,8 +1,0 @@
-.worktreeinclude
-.env.local
-.env.*.local
-docker-compose.override.yaml
-.idea/*.xml
-.idea/runConfigurations/
-.idea/codeStyles/
-.idea/inspectionProfiles/
