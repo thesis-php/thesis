@@ -983,8 +983,7 @@ Without an observation a wait only checks for a tracer before and after it parks
 and `Resumed`, a wait costs about 4 µs (two events and a short backtrace to find where it is written).
 Observations nest: each dispatcher gets the events until its own call returns. An observer that starts
 during a wait receives its `Resumed` event even if it missed the matching `Suspended`.
-A trace tool can register cleanup with `Trace\onDetach($dispatcher, $cleanup)`. The last observation using
-that dispatcher calls it. The returned closure removes the registration if the resource is released earlier.
+When the last observation of a dispatcher ends, that dispatcher receives `Trace\ObserverDetached`.
 
 ### Streams: `StreamWatcher`
 
@@ -1239,7 +1238,6 @@ all([user, orders])              orders fails after 50 ms
 | `SendResult`: `Sent`, `Full`, `Closed` | what `Channel::trySend()` did with the value |
 | `virtualTime(callable(): T, ?int $seed = null): T`, `burnCpu(Duration)` | run on a virtual clock that jumps to the next timer; take a duration without yielding, as busy code would |
 | `Trace\observe(Dispatcher, callable(): T): T`, listeners of `Trace\Event` and its classes | the events of the scope tree while a callable runs |
-| `Trace\onDetach(Dispatcher, callable(): void): \Closure(): void` | register cleanup for the last observation of this dispatcher and return its unsubscribe function |
 | `Trace\watchdog(Duration, callable(): void): \Closure(): void` | call back after a delay unless cancelled, without keeping the loop alive |
 
 ## Limitations

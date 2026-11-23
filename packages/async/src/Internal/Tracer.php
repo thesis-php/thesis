@@ -10,6 +10,7 @@ use Thesis\Async\Trace\Ended;
 use Thesis\Async\Trace\Event;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Joining;
+use Thesis\Async\Trace\ObserverDetached;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\ScopeCancelled;
 use Thesis\Async\Trace\ShieldCreated;
@@ -56,33 +57,6 @@ final class Tracer
      * @var list<Dispatcher>
      */
     private array $dispatchers = [];
-
-    /**
-     * @var array<int, \ArrayObject<int, \Closure(): void>> cleanup by dispatcher id and registration
-     */
-    private array $cleanup = [];
-
-    private int $nextCleanup = 0;
-
-    /**
-     * @param callable(): void $callback
-     * @return \Closure(): void
-     */
-    public function onDetach(Dispatcher $dispatcher, callable $callback): \Closure
-    {
-        if (!\in_array($dispatcher, $this->dispatchers, true)) {
-            return static function () {};
-        }
-
-        $id = spl_object_id($dispatcher);
-        $callbacks = $this->cleanup[$id] ??= new \ArrayObject();
-        $key = ++$this->nextCleanup;
-        $callbacks[$key] = $callback(...);
-
-        return static function () use ($callbacks, $key) {
-            unset($callbacks[$key]);
-        };
-    }
 
     /**
      * Whether any attached dispatcher listens to an event class, reset when the dispatchers change.
@@ -141,18 +115,8 @@ final class Tracer
             Scope::$tracer = null;
         }
 
-        $id = spl_object_id($dispatcher);
-
-        if (isset($this->cleanup[$id]) && !\in_array($dispatcher, $this->dispatchers, true)) {
-            $callbacks = $this->cleanup[$id];
-            unset($this->cleanup[$id]);
-
-            foreach (array_keys($callbacks->getArrayCopy()) as $key) {
-                // Another cleanup may already have unregistered this one.
-                $callback = $callbacks[$key] ?? null;
-                unset($callbacks[$key]);
-                $callback?->__invoke();
-            }
+        if (!\in_array($dispatcher, $this->dispatchers, true) && $dispatcher->listens(ObserverDetached::class)) {
+            $dispatcher->dispatch(new ObserverDetached());
         }
     }
 

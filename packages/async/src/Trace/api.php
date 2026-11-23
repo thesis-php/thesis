@@ -6,7 +6,6 @@ namespace Thesis\Async\Trace;
 
 use Thesis\Async\Internal\Callback;
 use Thesis\Async\Internal\Loop;
-use Thesis\Async\Internal\Scope;
 use Thesis\Async\Internal\Tracer;
 use Thesis\Dispatcher;
 use Time\Duration;
@@ -25,6 +24,7 @@ use function Thesis\Time\toNs;
  * suspend the fiber or cancel anything, and must not keep the values and the errors of the events
  * (format them right away), or it would hold them alive past their scope.
  *
+ * The dispatcher receives an {@see ObserverDetached} when its last observation ends.
  * A wait reads the active tracer before it suspends and again when it resumes.
  *
  * @api
@@ -41,21 +41,6 @@ function observe(Dispatcher $dispatcher, callable $fn): mixed
     } finally {
         $tracer->detach($dispatcher);
     }
-}
-
-/**
- * Registers cleanup for a tool that holds resources while observing. The last observe() with this
- * dispatcher calls the callback on exit. Outside an observation of this dispatcher nothing is registered.
- * The callback follows the rules of a listener: it must not throw or wait.
- *
- * @api
- * @param callable(): void $callback
- * @return \Closure(): void unregister, idempotent
- */
-function onDetach(Dispatcher $dispatcher, callable $callback): \Closure
-{
-    return Scope::$tracer?->onDetach($dispatcher, $callback)
-        ?? static function () {};
 }
 
 /**

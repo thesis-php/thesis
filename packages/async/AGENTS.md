@@ -155,8 +155,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - Tracing (`Trace\observe()`) only observes and costs nothing without an observation: every hook is
   `Scope::$tracer?->...`, which evaluates no arguments while it is null, and `suspend()` reads `Scope::$tracer`
   before the park and after cleanup. An observer attached during a wait sees its resumption, with the scope id
-  assigned by the tracer that is active then. A tool releases pending resources through `Trace\onDetach()` when
-  the last observation using that dispatcher ends.
+  assigned by the tracer that is active then. `Trace\ObserverDetached` goes to the dispatcher whose last observation
+  ended. It has no scope and is separate from the scope events in `Trace\Event`.
   A hook goes where the outcome is decided (the task callback of `GroupImpl::start()`, after `join()`, `Expired::run()`,
   `shield()`), never into `Scope::run()` or `ContinuationImpl`. `ScopeCancelled` is emitted after `notify()`, so the
   listener never runs in the middle of the walk, and the tracer finds the scopes it reached by `$isCancelled`

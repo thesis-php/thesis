@@ -69,6 +69,30 @@ final class LongWaitDetectorTest
         Assert::same($reports, []);
     }
 
+    public function detachingOneDispatcherKeepsTheOtherWatchdog(): void
+    {
+        $detector = new LongWaitDetector(sec(2));
+        $reports = [];
+        $listener = static function (LongWait $event, Dispatcher $dispatcher) use (&$reports) {
+            if (str_starts_with($event->what, "task 'waiting'")) {
+                $reports[] = $dispatcher;
+            }
+        };
+        $outer = new Dispatcher([$detector, $listener]);
+        $inner = new Dispatcher([$detector, $listener]);
+        group(static fn(Group $group) => observe($outer, static function () use ($outer, $inner, $group) {
+            $task = observe($inner, static fn() => observe($outer, static function () use ($group) {
+                $task = $group->spawn(static fn() => delay(sec(4)), name: 'waiting');
+                delay(sec(1));
+
+                return $task;
+            }));
+            $task->await();
+        }));
+
+        Assert::same($reports, [$outer]);
+    }
+
     public function reportsWaitLongerThanThresholdWhileItWaits(): void
     {
         $line = __LINE__ + 2;

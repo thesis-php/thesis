@@ -56,26 +56,18 @@ final class TraceTest
         Assert::contains($resumed, $finished);
     }
 
-    public function cleanupBelongsToLastObservationOfDispatcher(): void
+    public function onlyTheLastObservationDispatchesObserverDetached(): void
     {
-        $dispatcher = new Dispatcher();
         $events = [];
-        $cleanup = static function () use (&$events) {
-            $events[] = 'detached';
-        };
-        Trace\onDetach($dispatcher, $cleanup);
-        observe($dispatcher, static function () use ($dispatcher, $cleanup, &$events) {
-            observe($dispatcher, static function () use ($dispatcher, $cleanup) {
-                Trace\onDetach($dispatcher, $cleanup);
-                $unsubscribe = Trace\onDetach($dispatcher, $cleanup);
-                $unsubscribe();
-                $unsubscribe();
-            });
+        $dispatcher = new Dispatcher([static function (object $event) use (&$events) {
+            $events[] = $event::class;
+        }]);
+        observe($dispatcher, static function () use ($dispatcher, &$events) {
+            observe($dispatcher, static fn() => null);
             $events[] = 'inner returned';
         });
-        observe($dispatcher, static fn() => null);
 
-        Assert::same($events, ['inner returned', 'detached']);
+        Assert::same($events, ['inner returned', Trace\ObserverDetached::class]);
     }
 
     public function tracesTaskFromCreationToResult(): void

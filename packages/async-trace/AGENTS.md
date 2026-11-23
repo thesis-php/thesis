@@ -108,7 +108,7 @@ lives here. The format is described in `README.md`.
   it is dropped, not reported with a wrong end.
 - `LongWaitDetector` reports from a timer of the event loop: a hang brings no event. A `watchdog()` per wait
   not reported yet per dispatcher and scope, armed in the loop of that wait and cancelled when it resumes or the
-  last observation of the dispatcher ends. Duplicate deliveries share that timer, so nothing is left
+  dispatcher receives `ObserverDetached`. Duplicate deliveries share one timer, so nothing is left
   in the loop after `observe()`. Not one timer for all: a nested loop (`virtualTime()` in a task) runs on a clock
   of its own and blocks the outer one, whose timer would neither fire nor measure the inner waits.
   The timers of the loop never fire early, so a due timer reports without checking again. A wait that ends exactly
