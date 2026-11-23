@@ -22,7 +22,7 @@ final class FixedLengthReader implements SizedReader
     /**
      * @var non-negative-int
      */
-    private int $remaining;
+    public private(set) int $remaining;
 
     private bool $isReading = false;
 

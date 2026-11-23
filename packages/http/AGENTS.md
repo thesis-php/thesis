@@ -1,8 +1,8 @@
 # thesis/http
 
 Clients and servers share `Request`, `Response` and `Headers`. The `Http1\` codec reads and writes heads
-and handles fixed-length and chunked bodies. The planned `http-server` and `http-client` packages manage connections, fibers
-and timeouts. Read `README.md` for the API and `ideas/http.md` for planned work.
+and handles fixed-length and chunked bodies. The server owns connections, fibers and timeouts in `thesis/http-server`.
+Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 
 ## Invariants that must not be broken
 
@@ -23,8 +23,9 @@ and timeouts. Read `README.md` for the API and `ideas/http.md` for planned work.
   wherever they leave the class, and a test covers it.
 - A message clone shares the reader and its position unless the clone supplies a new reader.
   Pass an unread reader to the sender. A short body requires closing the connection before another head is written.
-- Trailer access reads the current reader state without I/O or suspension. `null` means the fields are
+- The `$trailers` property reads the current reader state without I/O or suspension. `null` means the fields are
   unavailable. An empty `Headers` value means the message has no trailers.
+  `discardBodyAndReadTrailers()` reads to EOF even if the trailer fields are already known.
 
 ### The codec
 
@@ -92,7 +93,7 @@ and timeouts. Read `README.md` for the API and `ideas/http.md` for planned work.
 - `Headers` stores names in lowercase (HTTP/2 requires it). The HTTP/1.1 codec writes them as `Content-Type`
   (`ucwords()` by hyphens): lowercase names are valid, but some peers compare names case-sensitively.
   So `ETag` is written as `Etag`, as Go does.
-- `Request` and `Response` expose a `Reader` and a separate `$trailers` property beside `$headers`.
+- `Request` and `Response` expose a `Reader` through `$body` and a separate `$trailers` property beside `$headers`.
   A message constructed without a reader gets its own empty `StringReader`. The wire codec enforces body boundaries.
 - Rejected: a separate HTTP `Body` wrapper. `Reader` carries the bytes, and the HTTP/1 codec already knows
   which reader enforces the message boundary.

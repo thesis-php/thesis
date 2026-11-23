@@ -38,7 +38,7 @@ $request = new Request(
     method: Method::POST,
     uri: new Uri('https://example.com/users?notify=1'),
     headers: new Headers(['content-type' => 'application/json']),
-    reader: new StringReader('{"name": "Alice"}'),
+    body: new StringReader('{"name": "Alice"}'),
 );
 
 $response = new Response(status: Status::CREATED, headers: new Headers(['location' => '/users/42']));
@@ -54,12 +54,12 @@ This package requires 64-bit PHP 8.6+ and needs no additional PHP extensions.
 
 ## Messages
 
-`Request` has a `$method` and a `$uri`, and `Response` has a `$status`. Both have `$headers`, a `$reader`
-for the body and optional `$trailers`. To change a message, make a copy with `clone()`:
+`Request` has a `$method` and a `$uri`, and `Response` has a `$status`. Both expose `$headers`, the body stream
+through `$body`, and optional `$trailers`. To change a message, make a copy with `clone()`:
 
 ```php
 $forwarded = clone($request, ['uri' => $request->uri->withHost('backend.internal')]);
-$notFound = clone($response, ['status' => Status::NOT_FOUND, 'reader' => new StringReader('Not found.')]);
+$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new StringReader('Not found.')]);
 ```
 
 The copy shares the reader with the original unless it supplies a new one. Reading from a shared reader
@@ -135,7 +135,7 @@ use Thesis\Io\UnexpectedEof;
 
 try {
     while (true) {
-        echo $request->reader->read(8192);
+        echo $request->body->read(8192);
     }
 } catch (UnexpectedEof) {
     // The end of the body.
@@ -146,6 +146,12 @@ The `$trailers` property contains ready fields, or `null` while the fields are u
 `Headers` means there are no trailers. The `trailers:` constructor argument accepts a `Headers` object,
 `null` or a callback that takes the current reader and returns its trailer state. The callback reads state
 without doing I/O or suspending the fiber. It can be called before and after the body is read.
+
+Use `$request->discardBodyAndReadTrailers()` or `$response->discardBodyAndReadTrailers()` when you only need the
+trailers. The method reads from the body's current position to EOF in bounded chunks, even when the trailers are
+already available. Reads may suspend and use the same limits and timeouts as reading the body yourself.
+An empty `Headers` means there are no trailers. Read errors propagate. If a custom trailer source still returns
+`null` at EOF, the method throws `LogicException`.
 
 ## HTTP/1.1
 
@@ -178,7 +184,7 @@ $requestHead->framing;      // Framing::Length
 $requestHead->length;       // 17
 $requestHead->isPersistent; // true: the connection stays open for the next request
 
-$response = new Response(status: Status::CREATED, reader: new StringReader('created'));
+$response = new Response(status: Status::CREATED, body: new StringReader('created'));
 $responseHead = ResponseHead::of($response, $requestHead);
 
 $connection->write($responseHead->toString());
@@ -249,14 +255,14 @@ $chunked = new ChunkedReader($buffer, $connection);
 $response = new Response(
     status: $responseHead->status,
     headers: $responseHead->headers,
-    reader: $chunked,
+    body: $chunked,
     trailers: static fn(Reader $reader) => $reader instanceof ChunkedReader ? $reader->trailers : null,
 );
 
 // A proxy can forward the decoded payload and then the trailer section.
 try {
     while (true) {
-        $downstream->write(encodeChunk($response->reader->read(8192)));
+        $downstream->write(encodeChunk($response->body->read(8192)));
     }
 } catch (\Thesis\Io\UnexpectedEof) {
     $trailers = $response->trailers ?? throw new \LogicException('The response trailers are unavailable.');

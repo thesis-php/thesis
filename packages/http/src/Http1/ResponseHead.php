@@ -111,7 +111,7 @@ final readonly class ResponseHead
         array $upgrade = [],
     ): self {
         Fields::assertUpgrade($upgrade);
-        $length = $response->reader instanceof SizedReader ? $response->reader->size : null;
+        $length = $response->body instanceof SizedReader ? $response->body->size : null;
         $hasTrailers = Fields::hasTrailers($response->headers, $response->trailers);
 
         if (self::hasBody($request->method, $response->status)) {

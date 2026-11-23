@@ -263,7 +263,7 @@ final class ResponseHeadTest
         $head = ResponseHead::of(
             response: new Response(
                 headers: new Headers(['content-type' => 'text/plain']),
-                reader: new StringReader('hello'),
+                body: new StringReader('hello'),
             ),
             request: requestHead('GET / HTTP/1.1'),
         );
@@ -301,7 +301,7 @@ final class ResponseHeadTest
     public function writesBodyOfUnknownLengthInChunks(): void
     {
         $head = ResponseHead::of(
-            response: new Response(reader: new ScriptedReader('abc')),
+            response: new Response(body: new ScriptedReader('abc')),
             request: requestHead('GET / HTTP/1.1'),
         );
 
@@ -314,7 +314,7 @@ final class ResponseHeadTest
     public function endsBodyOfUnknownLengthWithConnectionForHttp10(): void
     {
         $head = ResponseHead::of(
-            response: new Response(reader: new ScriptedReader('abc')),
+            response: new Response(body: new ScriptedReader('abc')),
             request: requestHead('GET / HTTP/1.0', 'Connection: keep-alive'),
         );
 
@@ -360,7 +360,7 @@ final class ResponseHeadTest
         string $bytes,
     ): void {
         $head = ResponseHead::of(
-            response: new Response(reader: new StringReader('a')),
+            response: new Response(body: new StringReader('a')),
             request: requestHead(...$requestLines),
             isPersistent: $serverKeeps,
         );
@@ -524,32 +524,32 @@ final class ResponseHeadTest
         ];
         yield 'HEAD with body' => [
             'HEAD / HTTP/1.1',
-            new Response(reader: new StringReader('hello')),
+            new Response(body: new StringReader('hello')),
             'A 200 response to HEAD must have no body, got a body of 5 bytes.',
         ];
         yield 'HEAD with body of unknown length' => [
             'HEAD / HTTP/1.1',
-            new Response(reader: $stream),
+            new Response(body: $stream),
             'A 200 response to HEAD must have no body, got a body of an unknown length.',
         ];
         yield '204 with body' => [
             $get,
-            new Response(204, reader: new StringReader('a')),
+            new Response(204, body: new StringReader('a')),
             'A 204 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield '304 with body' => [
             $get,
-            new Response(304, reader: new StringReader('a')),
+            new Response(304, body: new StringReader('a')),
             'A 304 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield '199 with body' => [
             $get,
-            new Response(199, reader: new StringReader('a')),
+            new Response(199, body: new StringReader('a')),
             'A 199 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield 'CONNECT 299 with body' => [
             'CONNECT example.com:443 HTTP/1.1',
-            new Response(299, reader: new StringReader('a')),
+            new Response(299, body: new StringReader('a')),
             'A 299 response to CONNECT must have no body, got a body of 1 bytes.',
         ];
     }
@@ -557,7 +557,7 @@ final class ResponseHeadTest
     public function writesBodyOfRefusedConnect(): void
     {
         $head = ResponseHead::of(
-            response: new Response(300, reader: new StringReader('a')),
+            response: new Response(300, body: new StringReader('a')),
             request: requestHead('CONNECT example.com:443 HTTP/1.1'),
         );
 

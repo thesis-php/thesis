@@ -104,7 +104,7 @@ final class RequestHeadFormatTest
     #[DataProvider('bodies')]
     public function framesBodyByItsLength(string $method, Reader $reader, Framing $framing, ?string $field): void
     {
-        $head = RequestHead::of(new Request($method, new Uri('http://example.com/'), reader: $reader));
+        $head = RequestHead::of(new Request($method, new Uri('http://example.com/'), body: $reader));
 
         Assert::same($head->framing, $framing);
         Assert::same($head->length, $reader instanceof SizedReader ? $reader->size : null);
@@ -151,7 +151,7 @@ final class RequestHeadFormatTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            reader: new StringReader('abc'),
+            body: new StringReader('abc'),
             trailers: new Headers(['x-count' => '1']),
         );
 
@@ -197,7 +197,7 @@ final class RequestHeadFormatTest
                 method: 'POST',
                 uri: new Uri('http://example.com/'),
                 headers: new Headers(['content-type' => 'text/plain']),
-                reader: new StringReader('abc'),
+                body: new StringReader('abc'),
             ),
             isPersistent: false,
             upgrade: ['websocket'],
@@ -291,7 +291,7 @@ final class RequestHeadFormatTest
             method: 'PUT',
             uri: new Uri('https://example.com:8443/files/a%20b?overwrite=1'),
             headers: new Headers(['content-type' => 'text/plain', 'accept' => ['a/b', 'c/d']]),
-            reader: new StringReader('hello'),
+            body: new StringReader('hello'),
         );
         $written = RequestHead::of($request, isPersistent: false, upgrade: ['h2c']);
 

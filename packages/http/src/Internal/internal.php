@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal;
 
+use Thesis\Http\Headers;
+use Thesis\Http\Request;
+use Thesis\Http\Response;
+use Thesis\Io\UnexpectedEof;
+
 /**
  * The characters allowed in a token (RFC 9110). A method and a field name are tokens.
  *
@@ -56,4 +61,18 @@ function quote(string $bytes): string
     }
 
     return '"' . addcslashes($bytes, "\0..\37\"\\\177..\377") . '"';
+}
+
+/**
+ * @internal
+ */
+function discardBodyAndReadTrailers(Request|Response $message): Headers
+{
+    while (true) {
+        try {
+            $message->body->read(8192);
+        } catch (UnexpectedEof) {
+            return $message->trailers ?? throw new \LogicException('Trailers are unavailable after the body ended.');
+        }
+    }
 }

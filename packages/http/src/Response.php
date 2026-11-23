@@ -6,6 +6,7 @@ namespace Thesis\Http;
 
 use Thesis\Io\Reader;
 use Thesis\Io\StringReader;
+use function Thesis\Http\Internal\discardBodyAndReadTrailers;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this response type. The response holds a status,
@@ -30,7 +31,7 @@ final class Response
      * A copy can replace the trailer fields with `clone()`.
      */
     public ?Headers $trailers {
-        get => ($this->trailersLoader)($this->reader);
+        get => ($this->trailersLoader)($this->body);
         /** @param null|Headers|(callable(Reader): ?Headers) $value */
         set(Headers|callable|null $value) {
             // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() lets the hook reinitialize this field)
@@ -46,10 +47,20 @@ final class Response
     public function __construct(
         public public(set) readonly int $status = Status::OK,
         public public(set) readonly Headers $headers = new Headers(),
-        public public(set) readonly Reader $reader = new StringReader(''),
+        public public(set) readonly Reader $body = new StringReader(''),
         null|Headers|callable $trailers = new Headers(),
     ) {
         $this->trailersLoader = self::normalizeTrailers($trailers);
+    }
+
+    /**
+     * Reads and discards the remaining body bytes, then returns the trailers. May suspend during a read.
+     *
+     * @throws \LogicException if the trailer source still reports pending fields at the end of the body
+     */
+    public function discardBodyAndReadTrailers(): Headers
+    {
+        return discardBodyAndReadTrailers($this);
     }
 
     /**

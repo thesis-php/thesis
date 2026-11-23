@@ -248,14 +248,14 @@ final class ChunkedTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            reader: $chunked,
+            body: $chunked,
             trailers: static fn(Reader $reader) => $reader instanceof ChunkedReader ? $reader->trailers : null,
         );
 
         Assert::null($request->trailers);
-        Assert::same($request->reader->read(3), 'abc');
+        Assert::same($request->body->read(3), 'abc');
         Assert::null($request->trailers);
-        Assert::same(readAll($request->reader), '');
+        Assert::same(readAll($request->body), '');
 
         Assert::same($request->trailers, $chunked->trailers);
         Assert::same($chunked->trailers?->get('x-checksum'), '900150983cd24fb0');

@@ -153,7 +153,7 @@ final readonly class RequestHead
             throw new \ValueError('The header "host" is written by the codec from the URI of a request.');
         }
 
-        $length = $request->reader instanceof SizedReader ? $request->reader->size : null;
+        $length = $request->body instanceof SizedReader ? $request->body->size : null;
         $framing = match (true) {
             $length === null || Fields::hasTrailers($request->headers, $request->trailers) => Framing::Chunked,
             // POST, PUT and PATCH are expected to have content, so an empty body is sent as Content-Length: 0.
