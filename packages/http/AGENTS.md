@@ -84,6 +84,7 @@ and timeouts. Read `README.md` for the API and `ideas/http.md` for planned work.
   from the getters, never from `toRawString()`.
 - A method is a string and a status is an int, so callers can use custom values such as `PURGE` and 299.
   `Method` and `Status` give these values names such as `Method::GET` and `Status::OK`.
+  HTTP/1 writes the phrase from `Status::reasonPhrase()`, or an empty phrase when the lookup returns null.
   Rejected: a list of all the methods (`METHODS`). It invites a check with `in_array()`, which refuses valid methods.
 - `Headers::get()` joins the lines with a comma, as RFC 9110 defines. Rejected: returning the first line
   (`Header.Get` in Go), which silently ignores a second `X-Forwarded-For` or `Authorization` line.

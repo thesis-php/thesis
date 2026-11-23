@@ -65,8 +65,9 @@ $notFound = clone($response, ['status' => Status::NOT_FOUND, 'reader' => new Str
 The copy shares the reader with the original unless it supplies a new one. Reading from a shared reader
 advances the position for both messages.
 
-The HTTP/1 codec handles the version and the fields that control the connection. On output it chooses
-the reason phrase from the response status. `RequestHead::of()` and `ResponseHead::of()` reject `Transfer-Encoding`, `Connection`,
+The HTTP/1 codec handles the version and the fields that control the connection. On output it uses
+`Status::reasonPhrase($code)`, which returns `null` for unknown codes. The codec writes an empty phrase for those codes.
+`RequestHead::of()` and `ResponseHead::of()` reject `Transfer-Encoding`, `Connection`,
 `Keep-Alive` and `Upgrade` in message headers. The codec derives the request's `Host` from `$uri`.
 For a fixed-length body, the codec derives `Content-Length` from the reader's size. A response to
 `HEAD` or a 304 response can instead carry the length the representation would have had.

@@ -57,5 +57,59 @@ final class Status
     public const int GATEWAY_TIMEOUT = 504;
     public const int HTTP_VERSION_NOT_SUPPORTED = 505;
 
+    /**
+     * @return non-empty-string|null the standard phrase, or null for a code without a named constant
+     */
+    public static function reasonPhrase(int $code): ?string
+    {
+        return match ($code) {
+            self::CONTINUE => 'Continue',
+            self::SWITCHING_PROTOCOLS => 'Switching Protocols',
+            self::EARLY_HINTS => 'Early Hints',
+            self::OK => 'OK',
+            self::CREATED => 'Created',
+            self::ACCEPTED => 'Accepted',
+            self::NO_CONTENT => 'No Content',
+            self::PARTIAL_CONTENT => 'Partial Content',
+            self::MOVED_PERMANENTLY => 'Moved Permanently',
+            self::FOUND => 'Found',
+            self::SEE_OTHER => 'See Other',
+            self::NOT_MODIFIED => 'Not Modified',
+            self::TEMPORARY_REDIRECT => 'Temporary Redirect',
+            self::PERMANENT_REDIRECT => 'Permanent Redirect',
+            self::BAD_REQUEST => 'Bad Request',
+            self::UNAUTHORIZED => 'Unauthorized',
+            self::FORBIDDEN => 'Forbidden',
+            self::NOT_FOUND => 'Not Found',
+            self::METHOD_NOT_ALLOWED => 'Method Not Allowed',
+            self::NOT_ACCEPTABLE => 'Not Acceptable',
+            self::REQUEST_TIMEOUT => 'Request Timeout',
+            self::CONFLICT => 'Conflict',
+            self::GONE => 'Gone',
+            self::LENGTH_REQUIRED => 'Length Required',
+            self::PRECONDITION_FAILED => 'Precondition Failed',
+            self::CONTENT_TOO_LARGE => 'Content Too Large',
+            self::URI_TOO_LONG => 'URI Too Long',
+            self::UNSUPPORTED_MEDIA_TYPE => 'Unsupported Media Type',
+            self::RANGE_NOT_SATISFIABLE => 'Range Not Satisfiable',
+            self::EXPECTATION_FAILED => 'Expectation Failed',
+            self::MISDIRECTED_REQUEST => 'Misdirected Request',
+            self::UNPROCESSABLE_CONTENT => 'Unprocessable Content',
+            self::TOO_EARLY => 'Too Early',
+            self::UPGRADE_REQUIRED => 'Upgrade Required',
+            self::PRECONDITION_REQUIRED => 'Precondition Required',
+            self::TOO_MANY_REQUESTS => 'Too Many Requests',
+            self::REQUEST_HEADER_FIELDS_TOO_LARGE => 'Request Header Fields Too Large',
+            self::UNAVAILABLE_FOR_LEGAL_REASONS => 'Unavailable For Legal Reasons',
+            self::INTERNAL_SERVER_ERROR => 'Internal Server Error',
+            self::NOT_IMPLEMENTED => 'Not Implemented',
+            self::BAD_GATEWAY => 'Bad Gateway',
+            self::SERVICE_UNAVAILABLE => 'Service Unavailable',
+            self::GATEWAY_TIMEOUT => 'Gateway Timeout',
+            self::HTTP_VERSION_NOT_SUPPORTED => 'HTTP Version Not Supported',
+            default => null,
+        };
+    }
+
     private function __construct() {}
 }
