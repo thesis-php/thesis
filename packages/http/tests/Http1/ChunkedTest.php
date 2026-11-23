@@ -121,9 +121,7 @@ final class ChunkedTest
             actual: [$chunked->read(3), $chunked->read(3), $chunked->read(4), $chunked->read(100)],
             expected: ['hel', 'lo', ' wor', 'ld'],
         );
-        Expect::exception(UnexpectedEof::class);
-
-        $chunked->read(1);
+        Assert::null($chunked->read(1));
     }
 
     public function decodesWhatItHasEncoded(): void
@@ -213,11 +211,7 @@ final class ChunkedTest
         readAll($chunked);
         $requests = \count($reader->requests);
 
-        try {
-            $chunked->read(1);
-            Assert::fail('The body has ended.');
-        } catch (UnexpectedEof) {
-        }
+        Assert::null($chunked->read(1));
 
         Assert::same(\count($reader->requests), $requests);
         Assert::same($requests, \strlen(self::HELLO_WORLD));
@@ -272,12 +266,16 @@ final class ChunkedTest
 
         while (true) {
             try {
-                $decoded .= $chunked->read(3);
+                $chunk = $chunked->read(3);
+                if ($chunk === null) {
+                    break;
+                }
+
+                $decoded .= $chunk;
             } catch (ReadFailed $failed) {
                 Assert::same($failed->getMessage(), 'Reset.');
                 ++$failures;
-            } catch (UnexpectedEof) {
-                break;
+
             }
         }
 

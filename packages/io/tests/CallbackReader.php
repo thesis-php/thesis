@@ -22,7 +22,7 @@ final class CallbackReader implements Reader
         private readonly int $chunkSize = 1,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->reading) {
             throw new ConcurrentRead('A read is already in progress on the reader.');
@@ -42,7 +42,7 @@ final class CallbackReader implements Reader
         }
 
         if ($this->data === '') {
-            throw new UnexpectedEof();
+            return null;
         }
 
         /** @var non-empty-string $bytes */

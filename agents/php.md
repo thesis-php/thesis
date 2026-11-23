@@ -116,6 +116,9 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 
 ### Exceptions
 
+- Prefer return values for expected outcomes, especially in a hot path. Creating an exception in PHP captures
+  a stack trace, and that cost grows with call depth. For example, reaching the end of a stream is normal
+  when reading until EOF. Reaching it before a promised number of bytes has arrived is a failure.
 - Put `@throws` on the declaration that owns the contract. Name the failure a caller can handle and the
   condition or call that raises it (`if close() was called on this reader`, `if $reader->read() fails`).
   For an error passed through from a callback, say whose error the caller gets.

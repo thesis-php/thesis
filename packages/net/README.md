@@ -73,11 +73,12 @@ and Nagle would hold back the last packet of every request.
 ### Reading and writing
 
 - `read(int $max)` returns the bytes that have arrived, 1 to `$max`, and waits only if there are none.
-  It throws `UnexpectedEof` once the peer closes the connection or shuts down writes and all received bytes have
+  It returns `null` once the peer closes the connection or shuts down writes and all received bytes have
   been read. A read error such as a connection reset or a TLS error throws `ReadFailed`. Calling `close()` on the
   socket makes pending and subsequent reads throw `SocketClosed`. A cancelled read consumes no bytes.
   A peer that sends without a pause does not starve the process: after a few reads that found bytes at once,
   `read()` lets the other tasks run for a tick.
+- `tryRead(int $max)` returns `null` when no bytes are ready and throws `UnexpectedEof` at EOF.
 - `write(string $bytes)` returns once every byte is handed to the OS. Any number of fibers may write: writes go
   one after another, never interleaved, so a frame written by one call stays whole.
   A write cancelled before it has sent anything leaves the socket as it was; a write cancelled or failed half-way

@@ -21,12 +21,12 @@ final class StringReader implements SizedReader
         $this->size = \strlen($bytes);
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         $bytes = substr($this->bytes, $this->offset, $max);
 
         if ($bytes === '') {
-            throw new UnexpectedEof('Unexpected end of string.');
+            return null;
         }
 
         $this->offset += \strlen($bytes);

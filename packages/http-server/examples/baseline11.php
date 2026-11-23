@@ -12,7 +12,6 @@ use Thesis\HttpServer\Config;
 use Thesis\HttpServer\Server;
 use Thesis\HttpServer\TcpEndpoint;
 use Thesis\Io\StringReader;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Net\InetAddress;
 use function Thesis\Async\awaitSignal;
 use function Thesis\Async\group;
@@ -40,12 +39,8 @@ $server = new Server(
         if ($request->method === Method::POST) {
             $body = '';
 
-            while (true) {
-                try {
-                    $body .= $request->body->read(8192);
-                } catch (UnexpectedEof) {
-                    break;
-                }
+            while (($chunk = $request->body->read(8192)) !== null) {
+                $body .= $chunk;
             }
 
             if (!is_numeric($body)) {

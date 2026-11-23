@@ -15,7 +15,6 @@ use Thesis\Http\Response;
 use Thesis\Io\Buffer;
 use Thesis\Io\StreamClosed;
 use Thesis\Io\StringReader;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Net\InetAddress;
 use Time\Duration;
 use Uri\Rfc3986\Uri;
@@ -82,12 +81,8 @@ final class ClientTest
                     $peer->write($wire);
                 }
 
-                try {
-                    $peer->read(1);
-                    Assert::fail('Expected the client to honor Connection: close.');
-                } catch (UnexpectedEof) {
-                    $peer->close();
-                }
+                Assert::null($peer->read(1));
+                $peer->close();
 
                 $next = $listener->accept() ?? throw new \LogicException();
                 new Buffer()->fillUntil($next, "\r\n\r\n");
@@ -191,10 +186,7 @@ final class ClientTest
                 try {
                     new Buffer()->fillUntil($peer, "\r\n\r\n");
                     $peer->write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n");
-                    $peer->read(1);
-                    Assert::fail('Expected the client to close the connection.');
-                } catch (UnexpectedEof) {
-                    // The callback abandoned the body.
+                    Assert::null($peer->read(1));
                 } finally {
                     $peer->close();
                     $listener->close();
@@ -239,12 +231,7 @@ final class ClientTest
                     $sendBody->await();
                     $peer->write('x');
 
-                    try {
-                        $peer->read(1);
-                        Assert::fail('Expected the client to close the connection.');
-                    } catch (UnexpectedEof) {
-                        // The client released the unfinished body.
-                    }
+                    Assert::null($peer->read(1));
                 } finally {
                     $peer->close();
                     $listener->close();

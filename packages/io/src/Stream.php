@@ -89,7 +89,7 @@ final class Stream implements Reader, Writer, Closer
         $this->pacer = new Pacer(self::OPS_PER_TICK);
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->reading) {
             throw new ConcurrentRead('A read is already in progress on the stream.');
@@ -120,7 +120,7 @@ final class Stream implements Reader, Writer, Closer
                 }
 
                 if (feof($stream)) {
-                    throw new UnexpectedEof('Unexpected end of stream.');
+                    return null;
                 }
 
                 if (!$this->watcher->readable()) {

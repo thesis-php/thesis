@@ -7,7 +7,6 @@ namespace Thesis\Http\Internal;
 use Thesis\Http\Headers;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Thesis\Io\UnexpectedEof;
 
 /** @internal */
 const EMPTY_HEADERS = new Headers();
@@ -71,11 +70,7 @@ function quote(string $bytes): string
  */
 function discardBodyAndReadTrailers(Request|Response $message): Headers
 {
-    while (true) {
-        try {
-            $message->body->read(8192);
-        } catch (UnexpectedEof) {
-            return $message->trailers ?? throw new \LogicException('Trailers are unavailable after the body ended.');
-        }
-    }
+    while ($message->body->read(8192) !== null);
+
+    return $message->trailers ?? throw new \LogicException('Trailers are unavailable after the body ended.');
 }

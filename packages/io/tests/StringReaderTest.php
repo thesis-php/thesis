@@ -6,7 +6,6 @@ namespace Thesis\Io;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
-use Testo\Expect;
 use Testo\Test;
 
 #[Test]
@@ -20,9 +19,7 @@ final class StringReaderTest
         Assert::same($reader->read(3), "a\0\xC3");
         Assert::same($reader->size, 5);
         Assert::same($reader->read(PHP_INT_MAX), "\xA9z");
-        Expect::exception(UnexpectedEof::class);
-
-        $reader->read(1);
+        Assert::null($reader->read(1));
     }
 
     public function emptyStringIsAlreadyAtEnd(): void
@@ -30,8 +27,6 @@ final class StringReaderTest
         $reader = new StringReader('');
 
         Assert::same($reader->size, 0);
-        Expect::exception(UnexpectedEof::class);
-
-        $reader->read(1);
+        Assert::null($reader->read(1));
     }
 }

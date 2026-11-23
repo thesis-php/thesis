@@ -71,7 +71,7 @@ final class SocketTest
         $client->write(str_repeat('x', 100_000));
         delay(ms(10));
 
-        Assert::true(\strlen($server->read(65_536)) > 8192);
+        Assert::true(\strlen($server->read(65_536) ?? '') > 8192);
     }
 
     public function transfersLargePayloadsBothWaysAtOnce(): void
@@ -151,16 +151,14 @@ final class SocketTest
         Assert::true(\is_int($progress->readsWhenTicked) && $progress->readsWhenTicked < 1000);
     }
 
-    public function throwsUnexpectedEofOnceThePeerHasClosedAndEverythingIsRead(): void
+    public function returnsNullOnceThePeerHasClosedAndEverythingIsRead(): void
     {
         [$left, $right] = socketPair();
         $left->write('last');
         $left->close();
 
         Assert::same($right->read(100), 'last');
-        Expect::exception(UnexpectedEof::class)->withMessage('The peer has closed the connection.');
-
-        $right->read(100);
+        Assert::null($right->read(100));
     }
 
     public function throwsReadFailedOnReset(): void
@@ -389,8 +387,7 @@ final class SocketTest
         });
 
         Assert::true($received === $bytes);
-        Expect::exception(UnexpectedEof::class);
-        $right->read(1);
+        Assert::null($right->read(1));
     }
 
     public function closeWriteSendsTheEndAndKeepsReading(): void
@@ -401,7 +398,7 @@ final class SocketTest
 
         Assert::same(readExactly($server, 7), 'request');
 
-        Assert::instanceOf(thrown(static fn() => $server->read(1)), UnexpectedEof::class);
+        Assert::null($server->read(1));
         $server->write('response');
         Assert::same(readExactly($client, 8), 'response');
     }

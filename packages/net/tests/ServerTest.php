@@ -192,7 +192,7 @@ final class ServerTest
             $group->spawn(static function () use ($server) {
                 $socket = $server->accept();
                 \assert($socket !== null);
-                $socket->write($socket->read(10));
+                $socket->write($socket->read(10) ?? throw new \LogicException('Missing echo request.'));
             });
             $client = connectUnix($path);
             $client->write('ping');

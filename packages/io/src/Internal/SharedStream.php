@@ -12,7 +12,6 @@ use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StreamClosed;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
 
@@ -72,7 +71,7 @@ final class SharedStream implements Reader, Writer, Closer
         $this->writeMutex = new LocalMutex();
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->reading) {
             throw new ConcurrentRead('A read is already in progress on the stream.');
@@ -106,7 +105,7 @@ final class SharedStream implements Reader, Writer, Closer
                 }
 
                 if (feof($stream)) {
-                    throw new UnexpectedEof('Unexpected end of stream.');
+                    return null;
                 }
             }
         } finally {

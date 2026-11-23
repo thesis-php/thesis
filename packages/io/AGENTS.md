@@ -13,11 +13,11 @@ Read `README.md` for the API and design decisions.
   `chr()` instead of `pack()` for 1-2 bytes, `clone` in `slice()`) are measured: keep them and their comments.
   `slice()` is `clone $this` and assignments, not `clone($this, [...])`: the array of `clone()` makes it 33-43% slower.
 - Every read is O(1): the cursor advances, consumed bytes are discarded only in `fill()`.
-- A failed read throws `UnexpectedEof` and leaves the cursor where it was.
+- An exact buffer read past the end throws `UnexpectedEof` and leaves the cursor where it was.
 - Range checks of written values are `assert()` only, never a runtime `if`: they cost nothing in production.
 - `readUint64()` throws `\OverflowException` above `PHP_INT_MAX`, varints keep the raw 64-bit pattern.
 - Marks of `reserve()` are absolute positions, invalidated by `fill()`, `flush()` and `drain()`.
-- `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
+- `Reader::read()` returns 1 to `$max` bytes, returns `null` at the end and throws `ReadFailed` on a transport error
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
   on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
   `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.

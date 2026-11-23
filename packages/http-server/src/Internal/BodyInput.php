@@ -22,9 +22,13 @@ final readonly class BodyInput implements Reader
         private Duration $idleTimeout,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
-        return timeoutOr($this->idleTimeout, fn() => $this->input->read($max))
-            ?? throw new MalformedMessage('The request body did not arrive in time.', Status::REQUEST_TIMEOUT);
+        $bytes = timeoutOr($this->idleTimeout, fn() => $this->input->read($max), default: false);
+        if ($bytes === false) {
+            throw new MalformedMessage('The request body did not arrive in time.', Status::REQUEST_TIMEOUT);
+        }
+
+        return $bytes;
     }
 }

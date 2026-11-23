@@ -120,7 +120,7 @@ final class Socket implements Reader, Writer, Closer
      * Reads that find bytes every time still yield to the event loop now and then,
      * so a peer that never pauses does not starve the other tasks.
      */
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->reading) {
             throw new ConcurrentRead('A read is already in progress on the socket.');
@@ -134,7 +134,7 @@ final class Socket implements Reader, Writer, Closer
             while (true) {
                 $bytes = $this->readAvailable($max);
                 if ($bytes !== null) {
-                    return $bytes;
+                    return $bytes === '' ? null : $bytes;
                 }
 
                 if (!$this->watcher->readable()) {
@@ -162,7 +162,12 @@ final class Socket implements Reader, Writer, Closer
             throw new ConcurrentRead('A read is already in progress on the socket.');
         }
 
-        return $this->readAvailable($max);
+        $bytes = $this->readAvailable($max);
+        if ($bytes === '') {
+            throw new UnexpectedEof('The peer has closed the connection.');
+        }
+
+        return $bytes;
     }
 
     /**
@@ -366,7 +371,7 @@ final class Socket implements Reader, Writer, Closer
 
     /**
      * @param positive-int $max
-     * @return ?non-empty-string
+     * @return ?string null while waiting for bytes, an empty string at EOF
      */
     private function readAvailable(int $max): ?string
     {
@@ -386,11 +391,7 @@ final class Socket implements Reader, Writer, Closer
             throw new ReadFailed(lastError('The connection is broken: reset by the peer or timed out.'));
         }
 
-        if (feof($stream)) {
-            throw new UnexpectedEof('The peer has closed the connection.');
-        }
-
-        return null;
+        return feof($stream) ? '' : null;
     }
 
     private function beginWrite(): void

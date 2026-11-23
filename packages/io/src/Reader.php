@@ -23,13 +23,12 @@ interface Reader
      * Catch {@see IoException} to handle all I/O failures.
      *
      * @param positive-int $max
-     * @return non-empty-string
+     * @return ?non-empty-string null when the stream has ended
      * @throws ConcurrentRead if a read is already in progress on this reader
-     * @throws UnexpectedEof when the stream reaches its end and no bytes remain to be read
      * @throws ReadFailed on a read error such as a connection reset
      * @throws IoException if close() was called on this reader before the read or while the read was waiting.
      *         {@see Stream} throws {@see StreamClosed}. A thesis/net socket throws `SocketClosed`.
      * @throws Cancelled if the scope is cancelled at a suspension point during the read
      */
-    public function read(int $max): string;
+    public function read(int $max): ?string;
 }

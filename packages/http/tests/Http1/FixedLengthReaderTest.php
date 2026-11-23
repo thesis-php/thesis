@@ -12,7 +12,6 @@ use Thesis\Http\ScriptedReader;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\ReadFailed;
-use Thesis\Io\UnexpectedEof;
 use function Thesis\Http\readAll;
 
 #[Test]
@@ -55,13 +54,9 @@ final class FixedLengthReaderTest
     {
         $source = new ScriptedReader('next');
         $reader = new FixedLengthReader(new Buffer(), $source, size: 0);
-        Expect::exception(UnexpectedEof::class);
-
-        try {
-            $reader->read(1);
-        } finally {
-            Assert::same($source->requests, []);
-        }
+        Assert::null($reader->read(1));
+        Assert::null($reader->read(1));
+        Assert::same($source->requests, []);
     }
 
     public function anInterruptedReadLeavesTheSameBytesToRead(): void

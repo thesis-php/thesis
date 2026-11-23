@@ -37,14 +37,14 @@ final class FixedLengthReader implements SizedReader
         $this->remaining = $size;
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->isReading) {
             throw new ConcurrentRead('A read is already in progress on the body.');
         }
 
         if ($this->remaining === 0) {
-            throw new UnexpectedEof();
+            return null;
         }
 
         $length = min($max, $this->remaining);
@@ -53,15 +53,17 @@ final class FixedLengthReader implements SizedReader
 
         try {
             $bytes = $buffered > 0 ? $this->buffer->read(min($length, $buffered)) : $this->reader->read($length);
-        } catch (UnexpectedEof $eof) {
+        } finally {
+            $this->isReading = false;
+        }
+
+        if ($bytes === null) {
             $received = $this->size - $this->remaining;
 
             throw new ReadFailed(
                 message: \sprintf('The body has ended after %d of %d bytes.', $received, $this->size),
-                previous: $eof,
+                previous: new UnexpectedEof(),
             );
-        } finally {
-            $this->isReading = false;
         }
 
         /** @var non-negative-int $remaining a reader gives at most the bytes it is asked for */

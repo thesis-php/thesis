@@ -15,7 +15,6 @@ use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\HttpServer\Stub\TimedReader;
 use Thesis\Io\StringReader;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use Thesis\TestoPlugin\VirtualTime;
 use function Thesis\Time\sec;
@@ -163,12 +162,8 @@ final class ConnectionLimitsTest
                 handler: static function (Request $request) {
                     $body = '';
 
-                    while (true) {
-                        try {
-                            $body .= $request->body->read(2);
-                        } catch (UnexpectedEof) {
-                            break;
-                        }
+                    while (($chunk = $request->body->read(2)) !== null) {
+                        $body .= $chunk;
                     }
 
                     Assert::same($body, 'ab');

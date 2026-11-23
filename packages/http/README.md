@@ -131,14 +131,8 @@ For fixed-length framing, the sender counts the bytes
 written and closes the connection if the reader ends before the advertised length.
 
 ```php
-use Thesis\Io\UnexpectedEof;
-
-try {
-    while (true) {
-        echo $request->body->read(8192);
-    }
-} catch (UnexpectedEof) {
-    // The end of the body.
+while (($bytes = $request->body->read(8192)) !== null) {
+    echo $bytes;
 }
 ```
 
@@ -262,14 +256,11 @@ $response = new Response(
 );
 
 // A proxy can forward the decoded payload and then the trailer section.
-try {
-    while (true) {
-        $downstream->write(encodeChunk($response->body->read(8192)));
-    }
-} catch (\Thesis\Io\UnexpectedEof) {
-    $trailers = $response->trailers ?? throw new \LogicException('The response trailers are unavailable.');
-    $downstream->write(encodeLastChunk($trailers));
+while (($bytes = $response->body->read(8192)) !== null) {
+    $downstream->write(encodeChunk($bytes));
 }
+$trailers = $response->trailers ?? throw new \LogicException('The response trailers are unavailable.');
+$downstream->write(encodeLastChunk($trailers));
 ```
 
 Outgoing HTTP/1.1 messages use chunked framing if trailers are present, announced by `Trailer`,

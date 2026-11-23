@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Thesis\HttpServer\Stub;
 
 use Thesis\Io\Reader;
-use Thesis\Io\UnexpectedEof;
 use Time\Duration;
 use function Thesis\Async\delay;
 
@@ -18,9 +17,13 @@ final class TimedReader implements Reader
         private array $parts,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
-        [$wait, $bytes] = $this->parts[0] ?? throw new UnexpectedEof();
+        if ($this->parts === []) {
+            return null;
+        }
+
+        [$wait, $bytes] = $this->parts[0];
         if ($wait !== null) {
             delay($wait);
         }

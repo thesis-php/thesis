@@ -22,12 +22,12 @@ final class ChunkedReader implements Reader
         private readonly int $chunkSize = PHP_INT_MAX,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         $this->requests[] = $max;
 
         if ($this->data === '') {
-            throw new UnexpectedEof();
+            return null;
         }
 
         /** @var non-empty-string $bytes */

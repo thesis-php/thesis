@@ -19,7 +19,7 @@ final readonly class SizedBodyReader implements SizedReader
         public int $size,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         return $this->reader->read($max);
     }

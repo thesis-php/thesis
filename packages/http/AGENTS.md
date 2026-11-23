@@ -59,8 +59,7 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   (`ResponseHead::hasBody()`), never by the fields. Only a response without a body may have `content-length`
   as a header: the length the body would have (`HEAD`, 304). It follows the same decimal syntax on input
   and output. Status 1xx and 204 forbid the field even for `HEAD`.
-- A chunked body that is cut short fails with `ReadFailed`. `UnexpectedEof` from the connection must not reach
-  the caller: for the caller it means a clean end of the body.
+- A chunked body that is cut short fails with `ReadFailed`. Return `null` only after the last chunk and all trailers.
 - After a malformed chunk or trailer, every later read reports the failure. The decoder may have
   consumed the offending line, so retrying the parser could interpret the next line as a fresh chunk.
   Check the trailer count as each line arrives, even when the final empty line has not arrived.

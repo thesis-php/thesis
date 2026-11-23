@@ -21,10 +21,10 @@ final class FuzzReader implements Reader
         $this->random = new Randomizer(new Mt19937($seed));
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->data === '') {
-            throw new UnexpectedEof('Fuzz reader is exhausted.');
+            return null;
         }
 
         /** @var non-empty-string $bytes */

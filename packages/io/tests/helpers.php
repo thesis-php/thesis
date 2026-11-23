@@ -13,13 +13,11 @@ function readAll(Reader $reader): string
 {
     $bytes = '';
 
-    while (true) {
-        try {
-            $bytes .= $reader->read(65_536);
-        } catch (UnexpectedEof) {
-            return $bytes;
-        }
+    while (($chunk = $reader->read(65_536)) !== null) {
+        $bytes .= $chunk;
     }
+
+    return $bytes;
 }
 
 /**

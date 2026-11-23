@@ -14,7 +14,7 @@ final class PrefixedReader implements Reader
         private readonly Reader $reader,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->hasPrefix) {
             $this->hasPrefix = false;

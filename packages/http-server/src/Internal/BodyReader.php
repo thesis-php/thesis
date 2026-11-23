@@ -9,7 +9,6 @@ use Thesis\Http\Status;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\IoException;
 use Thesis\Io\Reader;
-use Thesis\Io\UnexpectedEof;
 
 /**
  * @internal
@@ -29,7 +28,7 @@ final class BodyReader implements Reader
         private ?ContinueResponse $continue = null,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->isReading) {
             throw new ConcurrentRead('A read is already in progress on the body.');
@@ -60,25 +59,29 @@ final class BodyReader implements Reader
 
     /**
      * @param positive-int $max
-     * @return non-empty-string
+     * @return ?non-empty-string
      */
-    private function readBody(int $max): string
+    private function readBody(int $max): ?string
     {
         try {
             if ($this->remaining === 0) {
                 // The decoder must still be able to consume a final chunk and its trailers at the limit.
-                $this->body->read(1);
+                if ($this->body->read(1) === null) {
+                    return null;
+                }
 
                 throw new MalformedMessage('The request body exceeds its byte limit.', Status::CONTENT_TOO_LARGE);
             }
 
             $bytes = $this->body->read(min($max, $this->remaining));
-        } catch (UnexpectedEof $eof) {
-            throw $eof;
         } catch (IoException $failure) {
             $this->failure = $failure;
 
             throw $failure;
+        }
+
+        if ($bytes === null) {
+            return null;
         }
 
         /** @var non-negative-int $remaining a reader gives at most the bytes it is asked for */

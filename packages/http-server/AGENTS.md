@@ -139,3 +139,16 @@
   the same idle deadline. A checkpoint with 4096 runnable fibers cost 1.60 µs in isolation, but
   the mixed Arena median fell from 48.9k to 44.0k replies/s across three pairs. Both versions passed
   the Baseline and fragmentation checks.
+- On the same one-vCPU mixed workload at `ab4b259`, throwing a preallocated `UnexpectedEof` on
+  normal completion of fixed-length and chunked HTTP bodies raised throughput in all three pairs
+  (median 49.5k to 58.3k replies/s, p99 101.8 to 87.3 ms). The handler still drained each body.
+  Keep this as a diagnostic: callers of a shared exception see its allocation site and the same
+  exception object across requests. Disabling exception trace arguments alone gave mixed results.
+- Returning null at normal EOF in the request body and reading until null in the handler raised the
+  mixed Arena median from 43.8k to 55.0k replies/s in three pairs. The stock runs varied from 28.3k
+  to 44.6k, the candidate from 51.6k to 58.6k. Both passed the validator. This measured the request
+  body path only, with the old transport and Reader contract.
+- With nullable reads throughout the packages, the mixed Arena median rose from 33.9k replies/s
+  at `ab4b259` to 46.4k, and median p99 fell from 272.8 to 159.4 ms. Five of six pairs gained
+  throughput. Both arms had about 22% relative standard deviation on the working Mac. All replies
+  were 2xx with no reconnects or errors, and both arms passed the Arena validators.

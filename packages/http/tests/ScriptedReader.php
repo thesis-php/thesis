@@ -8,7 +8,6 @@ use Thesis\Io\Closer;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
-use Thesis\Io\UnexpectedEof;
 
 /**
  * The reader returns its bytes at most $chunkSize per read. Records the size every read asked for and the number of
@@ -48,7 +47,7 @@ final class ScriptedReader implements Reader, Closer
         private readonly int $chunkSize = PHP_INT_MAX,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->isReading) {
             throw new ConcurrentRead('A read is already in progress on the reader.');
@@ -77,7 +76,7 @@ final class ScriptedReader implements Reader, Closer
         }
 
         if ($this->bytes === '') {
-            throw new UnexpectedEof();
+            return null;
         }
 
         /** @var non-empty-string $bytes */

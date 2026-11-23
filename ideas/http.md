@@ -100,7 +100,7 @@ Consider an `IterableReader` in `thesis/io` for generators and other iterables o
 a fresh iterable and reader.
 Amp's `ReadableIterableStream` can return a whole yielded string. Thesis promises at most `$max` bytes:
 keep the current string and offset, advance the iterable only when the next read needs another chunk,
-skip empty strings and signal exhaustion with `UnexpectedEof`. A read that throws must lose no bytes.
+skip empty strings and return `null` at EOF. A read that throws must lose no bytes.
 
 A streaming response of the server (SSE, a large file) is a `Response` whose body is a pipe, and the writer
 runs as a child task. Cancellation comes from the task tree: the client disconnected, the scope of the request

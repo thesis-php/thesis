@@ -17,7 +17,7 @@ final readonly class UntilCloseReader implements Reader
         private Reader $source,
     ) {}
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         $available = $this->buffer->count();
 

@@ -47,7 +47,7 @@ final class ConnectionTest
                     $this->source = new StringReader($wire);
                 }
 
-                public function read(int $max): string
+                public function read(int $max): ?string
                 {
                     $bytes = $this->source->read(min($max, max(1, $this->split)));
                     if ($this->split !== 0) {
@@ -226,7 +226,7 @@ final class ConnectionTest
                 $this->source = new StringReader('hello');
             }
 
-            public function read(int $max): string
+            public function read(int $max): ?string
             {
                 return $this->source->read($max);
             }

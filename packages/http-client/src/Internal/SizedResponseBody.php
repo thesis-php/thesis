@@ -25,7 +25,7 @@ final readonly class SizedResponseBody implements SizedReader, Closer
         $this->body->close();
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         return $this->body->read($max);
     }

@@ -6,6 +6,7 @@ namespace Thesis\Net;
 
 use Testo\Assert;
 use Thesis\Async\Group;
+use Thesis\Io\UnexpectedEof;
 use function Thesis\Async\group;
 
 /**
@@ -113,7 +114,7 @@ function readExactly(Socket $socket, int $length): string
     $bytes = '';
 
     while (($missing = $length - \strlen($bytes)) > 0) {
-        $bytes .= $socket->read($missing);
+        $bytes .= $socket->read($missing) ?? throw new UnexpectedEof();
     }
 
     return $bytes;

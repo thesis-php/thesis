@@ -14,7 +14,6 @@ use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;
 use Thesis\Io\StringReader;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
 use Thesis\Net\Certificate;
 use Thesis\Net\ClientTls;
@@ -101,8 +100,7 @@ final class ServerTest
                     "HTTP/1.1 204 No Content\r\nConnection: close",
                     $buffer->readUntil("\r\n\r\n"),
                 );
-                Expect::exception(UnexpectedEof::class);
-                $client->read(1);
+                Assert::null($client->read(1));
             } finally {
                 $server->close();
                 $client->close();
@@ -135,8 +133,7 @@ final class ServerTest
                 $entered->await();
                 $server->close();
 
-                Expect::exception(UnexpectedEof::class);
-                $client->read(1);
+                Assert::null($client->read(1));
             } finally {
                 $server->close();
                 $client->close();
@@ -225,8 +222,7 @@ final class ServerTest
                 Assert::same('HTTP/1.1 204 No Content', $buffer->readUntil("\r\n\r\n"));
 
                 $server->close();
-                Expect::exception(UnexpectedEof::class);
-                $client->read(1);
+                Assert::null($client->read(1));
             } finally {
                 $failed->close();
                 $server->close();

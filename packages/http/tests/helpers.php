@@ -9,7 +9,6 @@ use Thesis\Http\Http1\MalformedMessage;
 use Thesis\Http\Http1\RequestHead;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
-use Thesis\Io\UnexpectedEof;
 
 /**
  * `readAll()` reads the reader to its end, asking for at most $max bytes at a time.
@@ -20,13 +19,11 @@ function readAll(Reader $reader, int $max = 65_536): string
 {
     $bytes = '';
 
-    while (true) {
-        try {
-            $bytes .= $reader->read($max);
-        } catch (UnexpectedEof) {
-            return $bytes;
-        }
+    while (($chunk = $reader->read($max)) !== null) {
+        $bytes .= $chunk;
     }
+
+    return $bytes;
 }
 
 /**

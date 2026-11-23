@@ -100,21 +100,17 @@ final class StreamTest
         Assert::same($bytes, 'abcd');
     }
 
-    public function throwsOnEof(): void
+    public function returnsNullOnEof(): void
     {
         $stream = new Stream(self::open('php://memory', 'r'));
-        Expect::exception(UnexpectedEof::class)->withMessage('Unexpected end of stream.');
-
-        $stream->read(1);
+        Assert::null($stream->read(1));
     }
 
     public function doesNotReportUnrelatedErrorOnEof(): void
     {
         @trigger_error('unrelated', E_USER_WARNING);
         $stream = new Stream(self::open('php://memory', 'r'));
-        Expect::exception(UnexpectedEof::class)->withMessage('Unexpected end of stream.');
-
-        $stream->read(1);
+        Assert::null($stream->read(1));
     }
 
     public function readsMoreThanDefaultSocketChunk(): void
@@ -122,7 +118,7 @@ final class StreamTest
         [$out, $in] = self::pair();
         $out->write(str_repeat('x', 20_000));
 
-        Assert::same(\strlen($in->read(65_536)), 20_000);
+        Assert::same(\strlen($in->read(65_536) ?? ''), 20_000);
     }
 
     public function readWaitsForThePeer(): void
@@ -202,16 +198,14 @@ final class StreamTest
         Assert::same($right->read(100), 'kept');
     }
 
-    public function throwsUnexpectedEofOnceThePeerHasClosed(): void
+    public function returnsNullOnceThePeerHasClosed(): void
     {
         [$left, $right] = self::pair();
         $left->write('last');
         $left->close();
 
         Assert::same($right->read(100), 'last');
-        Expect::exception(UnexpectedEof::class)->withMessage('Unexpected end of stream.');
-
-        $right->read(100);
+        Assert::null($right->read(100));
     }
 
     public function closeEndsAWaitingRead(): void

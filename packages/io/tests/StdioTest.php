@@ -26,13 +26,9 @@ final class StdioTest
             require '{$autoload}';
             Thesis\\Async\\group(static function () {
                 \$in = Thesis\\Io\\stdin();
-                try {
-                    while (true) {
-                        \$bytes = \$in->read(65536);
-                        Thesis\\Io\\stdout()->write(strtoupper(\$bytes));
-                        Thesis\\Io\\stderr()->write((string) strlen(\$bytes) . "\\n");
-                    }
-                } catch (Thesis\\Io\\UnexpectedEof) {
+                while ((\$bytes = \$in->read(65536)) !== null) {
+                    Thesis\\Io\\stdout()->write(strtoupper(\$bytes));
+                    Thesis\\Io\\stderr()->write((string) strlen(\$bytes) . "\\n");
                 }
             });
             PHP;

@@ -94,11 +94,10 @@ final readonly class Client
         $remaining = $head->length;
 
         while ($head->framing !== Framing::None && ($remaining === null || $remaining > 0)) {
-            try {
-                $bytes = $request->body->read(min(8192, $remaining ?? 8192));
-            } catch (UnexpectedEof $eof) {
+            $bytes = $request->body->read(min(8192, $remaining ?? 8192));
+            if ($bytes === null) {
                 if ($remaining !== null) {
-                    throw new ReadFailed('The request body ended before its declared length.', previous: $eof);
+                    throw new ReadFailed('The request body ended before its declared length.');
                 }
 
                 break;

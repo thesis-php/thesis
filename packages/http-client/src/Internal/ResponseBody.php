@@ -9,7 +9,6 @@ use Thesis\Io\Closer;
 use Thesis\Io\IoException;
 use Thesis\Io\Reader;
 use Thesis\Io\StreamClosed;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Net\Socket;
 
 /**
@@ -47,7 +46,7 @@ final class ResponseBody implements Reader, Closer
         $this->abort();
     }
 
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->isClosed) {
             throw new StreamClosed('The response body is closed.');
@@ -58,15 +57,11 @@ final class ResponseBody implements Reader, Closer
         }
 
         if ($this->release === null) {
-            throw new UnexpectedEof();
+            return null;
         }
 
         try {
             $bytes = $this->reader->read($max);
-        } catch (UnexpectedEof $eof) {
-            $this->finish();
-
-            throw $eof;
         } catch (IoException $failure) {
             $this->failure = $failure;
             $this->abort();
@@ -74,7 +69,7 @@ final class ResponseBody implements Reader, Closer
             throw $failure;
         }
 
-        if ($this->reader instanceof FixedLengthReader && $this->reader->remaining === 0) {
+        if ($bytes === null || ($this->reader instanceof FixedLengthReader && $this->reader->remaining === 0)) {
             $this->finish();
         }
 

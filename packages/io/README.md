@@ -101,16 +101,25 @@ $buffer->readVarint();
 
 ### Streams
 
-`Reader::read(int $max)` returns from 1 to `$max` bytes. It throws `UnexpectedEof` at the end of the stream
-and `ReadFailed` on a read error such as a connection reset.
+`Reader::read(int $max)` returns from 1 to `$max` bytes. It returns `null` at the end of the stream
+and throws `ReadFailed` on a read error such as a connection reset.
 `Writer::write(string $bytes)` writes all the bytes. Both may suspend the fiber while they wait.
 A read that throws, `Cancelled` included, has taken nothing, so a `timeout()` around a read loses no bytes.
+
+To copy a stream until EOF, check each read before passing the bytes to the writer:
+
+```php
+while (($bytes = $reader->read(8192)) !== null) {
+    $writer->write($bytes);
+}
+```
 
 Different fibers may take turns reading from the same reader. A reader allows only one `read()` in progress.
 An overlapping call immediately throws `Thesis\Io\ConcurrentRead`. The pending read continues. On a duplex stream,
 writes may proceed during a read. Closing the reader makes a pending read throw an `IoException` such as `StreamClosed`.
 
-`Buffer` works with streams to provide exact reads and batched writes.
+`Buffer` works with streams to provide exact reads and batched writes. If the stream ends before the required bytes or delimiter
+arrive, `fill()` and `fillUntil()` throw `UnexpectedEof`.
 
 ```php
 use Thesis\Io\Buffer;

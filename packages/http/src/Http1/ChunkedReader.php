@@ -75,7 +75,7 @@ final class ChunkedReader implements Reader
     /**
      * Invalid chunk framing or trailers cause MalformedMessage on this and every later read.
      */
-    public function read(int $max): string
+    public function read(int $max): ?string
     {
         if ($this->isReading) {
             throw new ConcurrentRead('A read is already in progress on the body.');
@@ -100,21 +100,23 @@ final class ChunkedReader implements Reader
 
     /**
      * @param positive-int $max
-     * @return non-empty-string
+     * @return ?non-empty-string
      */
-    private function readChunk(int $max): string
+    private function readChunk(int $max): ?string
     {
         if ($this->remaining === 0) {
             $this->remaining = $this->nextChunk();
+            if ($this->remaining === 0) {
+                return null;
+            }
         }
 
         $length = min($max, $this->remaining);
         $buffered = $this->buffer->count();
 
-        try {
-            $bytes = $buffered > 0 ? $this->buffer->read(min($length, $buffered)) : $this->reader->read($length);
-        } catch (UnexpectedEof $eof) {
-            throw self::cutShort($eof);
+        $bytes = $buffered > 0 ? $this->buffer->read(min($length, $buffered)) : $this->reader->read($length);
+        if ($bytes === null) {
+            throw self::cutShort(new UnexpectedEof());
         }
 
         /** @var non-negative-int $remaining a reader gives at most the bytes it is asked for */
@@ -132,15 +134,14 @@ final class ChunkedReader implements Reader
     /**
      * Every step changes the state only when it is complete, so a cancelled read continues from the same step.
      *
-     * @return positive-int the size of the next chunk
-     * @throws UnexpectedEof after the last chunk and the trailers
+     * @return non-negative-int the size of the next chunk, zero after the trailers
      * @throws ReadFailed
      * @throws MalformedMessage
      */
     private function nextChunk(): int
     {
         if ($this->trailers !== null) {
-            throw new UnexpectedEof();
+            return 0;
         }
 
         if (!$this->isLastChunkRead) {
@@ -151,7 +152,7 @@ final class ChunkedReader implements Reader
                     $this->buffer->skip(7);
                     $this->trailers = EMPTY_HEADERS;
 
-                    throw new UnexpectedEof();
+                    return 0;
                 }
 
                 $this->readEndOfChunk();
@@ -171,7 +172,7 @@ final class ChunkedReader implements Reader
 
         $this->trailers = $this->readTrailers();
 
-        throw new UnexpectedEof();
+        return 0;
     }
 
     /**

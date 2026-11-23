@@ -682,7 +682,7 @@ final class Buffer implements \Countable
         $this->compact();
 
         do {
-            $this->bytes .= $reader->read(max($missing, $this->chunkSize));
+            $this->bytes .= $reader->read(max($missing, $this->chunkSize)) ?? throw new UnexpectedEof();
             // Counted again: another fiber may have read from the buffer while the read waited.
             $missing = $length - \strlen($this->bytes) + $this->offset;
         } while ($missing > 0);
@@ -734,7 +734,7 @@ final class Buffer implements \Countable
             $missing = $maxLength - $available;
             $searched = $this->bytes;
             $offset = $this->offset;
-            $bytes = $reader->read(min($this->chunkSize, $missing));
+            $bytes = $reader->read(min($this->chunkSize, $missing)) ?? throw new UnexpectedEof();
 
             // Another fiber may have changed the buffer while the read waited: then everything is searched again.
             // The string is compared by identity first, so it costs nothing while no one has touched it.

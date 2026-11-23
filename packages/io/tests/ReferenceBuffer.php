@@ -289,7 +289,7 @@ final class ReferenceBuffer
         while (\strlen($this->bytes) < $length) {
             /** @var positive-int $max */
             $max = max($length - \strlen($this->bytes), $this->chunkSize);
-            $this->bytes .= $reader->read($max);
+            $this->bytes .= $reader->read($max) ?? throw new UnexpectedEof();
         }
     }
 
@@ -316,7 +316,7 @@ final class ReferenceBuffer
 
             /** @var positive-int $max */
             $max = min($this->chunkSize, $maxLength - \strlen($this->bytes));
-            $this->bytes .= $reader->read($max);
+            $this->bytes .= $reader->read($max) ?? throw new UnexpectedEof();
         }
 
         throw new \OverflowException(\sprintf('Delimiter not found within %d bytes.', $maxLength));
