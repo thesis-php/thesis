@@ -40,6 +40,7 @@ use Thesis\Amqp\Internal\Protocol\TxCommitOk;
 use Thesis\Amqp\Internal\Protocol\TxSelect;
 use Thesis\Amqp\Internal\Protocol\TxSelectOk;
 use Thesis\Async\Group;
+use Thesis\Async\TimedOut;
 use Thesis\Io\Buffer;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\checkpoint;
@@ -658,6 +659,26 @@ final class ChannelTest
             $peer->send(0, new ConnectionUnblocked());
             $job->await();
             Assert::false($done);
+        });
+    }
+
+    public function closeCanResumeAnInterruptedDrain(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id, Client $client) {
+            $select = $group->spawn($channel->confirmSelect(...));
+            $peer->expect(ConfirmSelect::class);
+            $peer->send($id, new ConfirmSelectOk());
+            $select->await();
+            $publish = $group->spawn(static fn() => $channel->publish(new Message('m')));
+            $peer->expect(BasicPublish::class);
+            $peer->expectMessage();
+            $first = thrown(static fn() => timeout(ms(100), $client->close(...)));
+            Assert::instanceOf($first, TimedOut::class);
+            $peer->send($id, new BasicAck(1, false));
+            $publish->await();
+            $group->daemon($peer->acceptClose(...));
+            $client->close();
+            Assert::true($channel->isClosed);
         });
     }
 }

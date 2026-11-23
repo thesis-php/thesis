@@ -45,6 +45,8 @@ The API and the guarantees are in `README.md` — read it first.
   `close()` during a handshake terminates the connection it produces (`run()` and `reconnect()` check `closing`
   after `connect()`). One `Backoff` serves all reconnects and is reset only by a connection that has lived 30 s.
   Hosts are validated by `Config`, not when a reconnect in a daemon tries them.
+- Fail the waiters for the next connection when startup fails or the supervisor ends: no daemon is left to wake
+  them. A retry of an interrupted graceful close resumes the drain or awaits the close-ok already requested.
 - Whatever the server sends, a decoding failure leaves `Frames::decode()` only as `ProtocolError`: it turns
   `UnexpectedEof` and `\OverflowException` (a long-long of 2^63 and above, as `Buffer::readUint64()` throws)
   into `FrameError`. Any other exception would escape `run()` instead of closing the connection.

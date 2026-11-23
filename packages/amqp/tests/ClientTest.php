@@ -15,11 +15,14 @@ use Thesis\Amqp\Internal\Protocol\ConfirmSelectOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionClose;
 use Thesis\Amqp\Internal\Protocol\ConnectionCloseOk;
 use Thesis\Amqp\Internal\Protocol\ConnectionStart;
+use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Io\IoException;
 use Thesis\TestoPlugin\VirtualTime;
+use function Thesis\Async\checkpoint;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -297,5 +300,44 @@ final class ClientTest
 
             new Client($server->config())->run($group);
         });
+    }
+
+    public function failedFirstHandshakeAlsoFailsAWaitingChannel(): void
+    {
+        timeout(sec(3), static fn() => group(static function (Group $group) {
+            $server = FakeServer::listen();
+            $client = new Client($server->config());
+            $run = $group->spawn(static fn() => thrown(static fn() => $client->run($group)));
+            $peer = $server->accept();
+            $waiting = $group->spawn(static fn() => thrown(static fn() => timeout(ms(500), $client->channel(...))));
+            checkpoint();
+            $peer->socket->close();
+            Assert::instanceOf($run->await(), ConnectionFailed::class);
+            Assert::instanceOf($waiting->await(), ConnectionFailed::class);
+        }));
+    }
+
+    public function channelWaitDuringReconnectEndsWithTheOwnerGroup(): void
+    {
+        timeout(sec(3), static fn() => group(static function (Group $outer) {
+            /** @var Deferred<Client> $ready */
+            $ready = new Deferred();
+            /** @var Deferred<null> $exit */
+            $exit = new Deferred();
+            $owner = $outer->spawn(static fn() => group(static function (Group $inner) use ($ready, $exit) {
+                $server = FakeServer::listen();
+                [$client, $peer] = connect($inner, $server, $server->config(reconnect: true));
+                $peer->socket->close();
+                delay(ms(10));
+                $ready->complete($client);
+                $exit->await();
+            }));
+            $client = $ready->await();
+            $waiter = $outer->spawn(static fn() => thrown(static fn() => timeout(ms(500), $client->channel(...))));
+            checkpoint();
+            $exit->complete();
+            $owner->await();
+            Assert::instanceOf($waiter->await(), ConnectionClosed::class);
+        }));
     }
 }

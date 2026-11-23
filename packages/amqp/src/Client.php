@@ -6,12 +6,15 @@ namespace Thesis\Amqp;
 
 use Thesis\Amqp\Internal\Connection;
 use Thesis\Async\Backoff;
+use Thesis\Async\Cancelled;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
+use Thesis\Async\LocalMutex;
 use Thesis\Async\TimedOut;
 use Thesis\Io\IoException;
 use function Thesis\Amqp\Internal\address;
+use function Thesis\Async\synchronized;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Net\connect;
@@ -47,6 +50,8 @@ final class Client
 
     private bool $closing = false;
 
+    private readonly LocalMutex $closeMutex;
+
     private ?Connection $connection = null;
 
     /**
@@ -71,6 +76,7 @@ final class Client
     ) {
         $this->next = new Deferred();
         $this->stopped = new Deferred();
+        $this->closeMutex = new LocalMutex();
     }
 
     /**
@@ -94,6 +100,11 @@ final class Client
             $connection = $this->connect();
         } catch (\Throwable $exception) {
             $this->running = false;
+            $waiting = $this->next;
+            $this->next = new Deferred();
+            $waiting->fail($exception instanceof Cancelled
+                ? new ConnectionFailed('The first connection attempt was cancelled.', previous: $exception)
+                : $exception);
 
             throw $exception;
         }
@@ -105,7 +116,13 @@ final class Client
         }
 
         $this->up($connection);
-        $group->daemon(fn() => $this->supervise($connection));
+        $group->daemon(function () use ($connection) {
+            try {
+                $this->supervise($connection);
+            } finally {
+                $this->next->fail(new ConnectionClosed('The client is stopped.'));
+            }
+        });
     }
 
     /**
@@ -139,7 +156,7 @@ final class Client
      */
     public function close(): void
     {
-        if (!$this->running || $this->closing) {
+        if (!$this->running) {
             return;
         }
 
@@ -147,7 +164,7 @@ final class Client
         $this->stopped->complete();
 
         try {
-            $this->connection?->close();
+            synchronized($this->closeMutex, fn() => $this->connection?->close());
         } finally {
             $this->next->fail(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
         }

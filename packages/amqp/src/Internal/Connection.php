@@ -314,6 +314,12 @@ final class Connection
      */
     public function close(): void
     {
+        if ($this->closeOk !== null) {
+            $this->closeOk->await();
+
+            return;
+        }
+
         foreach ($this->channels as $handler) {
             try {
                 ($handler->drain)();
@@ -334,6 +340,10 @@ final class Connection
             $this->send(0, new ConnectionClose(ReplyCode::ReplySuccess->value, 'Closed by the client.', 0, 0));
         } catch (ConnectionClosed) {
             return;
+        } catch (\Throwable $exception) {
+            $this->closeOk = null;
+
+            throw $exception;
         }
 
         $closeOk->await();
