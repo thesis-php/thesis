@@ -9,7 +9,6 @@ use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Status;
-use Thesis\Io\SizedReader;
 use Uri\Rfc3986\Uri;
 use function Thesis\Http\Internal\isToken;
 use function Thesis\Http\Internal\quote;
@@ -158,9 +157,9 @@ final readonly class RequestHead
             throw new \ValueError('The header "host" is written by the codec from the URI of a request.');
         }
 
-        $length = $request->body instanceof SizedReader ? $request->body->size : null;
+        $length = $request->body->size;
         $framing = match (true) {
-            $length === null || Fields::hasTrailers($request->headers, $request->trailers) => Framing::Chunked,
+            $length === null || Fields::hasTrailers($request->headers, $request->body->trailers) => Framing::Chunked,
             // POST, PUT and PATCH are expected to have content, so an empty body is sent as Content-Length: 0.
             $length > 0,
             \in_array($request->method, [Method::POST, Method::PUT, Method::PATCH], strict: true) => Framing::Length,

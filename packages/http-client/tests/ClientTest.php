@@ -14,7 +14,6 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Io\Buffer;
 use Thesis\Io\StreamClosed;
-use Thesis\Io\StringReader;
 use Thesis\Net\InetAddress;
 use Time\Duration;
 use Uri\Rfc3986\Uri;
@@ -51,13 +50,13 @@ final class ClientTest
                 }
             });
 
-            $request = new Request('POST', new Uri("http://{$address}/upload?q=1"), body: new StringReader('data'));
+            $request = new Request('POST', new Uri("http://{$address}/upload?q=1"), body: 'data');
             $end = new Client()->withResponse($request, static function (Response $response) {
                 Assert::false(new \ReflectionObject($response->body)->isCloneable());
-                Assert::null($response->trailers);
+                Assert::null($response->body->trailers);
                 Assert::same($response->body->read(2), 'ok');
 
-                return $response->discardBodyAndReadTrailers()->get('x-end');
+                return $response->body->discard()->get('x-end');
             });
             Assert::same($end, 'yes');
         });
@@ -96,9 +95,9 @@ final class ClientTest
             $first = $client->send($request);
             Assert::same($first->body->read(1), 'x');
             $second = $client->send($request);
-            $first->closeBody();
+            $first->body->close();
             Assert::same($second->body->read(1), 'y');
-            Assert::same($second->discardBodyAndReadTrailers()->get('x-end'), 'yes');
+            Assert::same($second->body->discard()->get('x-end'), 'yes');
             Assert::same($client->send($request)->status, 204);
             Assert::same($client->send($request)->status, 200);
             Assert::same($client->send($request)->status, 204);
@@ -250,8 +249,8 @@ final class ClientTest
                 return;
             }
 
-            $response->closeBody();
-            $response->closeBody();
+            $response->body->close();
+            $response->body->close();
             $server->await();
             Expect::exception(StreamClosed::class);
             $reader->read(1);

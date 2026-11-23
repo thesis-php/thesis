@@ -17,6 +17,8 @@ use Uri\Rfc3986\Uri;
 #[Test]
 #[Covers(Request::class)]
 #[Covers(Response::class)]
+#[Covers(Body::class)]
+#[Covers(Query::class)]
 final class MessageTest
 {
     public function requestHasNoHeadersAndEmptyBodyByDefault(): void
@@ -32,7 +34,7 @@ final class MessageTest
         $body = new ScriptedReader('payload');
         $request = new Request('POST', new Uri('/'), body: $body);
 
-        $request->closeBody();
+        $request->body->close();
 
         Assert::same($body->closes, 1);
         Assert::same($body->requests, []);
@@ -47,7 +49,7 @@ final class MessageTest
 
     public function copiesRequestWithPropertiesChanged(): void
     {
-        $request = new Request('POST', new Uri('https://example.com/a?b'), body: new StringReader('abc'));
+        $request = new Request('POST', new Uri('https://example.com/a?b'), body: 'abc');
 
         $copy = clone($request, [
             'method' => 'PUT',
@@ -62,6 +64,20 @@ final class MessageTest
         Assert::same($request->method, 'POST');
     }
 
+    public function replacingTheQueryUpdatesOnlyTheClonedUri(): void
+    {
+        $request = new Request('GET', new Uri('/search?tag=a&sort=C++&tag=b#top'));
+        $query = $request->query;
+        $next = clone($request, ['query' => $query->with('tag', 'a & b')]);
+        $other = clone($next, ['uri' => new Uri('/?page=2')]);
+
+        Assert::same($query->all('tag'), ['a', 'b']);
+        Assert::same($query->get('sort'), 'C++');
+        Assert::same($next->uri->toRawString(), '/search?tag=a%20%26%20b&sort=C%2B%2B#top');
+        Assert::same($other->query->toArray(), ['page' => ['2']]);
+        Assert::same($request->query, $query);
+    }
+
     public function responseIsOkWithoutHeadersAndWithEmptyBodyByDefault(): void
     {
         $response = new Response();
@@ -73,8 +89,8 @@ final class MessageTest
 
     public function closingAStringBodyLeavesItsBytesAvailable(): void
     {
-        $response = new Response(body: new StringReader('payload'));
-        $response->closeBody();
+        $response = new Response(body: 'payload');
+        $response->body->close();
 
         Assert::same(readAll($response->body), 'payload');
     }
@@ -88,7 +104,7 @@ final class MessageTest
     {
         $response = new Response(headers: new Headers(['content-type' => 'text/plain']));
 
-        $copy = clone($response, ['status' => 404, 'body' => new StringReader('Not found.')]);
+        $copy = clone($response, ['status' => 404, 'body' => new Body('Not found.')]);
 
         Assert::same($copy->status, 404);
         Assert::same($copy->headers, $response->headers);
@@ -98,33 +114,33 @@ final class MessageTest
 
     public function replacesTrailersOnACopyOfTheResponse(): void
     {
-        $response = new Response(trailers: null);
+        $response = new Response(body: new Body('', static fn() => null));
         $trailers = new Headers(['x-count' => '1']);
 
-        $copy = clone($response, ['trailers' => $trailers]);
+        $copy = clone($response, ['body' => new Body('', $trailers)]);
 
-        Assert::null($response->trailers);
-        Assert::same($copy->trailers, $trailers);
+        Assert::null($response->body->trailers);
+        Assert::same($copy->body->trailers, $trailers);
     }
 
     public function discardsRemainingRequestBodyThroughItsTrailers(): void
     {
         $buffer = new Buffer(bytes: "3\r\nabc\r\n0\r\nX-End: yes\r\n\r\nnext");
         $body = new ChunkedReader($buffer, new StringReader(''));
-        $request = new Request('POST', new Uri('/'), body: $body, trailers: static fn() => $body->trailers);
+        $request = new Request('POST', new Uri('/'), body: new Body($body, static fn() => $body->trailers));
 
         Assert::same($request->body->read(1), 'a');
-        Assert::null($request->trailers);
-        Assert::same($request->discardBodyAndReadTrailers()->get('x-end'), 'yes');
-        Assert::same($request->trailers, $request->discardBodyAndReadTrailers());
+        Assert::null($request->body->trailers);
+        Assert::same($request->body->discard()->get('x-end'), 'yes');
+        Assert::same($request->body->trailers, $request->body->discard());
         Assert::same($buffer->drain(), 'next');
     }
 
     public function discardsResponseBodyEvenWhenTrailersAreReady(): void
     {
-        $response = new Response(body: new StringReader('payload'));
+        $response = new Response(body: 'payload');
 
-        Assert::same($response->discardBodyAndReadTrailers(), $response->trailers);
+        Assert::same($response->body->discard(), $response->body->trailers);
         Assert::same(readAll($response->body), '');
     }
 
@@ -132,13 +148,13 @@ final class MessageTest
     {
         $response = new Response(body: chunked("3\r\nab"));
         Expect::exception(ReadFailed::class);
-        $response->discardBodyAndReadTrailers();
+        $response->body->discard();
     }
 
     public function pendingTrailersAtEndOfBodyAreAnError(): void
     {
-        $response = new Response(trailers: null);
+        $response = new Response(body: new Body('', static fn() => null));
         Expect::exception(\LogicException::class);
-        $response->discardBodyAndReadTrailers();
+        $response->body->discard();
     }
 }

@@ -9,7 +9,6 @@ use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use Thesis\Io\SizedReader;
 use function Thesis\Http\Internal\isFieldValue;
 use function Thesis\Http\Internal\quote;
 
@@ -111,8 +110,8 @@ final readonly class ResponseHead
         array $upgrade = [],
     ): self {
         Fields::assertUpgrade($upgrade);
-        $length = $response->body instanceof SizedReader ? $response->body->size : null;
-        $hasTrailers = Fields::hasTrailers($response->headers, $response->trailers);
+        $length = $response->body->size;
+        $hasTrailers = Fields::hasTrailers($response->headers, $response->body->trailers);
 
         if (self::hasBody($request->method, $response->status)) {
             Fields::assertEndToEnd($response->headers);

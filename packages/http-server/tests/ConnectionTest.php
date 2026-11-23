@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
@@ -62,7 +63,7 @@ final class ConnectionTest
             Connection::serve($input, $output, static function (Request $request) use (&$paths) {
                 $paths[] = $request->uri->getRawPath();
 
-                return new Response(body: $request->body, trailers: static fn() => $request->trailers);
+                return new Response(body: $request->body);
             }, $config);
             Assert::same(['/first', '/second'], $paths);
             Assert::same($expected, $output->bytes);
@@ -116,9 +117,9 @@ final class ConnectionTest
                 return new Response(body: $body);
             }
 
-            return new Response(body: $body, trailers: static function () use (&$reads) {
+            return new Response(body: new Body($body, static function () use (&$reads) {
                 return ++$reads === 1 ? null : new Headers(['X-End' => 'yes']);
-            });
+            }));
         }, new Config('/test.sock'));
 
         Assert::same($reads, 2);
@@ -173,7 +174,7 @@ final class ConnectionTest
             output: $output,
             handler: static fn(Request $request) => $request->method === Method::HEAD
                 ? new Response(headers: new Headers(['content-length' => '5']))
-                : new Response(body: new StringReader('hello')),
+                : new Response(body: 'hello'),
             config: new Config('/test.sock'),
         );
 
@@ -191,7 +192,7 @@ final class ConnectionTest
         Connection::serve(
             input: new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n"),
             output: $output,
-            handler: static fn() => new Response(body: new StringReader($body)),
+            handler: static fn() => new Response(body: $body),
             config: new Config('/test.sock'),
         );
 

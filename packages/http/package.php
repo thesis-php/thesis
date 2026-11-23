@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'HTTP messages shared by clients and servers: requests, responses, headers, streamed bodies '
+    description: 'HTTP messages shared by clients and servers: requests with query parameters, responses, headers, streamed bodies '
         . 'with trailers, and a strict HTTP/1.1 codec that refuses what request smuggling is made of.',
     licenseSince: 2026,
     version: '0.1',
@@ -16,6 +16,7 @@ return new Manifest(
         'http',
         'http-message',
         'http-headers',
+        'query-string',
         'http-trailers',
         'http1',
         'http-parser',

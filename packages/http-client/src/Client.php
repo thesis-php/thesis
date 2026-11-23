@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient;
 
-use Thesis\Http\Headers;
+use Thesis\Http\Body;
 use Thesis\Http\Http1\ChunkedReader;
 use Thesis\Http\Http1\FixedLengthReader;
 use Thesis\Http\Http1\Framing;
@@ -85,7 +85,7 @@ final readonly class Client
         try {
             return $consume($response);
         } finally {
-            $response->closeBody();
+            $response->body->close();
         }
     }
 
@@ -110,7 +110,8 @@ final readonly class Client
         }
 
         if ($head->framing === Framing::Chunked) {
-            $socket->write(encodeLastChunk($request->trailers ?? throw new \ValueError('Missing request trailers.')));
+            $trailers = $request->body->trailers ?? throw new \ValueError('Missing request trailers.');
+            $socket->write(encodeLastChunk($trailers));
         }
     }
 
@@ -158,8 +159,11 @@ final readonly class Client
         return new Response(
             status: $head->status,
             headers: $head->headers,
-            body: $reader instanceof FixedLengthReader ? new SizedResponseBody($body, $reader->size) : $body,
-            trailers: $reader instanceof ChunkedReader ? static fn() => $reader->trailers : new Headers(),
+            body: match (true) {
+                $reader instanceof FixedLengthReader => new SizedResponseBody($body, $reader->size),
+                $reader instanceof ChunkedReader => new Body($body, static fn() => $reader->trailers),
+                default => $body,
+            },
         );
     }
 }

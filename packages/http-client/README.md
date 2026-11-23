@@ -35,7 +35,7 @@ $request = new Request('GET', new Uri('https://example.com/'));
 $client = new Client();
 $response = timeout(sec(5), static fn() => $client->send($request));
 $status = $response->status;
-$response->closeBody();
+$response->body->close();
 ```
 
 Use `withResponse()` to close the body when a callback returns or throws:
@@ -46,7 +46,7 @@ $status = $client->withResponse($request, static fn(Response $response) => $resp
 
 Reuse the same client across requests to share connections for the same scheme, host and port.
 A fixed-length body releases its socket on the last byte. A chunked body releases it after the trailers.
-`discardBodyAndReadTrailers()` consumes any remaining bytes. A bodyless response releases it immediately.
+`$response->body->discard()` consumes any remaining bytes. A bodyless response releases it immediately.
 An outstanding body keeps its own socket. The client retains one idle socket per origin, up to 32 in total.
 If a peer closes an idle connection, the next request opens a new one. A disconnect during a request
 propagates to the caller. The client never replays an upload.

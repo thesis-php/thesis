@@ -37,7 +37,6 @@ $server = new Server(
     config: new Config(8080),
     handler: static fn(Request $request) => new Response(
         body: $request->body,
-        trailers: static fn() => $request->trailers,
     ),
 );
 

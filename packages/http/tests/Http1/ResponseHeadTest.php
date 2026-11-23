@@ -9,11 +9,11 @@ use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Response;
 use Thesis\Http\ScriptedReader;
-use Thesis\Io\StringReader;
 use function Thesis\Http\failure;
 use function Thesis\Http\head;
 use function Thesis\Http\lines;
@@ -263,7 +263,7 @@ final class ResponseHeadTest
         $head = ResponseHead::of(
             response: new Response(
                 headers: new Headers(['content-type' => 'text/plain']),
-                body: new StringReader('hello'),
+                body: 'hello',
             ),
             request: requestHead('GET / HTTP/1.1'),
         );
@@ -326,7 +326,8 @@ final class ResponseHeadTest
 
     public function usesChunkedFramingForAnEmptyReaderWithPendingTrailers(): void
     {
-        $head = ResponseHead::of(new Response(trailers: null), requestHead('GET / HTTP/1.1'));
+        $response = new Response(body: new Body('', static fn() => null));
+        $head = ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
 
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
@@ -335,7 +336,7 @@ final class ResponseHeadTest
 
     public function rejectsTrailersForHttp10(): void
     {
-        $response = new Response(trailers: new Headers(['x-count' => '1']));
+        $response = new Response(body: new Body('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('An HTTP/1.0 response cannot have trailers.');
 
         ResponseHead::of($response, requestHead('GET / HTTP/1.0'));
@@ -343,7 +344,7 @@ final class ResponseHeadTest
 
     public function rejectsTrailersForAResponseWithoutABody(): void
     {
-        $response = new Response(204, trailers: new Headers(['x-count' => '1']));
+        $response = new Response(204, body: new Body('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('A response without a body cannot have trailers.');
 
         ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
@@ -360,7 +361,7 @@ final class ResponseHeadTest
         string $bytes,
     ): void {
         $head = ResponseHead::of(
-            response: new Response(body: new StringReader('a')),
+            response: new Response(body: 'a'),
             request: requestHead(...$requestLines),
             isPersistent: $serverKeeps,
         );
@@ -524,7 +525,7 @@ final class ResponseHeadTest
         ];
         yield 'HEAD with body' => [
             'HEAD / HTTP/1.1',
-            new Response(body: new StringReader('hello')),
+            new Response(body: 'hello'),
             'A 200 response to HEAD must have no body, got a body of 5 bytes.',
         ];
         yield 'HEAD with body of unknown length' => [
@@ -534,22 +535,22 @@ final class ResponseHeadTest
         ];
         yield '204 with body' => [
             $get,
-            new Response(204, body: new StringReader('a')),
+            new Response(204, body: 'a'),
             'A 204 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield '304 with body' => [
             $get,
-            new Response(304, body: new StringReader('a')),
+            new Response(304, body: 'a'),
             'A 304 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield '199 with body' => [
             $get,
-            new Response(199, body: new StringReader('a')),
+            new Response(199, body: 'a'),
             'A 199 response to GET must have no body, got a body of 1 bytes.',
         ];
         yield 'CONNECT 299 with body' => [
             'CONNECT example.com:443 HTTP/1.1',
-            new Response(299, body: new StringReader('a')),
+            new Response(299, body: 'a'),
             'A 299 response to CONNECT must have no body, got a body of 1 bytes.',
         ];
     }
@@ -557,7 +558,7 @@ final class ResponseHeadTest
     public function writesBodyOfRefusedConnect(): void
     {
         $head = ResponseHead::of(
-            response: new Response(300, body: new StringReader('a')),
+            response: new Response(300, body: 'a'),
             request: requestHead('CONNECT example.com:443 HTTP/1.1'),
         );
 

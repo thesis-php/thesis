@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Http;
 
 use Thesis\Io\Reader;
-use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
-use function Thesis\Http\Internal\discardBodyAndReadTrailers;
-use function Thesis\Io\close;
 use const Thesis\Http\Internal\EMPTY_HEADERS;
 
 /**
@@ -16,76 +13,46 @@ use const Thesis\Http\Internal\EMPTY_HEADERS;
  * URI, message headers and body. The codec gets the host from the URI and the length from the body.
  * The headers exclude connection fields such as `Host`, `Content-Length`, `Transfer-Encoding` and `Connection`.
  *
- * The properties are `public(set)` so that `clone($request, ['uri' => $uri])` can make a changed copy.
+ * `clone($request, ['uri' => $uri])` derives the query from the new URI.
+ * `clone($request, ['query' => $query])` updates the query component of the URI.
  * The copy shares the reader with the original.
  *
  * @api
  */
 final class Request
 {
-    /**
-     * @var null|Headers|(\Closure(Reader): ?Headers)
-     */
-    private readonly null|Headers|\Closure $trailerSource;
+    public public(set) readonly Body $body;
 
-    /**
-     * The trailer fields, or null while the reader has yet to receive them.
-     * A copy can replace the trailer fields with `clone()`.
-     */
-    public ?Headers $trailers {
-        get => $this->trailerSource instanceof \Closure
-            ? ($this->trailerSource)($this->body)
-            : $this->trailerSource;
-        /** @param null|Headers|(callable(Reader): ?Headers) $value */
-        set(Headers|callable|null $value) {
-            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() lets the hook reinitialize this field)
-            $this->trailerSource = self::normalizeTrailers($value);
+    // @phpstan-ignore property.uninitializedReadonly (parsed on first access)
+    private readonly Query $parsedQuery;
+
+    public Query $query {
+        // @phpstan-ignore property.readOnlyAssignNotInConstructor (first access initializes the cache)
+        get => $this->parsedQuery ??= Query::parse($this->uri->getRawQuery() ?? '');
+        set {
+            $encoded = $value->toString();
+            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() permits replacing the URI)
+            $this->uri = $this->uri->withQuery($encoded === '' ? null : $encoded);
+            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() initializes its own cache)
+            $this->parsedQuery = $value;
         }
     }
 
     /**
      * @param non-empty-string $method
-     * @param null|Headers|(callable(Reader): ?Headers) $trailers ready fields, null while they are unavailable,
-     *     or a callback that reads the current reader's trailer state without I/O or suspension
      */
     public function __construct(
         public public(set) readonly string $method,
         public public(set) readonly Uri $uri,
         public public(set) readonly Headers $headers = EMPTY_HEADERS,
-        public public(set) readonly Reader $body = new StringReader(''),
-        null|Headers|callable $trailers = EMPTY_HEADERS,
+        string|Reader $body = '',
     ) {
-        $this->trailerSource = self::normalizeTrailers($trailers);
+        $this->body = $body instanceof Body ? $body : new Body($body);
     }
 
-    /**
-     * Closes the body if it implements Closer. A copy sharing the same body observes the close too.
-     */
-    public function closeBody(): void
+    public function __clone(): void
     {
-        close($this->body);
-    }
-
-    /**
-     * Reads and discards the remaining body bytes, then returns the trailers. May suspend during a read.
-     *
-     * @throws \LogicException if the trailer source still reports pending fields at the end of the body
-     */
-    public function discardBodyAndReadTrailers(): Headers
-    {
-        return discardBodyAndReadTrailers($this);
-    }
-
-    /**
-     * @param null|Headers|(callable(Reader): ?Headers) $trailers
-     * @return null|Headers|(\Closure(Reader): ?Headers)
-     */
-    private static function normalizeTrailers(null|Headers|callable $trailers): null|Headers|\Closure
-    {
-        if ($trailers === null || $trailers instanceof Headers) {
-            return $trailers;
-        }
-
-        return $trailers(...);
+        // @phpstan-ignore unset.readOnlyProperty (a clone may replace its URI)
+        unset($this->parsedQuery);
     }
 }

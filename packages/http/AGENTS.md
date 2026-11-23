@@ -8,7 +8,7 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 
 ### Messages
 
-- Requests and responses accept any `Reader`. `closeBody()` delegates to `Thesis\Io\close()` so callers can release a closable body.
+- Messages accept a string or any `Reader`. Passing a `Body` shares its stream position and its trailers.
 - A message carries only the meaning of HTTP and nothing about the connection: no version, no reason phrase,
   no framing. The head formatter rejects the fields in `Fields::OF_CONNECTION` in message headers,
   except for the representation length described below. On requests it also rejects `Host`, which comes
@@ -24,9 +24,9 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   when iterating. The codec reads the underlying array and casts names when it writes them.
 - A message clone shares the reader and its position unless the clone supplies a new reader.
   Pass an unread reader to the sender. A short body requires closing the connection before another head is written.
-- The `$trailers` property reads the current reader state without I/O or suspension. `null` means the fields are
+- The `Body::$trailers` property reads the current reader state without I/O or suspension. `null` means the fields are
   unavailable. An empty `Headers` value means the message has no trailers.
-  `discardBodyAndReadTrailers()` reads to EOF even if the trailer fields are already known.
+  `Body::discard()` reads to EOF even if the trailer fields are already known.
 
 ### The codec
 
@@ -95,15 +95,15 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 - `Headers` stores names in lowercase (HTTP/2 requires it). The HTTP/1.1 codec writes them as `Content-Type`
   (`ucwords()` by hyphens): lowercase names are valid, but some peers compare names case-sensitively.
   So `ETag` is written as `Etag`, as Go does.
-- `Request` and `Response` expose a `Reader` through `$body` and a separate `$trailers` property beside `$headers`.
-  A message constructed without a reader gets its own empty `StringReader`. The wire codec enforces body boundaries.
+- The body owns the reader and its trailers so forwarding a body also forwards pending trailers.
+  The wire codec enforces body boundaries.
+- A request parses its query on first access. A clone with a new URI parses its own query.
+  Replacing the query on a clone updates the URI that the codec writes.
 - Rejected: PSR-7 as the shared message contract. `StreamInterface` permits sequential reads, but an arbitrary
   implementation can block the event loop. PSR-7 has no standard access to trailers, which can arrive at EOF.
   It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives
   `Host` from the URI, and `Headers` stores lowercase names. Interoperability belongs in adapters at the
   application boundary, where the adapter can define which streams and message fields it supports.
-- Rejected: a separate HTTP `Body` wrapper. `Reader` carries the bytes, and the HTTP/1 codec already knows
-  which reader enforces the message boundary.
 - Rejected: lazy reader factories and replay on the body. They make reading responsible for opening resources,
   including races between a suspended open and closing the body. Revisit fresh readers when a client needs to
   resend a body on redirects or retries.
@@ -112,8 +112,6 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   the current reader and runs without caching or waiting.
 - Rejected: a lazy `Headers` proxy. If its initializer suspends, another reader of the proxy can see an
   uninitialized object. The codec publishes a complete immutable `Headers` at the end of the trailer section.
-- The trailer hook stores ready fields and null directly. Only a callable needs a closure. The source stays
-  in a private readonly property, and `clone()` allows the setter to replace it on the copy. An ordinary write fails.
 - A head is a value with a private constructor, two static constructors (`parse()` from bytes, `of()` from
   a message) and `toString()`. So every head is either what a peer has sent or what a message allows.
   The server and the client read from the same value what they must do after they write the head (chunk

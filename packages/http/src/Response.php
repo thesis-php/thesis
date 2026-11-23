@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Thesis\Http;
 
 use Thesis\Io\Reader;
-use Thesis\Io\StringReader;
-use function Thesis\Http\Internal\discardBodyAndReadTrailers;
-use function Thesis\Io\close;
 use const Thesis\Http\Internal\EMPTY_HEADERS;
 
 /**
@@ -21,70 +18,18 @@ use const Thesis\Http\Internal\EMPTY_HEADERS;
  *
  * @api
  */
-final class Response
+final readonly class Response
 {
-    /**
-     * @var null|Headers|(\Closure(Reader): ?Headers)
-     */
-    private readonly null|Headers|\Closure $trailerSource;
+    public public(set) Body $body;
 
     /**
-     * The trailer fields, or null while the reader has yet to receive them.
-     * A copy can replace the trailer fields with `clone()`.
-     */
-    public ?Headers $trailers {
-        get => $this->trailerSource instanceof \Closure
-            ? ($this->trailerSource)($this->body)
-            : $this->trailerSource;
-        /** @param null|Headers|(callable(Reader): ?Headers) $value */
-        set(Headers|callable|null $value) {
-            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() lets the hook reinitialize this field)
-            $this->trailerSource = self::normalizeTrailers($value);
-        }
-    }
-
-    /**
-     * @param int<100, 999> $status not an enum: anyone may define a status code
-     * @param null|Headers|(callable(Reader): ?Headers) $trailers ready fields, null while they are unavailable,
-     *     or a callback that reads the current reader's trailer state without I/O or suspension
+     * @param int<100, 999> $status anyone may define a status code
      */
     public function __construct(
-        public public(set) readonly int $status = Status::OK,
-        public public(set) readonly Headers $headers = EMPTY_HEADERS,
-        public public(set) readonly Reader $body = new StringReader(''),
-        null|Headers|callable $trailers = EMPTY_HEADERS,
+        public public(set) int $status = Status::OK,
+        public public(set) Headers $headers = EMPTY_HEADERS,
+        string|Reader $body = '',
     ) {
-        $this->trailerSource = self::normalizeTrailers($trailers);
-    }
-
-    /**
-     * Closes the body if it implements Closer. A copy sharing the same body observes the close too.
-     */
-    public function closeBody(): void
-    {
-        close($this->body);
-    }
-
-    /**
-     * Reads and discards the remaining body bytes, then returns the trailers. May suspend during a read.
-     *
-     * @throws \LogicException if the trailer source still reports pending fields at the end of the body
-     */
-    public function discardBodyAndReadTrailers(): Headers
-    {
-        return discardBodyAndReadTrailers($this);
-    }
-
-    /**
-     * @param null|Headers|(callable(Reader): ?Headers) $trailers
-     * @return null|Headers|(\Closure(Reader): ?Headers)
-     */
-    private static function normalizeTrailers(null|Headers|callable $trailers): null|Headers|\Closure
-    {
-        if ($trailers === null || $trailers instanceof Headers) {
-            return $trailers;
-        }
-
-        return $trailers(...);
+        $this->body = $body instanceof Body ? $body : new Body($body);
     }
 }

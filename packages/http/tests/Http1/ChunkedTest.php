@@ -9,12 +9,12 @@ use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Request;
 use Thesis\Http\ScriptedReader;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
-use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use Uri\Rfc3986\Uri;
@@ -242,16 +242,15 @@ final class ChunkedTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            body: $chunked,
-            trailers: static fn(Reader $reader) => $reader instanceof ChunkedReader ? $reader->trailers : null,
+            body: new Body($chunked, static fn() => $chunked->trailers),
         );
 
-        Assert::null($request->trailers);
+        Assert::null($request->body->trailers);
         Assert::same($request->body->read(3), 'abc');
-        Assert::null($request->trailers);
+        Assert::null($request->body->trailers);
         Assert::same(readAll($request->body), '');
 
-        Assert::same($request->trailers, $chunked->trailers);
+        Assert::same($request->body->trailers, $chunked->trailers);
         Assert::same($chunked->trailers?->get('x-checksum'), '900150983cd24fb0');
     }
 

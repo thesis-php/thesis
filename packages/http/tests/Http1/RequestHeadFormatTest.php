@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Test;
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Request;
@@ -151,8 +152,7 @@ final class RequestHeadFormatTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            body: new StringReader('abc'),
-            trailers: new Headers(['x-count' => '1']),
+            body: new Body('abc', new Headers(['x-count' => '1'])),
         );
 
         $head = RequestHead::of($request);
@@ -197,7 +197,7 @@ final class RequestHeadFormatTest
                 method: 'POST',
                 uri: new Uri('http://example.com/'),
                 headers: new Headers(['content-type' => 'text/plain']),
-                body: new StringReader('abc'),
+                body: 'abc',
             ),
             isPersistent: false,
             upgrade: ['websocket'],
@@ -291,7 +291,7 @@ final class RequestHeadFormatTest
             method: 'PUT',
             uri: new Uri('https://example.com:8443/files/a%20b?overwrite=1'),
             headers: new Headers(['content-type' => 'text/plain', 'accept' => ['a/b', 'c/d']]),
-            body: new StringReader('hello'),
+            body: 'hello',
         );
         $written = RequestHead::of($request, isPersistent: false, upgrade: ['h2c']);
 

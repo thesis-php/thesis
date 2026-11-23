@@ -94,7 +94,7 @@ the whole monorepo is for the final check.
 - `dispatcher`: Synchronous event dispatcher: a listener gets the events of the type of its parameter, resolved once per class. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
-- `http`: HTTP messages shared by clients and servers: requests, responses, headers, streamed bodies with trailers, and a strict HTTP/1.1 codec that refuses what request smuggling is made of. Requires: io.
+- `http`: HTTP messages shared by clients and servers: requests with query parameters, responses, headers, streamed bodies with trailers, and a strict HTTP/1.1 codec that refuses what request smuggling is made of. Requires: io.
 - `http-client`: Asynchronous HTTP/1 client for HTTP and HTTPS with connection pooling, streaming bodies and trailers. Requires: http, io, net.
 - `http-server`: Asynchronous HTTP/1 server for TCP and Unix sockets with streaming bodies, trailers, TLS and graceful shutdown. Requires: async, http, io, net, time.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.

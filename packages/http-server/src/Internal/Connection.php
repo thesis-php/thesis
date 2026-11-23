@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\HttpServer\Internal;
 
 use Thesis\Async\Cancelled;
-use Thesis\Http\Headers;
+use Thesis\Http\Body;
 use Thesis\Http\Http1\ChunkedReader;
 use Thesis\Http\Http1\FixedLengthReader;
 use Thesis\Http\Http1\Framing;
@@ -159,14 +159,11 @@ final class Connection
             }
         }
 
-        /** @var Headers $emptyTrailers */
-        static $emptyTrailers = new Headers();
         $request = new Request(
             method: $head->method,
             uri: $head->uri,
             headers: $head->headers,
-            body: $reader,
-            trailers: $body instanceof ChunkedReader ? static fn() => $body->trailers : $emptyTrailers,
+            body: $body instanceof ChunkedReader ? new Body($reader, static fn() => $body->trailers) : $reader,
         );
 
         try {
@@ -195,16 +192,16 @@ final class Connection
             $first = null;
 
             if ($continue !== null && $continue->isPending && $reply->length !== 0) {
-                if ($response->body === $reader) {
+                if ($response->body === $request->body) {
                     // The client may abandon the body on seeing a final head before it has sent any bytes.
                     $first = self::readBody($response->body, $reply->length);
-                } elseif ($response->status < Status::BAD_REQUEST && !$response->body instanceof StringReader) {
+                } elseif ($response->status < Status::BAD_REQUEST && !$response->body->isBuffered) {
                     // A streaming response may read from the request only after producing response bytes.
                     $continue->send();
                 }
             }
 
-            $ignoresBody = $reply->length === 0 || $response->body instanceof StringReader;
+            $ignoresBody = $reply->length === 0 || $response->body->isBuffered;
             $mustClose = $continue?->isPending === true || $state?->isStopping === true
                 || ($ignoresBody && !self::isBodyComplete($body));
 
@@ -252,7 +249,7 @@ final class Connection
             bytes: $bytes,
             output: $output,
             first: $first,
-            bufferedEcho: $response->body === $reader && $body instanceof FixedLengthReader
+            bufferedEcho: $response->body === $request->body && $body instanceof FixedLengthReader
                 && $buffer->count() >= $body->remaining,
         );
 
@@ -267,19 +264,19 @@ final class Connection
         /** @var ?array{ResponseHead, string} $last */
         static $last = null;
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
-        if ($last !== null && $ordinary && $response->body instanceof StringReader) {
+        if ($last !== null && $ordinary && $response->body->isBuffered) {
             $cached = $last;
             $head = $cached[0];
             if ($response->status === $head->status && $response->body->size === $head->length
                 && $request->version === $head->version && ($isPersistent && $request->isPersistent) === $head->isPersistent
                 && $response->headers->toArray() === $head->headers->toArray()) {
-                $trailers = $response->trailers;
+                $trailers = $response->body->trailers;
                 if ($trailers?->toArray() === []) {
                     return $cached;
                 }
 
                 // A trailer provider is evaluated once when framing the response.
-                $response = clone($response, ['trailers' => $trailers]);
+                $response = clone($response, ['body' => new Body($response->body, static fn() => $trailers)]);
             }
         }
 
@@ -327,7 +324,7 @@ final class Connection
     ): void {
         $remaining = $head->length;
         if ($remaining !== null && $remaining > 0 && $remaining <= 8192
-            && ($first !== null || $bufferedEcho || $response->body instanceof StringReader)) {
+            && ($first !== null || $bufferedEcho || $response->body->isBuffered)) {
             try {
                 $chunk = $first ?? self::readBody($response->body, $remaining);
                 $first = null;
@@ -361,7 +358,8 @@ final class Connection
         }
 
         if ($head->framing === Framing::Chunked) {
-            $trailers = $response->trailers ?? throw new \ValueError('Response trailers are still pending at EOF.');
+            $trailers = $response->body->trailers
+                ?? throw new \ValueError('Response trailers are still pending at EOF.');
             $output->write(encodeLastChunk($trailers));
         }
     }
@@ -369,10 +367,10 @@ final class Connection
     /**
      * @param ?positive-int $remaining
      */
-    private static function readBody(Reader $reader, ?int $remaining): string
+    private static function readBody(Body $body, ?int $remaining): string
     {
-        $max = $reader instanceof StringReader ? 64 * 1024 : 8192;
-        $bytes = $reader->read(min($max, $remaining ?? $max));
+        $max = $body->isBuffered ? 64 * 1024 : 8192;
+        $bytes = $body->read(min($max, $remaining ?? $max));
         if ($bytes === null && $remaining !== null) {
             throw new ReadFailed('The response body ended before its declared length.');
         }

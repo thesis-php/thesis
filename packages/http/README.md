@@ -19,7 +19,7 @@
 <!-- head:end -->
 
 HTTP clients and servers share `Request`, `Response` and `Headers`. Each message holds HTTP data independent
-of the connection, including a reader for the body and a separate set of trailer fields.
+of the connection, including a streaming body that carries its trailer fields.
 
 The strict HTTP/1.1 codec reads and writes message heads and chunked bodies. It rejects input that
 two recipients could interpret differently. Clients and servers use the codec and manage their
@@ -31,14 +31,13 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
 
 $request = new Request(
     method: Method::POST,
     uri: new Uri('https://example.com/users?notify=1'),
     headers: new Headers(['content-type' => 'application/json']),
-    body: new StringReader('{"name": "Alice"}'),
+    body: '{"name": "Alice"}',
 );
 
 $response = new Response(status: Status::CREATED, headers: new Headers(['location' => '/users/42']));
@@ -54,12 +53,11 @@ This package requires 64-bit PHP 8.6+ and needs no additional PHP extensions.
 
 ## Messages
 
-`Request` has a `$method` and a `$uri`, and `Response` has a `$status`. Both expose `$headers`, the body stream
-through `$body`, and optional `$trailers`. To change a message, make a copy with `clone()`:
+`Request` has a `$method` and a `$uri`, and `Response` has a `$status`. Both expose `$headers` and a `Body` through `$body`. To change a message, make a copy with `clone()`:
 
 ```php
 $forwarded = clone($request, ['uri' => $request->uri->withHost('backend.internal')]);
-$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new StringReader('Not found.')]);
+$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new \Thesis\Http\Body('Not found.')]);
 ```
 
 The copy shares the reader with the original unless it supplies a new one. Reading from a shared reader
@@ -85,6 +83,14 @@ the class built into PHP. Its `getRawPath()` and `getRawQuery()` methods preserv
 and percent escapes. A router, a proxy and a request signature need that.
 `Uri\WhatWg\Url` does not fit: it rewrites what it parses (removes dot segments, drops tabs) and cannot hold
 a target without a host.
+
+Read parameters through `$request->query`. Names are case-sensitive and a literal plus sign is preserved.
+`get()` returns the first value, `all()` returns every value for a name, and `toArray()` groups values by name.
+Iterating the query preserves the order of the pairs. Replacing the query on a copy updates its URI:
+
+```php
+$next = clone($request, ['query' => $request->query->with('page', '2')]);
+```
 
 A method is a string, sent exactly as written. Any token is a valid method: `GET`, `PURGE`, `PROPFIND`.
 `Method` defines constants for common methods, including `Method::GET`, `Method::POST` and `Method::HEAD`.
@@ -136,14 +142,11 @@ while (($bytes = $request->body->read(8192)) !== null) {
 }
 ```
 
-The `$trailers` property contains ready fields, or `null` while the fields are unavailable. An empty
-`Headers` means there are no trailers. The `trailers:` constructor argument accepts a `Headers` object,
-`null` or a callback that takes the current reader and returns its trailer state. The callback reads state
-without doing I/O or suspending the fiber. It can be called before and after the body is read.
+Read `$body->trailers` to see the available fields. Pending fields return `null`.
+An empty `Headers` means the body has no trailers. Use `new Body($reader, $trailers)` to supply
+ready fields or a callback that observes the current fields without I/O or suspension.
 
-Use `$request->closeBody()` or `$response->closeBody()` to release a closable body without reading the remaining bytes.
-
-Use `$request->discardBodyAndReadTrailers()` or `$response->discardBodyAndReadTrailers()` when you only need the
+Use `$body->close()` to release a closable reader or `$body->discard()` when you only need the
 trailers. The method reads from the body's current position to EOF in bounded chunks, even when the trailers are
 already available. Reads may suspend and use the same limits and timeouts as reading the body yourself.
 An empty `Headers` means there are no trailers. Read errors propagate. If a custom trailer source still returns
@@ -165,7 +168,6 @@ use Thesis\Http\Http1\ResponseHead;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;
-use Thesis\Io\StringReader;
 
 $buffer = new Buffer();
 $buffer->fillUntil($connection, "\r\n\r\n", maxLength: 16 * 1024);
@@ -180,7 +182,7 @@ $requestHead->framing;      // Framing::Length
 $requestHead->length;       // 17
 $requestHead->isPersistent; // true: the connection stays open for the next request
 
-$response = new Response(status: Status::CREATED, body: new StringReader('created'));
+$response = new Response(status: Status::CREATED, body: 'created');
 $responseHead = ResponseHead::of($response, $requestHead);
 
 $connection->write($responseHead->toString());
@@ -242,7 +244,7 @@ For `Framing::Chunked`, use `ChunkedReader` and expose its trailer state on the 
 ```php
 use Thesis\Http\Http1\ChunkedReader;
 use Thesis\Http\Response;
-use Thesis\Io\Reader;
+use Thesis\Http\Body;
 use function Thesis\Http\Http1\encodeChunk;
 use function Thesis\Http\Http1\encodeLastChunk;
 
@@ -251,15 +253,14 @@ $chunked = new ChunkedReader($buffer, $connection);
 $response = new Response(
     status: $responseHead->status,
     headers: $responseHead->headers,
-    body: $chunked,
-    trailers: static fn(Reader $reader) => $reader instanceof ChunkedReader ? $reader->trailers : null,
+    body: new Body($chunked, static fn() => $chunked->trailers),
 );
 
 // A proxy can forward the decoded payload and then the trailer section.
 while (($bytes = $response->body->read(8192)) !== null) {
     $downstream->write(encodeChunk($bytes));
 }
-$trailers = $response->trailers ?? throw new \LogicException('The response trailers are unavailable.');
+$trailers = $response->body->trailers ?? throw new \LogicException('The response trailers are unavailable.');
 $downstream->write(encodeLastChunk($trailers));
 ```
 
