@@ -27,6 +27,7 @@ jobs:
           - exceptionally
           - formatter
           - http
+          - http-client
           - http-server
           - io
           - net

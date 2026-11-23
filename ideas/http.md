@@ -3,8 +3,8 @@
 The shared messages and HTTP/1 codec are implemented in [thesis/http](../packages/http/README.md).
 Its [package notes](../packages/http/AGENTS.md) record the decisions behind them.
 The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
-binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The client and the extensions
-to the server described below remain proposals.
+binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The first [HTTP/1 client](../packages/http-client/README.md) opens a connection per exchange and
+transfers it to the returned response body. Pooling and the server extensions below remain proposals.
 
 ## One set of messages for both directions
 
@@ -248,7 +248,7 @@ The options:
 2. Structured: `send(Request, callable(Response): T): T`, the client reclaims the connection after the callback. In the spirit
    of `async`, but awkward when the response is passed on (a proxy).
 
-The proposal uses the first option and ties the incoming body to the scope of the task that called `send()`.
+The first client implements option 1 and releases the connection with the body. A future alternative ties the incoming body to the scope of the task that called `send()`.
 When the scope ends, the client returns a reusable connection to the pool or closes it. A proxy works, and a leak lasts
 no longer than the task. To check on `async`: whether such a binding works without cycles (the trap of
 fiber keys in `agents/fibers.md`).

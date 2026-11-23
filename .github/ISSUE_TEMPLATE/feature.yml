@@ -15,6 +15,7 @@ body:
         - thesis/exceptionally
         - thesis/formatter
         - thesis/http
+        - thesis/http-client
         - thesis/http-server
         - thesis/io
         - thesis/net

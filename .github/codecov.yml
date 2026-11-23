@@ -58,6 +58,12 @@ component_management:
         - packages/http/src/**
       flag_regexes:
         - '^http$'
+    - component_id: http-client
+      name: thesis/http-client
+      paths:
+        - packages/http-client/src/**
+      flag_regexes:
+        - '^http-client$'
     - component_id: http-server
       name: thesis/http-server
       paths:
