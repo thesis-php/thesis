@@ -125,7 +125,7 @@ bench-accept: var vendor ## Make the results of the last `make bench` the expect
 
 # (Coverage of one package by its own tests, uploaded by the job coverage of check.yaml (agents/tests.md).
 # A run of every suite at once exhausts 2 GB in Xdebug)
-coverage: var vendor up ## Collect the coverage of a package by its tests into var/coverage/<name>.xml P=
+coverage: var vendor $(if $(filter amqp,$(P)),up) ## Collect the coverage of a package by its tests into var/coverage/<name>.xml P=
 	$(if $(P),,$(error P= names the package))
 	$(RUN) env XDEBUG_MODE=coverage vendor/bin/testo --suite=$(P) --coverage --coverage-clover=var/coverage/$(P).xml $(ARGS)
 .PHONY: coverage

@@ -43,6 +43,8 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
 - Coverage is for the badge of a package (`tools/monorepo/AGENTS.md`), not a gate: no target, no statuses
   and no comments of Codecov. The job `coverage` of `check.yaml` runs `make coverage P=<name>` for every package
   with `tests/` (the matrix is written by `sync`) and uploads its Clover report with the flag `<name>`.
+  `make coverage` starts RabbitMQ only for the AMQP integration tests so a broker startup failure cannot
+  block coverage of the other packages.
   The report of one suite lists the `src/` of every package, so the component `<name>` of `.github/codecov.yml`
   takes the flag and `packages/<name>/src/**` together: a package is covered by its own tests, not by those
   of the packages that use it. Trap: one run of every suite with coverage exhausts 2 GB in Xdebug,
