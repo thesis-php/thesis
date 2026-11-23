@@ -8,7 +8,7 @@ use Thesis\Monorepo\Config;
 return new Config(
     php: '^8.6',
     description: 'Asynchronous PHP on an event loop of its own: structured concurrency for fibers, '
-        . 'non-blocking I/O, TCP/TLS/DNS, AMQP. Monorepo of the thesis/* packages.',
+        . 'non-blocking I/O, TCP/TLS/DNS, HTTP/1 server, AMQP. Monorepo of the thesis/* packages.',
     copyrightHolder: 'The Thesis Authors',
     licenseSince: 2026,
     keywords: [
@@ -25,6 +25,7 @@ return new Config(
         'rabbitmq',
         'sockets',
         'dns',
+        'http-server',
     ],
     authors: [
         ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],

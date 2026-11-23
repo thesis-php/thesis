@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, AMQP. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1 server, AMQP. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -16,7 +16,8 @@
         "amqp",
         "rabbitmq",
         "sockets",
-        "dns"
+        "dns",
+        "http-server"
     ],
     "authors": [
         {
@@ -83,6 +84,7 @@
         "thesis/exceptionally": "0.4.x-dev",
         "thesis/formatter": "0.2.x-dev",
         "thesis/http": "0.1.x-dev",
+        "thesis/http-server": "0.1.x-dev",
         "thesis/io": "0.1.x-dev",
         "thesis/net": "0.1.x-dev",
         "thesis/phpstan-extension": "0.1.x-dev",
@@ -101,6 +103,7 @@
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Cache\\": "packages/cache/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
+            "Thesis\\HttpServer\\": "packages/http-server/src/",
             "Thesis\\Http\\": "packages/http/src/",
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
@@ -143,6 +146,7 @@
             "Thesis\\Async\\Benchmarks\\": "packages/async/benchmarks/",
             "Thesis\\Cache\\": "packages/cache/tests/",
             "Thesis\\Formatter\\": "packages/formatter/tests/",
+            "Thesis\\HttpServer\\": "packages/http-server/tests/",
             "Thesis\\Http\\": "packages/http/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",

@@ -1,0 +1,68 @@
+{
+    "name": "thesis/http-server",
+    "description": "Asynchronous HTTP/1 server for TCP and Unix sockets with streaming bodies, trailers, TLS and graceful shutdown.",
+    "keywords": [
+        "php",
+        "async",
+        "http",
+        "http1",
+        "http-server",
+        "streaming",
+        "keep-alive",
+        "tcp",
+        "unix-socket",
+        "tls"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/thesis-php/thesis/issues",
+        "source": "https://github.com/thesis-php/thesis/tree/main/packages/http-server",
+        "security": "https://github.com/thesis-php/thesis/security/policy"
+    },
+    "require": {
+        "php": "^8.6",
+        "thesis/async": "^0.1",
+        "thesis/http": "^0.1",
+        "thesis/io": "^0.1",
+        "thesis/net": "^0.1",
+        "thesis/time": "^0.4"
+    },
+    "require-dev": {
+        "ext-openssl": "*",
+        "testo/assert": "^0.1.17",
+        "testo/codecov": "^0.2.5",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29",
+        "thesis/testo-plugin": "^0.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\HttpServer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\HttpServer\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}

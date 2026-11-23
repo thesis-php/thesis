@@ -2,7 +2,9 @@
 
 The shared messages and HTTP/1 codec are implemented in [thesis/http](../packages/http/README.md).
 Its [package notes](../packages/http/AGENTS.md) record the decisions behind them.
-The client and server APIs below are proposals for the next phase.
+The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
+binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The client and the extensions
+to the server described below remain proposals.
 
 ## One set of messages for both directions
 
@@ -20,13 +22,13 @@ The rule: **a message holds the semantics of HTTP only, the transport goes besid
 string $method;
 Uri $uri;
 Headers $headers;
-Reader $reader;
+Reader $body;
 ?Headers $trailers;
 
 // Response properties
 int $status;
 Headers $headers;
-Reader $reader;
+Reader $body;
 ?Headers $trailers;
 ```
 
@@ -45,7 +47,7 @@ final readonly class Context
 HttpServer\listen(
     address: '0.0.0.0:8080',
     handler: static function (Request $request, Context $context): Response {
-        return new Response(status: 200, reader: new StringReader("hello {$context->remoteAddress}"));
+        return new Response(status: 200, body: new StringReader("hello {$context->remoteAddress}"));
     },
 );
 ```
@@ -144,7 +146,7 @@ default zero-capacity queue can also wait until the consumer takes the chunk. If
 the queue early, the driver can continue reading and discarding the remaining body within its limits.
 After completing the body it waits for the response before parsing the next request.
 
-For Thesis HTTP/1, start with demand-driven reads. The handler's `$request->reader->read()` asks the decoder for
+For Thesis HTTP/1, start with demand-driven reads. The handler's `$request->body->read()` asks the decoder for
 bytes from the connection buffer and, when necessary, the socket. A slow handler naturally sets the
 pace. A slow peer suspends the fiber doing the read. This avoids a per-request queue and producer task.
 
@@ -157,7 +159,7 @@ sequenceDiagram
     D->>S: Read the request head
     Note over S: Bytes beyond the head stay in the buffer
     D->>H: Call handler with the request
-    H->>F: request.reader.read(max)
+    H->>F: request.body.read(max)
     F->>S: Use buffered bytes, read the socket as needed
     S-->>F: Wire bytes
     F-->>H: Decoded payload
