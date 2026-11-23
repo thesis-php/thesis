@@ -20,8 +20,11 @@ Read `README.md` for the API and design decisions.
 - `Reader::read()` returns 1 to `$max` bytes, throws `UnexpectedEof` at the end, `ReadFailed` on any other failure
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
   on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
-  `SocketClosed`). Callers keep at most one read in progress per reader. A reader can reject an overlapping read
-  with `LogicException`. `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
+  `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
+- At most one `read()` per reader may be in progress. Different fibers may take turns. Every reader rejects an
+  overlapping call immediately with `ConcurrentRead` and leaves the pending read in progress. A reader that can
+  suspend or call user code guards the read before it can yield or be reentered. The write and close contracts
+  apply during a pending read.
 - `SizedReader::$size` is the total size in bytes, including bytes already read. `StringReader` advances an
   offset into the original string and reads without suspending the fiber.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.
@@ -36,8 +39,9 @@ Read `README.md` for the API and design decisions.
   while the reader waits. `fillUntil()` searches everything again once the buffer has changed meanwhile.
 - `Buffer`, `Order` and the interfaces call nothing of thesis/async: only streams that wait do
   (the interfaces name `Cancelled` in their PHPDoc only).
-- `Stream` and `SharedStream` hold the `reading` flag for the whole `read()`, `pace()` included: a second reader
-  is a `LogicException` even when bytes have arrived for the first, which would otherwise wait forever for them.
+- `Stream` and `SharedStream` hold the `reading` flag for the whole `read()`, including `pace()`.
+  They reject an overlapping read with `ConcurrentRead` even when bytes have arrived for the pending read.
+  Otherwise an overlapping read could take those bytes and leave the pending read waiting.
 - One `fread()` asks for at most 1 MiB (`MAX_READ`): PHP allocates the whole length before reading, so a length
   from a header would cost its size in memory before a byte has arrived. `Socket` of thesis/net does the same.
 - Reads and writes that do not wait go through one `Pacer(16)` per stream: a file, /dev/null or a fast peer

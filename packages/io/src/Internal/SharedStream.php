@@ -8,6 +8,7 @@ use Thesis\Async\LocalMutex;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Closer;
+use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StreamClosed;
@@ -74,7 +75,7 @@ final class SharedStream implements Reader, Writer, Closer
     public function read(int $max): string
     {
         if ($this->reading) {
-            throw new \LogicException('Another fiber is reading from the stream.');
+            throw new ConcurrentRead('A read is already in progress on the stream.');
         }
 
         $this->reading = true;

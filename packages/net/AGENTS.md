@@ -39,8 +39,9 @@ Read `README.md` for the API and its guarantees.
   It yields *before* the operation, so a cancelled read has taken nothing and a cancelled write has sent nothing.
 - A second `enableTls()` during a handshake is a `LogicException` (`$handshaking`): without it the second one
   waits for good and its records mix with those of the first.
-- A second concurrent reader is a `LogicException`, never a silent race: the `reading` flag is held for the whole
-  `read()`, so the second one fails even when bytes have arrived for the first, which would wait forever for them.
+- The `reading` flag is held for the whole `read()`. An overlapping read throws `ConcurrentRead` even when bytes
+  have arrived for the pending read. Otherwise an overlapping read could take those bytes and leave the pending
+  read waiting.
 - One `fread()` asks for at most 1 MiB (`MAX_READ`): PHP allocates the whole length before reading, so a length
   from a header would cost its size in memory before a byte has arrived.
 - `Server::accept()` never spins: a failed accept after a readiness wake-up backs off (5 ms doubling to 1 s),

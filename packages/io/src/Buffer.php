@@ -667,6 +667,7 @@ final class Buffer implements \Countable
      *
      * @throws UnexpectedEof
      * @throws IoException if $reader->read() fails, for example with {@see ReadFailed} or {@see StreamClosed}
+     * @throws ConcurrentRead if $reader rejects an overlapping read
      */
     public function fill(Reader $reader, int $length): void
     {
@@ -697,6 +698,7 @@ final class Buffer implements \Countable
      * @param positive-int $maxLength max number of unread bytes to buffer while searching
      * @throws UnexpectedEof
      * @throws IoException if $reader->read() fails, for example with {@see ReadFailed} or {@see StreamClosed}
+     * @throws ConcurrentRead if $reader rejects an overlapping read
      * @throws \OverflowException if the delimiter is not found within $maxLength bytes
      */
     public function fillUntil(Reader $reader, string $delimiter, int $maxLength = 64 * 1024): void

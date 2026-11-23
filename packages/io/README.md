@@ -101,13 +101,16 @@ $buffer->readVarint();
 
 ### Streams
 
-`Reader::read(int $max)` returns from 1 to `$max` bytes, throws `UnexpectedEof` at the end of the stream
-and `ReadFailed` if the read fails otherwise (a connection reset),
+`Reader::read(int $max)` returns from 1 to `$max` bytes. It throws `UnexpectedEof` at the end of the stream
+and `ReadFailed` on a read error such as a connection reset.
 `Writer::write(string $bytes)` writes all the bytes. Both may suspend the fiber while they wait.
-Wait for each read to finish before starting another one on the same reader. An overlapping read may
-throw `LogicException`.
 A read that throws, `Cancelled` included, has taken nothing, so a `timeout()` around a read loses no bytes.
-`Buffer` turns them into exact, buffered reads and batched writes:
+
+Different fibers may take turns reading from the same reader. A reader allows only one `read()` in progress.
+An overlapping call immediately throws `Thesis\Io\ConcurrentRead`. The pending read continues. On a duplex stream,
+writes may proceed during a read. Closing the reader makes a pending read throw an `IoException` such as `StreamClosed`.
+
+`Buffer` works with streams to provide exact reads and batched writes.
 
 ```php
 use Thesis\Io\Buffer;
@@ -152,8 +155,8 @@ whose `$size` gives the total number of bytes, including bytes already read.
 
 `Stream` adapts a PHP stream resource that the process owns (a pipe of `proc_open()`, a file, a socket without TLS)
 to `Reader`, `Writer` and `Closer`. It makes the resource non-blocking: a read waits for bytes and a write
-for room in the pipe without blocking the event loop. As with sockets of thesis/net, one fiber reads at a time,
-writes of concurrent fibers never interleave, and a write that fails after a part of its bytes closes the stream.
+for room in the pipe without blocking the event loop.
+Concurrent writes never interleave. A write that fails after sending some bytes closes the stream.
 One read returns at most 1 MiB, whatever `$max` is: PHP allocates the whole length before reading.
 Reads and writes that never have to wait (a file, `/dev/null`, a fast peer) still yield to the event loop
 now and then, so a loop of them does not starve the other tasks.

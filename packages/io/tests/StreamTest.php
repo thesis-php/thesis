@@ -99,6 +99,24 @@ final class StreamTest
         Assert::same($read, 'late');
     }
 
+    public function aPendingReadAllowsWritingAndReadsCanPassToAnotherFiber(): void
+    {
+        [$left, $right] = self::pair();
+
+        timeout(sec(1), static fn() => group(static function (Group $group) use ($left, $right) {
+            $read = $group->spawn(static fn() => $right->read(1));
+            delay(ms(1));
+            Assert::false($read->isDone);
+
+            $right->write('?');
+            Assert::same($left->read(1), '?');
+            $left->write('ab');
+
+            Assert::same($read->await(), 'a');
+            Assert::same($right->read(1), 'b');
+        }));
+    }
+
     public function writeWaitsWhileThePeerDoesNotRead(): void
     {
         [$left, $right] = self::pair();
@@ -222,7 +240,7 @@ final class StreamTest
     public function secondConcurrentReaderIsAnError(): void
     {
         [$left, $right] = self::pair();
-        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the stream.');
+        Expect::exception(ConcurrentRead::class)->withMessage('A read is already in progress on the stream.');
 
         group(static function (Group $group) use ($right) {
             $group->spawn(static fn() => $right->read(1));
@@ -235,7 +253,7 @@ final class StreamTest
     public function secondReaderIsAnErrorEvenIfBytesHaveArrivedForTheFirst(): void
     {
         [$left, $right] = self::pair();
-        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the stream.');
+        Expect::exception(ConcurrentRead::class)->withMessage('A read is already in progress on the stream.');
 
         // without the error, the first reader would wait forever for the bytes the second has taken
         timeout(sec(1), static fn() => group(static function (Group $group) use ($left, $right) {

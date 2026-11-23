@@ -8,8 +8,12 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Test;
 use Thesis\Async\Group;
+use Thesis\Io\Internal\SharedStream;
+use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -196,6 +200,28 @@ final class StdioTest
         $stderr = self::runChild($code, [0 => ['pipe', 'r'], 2 => ['pipe', 'w']], output: 2);
 
         Assert::same($stderr, "blocking\nblocking\n");
+    }
+
+    public function sharedStreamRejectsOverlapAndKeepsThePendingRead(): void
+    {
+        $pair = stream_socket_pair(domain: STREAM_PF_UNIX, type: STREAM_SOCK_STREAM, protocol: STREAM_IPPROTO_IP);
+        \assert(\is_array($pair) && isset($pair[0], $pair[1]));
+        $reader = new SharedStream($pair[0]);
+        $peer = new Stream($pair[1]);
+
+        try {
+            timeout(sec(1), static fn() => group(static function (Group $group) use ($reader, $peer) {
+                $read = $group->spawn(static fn() => $reader->read(1));
+                delay(ms(1));
+                $peer->write('x');
+
+                Assert::instanceOf(thrown(static fn() => $reader->read(1)), ConcurrentRead::class);
+                Assert::same($read->await(), 'x');
+            }));
+        } finally {
+            $reader->close();
+            $peer->close();
+        }
     }
 
     public function stdoutIsBlockingForOthersWhileAWriteWaitsForRoom(): void

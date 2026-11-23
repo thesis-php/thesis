@@ -10,6 +10,8 @@ namespace Thesis\Io;
  */
 final class CallbackReader implements Reader
 {
+    private bool $reading = false;
+
     /**
      * @param ?\Closure(): void $meanwhile
      * @param positive-int $chunkSize
@@ -22,11 +24,21 @@ final class CallbackReader implements Reader
 
     public function read(int $max): string
     {
+        if ($this->reading) {
+            throw new ConcurrentRead('A read is already in progress on the reader.');
+        }
+
         $meanwhile = $this->meanwhile;
         $this->meanwhile = null;
 
         if ($meanwhile !== null) {
-            $meanwhile();
+            $this->reading = true;
+
+            try {
+                $meanwhile();
+            } finally {
+                $this->reading = false;
+            }
         }
 
         if ($this->data === '') {

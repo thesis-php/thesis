@@ -82,7 +82,8 @@ and Nagle would hold back the last packet of every request.
   one after another, never interleaved, so a frame written by one call stays whole.
   A write cancelled before it has sent anything leaves the socket as it was; a write cancelled or failed half-way
   **closes the socket**, because the peer has got half a message and nothing after it would make sense.
-- One fiber reads at a time: a second reader gets a `LogicException`. A protocol has one reader loop per connection.
+- Different fibers may take turns reading from the socket. An overlapping read throws `Thesis\Io\ConcurrentRead`.
+  Writes may proceed during a pending read.
 - `close()` closes at once; reads and writes waiting in other fibers throw `SocketClosed`.
   `closeWrite()` sends the end of the stream and keeps reading (not over TLS: PHP cannot do it).
 

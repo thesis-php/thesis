@@ -14,7 +14,7 @@ use function Thesis\Io\Internal\lastError;
  * of `proc_open()`, a file, a socket without TLS. The stream is made non-blocking, and every wait is a wait of thesis/async:
  * cancelled with the current scope and bounded by `timeout()`. The stream is owned: {@see close()} closes it.
  *
- * One fiber reads at a time, any number may write: a write is never interleaved with another one.
+ * Several fibers may write while a read is pending. Writes never interleave.
  *
  * @api
  */
@@ -52,7 +52,7 @@ final class Stream implements Reader, Writer, Closer
     private readonly Pacer $pacer;
 
     /**
-     * Whether a read is in progress: a second reader is a bug, the two would take bytes from each other.
+     * Held even while the pacer yields, so a later read cannot take bytes meant for the pending read.
      */
     private bool $reading = false;
 
@@ -90,7 +90,7 @@ final class Stream implements Reader, Writer, Closer
     public function read(int $max): string
     {
         if ($this->reading) {
-            throw new \LogicException('Another fiber is reading from the stream.');
+            throw new ConcurrentRead('A read is already in progress on the stream.');
         }
 
         $this->reading = true;

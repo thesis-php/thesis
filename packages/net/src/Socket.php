@@ -8,6 +8,7 @@ use Thesis\Async\LocalMutex;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Closer;
+use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
@@ -20,7 +21,7 @@ use function Thesis\Net\Internal\lastError;
  * A connected stream socket: TCP or Unix, plain or TLS. Every wait is a wait of thesis/async:
  * cancelled with the current scope and bounded by `timeout()`, so no method takes a timeout.
  *
- * One fiber reads at a time, any number may write: a write is never interleaved with another one.
+ * Several fibers may write while a read is pending. Writes never interleave.
  *
  * @api
  */
@@ -81,7 +82,7 @@ final class Socket implements Reader, Writer, Closer
     private readonly Pacer $pacer;
 
     /**
-     * Whether a read is in progress: a second reader is a bug, the two would take bytes from each other.
+     * Held even while the pacer yields, so a later read cannot take bytes meant for the pending read.
      */
     private bool $reading = false;
 
@@ -120,7 +121,7 @@ final class Socket implements Reader, Writer, Closer
     public function read(int $max): string
     {
         if ($this->reading) {
-            throw new \LogicException('Another fiber is reading from the socket.');
+            throw new ConcurrentRead('A read is already in progress on the socket.');
         }
 
         $this->reading = true;

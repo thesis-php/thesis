@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Group;
+use Thesis\Io\ConcurrentRead;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Io\WriteFailed;
@@ -186,7 +187,7 @@ final class SocketTest
     public function rejectsASecondReader(): void
     {
         [$left, $right] = socketPair();
-        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the socket.');
+        Expect::exception(ConcurrentRead::class)->withMessage('A read is already in progress on the socket.');
 
         group(static function (Group $group) use ($left) {
             $group->daemon(static fn() => $left->read(1));
@@ -210,7 +211,7 @@ final class SocketTest
     public function secondReaderIsAnErrorEvenIfBytesHaveArrivedForTheFirst(): void
     {
         [$left, $right] = socketPair();
-        Expect::exception(\LogicException::class)->withMessage('Another fiber is reading from the socket.');
+        Expect::exception(ConcurrentRead::class)->withMessage('A read is already in progress on the socket.');
 
         // without the error, the first reader would wait forever for the bytes the second has taken
         timeout(sec(1), static fn() => group(static function (Group $group) use ($left, $right) {

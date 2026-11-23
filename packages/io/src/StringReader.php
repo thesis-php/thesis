@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Io;
 
 /**
- * Reads bytes from a string in memory.
+ * Reads bytes from a string in memory without suspending the fiber.
  *
  * @api
  */
