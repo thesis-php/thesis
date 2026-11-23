@@ -7,7 +7,7 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
 
 - Write the failing test first, then the fix.
 - `make infect P=<name>` kills every mutant of a package with `mutationTesting` (on by default) in its manifest:
-  `sync` writes them to the matrix of the job `infect` of `check.yaml`.
+  `sync` writes them to the matrix of the job `infect` of `infection.yaml`, which runs nightly and on manual dispatch.
   A surviving mutant gets a test. A mutant that shows code to be redundant gets the code simplified. Only one
   that no input tells from the code (most often it only makes the code slower) is skipped by a comment
   above the statement it mutates: the reason, then `// @infection-ignore <Mutator>, ...`. An annotation covers
@@ -25,11 +25,11 @@ skills (`testo-*`), a test that depends on the order of callbacks is in `fibers.
   crashes, the same without `--coverage-xml` passes, on any `--coverage-level`. aarch64 passes (a Mac),
   so the job `infect` runs on `ubuntu-24.04-arm`; reproduce with `docker run --platform linux/amd64`.
   Move it back to `ubuntu-latest` once a release of Xdebug passes there.
-- For now the job `infect` has `continue-on-error: true` and is out of `needs` of the release: the rewrite
+- For now the job `infect` has `continue-on-error: true`: the rewrite
   of the event loop left surviving mutants in async (120 on CI, MSI 86 %), net, `Stream` of io and async-trace.
-  Kill them, then make it block again.
+  Kill them, then make the workflow fail on a surviving mutant.
 - The mutation score is also the badge of a package (`tools/monorepo/AGENTS.md`). `make infect P=<name>` writes
-  the summary of the run to `var/infection/<name>.json`, and on a push to `main` the job `infect` puts its `msi`
+  the summary of the run to `var/infection/<name>.json`, and on a run of `main` the job `infect` puts its `msi`
   to the module `<name>` of the project `github.com/thesis-php/thesis` in the Stryker Dashboard, also when
   Infection has failed on a surviving mutant: the badge shows the score there is. It needs
   `secrets.STRYKER_DASHBOARD_API_KEY` of the monorepo, the key of the repository enabled

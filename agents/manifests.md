@@ -19,7 +19,7 @@ or changing the public API of a package that others use. How the generator works
   - `skills.json` (`sources`),
   - the forms of issues in `.github/ISSUE_TEMPLATE/` (the dropdown of the packages),
   - `.github/codecov.yml`: a component of Codecov per package with `tests/` (`tests.md`),
-  - the matrices of the jobs of `.github/workflows/check.yaml` that run per package, each under its marker
+  - the matrices of the jobs of `check.yaml` and `infection.yaml` that run per package, each under its marker
     (`Matrices`): `test-alone` (every PHP below the monorepo that `php` of the manifest allows),
     `test-32-bit` (`bit32Testing`), `infect` (`tests/` and `mutationTesting`), `coverage` (`tests/`),
   - the package catalog in the root `AGENTS.md` and the table of packages in the root `README.md`,

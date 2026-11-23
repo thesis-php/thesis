@@ -52,7 +52,7 @@ final class Package
     }
 
     /**
-     * The job infect of check.yaml runs on the package and sends its mutation score for the badge of README.md.
+     * The job infect of infection.yaml runs on the package and sends its mutation score for the badge of README.md.
      */
     public bool $isMutationTested {
         get => $this->hasTests && $this->manifest->mutationTesting;

@@ -52,7 +52,7 @@ final readonly class Manifest
      *     installs by its type
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names
      *     outside src/ goes to $dist too
-     * @param bool $mutationTesting the job infect of check.yaml runs make infect on the tests/ of the package.
+     * @param bool $mutationTesting the job infect of infection.yaml runs make infect on the tests/ of the package.
      *     Turned off with a comment on why
      * @param bool $bit32Testing CI tests the package on 32-bit PHP, which the package then guarantees.
      *     The tests run on the package's minimum PHP version and on the monorepo's PHP version (agents/platform.md).

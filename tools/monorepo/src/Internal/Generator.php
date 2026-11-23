@@ -83,7 +83,8 @@ final class Generator
             '.github/ISSUE_TEMPLATE/bug.yml' => $generator->bugForm(),
             '.github/ISSUE_TEMPLATE/feature.yml' => $generator->featureForm(),
             '.github/codecov.yml' => $generator->codecov(),
-            Matrices::PATH => Matrices::write($monorepo),
+            Matrices::CHECK => Matrices::write($monorepo, Matrices::CHECK),
+            Matrices::INFECTION => Matrices::write($monorepo, Matrices::INFECTION),
         ];
 
         foreach ($monorepo->packages as $package) {
@@ -560,7 +561,7 @@ final class Generator
 
     /**
      * The module of the package in the project of the monorepo in the Stryker Dashboard: the job infect
-     * of check.yaml sends the score of the package on the default branch there.
+     * of infection.yaml sends the score of the package on the default branch there.
      */
     private static function mutationBadge(Package $package): string
     {
