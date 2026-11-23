@@ -132,24 +132,9 @@ final class Socket implements Reader, Writer, Closer
             $this->pacer->pace();
 
             while (true) {
-                $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
-
-                // Read first, wait only if there is nothing:
-                // TLS keeps decrypted bytes where the event loop does not see them.
-                error_clear_last();
-                $bytes = @fread($stream, min($max, self::MAX_READ));
-
-                if ($bytes !== '' && $bytes !== false) {
+                $bytes = $this->readAvailable($max);
+                if ($bytes !== null) {
                     return $bytes;
-                }
-
-                if ($bytes === false) {
-                    // PHP raises no error for a reset of a plain socket, only TLS has its own messages.
-                    throw new ReadFailed(lastError('The connection is broken: reset by the peer or timed out.'));
-                }
-
-                if (feof($stream)) {
-                    throw new UnexpectedEof('The peer has closed the connection.');
                 }
 
                 if (!$this->watcher->readable()) {
@@ -159,6 +144,25 @@ final class Socket implements Reader, Writer, Closer
         } finally {
             $this->reading = false;
         }
+    }
+
+    /**
+     * Reads once without waiting. Returns null when the peer has no bytes ready.
+     *
+     * @param positive-int $max
+     * @return ?non-empty-string
+     * @throws ConcurrentRead if another read is in progress
+     * @throws SocketClosed if the socket is closed
+     * @throws UnexpectedEof if the peer has finished writing
+     * @throws ReadFailed on a transport error
+     */
+    public function tryRead(int $max): ?string
+    {
+        if ($this->reading) {
+            throw new ConcurrentRead('A read is already in progress on the socket.');
+        }
+
+        return $this->readAvailable($max);
     }
 
     /**
@@ -326,6 +330,35 @@ final class Socket implements Reader, Writer, Closer
         $this->stream = null;
         $this->watcher->close();
         @fclose($stream);
+    }
+
+    /**
+     * @param positive-int $max
+     * @return ?non-empty-string
+     */
+    private function readAvailable(int $max): ?string
+    {
+        $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
+
+        // Read first, wait only if there is nothing:
+        // TLS keeps decrypted bytes where the event loop does not see them.
+        error_clear_last();
+        $bytes = @fread($stream, min($max, self::MAX_READ));
+
+        if ($bytes !== '' && $bytes !== false) {
+            return $bytes;
+        }
+
+        if ($bytes === false) {
+            // PHP raises no error for a reset of a plain socket, only TLS has its own messages.
+            throw new ReadFailed(lastError('The connection is broken: reset by the peer or timed out.'));
+        }
+
+        if (feof($stream)) {
+            throw new UnexpectedEof('The peer has closed the connection.');
+        }
+
+        return null;
     }
 
     private function beginWrite(): void

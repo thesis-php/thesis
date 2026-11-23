@@ -25,6 +25,24 @@ use function Thesis\Time\sec;
 #[Test]
 final class SocketTest
 {
+    public function triesAReadWithoutWaitingForData(): void
+    {
+        [$left, $right] = socketPair();
+
+        Assert::null($right->tryRead(1));
+        $left->write('xy');
+        Assert::same($right->tryRead(1), 'x');
+        Assert::same($right->read(1), 'y');
+        $left->close();
+
+        try {
+            $right->tryRead(1);
+            Assert::fail('Expected EOF after the peer closed the socket.');
+        } catch (UnexpectedEof) {
+            $right->close();
+        }
+    }
+
     public function readsWhatThePeerWrites(): void
     {
         [$left, $right] = socketPair();

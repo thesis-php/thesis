@@ -215,7 +215,7 @@ in the same event loop, without a network.
 | `listen(string $host, int $port, int $backlog = 511, bool $reusePort = false, bool $noDelay = true): Server` | TCP server on an IP address |
 | `listenUnix(string $path, int $backlog = 511): Server` | Unix server |
 | `socketPair(): array{Socket, Socket}` | two connected sockets |
-| `Socket`: `read()`, `write()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
+| `Socket`: `read()`, `tryRead()`, `write()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
 | `Server`: `accept(): ?Socket`, `awaitClose()`, `close()`, `$address`, `$isClosed` | a listening socket |
 | `ClientTls`, `ServerTls`, `Certificate`, `TlsVersion`, `TlsInfo` | TLS |
 | `Resolver`, `DnsResolver`: `system()`, `fromFiles()` | DNS |
