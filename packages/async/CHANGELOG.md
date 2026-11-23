@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `group()` starts a task group with tasks and daemons. The task tree controls cancellation.
 - `group()` runs an event loop on PHP 8.6's `Io\Poll` from `{main}`. The loop throws `Deadlock` when
   nothing can wake a waiting task.
-- `all()`, `allSettled()`, `race()` and `some()` run tasks together. `each()` and `map()` limit concurrency.
+- `all()`, `allSettled()`, `race()` and `some()` run tasks together. `each()` and `map()` limit concurrency. A repeated input key in `map()` takes its last value in input order.
 - `timeout()`, `timeoutOr()` and `remaining()` manage deadlines. `shield()` protects cleanup from cancellation.
 - `delay()` waits on a timer, and `checkpoint()` yields to the event loop and checks cancellation.
 - `suspend()` lets callers build their own waiting primitives. `onCancel()` and `isCancelled()` work without a wait.

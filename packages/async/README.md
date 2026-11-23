@@ -397,6 +397,7 @@ may share a fiber, so fiber-local state, including state from third-party code, 
 
 The tasks iterate the items one at a time, so the iterable may itself wait, for example, for the next page of an API.
 The next item is pulled only once a task is free for it, and none is pulled after a failure.
+If an iterable repeats a key, the result contains the value mapped from its last occurrence.
 The callable gets the value only, so a function like `strval(...)` fits. `map()` keeps the keys in its result,
 so it needs array keys; `each()` ignores them: a generator may yield objects or repeat them.
 

@@ -15,6 +15,22 @@ use function Thesis\Time\sec;
 #[Test]
 final class EachAndMapTest
 {
+    public function lastInputWinsWhenGeneratorRepeatsKey(): void
+    {
+        $items = static function () {
+            yield 'x' => 1;
+            yield 'x' => 2;
+        };
+        $map = static function (int $value) {
+            if ($value === 1) {
+                delay(sec(1));
+            }
+
+            return $value;
+        };
+        Assert::same(map($items(), 2, $map), ['x' => 2]);
+    }
+
     public function eachCallsFnForEveryItemWithValueOnly(): void
     {
         $calls = [];

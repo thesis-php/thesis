@@ -80,7 +80,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   `current()`. Taking checks cancellation first (after getting the lock), so nothing is pulled after a failure.
   A new worker is started only when the item just taken leaves no worker free.
   The callable gets the value only (`$fn($value)`, so an internal function fits); only `map()` uses the key, for its
-  result. `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
+  result. A repeated key in a generator takes the last input's result. Each invocation writes its own cell, so
+  an earlier invocation that finishes later cannot overwrite it. `each()` keeps no results, so its memory does not grow with the items, and its keys need not be array keys.
 - `StreamWatcher` is an object owned with the stream, not free functions like `awaitReadable($stream)`: the owner must
   be able to end every wait before `fclose()` (the kernel drops a closed descriptor, and nothing would wake its
   waits). `close()` resumes the waits with `false` and cancels their watchers; a wait after `close()` returns `false`

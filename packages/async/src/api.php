@@ -502,8 +502,9 @@ function map(iterable $items, int $concurrency, callable $fn): array
                 /** @var K $key */
                 // $fn is called right after its item is taken, in the order of $items:
                 // reserving the key first keeps that order.
-                $results[$key] = null;
-                $results[$key] = $fn($item);
+                // A generator can repeat a key. Each occurrence writes to its own cell even if it finishes last.
+                $results[$key] = &$result;
+                $result = $fn($item);
             },
             traced: $fn,
         );
