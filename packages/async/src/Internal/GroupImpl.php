@@ -36,6 +36,10 @@ final class GroupImpl implements Group
      */
     private bool $tasksCancelled = false;
 
+    private ?Scope $tasksScope = null;
+
+    private ?Scope $daemonsScope = null;
+
     private int $tasks = 0;
 
     private int $daemons = 0;
@@ -73,10 +77,8 @@ final class GroupImpl implements Group
 
         $parent = Scope::current();
         $bodyScope = new Scope($parent);
-        $tasksScope = new Scope($bodyScope);
-        $daemonsScope = new Scope($tasksScope);
-        $group = new self(bodyScope: $bodyScope, tasksScope: $tasksScope, daemonsScope: $daemonsScope);
-        Scope::$tracer?->groupCreated($bodyScope, $tasksScope, $daemonsScope, $parent, $function, $name);
+        $group = new self($bodyScope);
+        Scope::$tracer?->groupCreated($bodyScope, $parent, $function, $name);
         $result = null;
         $error = null;
 
@@ -116,10 +118,10 @@ final class GroupImpl implements Group
 
             throw $error;
         } finally {
-            // Each child holds its parent and is held by it: closing all three breaks the cycle,
+            // Each child holds its parent and is held by it: closing each scope breaks the cycle,
             // so a group is freed by refcounting, without waiting for the cycle collector.
-            $daemonsScope->close();
-            $tasksScope->close();
+            $group->daemonsScope?->close();
+            $group->tasksScope?->close();
             $bodyScope->close();
         }
 
@@ -136,18 +138,16 @@ final class GroupImpl implements Group
 
     private function __construct(
         private readonly Scope $bodyScope,
-        private readonly Scope $tasksScope,
-        private readonly Scope $daemonsScope,
     ) {}
 
     public function spawn(callable $task, ?string $name = null): Task
     {
-        return $this->start($this->tasksScope, $task, $name);
+        return $this->start(false, $task, $name);
     }
 
     public function daemon(callable $task, ?string $name = null): Task
     {
-        return $this->start($this->daemonsScope, $task, $name);
+        return $this->start(true, $task, $name);
     }
 
     /**
@@ -162,14 +162,20 @@ final class GroupImpl implements Group
      */
     public function spawnWrapped(callable $wrapper, callable $task, ?string $name): Task
     {
-        return $this->start($this->tasksScope, $wrapper, $name, $task);
+        return $this->start(false, $wrapper, $name, $task);
     }
 
     public function cancelTasks(): void
     {
-        if (!$this->tasksScope->isCancelled) {
+        if ($this->closed && $this->tasksScope === null) {
+            return;
+        }
+
+        $tasksScope = $this->tasksScope ??= new Scope($this->bodyScope);
+
+        if (!$tasksScope->isCancelled) {
             $this->tasksCancelled = true;
-            $this->tasksScope->cancel(CancelCause::CancelTasks, by: Scope::current());
+            $tasksScope->cancel(CancelCause::CancelTasks, by: Scope::current(), tracedScope: $this->bodyScope);
         }
     }
 
@@ -213,7 +219,12 @@ final class GroupImpl implements Group
         try {
             while ($this->tasks > 0 || $this->daemons > 0) {
                 if ($this->tasks === 0) {
-                    $this->daemonsScope->cancel(CancelCause::DaemonsAfterTasks, by: $this->bodyScope);
+                    \assert($this->daemonsScope !== null);
+                    $this->daemonsScope->cancel(
+                        CancelCause::DaemonsAfterTasks,
+                        by: $this->bodyScope,
+                        tracedScope: $this->bodyScope,
+                    );
                 }
 
                 try {
@@ -254,13 +265,18 @@ final class GroupImpl implements Group
      * @param ?callable(never): mixed $traced what the trace gets as the task, if not $task itself
      * @return Task<T>
      */
-    private function start(Scope $parent, callable $task, ?string $name, ?callable $traced = null): Task
+    private function start(bool $daemon, callable $task, ?string $name, ?callable $traced = null): Task
     {
         if ($this->closed) {
             throw new \LogicException('The group is closed: a task can only be started until group() returns.');
         }
 
-        $daemon = $parent === $this->daemonsScope;
+        $parent = $this->tasksScope ??= new Scope($this->bodyScope);
+
+        if ($daemon) {
+            $parent = $this->daemonsScope ??= new Scope($parent);
+        }
+
         $scope = new Scope($parent);
         // Here, in the spawning fiber: the scope tree does not know where the task was spawned.
         $values = Context::capture();

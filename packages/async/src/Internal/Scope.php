@@ -182,11 +182,15 @@ final class Scope implements Waiter
      * @param ?self $by the scope that cancels it, for the trace: null for none
      * @param ?\Throwable $error the failure that cancels it, for the trace: only for {@see CancelCause::Failure}
      */
-    public function cancel(CancelCause $cause, ?self $by, ?\Throwable $error = null): void
-    {
+    public function cancel(
+        CancelCause $cause,
+        ?self $by,
+        ?\Throwable $error = null,
+        ?self $tracedScope = null,
+    ): void {
         if (!$this->isCancelled) {
             $this->notify();
-            self::$tracer?->cancelled($this, $cause, $by, $error);
+            self::$tracer?->cancelled($tracedScope ?? $this, $cause, $by, $error);
         }
     }
 

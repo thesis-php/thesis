@@ -800,10 +800,12 @@ final class GroupTest
 
         group(static function (Group $group) use ($onlyChild) {
             $body = Scope::current();
+            Assert::same(self::children($body), []);
             timeout(sec(1000), static fn() => null);
             thrown(static fn() => timeout(sec(1), never(...)));
             shield(static fn() => null);
-            $group->spawn(static fn() => null);
+            $group->spawn(static fn() => null)->await();
+            Assert::same(self::children($onlyChild($body)), []);
             $group->spawn(never(...))->cancel();
             $group->daemon(static fn() => null);
             $group->spawn(static function () {

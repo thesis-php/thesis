@@ -126,15 +126,11 @@ final class Tracer
      */
     public function groupCreated(
         Scope $body,
-        Scope $tasks,
-        Scope $daemons,
         Scope $parent,
         string $function,
         ?string $name,
     ): void {
         $id = $this->created($body, $parent);
-        $this->ids[$tasks] = $id;
-        $this->ids[$daemons] = $id;
 
         if ($this->listens(GroupCreated::class)) {
             $this->emit(new GroupCreated(
