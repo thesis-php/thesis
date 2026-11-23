@@ -92,27 +92,19 @@ test: var vendor up ## Run tests [P=]
 	$(RUN) vendor/bin/testo $(if $(P),--suite=$(P)) $(ARGS)
 .PHONY: test
 
-# (The package is copied to var/alone/<name>, installed there and tested on PHP_VERSION. With CHECKOUT_DEPS=1,
-# Composer installs monorepo dependencies from packages/ at their dev-main aliases. Otherwise it uses Packagist.
+# (A package that runs on an older PHP than the monorepo is copied to var/alone/<name>, installed there
+# with the newest dependencies its composer.json allows and tested on PHP_VERSION. A monorepo package it requires
+# comes from Packagist, as released, not from packages/.
 # ARCH=386 runs the tests on 32-bit PHP of IMAGE, the official image by default: ours has no i386 build,
 # Composer installs in it all the same)
 ARCH ?=
 IMAGE ?= php:$(or $(PHP_VERSION),8.6)-cli
-CHECKOUT_DEPS ?= 0
-test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=] [CHECKOUT_DEPS=1] [ARCH=386] [IMAGE=]
+test-alone: var ## Run the tests of a package installed alone P= [PHP_VERSION=] [ARCH=386] [IMAGE=]
 	$(if $(P),,$(error P= names the package))
 	rm -rf var/alone/$(P)
 	mkdir -p var/alone
 	cp -R packages/$(P) var/alone/$(P)
-	$(RUN) sh -ec '\
-		cd var/alone/$(P); \
-		if [ "$(CHECKOUT_DEPS)" = 1 ]; then \
-			composer config repositories.checkout path "../../../packages/*"; \
-			composer config minimum-stability dev; \
-			composer config prefer-stable true; \
-			export COMPOSER_ROOT_VERSION=dev-main COMPOSER_MIRROR_PATH_REPOS=1; \
-		fi; \
-		composer update --no-interaction --no-progress'
+	$(RUN) sh -c 'cd var/alone/$(P) && composer update --no-interaction --no-progress'
 ifeq ($(ARCH),386)
 	docker run --rm --platform linux/386 --user $(DOCKER_USER) --volume "$(CURDIR)":/workspace \
 		--workdir /workspace/var/alone/$(P) $(IMAGE) vendor/bin/testo --config=../../../testo-alone.php $(ARGS)
