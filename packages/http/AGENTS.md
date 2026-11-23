@@ -139,6 +139,23 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 - The HTTP/1 parser checks each field once. `Headers::fromHttp1()` takes the immutable `Fields` object
   created by the parser. Accepting an array here would let callers put unchecked names and values on the wire.
 
+### HTTP/1 codec performance
+
+These decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.
+Revisit them if a profile shows a different workload or a PHP upgrade changes the cost.
+
+- Rejected: scanning a path for escapable bytes before calling `strtr()`. Plain short paths saved
+  0.07 µs per head, paths with brackets got slower, and TCP throughput changed by only 0.5%.
+- Rejected: caching the status line by HTTP version and status code. Creating and encoding a fresh
+  response took 2.117 µs before and 2.110 µs after. The cache gave no TCP gain.
+- Rejected: storing encoded field lines on each `Headers`. Reusing the same headers cut response
+  encoding from 1.40 to 1.26 µs, but fresh headers went from 2.12 to 2.20 µs. Even with shared
+  headers the TCP run stayed around 60k responses/s. Include fresh, shared and cloned headers in a retry.
+- Rejected: special-casing GET and POST before the method token check. Tally counted 2.15% fewer
+  parser instructions on a short GET. TCP throughput changed by 0.5% and batch p99 did not improve.
+- Rejected: PCRE in place of `strcspn()` for forbidden bytes in a field value. With a 3 KB Cookie,
+  the parser used 28% more instructions and TCP throughput fell from 49.4k to 43.5k requests/s.
+
 ## Tests
 
 - A rejection is asserted with its status and its whole message (`rejection()` in `tests/helpers.php`),

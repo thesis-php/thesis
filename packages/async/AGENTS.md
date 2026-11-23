@@ -216,6 +216,8 @@ or the process loop. `virtualTime()` runs a separate loop.
   `Deadlock` (`@api`, an `\Error`) is thrown into its wait, with the place of every suspended fiber.
 - The newest timer stays outside the heap until another timer is registered or the loop needs the heap.
   A synchronous operation can cancel its deadline without inserting or extracting a heap entry.
+  On PHP 8.6, deferring the heap entry (`f39fec8`) cut instructions by 5.0% in `TimeoutBench`
+  and added 1.7% in `DelayBench`. Run both when changing the heap: one cancels timers, the other fires them.
   A timer registered by a waking timer can still fire in the same tick. A cancel nulls the waiter,
   and the heap is rebuilt once outdated entries outnumber the pending ones (at least 64).
   A cancelled timer at the top leaves at once. Expirations saturate
