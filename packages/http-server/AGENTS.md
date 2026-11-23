@@ -19,8 +19,8 @@
 - Like the AMQP client, the server starts a daemon in the group passed to `run()`. It returns once the daemon
   has registered shutdown. A handler may call `close()`: the group joins active exchanges after it returns.
 
-- The listener owns its sockets and drains active exchanges on shutdown. `Connection::serve()` also works
-  with a caller-provided reader and writer; that caller closes its transport in a finally block.
+- The listener owns its sockets and drains active exchanges on shutdown. The internal `Connection::serve()`
+  runs HTTP/1 exchanges on a reader and writer so tests and benchmarks can run without sockets.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Write a small string body with its response head. Reading a stream can wait for the peer to receive

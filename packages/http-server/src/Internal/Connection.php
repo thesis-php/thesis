@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\HttpServer;
+namespace Thesis\HttpServer\Internal;
 
 use Thesis\Async\Cancelled;
 use Thesis\Http\Headers;
@@ -17,13 +17,7 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use Thesis\HttpServer\Internal\BodyInput;
-use Thesis\HttpServer\Internal\BodyReader;
-use Thesis\HttpServer\Internal\ConnectionState;
-use Thesis\HttpServer\Internal\ContinueResponse;
-use Thesis\HttpServer\Internal\HeadReader;
-use Thesis\HttpServer\Internal\ResponseWriter;
-use Thesis\HttpServer\Internal\SizedBodyReader;
+use Thesis\HttpServer\Options;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Io\Reader;
@@ -37,12 +31,12 @@ use function Thesis\Http\Http1\encodeChunk;
 use function Thesis\Http\Http1\encodeLastChunk;
 
 /**
- * @api
+ * @internal
  */
 final class Connection
 {
     /**
-     * Serve one plaintext connection. The caller must close the transport in a finally block.
+     * Serve HTTP/1 requests on one connection. The caller closes the transport in a finally block.
      * A handler failure before the final head gets an empty 500 response and still propagates to the caller.
      *
      * @param callable(Request): Response $handler

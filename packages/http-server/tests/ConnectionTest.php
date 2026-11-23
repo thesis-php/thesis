@@ -12,6 +12,7 @@ use Thesis\Http\Headers;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;

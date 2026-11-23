@@ -9,7 +9,7 @@ use Tally\Attribute\Linear;
 use Tally\Attribute\Warmup;
 use Thesis\Http\Headers;
 use Thesis\Http\Response;
-use Thesis\HttpServer\Connection;
+use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Options;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\Io\StringReader;

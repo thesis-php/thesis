@@ -11,6 +11,7 @@ use Testo\Test;
 use Thesis\Async\Instant;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\HttpServer\Stub\TimedReader;
 use Thesis\Io\StringReader;

@@ -10,7 +10,6 @@ use Thesis\Async\Group;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Thesis\HttpServer\Connection;
 use Thesis\HttpServer\Context;
 use Thesis\HttpServer\Options;
 use Thesis\Net\Server;

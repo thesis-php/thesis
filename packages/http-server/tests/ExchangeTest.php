@@ -11,6 +11,7 @@ use Testo\Test;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
+use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\ContinueReader;
 use Thesis\HttpServer\Stub\PrefixedReader;
 use Thesis\HttpServer\Stub\RecordingWriter;
