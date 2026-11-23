@@ -96,6 +96,11 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   So `ETag` is written as `Etag`, as Go does.
 - `Request` and `Response` expose a `Reader` through `$body` and a separate `$trailers` property beside `$headers`.
   A message constructed without a reader gets its own empty `StringReader`. The wire codec enforces body boundaries.
+- Rejected: PSR-7 as the shared message contract. `StreamInterface` permits sequential reads, but an arbitrary
+  implementation can block the event loop. PSR-7 has no standard access to trailers, which can arrive at EOF.
+  It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives
+  `Host` from the URI, and `Headers` stores lowercase names. Interoperability belongs in adapters at the
+  application boundary, where the adapter can define which streams and message fields it supports.
 - Rejected: a separate HTTP `Body` wrapper. `Reader` carries the bytes, and the HTTP/1 codec already knows
   which reader enforces the message boundary.
 - Rejected: lazy reader factories and replay on the body. They make reading responsible for opening resources,
