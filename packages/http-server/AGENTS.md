@@ -160,6 +160,13 @@
   at `ab4b259` to 46.4k, and median p99 fell from 272.8 to 159.4 ms. Five of six pairs gained
   throughput. Both arms had about 22% relative standard deviation on the working Mac. All replies
   were 2xx with no reconnects or errors, and both arms passed the Arena validators.
+- At `21ff928`, three one-vCPU M1 Pro pairs gave Thesis/true-async medians of 58.1k/78.5k replies/s on the mix,
+  58.8k/79.5k on GET, 58.9k/78.3k on Content-Length POST and 55.4k/76.1k on chunked POST. The same constant
+  two-byte GET response through both APIs still gave 65.6k/87.2k. Include a GET control when measuring POST costs.
+- Rejected: passing a known response length of at most 8 KiB directly to `Body::read()` in `Connection::readBody()`
+  to skip the buffering check and block-size clamp. In eight alternating in-process rounds, writing a two-byte
+  response took 4.3% less time at the median, but a 64 KiB response took 5.0% more. Across three TCP pairs at
+  `21ff928`, two lost throughput on GET and two on the Arena mix. The throughput ranges overlapped on both.
 - At `7eaf938`, Thesis served 72.9%, 80.7% and 75.2% of true-async throughput in three mixed pairs
   with one server vCPU. Median p99 was 110.9 ms for Thesis and 92.7 ms for true-async.
 - Rejected: checking for an exact whole-head match before the cached prefix match to skip writing an empty suffix.
