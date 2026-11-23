@@ -36,7 +36,7 @@ final readonly class Config
      *     or a configured endpoint
      * @param ?ServerTls $tls the TLS settings, or null to serve plaintext
      * @param positive-int $maxConnections connections served at the same time
-     * @param positive-int $maxRequestsPerConnection requests allowed before the server closes the connection
+     * @param positive-int|null $maxRequestsPerConnection requests allowed on one connection, or null for no limit
      * @param positive-int $maxHeadBytes bytes allowed per request head, including the final empty line
      * @param non-negative-int $maxBodyBytes decoded bytes allowed per request body
      * @param ?Duration $headTimeout time to receive a complete request head, defaults to 10 seconds
@@ -52,7 +52,7 @@ final readonly class Config
         int|string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint,
         public ?ServerTls $tls = null,
         public int $maxConnections = 1024,
-        public int $maxRequestsPerConnection = 1000,
+        public ?int $maxRequestsPerConnection = null,
         public int $maxHeadBytes = 64 * 1024,
         public int $maxBodyBytes = 16 * 1024 * 1024,
         ?Duration $headTimeout = null,

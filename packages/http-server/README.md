@@ -96,7 +96,7 @@ Sizes count bytes. Durations use `Time\Duration`, for example `Thesis\Time\sec(5
 | Option | Default | Applies to |
 | --- | --- | --- |
 | `maxConnections` | 1024 | Accepted connections, including idle ones |
-| `maxRequestsPerConnection` | 1000 | Successive requests on one connection |
+| `maxRequestsPerConnection` | `null` (unlimited) | Set a positive integer to limit requests per connection |
 | `maxHeadBytes` | 64 KiB | The request line and fields, including the terminating empty line |
 | `maxBodyBytes` | 16 MiB | Payload after decoding HTTP/1 framing |
 | `headTimeout` | 10 s | Receipt of the complete head |

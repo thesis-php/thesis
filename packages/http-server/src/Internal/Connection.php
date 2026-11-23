@@ -52,8 +52,10 @@ final class Connection
         $buffer = new Buffer();
         $output = new ResponseWriter($output, $config->writeTimeout);
         $bodyInput = new BodyInput($input, $config->bodyIdleTimeout);
+        $requestsRemaining = $config->maxRequestsPerConnection;
+        $reused = false;
 
-        for ($served = 0; $served < $config->maxRequestsPerConnection; ++$served) {
+        while (true) {
             if (isCancelled()) {
                 checkpoint();
             }
@@ -67,7 +69,7 @@ final class Connection
                     buffer: $buffer,
                     input: $input,
                     config: $config,
-                    isKeepAlive: $served > 0,
+                    isKeepAlive: $reused,
                     scheme: $state->scheme ?? 'http',
                 );
             } catch (MalformedMessage $error) {
@@ -80,6 +82,10 @@ final class Connection
                 return;
             }
 
+            if ($requestsRemaining !== null) {
+                --$requestsRemaining;
+            }
+
             try {
                 $keepAlive = self::exchange(
                     head: $head,
@@ -88,7 +94,7 @@ final class Connection
                     output: $output,
                     handler: $handler,
                     maxBodyBytes: $config->maxBodyBytes,
-                    keepAlive: $served + 1 < $config->maxRequestsPerConnection,
+                    keepAlive: $requestsRemaining !== 0,
                     state: $state,
                 );
             } finally {
@@ -98,6 +104,8 @@ final class Connection
             if (!$keepAlive) {
                 return;
             }
+
+            $reused = true;
         }
     }
 

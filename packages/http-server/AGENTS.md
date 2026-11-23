@@ -26,6 +26,8 @@
   runs HTTP/1 exchanges on a reader and writer so tests and benchmarks can run without sockets.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
+- Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
+  reconnects. The idle timeout still applies between requests. An explicit request limit closes after the last response.
 - Write a small string body with its response head. Reading a stream can wait for the peer to receive
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:

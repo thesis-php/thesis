@@ -198,18 +198,38 @@ final class ConnectionLimitsTest
         Assert::string($output->bytes)->startsWith('HTTP/1.1 413 ');
     }
 
+    public function defaultAllowsMoreThanAThousandRequestsOnOneConnection(): void
+    {
+        $wire = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
+        $output = new RecordingWriter();
+
+        Connection::serve(
+            input: new StringReader(str_repeat($wire, 1001)),
+            output: $output,
+            handler: static fn() => new Response(),
+            config: new Config('/test.sock'),
+        );
+
+        Assert::same(substr_count($output->bytes, 'HTTP/1.1 200 OK'), 1001);
+        Assert::string($output->bytes)->notContains('Connection: close');
+    }
+
     public function requestLimitClosesBeforeDispatchingBufferedRequest(): void
     {
         $wire = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
         $output = new RecordingWriter();
 
         Connection::serve(
-            input: new StringReader($wire . $wire),
+            input: new StringReader(str_repeat($wire, 3)),
             output: $output,
             handler: static fn() => new Response(),
-            config: new Config('/test.sock', maxRequestsPerConnection: 1),
+            config: new Config('/test.sock', maxRequestsPerConnection: 2),
         );
 
-        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        Assert::same(
+            actual: $output->bytes,
+            expected: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+            . "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        );
     }
 }
