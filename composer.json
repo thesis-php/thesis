@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1 server, AMQP. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1 server, AMQP, PSR-3 logging. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -17,7 +17,8 @@
         "rabbitmq",
         "sockets",
         "dns",
-        "http-server"
+        "http-server",
+        "logging"
     ],
     "authors": [
         {
@@ -43,6 +44,7 @@
         "internal/container": "^1.1",
         "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
+        "psr/log": "^3.0",
         "symfony/polyfill-php84": "^1.34",
         "symfony/polyfill-php85": "^1.32",
         "testo/testo": "^0.10.60"
@@ -62,6 +64,7 @@
         "friendsofphp/php-cs-fixer": "^3.95.30",
         "infection/infection": "^0.35.10",
         "llm/skills": "^1.17",
+        "monolog/monolog": "^3.0",
         "phpstan/phpstan-strict-rules": "^2.1.1",
         "phpstan/tally": "^1.0.2",
         "rector/rector": "^2.8.5",
@@ -87,6 +90,7 @@
         "thesis/http-client": "0.1.x-dev",
         "thesis/http-server": "0.1.x-dev",
         "thesis/io": "0.1.x-dev",
+        "thesis/log": "0.1.x-dev",
         "thesis/net": "0.1.x-dev",
         "thesis/phpstan-extension": "0.1.x-dev",
         "thesis/source-location": "0.1.x-dev",
@@ -108,6 +112,7 @@
             "Thesis\\HttpServer\\": "packages/http-server/src/",
             "Thesis\\Http\\": "packages/http/src/",
             "Thesis\\Io\\": "packages/io/src/",
+            "Thesis\\Log\\": "packages/log/src/",
             "Thesis\\Net\\": "packages/net/src/",
             "Thesis\\PhpstanExtension\\": "packages/phpstan-extension/src/",
             "Thesis\\SourceLocation\\": "packages/source-location/src/",
@@ -153,6 +158,7 @@
             "Thesis\\HttpServer\\Benchmarks\\": "packages/http-server/benchmarks/",
             "Thesis\\Http\\": "packages/http/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
+            "Thesis\\Log\\": "packages/log/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",
             "Thesis\\Monorepo\\Tests\\": "tools/monorepo/tests/",
             "Thesis\\Net\\": "packages/net/tests/",
@@ -173,6 +179,7 @@
             "packages/exceptionally/tests/Exceptionally/helpers.php",
             "packages/http/tests/helpers.php",
             "packages/io/tests/helpers.php",
+            "packages/log/tests/helpers.php",
             "packages/net/tests/helpers.php",
             "packages/time/tests/helpers.php"
         ]

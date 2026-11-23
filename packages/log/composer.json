@@ -1,0 +1,69 @@
+{
+    "name": "thesis/log",
+    "description": "PSR-3 logger with a configurable clock, bounded buffering, and asynchronous JSON and colored console output.",
+    "keywords": [
+        "php",
+        "async",
+        "logging",
+        "psr-3",
+        "psr-20",
+        "ndjson",
+        "console"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/thesis-php/thesis/issues",
+        "source": "https://github.com/thesis-php/thesis/tree/main/packages/log",
+        "security": "https://github.com/thesis-php/thesis/security/policy"
+    },
+    "require": {
+        "php": "^8.6",
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0",
+        "thesis/async": "^0.1",
+        "thesis/io": "^0.1",
+        "thesis/time": "^0.4"
+    },
+    "require-dev": {
+        "monolog/monolog": "^3.0",
+        "testo/assert": "^0.1.17",
+        "testo/codecov": "^0.2.5",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29",
+        "thesis/dispatcher": "^0.4",
+        "thesis/testo-plugin": "^0.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Thesis\\Log\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\Log\\": "tests/"
+        },
+        "files": [
+            "tests/helpers.php"
+        ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}

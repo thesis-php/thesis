@@ -30,6 +30,7 @@ jobs:
           - http-client
           - http-server
           - io
+          - log
           - net
           - source-location
           - testo-plugin

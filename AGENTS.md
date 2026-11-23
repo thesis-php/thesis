@@ -98,6 +98,7 @@ the whole monorepo is for the final check.
 - `http-client`: Asynchronous HTTP/1 client for HTTP and HTTPS with connection pooling, streaming bodies and trailers. Requires: http, io, net.
 - `http-server`: Asynchronous HTTP/1 server for TCP and Unix sockets with streaming bodies, trailers, TLS and graceful shutdown. Requires: async, http, io, net, time.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
+- `log`: PSR-3 logger with a configurable clock, bounded buffering, and asynchronous JSON and colored console output. Requires: async, io, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `source-location`: Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.

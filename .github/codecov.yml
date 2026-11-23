@@ -76,6 +76,12 @@ component_management:
         - packages/io/src/**
       flag_regexes:
         - '^io$'
+    - component_id: log
+      name: thesis/log
+      paths:
+        - packages/log/src/**
+      flag_regexes:
+        - '^log$'
     - component_id: net
       name: thesis/net
       paths:

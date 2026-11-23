@@ -19,6 +19,7 @@ agent topic or package `AGENTS.md`. Remove steps from the roadmap as they are co
 | `dns` | `net` | Check the hosts file and `resolv.conf` |
 | `uri` | PHP URI classes | HTTP uses `Uri\Rfc3986\Uri` to preserve raw paths and queries |
 | `cache` | `cache` | A Redis cache, with `redis` |
+| `log` | `log` | — (PSR-3 with NDJSON and console output through `io`) |
 | `phpunit-util` | Testo, `testo` | — |
 
 ### To do
@@ -42,7 +43,6 @@ What amphp has, then what thesis makes of it.
 
 ### Not carried over
 
-- `log`: psr/log and the non-blocking stdout of `io` are enough, a Monolog handler may come as a bridge.
 - `rpc`: grpc takes its place. `http-server-session`, `http-client-guzzle-adapter`, `mysql-dbal`: application level
   or not needed.
 - Stale or niche: `quic`, `ssh`, `beanstalk`, `stomp`, `dbus`, `react-adapter`, `react-stream-adapter`.

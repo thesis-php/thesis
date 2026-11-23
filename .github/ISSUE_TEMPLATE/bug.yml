@@ -18,6 +18,7 @@ body:
         - thesis/http-client
         - thesis/http-server
         - thesis/io
+        - thesis/log
         - thesis/net
         - thesis/phpstan-extension
         - thesis/source-location
