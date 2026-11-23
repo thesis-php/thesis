@@ -20,15 +20,22 @@ final class HeadReader
 {
     private const string END = "\r\n\r\n";
 
+    private ?string $lastBytes = null;
+
+    private ?RequestHead $lastHead = null;
+
     /**
      * @param 'http'|'https' $scheme the scheme of the connection
      */
-    public static function read(
+    public function __construct(
+        private readonly string $scheme,
+    ) {}
+
+    public function read(
         Buffer $buffer,
         Reader $input,
         Config $config,
         bool $isKeepAlive = false,
-        string $scheme = 'http',
     ): ?RequestHead {
         try {
             if ($isKeepAlive && $buffer->count() === 0) {
@@ -52,7 +59,7 @@ final class HeadReader
                     throw new \OverflowException();
                 }
 
-                return RequestHead::parse($bytes, $scheme);
+                return $this->parse($bytes);
             }
 
             $filled = timeoutOr($config->headTimeout, static function () use ($buffer, $input, $config) {
@@ -79,6 +86,26 @@ final class HeadReader
 
         $bytes = $buffer->readUntil(self::END) ?? throw new \LogicException('The request head is missing.');
 
-        return RequestHead::parse($bytes, $scheme);
+        return $this->parse($bytes);
+    }
+
+    private function parse(string $bytes): RequestHead
+    {
+        if ($this->lastBytes === $bytes && $this->lastHead !== null) {
+            return $this->lastHead;
+        }
+
+        $head = RequestHead::parse($bytes, $this->scheme);
+
+        // Keep one short head for a client that polls the same resource on this connection.
+        if (\strlen($bytes) <= 1024) {
+            $this->lastBytes = $bytes;
+            $this->lastHead = $head;
+        } else {
+            $this->lastBytes = null;
+            $this->lastHead = null;
+        }
+
+        return $head;
     }
 }

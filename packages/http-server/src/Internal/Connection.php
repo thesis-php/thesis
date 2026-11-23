@@ -49,6 +49,7 @@ final class Connection
         Config $config,
         ?ConnectionState $state = null,
     ): void {
+        $headReader = new HeadReader($state->scheme ?? 'http');
         $buffer = new Buffer();
         $output = new ResponseWriter($output, $config->writeTimeout);
         $bodyInput = new BodyInput($input, $config->bodyIdleTimeout);
@@ -65,12 +66,11 @@ final class Connection
             }
 
             try {
-                $head = HeadReader::read(
+                $head = $headReader->read(
                     buffer: $buffer,
                     input: $input,
                     config: $config,
                     isKeepAlive: $reused,
-                    scheme: $state->scheme ?? 'http',
                 );
             } catch (MalformedMessage $error) {
                 self::writeError($output, $error->status);

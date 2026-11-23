@@ -24,6 +24,9 @@
 
 - The listener owns its sockets and drains active exchanges on shutdown. The internal `Connection::serve()`
   runs HTTP/1 exchanges on a reader and writer so tests and benchmarks can run without sockets.
+- Each connection keeps its last parsed head if the wire head fits in 1 KiB, excluding the final delimiter.
+  A byte-for-byte match can reuse the immutable head. The scheme belongs to the connection after the TLS handshake.
+  Create the request and its body reader anew even when two heads match.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
@@ -40,7 +43,8 @@
 - Profile the cancellation scope around each response write. In `ConnectionBench` with 512 requests
   and an in-memory writer, bypassing the entire write deadline saved 19.1% of instructions. This
   measures the scope, timer and call together. The heap change in `f39fec8` saved about 1% on the
-  same exchange. Measure scope entry and exit separately before changing the timer queue again.
+  same exchange. On PHP 8.6 a synchronous timeout took 1.36 µs, constructing, binding and closing its
+  scope took 0.65 µs, and registering and cancelling a timer in isolation took 0.47 µs (warm medians).
 - Rejected: starting the write timeout only when the socket watcher waits. A write can already have
   suspended behind another writer or in the pacer. Check a client that stops reading a large response:
   the write must time out while independent clients still receive replies.
@@ -60,6 +64,10 @@
   and Xdebug off. Run base, candidate, candidate, base on the same host, discard warm-up and check
   every response. Match TCP_NODELAY, framing and response headers across servers. A split write
   without TCP_NODELAY introduced about 40 ms of delay in the fragmented-head experiment.
+- Against `27496ba`, reusing the last short head on the connection raised the median of a repeated plaintext GET
+  from 49.8k to 57.1k responses/s with 64 clients, and lowered median p99 from 2.39 to 2.01 ms.
+  Alternating two paths missed on every request (46.5k vs 47.7k). A single client sending 16 identical requests
+  per batch went from 64.0k to 73.7k responses/s; median batch p99 was 438 vs 386 µs.
 - Earlier TCP comparisons explain the current block sizes. At `4992a57`, 64 KiB string writes
   raised throughput by 71% for a 64 KiB response and 59% for 256 KiB. At `016ed2c`, writing a
   buffered echo with its head gained 24% for 256 bytes and 16% for 4 KiB. When changing either
