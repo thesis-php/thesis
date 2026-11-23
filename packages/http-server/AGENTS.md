@@ -131,3 +131,11 @@
   true-async worker threads. With the post-f477ba2 changes, three runs per configuration gave median
   throughput of 45k/90k/199k for Thesis and 72k/131k/344k for true-async. Both Arena handlers passed
   validation. They do different application work on the same inputs, and macOS controls physical core placement.
+- At `ab4b259` on the one-vCPU M1 Pro setup above, a constant two-byte GET response through each
+  server's API gave 64.2k/83.4k replies/s (Thesis/true-async). Identical query computation gave
+  60.8k/77.3k. The stock handlers gave 59.8k/77.1k on GET, 49.3k/76.3k on Content-Length POST
+  and 44.9k/75.1k on chunked POST. Use interleaved runs: Thesis chunked ranged from 30.8k to 45.2k.
+- Rejected: replacing the keep-alive checkpoint and immediate read with a direct socket read under
+  the same idle deadline. A checkpoint with 4096 runnable fibers cost 1.60 µs in isolation, but
+  the mixed Arena median fell from 48.9k to 44.0k replies/s across three pairs. Both versions passed
+  the Baseline and fragmentation checks.
