@@ -6,6 +6,8 @@ namespace Thesis\HttpServer;
 
 use Thesis\Net\InetAddress;
 use Thesis\Net\ServerTls;
+use Time\Duration;
+use function Thesis\Time\sec;
 
 /**
  * The listening endpoint, HTTP limits and optional TLS settings. Creating a config does no I/O.
@@ -14,46 +16,78 @@ use Thesis\Net\ServerTls;
  */
 final readonly class Config
 {
-    /**
-     * @param non-empty-string $host an IPv4 or IPv6 address
-     * @param int<0, 65535> $port zero lets the operating system choose the port
-     * @param positive-int $backlog
-     */
-    public static function tcp(
-        string $host,
-        int $port,
-        Options $options = new Options(),
-        ?ServerTls $tls = null,
-        int $backlog = 511,
-        bool $reusePort = false,
-        bool $noDelay = true,
-    ): self {
-        return new self(new InetAddress($host, $port), $options, $tls, $backlog, $reusePort, $noDelay);
-    }
+    public TcpEndpoint|UnixEndpoint $endpoint;
+
+    public Duration $headTimeout;
+
+    public Duration $idleTimeout;
+
+    public Duration $bodyIdleTimeout;
+
+    public Duration $writeTimeout;
+
+    public Duration $tlsHandshakeTimeout;
+
+    public Duration $shutdownTimeout;
 
     /**
-     * @param non-empty-string $path
-     * @param positive-int $backlog
+     * @param int<0, 65535>|non-empty-string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint an IPv4 loopback port
+     *     (zero lets the OS choose), an absolute Unix socket path, a TCP address in IP:port or [IPv6]:port form,
+     *     or a configured endpoint
+     * @param ?ServerTls $tls the TLS settings, or null to serve plaintext
+     * @param positive-int $maxConnections connections served at the same time
+     * @param positive-int $maxRequestsPerConnection requests allowed before the server closes the connection
+     * @param positive-int $maxHeadBytes bytes allowed per request head, including the final empty line
+     * @param non-negative-int $maxBodyBytes decoded bytes allowed per request body
+     * @param ?Duration $headTimeout time to receive a complete request head, defaults to 10 seconds
+     * @param ?Duration $idleTimeout time to wait for the next request, defaults to 30 seconds
+     * @param ?Duration $bodyIdleTimeout time without input while reading a body, defaults to 30 seconds
+     * @param ?Duration $writeTimeout time to complete each write, defaults to 30 seconds
+     * @param ?Duration $tlsHandshakeTimeout time to complete a TLS handshake, defaults to 10 seconds
+     * @param ?Duration $shutdownTimeout time for active exchanges to finish after shutdown, defaults to 5 seconds
+     * @throws \ValueError if a timeout is negative
+     * @throws \ValueError if an endpoint string is neither an absolute Unix path nor a valid TCP address
      */
-    public static function unix(
-        string $path,
-        Options $options = new Options(),
-        ?ServerTls $tls = null,
-        int $backlog = 511,
-    ): self {
-        return new self($path, $options, $tls, $backlog);
-    }
+    public function __construct(
+        int|string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint,
+        public ?ServerTls $tls = null,
+        public int $maxConnections = 1024,
+        public int $maxRequestsPerConnection = 1000,
+        public int $maxHeadBytes = 64 * 1024,
+        public int $maxBodyBytes = 16 * 1024 * 1024,
+        ?Duration $headTimeout = null,
+        ?Duration $idleTimeout = null,
+        ?Duration $bodyIdleTimeout = null,
+        ?Duration $writeTimeout = null,
+        ?Duration $tlsHandshakeTimeout = null,
+        ?Duration $shutdownTimeout = null,
+    ) {
+        $this->endpoint = match (true) {
+            \is_int($endpoint) => new TcpEndpoint(new InetAddress('127.0.0.1', $endpoint)),
+            \is_string($endpoint) => str_starts_with($endpoint, '/')
+                ? new UnixEndpoint($endpoint)
+                : new TcpEndpoint(InetAddress::fromString($endpoint)),
+            $endpoint instanceof InetAddress => new TcpEndpoint($endpoint),
+            $endpoint instanceof TcpEndpoint, $endpoint instanceof UnixEndpoint => $endpoint,
+        };
+        $this->headTimeout = $headTimeout ?? sec(10);
+        $this->idleTimeout = $idleTimeout ?? sec(30);
+        $this->bodyIdleTimeout = $bodyIdleTimeout ?? sec(30);
+        $this->writeTimeout = $writeTimeout ?? sec(30);
+        $this->tlsHandshakeTimeout = $tlsHandshakeTimeout ?? sec(10);
+        $this->shutdownTimeout = $shutdownTimeout ?? sec(5);
 
-    /**
-     * @param InetAddress|non-empty-string $endpoint TCP address or Unix socket path
-     * @param positive-int $backlog
-     */
-    private function __construct(
-        public InetAddress|string $endpoint,
-        public Options $options,
-        public ?ServerTls $tls,
-        public int $backlog,
-        public bool $reusePort = false,
-        public bool $noDelay = true,
-    ) {}
+        foreach ([
+            'headTimeout' => $this->headTimeout,
+            'idleTimeout' => $this->idleTimeout,
+            'bodyIdleTimeout' => $this->bodyIdleTimeout,
+            'writeTimeout' => $this->writeTimeout,
+            'tlsHandshakeTimeout' => $this->tlsHandshakeTimeout,
+            'shutdownTimeout' => $this->shutdownTimeout,
+        ] as $name => $timeout) {
+            if ($timeout->negative) {
+                throw new \ValueError("The {$name} option must be a non-negative duration.");
+            }
+        }
+    }
 }

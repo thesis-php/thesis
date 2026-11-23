@@ -7,7 +7,7 @@ namespace Thesis\HttpServer\Internal;
 use Thesis\Http\Http1\MalformedMessage;
 use Thesis\Http\Http1\RequestHead;
 use Thesis\Http\Status;
-use Thesis\HttpServer\Options;
+use Thesis\HttpServer\Config;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 use Thesis\Io\UnexpectedEof;
@@ -26,7 +26,7 @@ final class HeadReader
     public static function read(
         Buffer $buffer,
         Reader $input,
-        Options $options,
+        Config $config,
         bool $isKeepAlive = false,
         string $scheme = 'http',
     ): ?RequestHead {
@@ -34,8 +34,8 @@ final class HeadReader
             if ($isKeepAlive && $buffer->count() === 0) {
                 // Once a byte arrives, the entire remainder shares one deadline.
                 $first = timeoutOr(
-                    duration: $options->idleTimeout,
-                    body: static fn() => $input->read(min(8192, $options->maxHeadBytes)),
+                    duration: $config->idleTimeout,
+                    body: static fn() => $input->read(min(8192, $config->maxHeadBytes)),
                 );
 
                 if ($first === null) {
@@ -48,15 +48,15 @@ final class HeadReader
 
             $bytes = $buffer->readUntil(self::END);
             if ($bytes !== null) {
-                if (\strlen($bytes) + \strlen(self::END) > $options->maxHeadBytes) {
+                if (\strlen($bytes) + \strlen(self::END) > $config->maxHeadBytes) {
                     throw new \OverflowException();
                 }
 
                 return RequestHead::parse($bytes, $scheme);
             }
 
-            $filled = timeoutOr($options->headTimeout, static function () use ($buffer, $input, $options) {
-                $buffer->fillUntil($input, self::END, $options->maxHeadBytes);
+            $filled = timeoutOr($config->headTimeout, static function () use ($buffer, $input, $config) {
+                $buffer->fillUntil($input, self::END, $config->maxHeadBytes);
 
                 return true;
             });
@@ -72,7 +72,7 @@ final class HeadReader
             throw new MalformedMessage('The connection ended in a request head.');
         } catch (\OverflowException) {
             throw new MalformedMessage(
-                message: \sprintf('The request head exceeds %d bytes.', $options->maxHeadBytes),
+                message: \sprintf('The request head exceeds %d bytes.', $config->maxHeadBytes),
                 status: Status::REQUEST_HEADER_FIELDS_TOO_LARGE,
             );
         }

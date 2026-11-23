@@ -9,8 +9,8 @@ use Tally\Attribute\Linear;
 use Tally\Attribute\Warmup;
 use Thesis\Http\Headers;
 use Thesis\Http\Response;
+use Thesis\HttpServer\Config;
 use Thesis\HttpServer\Internal\Connection;
-use Thesis\HttpServer\Options;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\Io\StringReader;
 use function Thesis\Async\group;
@@ -45,7 +45,7 @@ final class ConnectionBench
                 headers: new Headers(['Content-Type' => 'text/plain']),
                 body: new StringReader('Hello, World!'),
             ),
-            options: new Options(maxRequestsPerConnection: $count),
+            config: new Config('/test.sock', maxRequestsPerConnection: $count),
         ));
 
         if (substr_count($output->bytes, 'Hello, World!') !== $count) {

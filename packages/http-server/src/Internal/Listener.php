@@ -10,10 +10,9 @@ use Thesis\Async\Group;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpServer\Config;
 use Thesis\HttpServer\Context;
-use Thesis\HttpServer\Options;
 use Thesis\Net\Server;
-use Thesis\Net\ServerTls;
 use Thesis\Net\SocketClosed;
 use Thesis\Net\TlsFailed;
 use function Thesis\Async\group;
@@ -44,12 +43,11 @@ final class Listener
     public function __construct(
         private readonly Server $listener,
         private readonly \Closure $handler,
-        private readonly Options $options,
-        private readonly ?ServerTls $tls,
+        private readonly Config $config,
         private readonly ?\Closure $onError,
     ) {
         $this->drained = new Deferred();
-        $this->capacity = new LocalSemaphore($options->maxConnections);
+        $this->capacity = new LocalSemaphore($config->maxConnections);
     }
 
     public function run(): void
@@ -66,7 +64,7 @@ final class Listener
                 }
 
                 if ($this->connections !== []) {
-                    timeoutOr($this->options->shutdownTimeout, $this->drained->await(...));
+                    timeoutOr($this->config->shutdownTimeout, $this->drained->await(...));
                 }
             } finally {
                 $this->listener->close();
@@ -116,11 +114,11 @@ final class Listener
         }
 
         $socket = $connection->socket;
-        $tls = $this->tls;
+        $tls = $this->config->tls;
 
         try {
             if ($tls !== null) {
-                timeout($this->options->tlsHandshakeTimeout, static fn() => $socket->enableTls($tls));
+                timeout($this->config->tlsHandshakeTimeout, static fn() => $socket->enableTls($tls));
 
                 $protocol = $socket->tls?->alpnProtocol;
                 if ($protocol !== null && $protocol !== 'http/1.1') {
@@ -137,7 +135,7 @@ final class Listener
                 input: $socket,
                 output: $socket,
                 handler: fn(Request $request) => ($this->handler)($request, $context),
-                options: $this->options,
+                config: $this->config,
                 state: $connection,
             );
         } catch (Cancelled $cancelled) {

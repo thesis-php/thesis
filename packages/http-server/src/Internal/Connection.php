@@ -17,7 +17,7 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use Thesis\HttpServer\Options;
+use Thesis\HttpServer\Config;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Io\Reader;
@@ -46,14 +46,14 @@ final class Connection
         Reader $input,
         Writer $output,
         callable $handler,
-        Options $options = new Options(),
+        Config $config,
         ?ConnectionState $state = null,
     ): void {
         $buffer = new Buffer();
-        $output = new ResponseWriter($output, $options->writeTimeout);
-        $bodyInput = new BodyInput($input, $options->bodyIdleTimeout);
+        $output = new ResponseWriter($output, $config->writeTimeout);
+        $bodyInput = new BodyInput($input, $config->bodyIdleTimeout);
 
-        for ($served = 0; $served < $options->maxRequestsPerConnection; ++$served) {
+        for ($served = 0; $served < $config->maxRequestsPerConnection; ++$served) {
             if (isCancelled()) {
                 checkpoint();
             }
@@ -66,7 +66,7 @@ final class Connection
                 $head = HeadReader::read(
                     buffer: $buffer,
                     input: $input,
-                    options: $options,
+                    config: $config,
                     isKeepAlive: $served > 0,
                     scheme: $state->scheme ?? 'http',
                 );
@@ -87,8 +87,8 @@ final class Connection
                     input: $bodyInput,
                     output: $output,
                     handler: $handler,
-                    maxBodyBytes: $options->maxBodyBytes,
-                    keepAlive: $served + 1 < $options->maxRequestsPerConnection,
+                    maxBodyBytes: $config->maxBodyBytes,
+                    keepAlive: $served + 1 < $config->maxRequestsPerConnection,
                     state: $state,
                 );
             } finally {

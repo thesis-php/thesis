@@ -40,7 +40,7 @@ final class ServerTest
             /** @var Deferred<null> $release */
             $release = new Deferred();
             $server = new Server(
-                config: Config::tcp('127.0.0.1', 0, options: new Options(maxConnections: 1)),
+                config: new Config('127.0.0.1:0', maxConnections: 1),
                 handler: static function (Request $request, Context $context) use ($entered, $release) {
                     $entered->complete($context);
                     $release->await();
@@ -86,7 +86,7 @@ final class ServerTest
             /** @var Deferred<null> $entered */
             $entered = new Deferred();
             $server = new Server(
-                config: Config::tcp('127.0.0.1', 0, options: new Options(shutdownTimeout: ms(10))),
+                config: new Config(0, shutdownTimeout: ms(10)),
                 handler: static function () use ($entered) {
                     $entered->complete();
                     delay(sec(10));
@@ -123,7 +123,7 @@ final class ServerTest
             /** @var Deferred<null> $next */
             $next = new Deferred();
             $server = new Server(
-                config: Config::tcp('127.0.0.1', 0, options: new Options(maxConnections: 1)),
+                config: new Config(new InetAddress('127.0.0.1', 0), maxConnections: 1),
                 handler: static function (Request $request) use ($entered, $release, $next) {
                     if ($request->uri->getRawPath() === '/first') {
                         $entered->complete();
@@ -166,7 +166,7 @@ final class ServerTest
             $failure = new Deferred();
             $error = new \RuntimeException('Handler failed.');
             $server = new Server(
-                config: Config::tcp('127.0.0.1', 0),
+                config: new Config(new InetAddress('127.0.0.1', 0)),
                 handler: static function (Request $request) use ($error) {
                     if ($request->uri->getRawPath() === '/fail') {
                         throw $error;
@@ -207,7 +207,7 @@ final class ServerTest
     public function rejectsASecondRun(): void
     {
         group(static function (Group $group) {
-            $server = new Server(Config::tcp('127.0.0.1', 0), static fn() => new Response());
+            $server = new Server(new Config(new InetAddress('127.0.0.1', 0)), static fn() => new Response());
             $server->run($group);
 
             Expect::exception(\LogicException::class);
@@ -217,14 +217,14 @@ final class ServerTest
 
     public function endingGroupImmediatelyClosesTheServer(): void
     {
-        $server = new Server(Config::tcp('127.0.0.1', 0), static fn() => new Response());
+        $server = new Server(new Config(new InetAddress('127.0.0.1', 0)), static fn() => new Response());
         group($server->run(...));
         Assert::null($server->address);
     }
 
     public function cancellationClosesTheListener(): void
     {
-        $server = new Server(Config::tcp('127.0.0.1', 0), static fn() => new Response());
+        $server = new Server(new Config(new InetAddress('127.0.0.1', 0)), static fn() => new Response());
         $expired = new \stdClass();
         $result = timeoutOr(
             duration: ms(10),
@@ -245,7 +245,7 @@ final class ServerTest
             $occupied = listen('127.0.0.1', 0);
             $address = $occupied->address;
             \assert($address instanceof InetAddress);
-            $server = new Server(Config::tcp($address->ip, $address->port), static fn() => new Response());
+            $server = new Server(new Config(new TcpEndpoint($address, backlog: 16)), static fn() => new Response());
             Assert::null($server->address);
 
             try {
@@ -265,7 +265,7 @@ final class ServerTest
     public function createsUnixSocketDuringRunAndRemovesItOnClose(): void
     {
         $path = sys_get_temp_dir() . '/http-' . bin2hex(random_bytes(8));
-        $server = new Server(Config::unix($path), static fn() => new Response());
+        $server = new Server(new Config(new UnixEndpoint($path, backlog: 16)), static fn() => new Response());
         Assert::false(file_exists($path));
 
         group(static function (Group $group) use ($server, $path) {
@@ -292,7 +292,7 @@ final class ServerTest
                 $failure = new Deferred();
                 $tls = new ServerTls(certificate: $certificate, alpnProtocols: ['http/1.1', 'h2']);
                 $server = new Server(
-                    config: Config::tcp('127.0.0.1', 0, tls: $tls),
+                    config: new Config(new InetAddress('127.0.0.1', 0), tls: $tls),
                     handler: static function (Request $request, Context $context) use ($received) {
                         $received->complete([$request->uri->getScheme(), $context->tls?->alpnProtocol]);
 

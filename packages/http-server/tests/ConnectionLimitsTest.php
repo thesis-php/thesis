@@ -38,7 +38,7 @@ final class ConnectionLimitsTest
             input: $input,
             output: $output,
             handler: static fn() => throw new \LogicException('An incomplete head must not reach the handler.'),
-            options: new Options(headTimeout: sec(3)),
+            config: new Config('/test.sock', headTimeout: sec(3)),
         );
 
         Assert::equals(Instant::now()->since($start), sec(3));
@@ -64,7 +64,7 @@ final class ConnectionLimitsTest
 
                 return new Response();
             },
-            options: new Options(bodyIdleTimeout: sec(3)),
+            config: new Config('/test.sock', bodyIdleTimeout: sec(3)),
         );
 
         Assert::equals(Instant::now()->since($start), sec(4));
@@ -88,7 +88,7 @@ final class ConnectionLimitsTest
 
                 return new Response();
             },
-            options: new Options(bodyIdleTimeout: sec(1)),
+            config: new Config('/test.sock', bodyIdleTimeout: sec(1)),
         );
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 408 ');
@@ -106,7 +106,7 @@ final class ConnectionLimitsTest
             input: $input,
             output: $output,
             handler: static fn() => new Response(),
-            options: new Options(writeTimeout: sec(1)),
+            config: new Config('/test.sock', writeTimeout: sec(1)),
         );
     }
 
@@ -124,7 +124,7 @@ final class ConnectionLimitsTest
             input: $input,
             output: $output,
             handler: static fn() => new Response(),
-            options: new Options(idleTimeout: sec(1)),
+            config: new Config('/test.sock', idleTimeout: sec(1)),
         );
 
         Assert::equals(Instant::now()->since($start), sec(1));
@@ -142,7 +142,7 @@ final class ConnectionLimitsTest
                 input: new StringReader($head),
                 output: $output,
                 handler: static fn() => new Response(),
-                options: new Options(maxHeadBytes: $limit),
+                config: new Config('/test.sock', maxHeadBytes: $limit),
             );
 
             Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
@@ -176,7 +176,7 @@ final class ConnectionLimitsTest
 
                     return new Response();
                 },
-                options: new Options(maxBodyBytes: $limit),
+                config: new Config('/test.sock', maxBodyBytes: $limit),
             );
 
             Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
@@ -192,7 +192,7 @@ final class ConnectionLimitsTest
             input: new StringReader($wire),
             output: $output,
             handler: static fn() => throw new \LogicException('An oversized body must not reach the handler.'),
-            options: new Options(maxBodyBytes: 1),
+            config: new Config('/test.sock', maxBodyBytes: 1),
         );
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 413 ');
@@ -207,7 +207,7 @@ final class ConnectionLimitsTest
             input: new StringReader($wire . $wire),
             output: $output,
             handler: static fn() => new Response(),
-            options: new Options(maxRequestsPerConnection: 1),
+            config: new Config('/test.sock', maxRequestsPerConnection: 1),
         );
 
         Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");

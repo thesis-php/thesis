@@ -13,7 +13,7 @@ use function Thesis\Async\group;
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 $server = new Server(
-    config: Config::tcp('0.0.0.0', 8080),
+    config: new Config('0.0.0.0:8080'),
     handler: static fn(Request $request) => new Response(
         body: $request->body,
         trailers: static fn() => $request->trailers,

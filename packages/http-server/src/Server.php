@@ -9,7 +9,6 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpServer\Internal\Listener;
 use Thesis\Net\Address;
-use Thesis\Net\InetAddress;
 use Thesis\Net\ListenFailed;
 use Thesis\Net\Server as SocketListener;
 use function Thesis\Async\checkpoint;
@@ -70,23 +69,23 @@ final class Server
         }
 
         $endpoint = $this->config->endpoint;
-        $this->listener = $endpoint instanceof InetAddress
-            ? listen(
-                host: $endpoint->ip,
-                port: $endpoint->port,
-                backlog: $this->config->backlog,
-                reusePort: $this->config->reusePort,
-                noDelay: $this->config->noDelay,
-            )
-            : listenUnix($endpoint, $this->config->backlog);
+        $this->listener = match (true) {
+            $endpoint instanceof TcpEndpoint => listen(
+                host: $endpoint->address->ip,
+                port: $endpoint->address->port,
+                backlog: $endpoint->backlog,
+                reusePort: $endpoint->reusePort,
+                noDelay: $endpoint->noDelay,
+            ),
+            $endpoint instanceof UnixEndpoint => listenUnix($endpoint->path, $endpoint->backlog),
+        };
         $ready = false;
 
         try {
             $driver = new Listener(
                 listener: $this->listener,
                 handler: $this->handler,
-                options: $this->config->options,
-                tls: $this->config->tls,
+                config: $this->config,
                 onError: $this->onError,
             );
             $task = $group->daemon(function () use ($driver, &$ready) {

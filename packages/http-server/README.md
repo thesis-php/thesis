@@ -34,7 +34,7 @@ use function Thesis\Async\awaitSignal;
 use function Thesis\Async\group;
 
 $server = new Server(
-    config: Config::tcp('127.0.0.1', 8080),
+    config: new Config(8080),
     handler: static fn(Request $request) => new Response(
         body: $request->body,
         trailers: static fn() => $request->trailers,
@@ -67,7 +67,12 @@ curl --http1.1 -sS -H 'Transfer-Encoding: chunked' --data-binary 'one' http://12
 
 ## Connection lifetime
 
-The constructor takes a `Config` and the request handler and does no I/O. Choose `Config::tcp($host, $port)` or `Config::unix($path)`.
+The server constructor takes a `Config` and the request handler and does no I/O.
+Pass an integer port to listen on `127.0.0.1`. With `new Config(0)`, the OS chooses the port.
+To specify the address, pass a string such as `'0.0.0.0:8080'` or `'[::1]:8080'`, or pass an `InetAddress`.
+For Unix, pass an absolute socket path such as `'/run/app.sock'`. Use `UnixEndpoint` for a relative path.
+Both endpoint types let you set `backlog`, which defaults to 511. `TcpEndpoint` also takes `reusePort` and `noDelay`.
+
 `$server->run($group)` binds the endpoint and returns once the server is ready. A bind failure throws
 `Thesis\Net\ListenFailed` from `run()`. With TCP port zero, `$server->address` gives the assigned port. Call `$server->close()` to stop accepting clients.
 The group waits for shutdown to finish. The server closes idle sockets and lets active handlers
@@ -85,8 +90,8 @@ the decoder has consumed the terminating chunk and all its trailers.
 
 ## Limits
 
-Pass `options: new Options(...)` to `Config::tcp()` or `Config::unix()`. Sizes count bytes. Durations use `Time\Duration`,
-for example `Thesis\Time\sec(5)`.
+Pass limits and timeouts as named arguments of `Config`, for example `new Config($endpoint, maxConnections: 256)`.
+Sizes count bytes. Durations use `Time\Duration`, for example `Thesis\Time\sec(5)`.
 
 | Option | Default | Applies to |
 | --- | --- | --- |
@@ -103,7 +108,7 @@ for example `Thesis\Time\sec(5)`.
 
 ## TLS and request expectations
 
-Pass a `Thesis\Net\ServerTls` configuration through the `tls` argument of `Config::tcp()` or `Config::unix()` to enable HTTPS.
+Pass a `Thesis\Net\ServerTls` configuration through the `tls` argument of `Config` to enable HTTPS.
 The TLS handshake runs in the task for the accepted socket. The handler can inspect the negotiated details
 through `$context->tls`. Use `http/1.1` when configuring ALPN for this server.
 
