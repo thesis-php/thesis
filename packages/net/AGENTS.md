@@ -31,6 +31,9 @@ Read `README.md` for the API and its guarantees.
   can use another buffer or a shorter chunk that holds the record.
 - An `fwrite()` that returns 0 *with* an error has failed: OpenSSL reports a broken pipe this way, not as `false`,
   and waiting for writability then would spin forever.
+- `tryWrite()` returns zero when a writer holds the socket or the pacer would yield. A positive result
+  counts only the bytes accepted by that call. A caller sending the rest owns the partial-write cleanup.
+  During or after a TLS handshake, use `write()` so it owns the OpenSSL record until the retry.
 - `read()`, `write()` and `accept()` call `Pacer::pace()` (one `Pacer(16)` per socket or server) before they touch
   the stream: it yields for a tick after 16 calls in one tick, so a peer that never pauses, one that reads faster
   than we write (another process on the same host), or a flood of connections does not starve the event loop.

@@ -91,6 +91,8 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 - `Headers::get()` joins the lines with a comma, as RFC 9110 defines. Rejected: returning the first line
   (`Header.Get` in Go), which silently ignores a second `X-Forwarded-For` or `Authorization` line.
 - `Headers` stores string values. Typed field descriptors can wait until callers need shared parsing and formatting.
+- A repeated single string field can reuse its checked lines. Remember one exact input name and value
+  up to 1 KiB together. Save the two strings by value because a caller's input array can contain references.
 - `Headers` stores names in lowercase (HTTP/2 requires it). The HTTP/1.1 codec writes them as `Content-Type`
   (`ucwords()` by hyphens): lowercase names are valid, but some peers compare names case-sensitively.
   So `ETag` is written as `Etag`, as Go does.

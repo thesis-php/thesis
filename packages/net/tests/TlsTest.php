@@ -244,6 +244,19 @@ final class TlsTest
         Assert::same($client->tls?->protocol, 'TLSv1.3');
     }
 
+    public function immediateWriteLeavesTlsRecordsToTheWriter(): void
+    {
+        [$client, $server] = tcpPair();
+        all([
+            static fn() => $client->enableTls(self::trusting('server.test', peerName: 'server.test')),
+            static fn() => $server->enableTls(self::server('server.test')),
+        ]);
+
+        Assert::same($client->tryWrite('x'), 0);
+        $client->write('y');
+        Assert::same($server->read(1), 'y');
+    }
+
     public function localCloseAfterReadinessEndsTheHandshake(): void
     {
         [$client, $peer] = tcpPair();

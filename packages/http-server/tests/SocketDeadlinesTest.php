@@ -15,6 +15,7 @@ use Thesis\Net\SocketClosed;
 use Thesis\TestoPlugin\VirtualTime;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
+use function Thesis\Async\timeoutOr;
 use function Thesis\Net\socketPair;
 use function Thesis\Time\sec;
 
@@ -102,6 +103,19 @@ final class SocketDeadlinesTest
             Assert::equals(sec(3), Instant::now()->since($start));
             Assert::true($owner->await());
             $peer->close();
+        });
+    }
+
+    #[VirtualTime]
+    public function cancellingAfterAnImmediatePartialWriteClosesTheSocket(): void
+    {
+        group(static function (Group $group) {
+            $writes = new SocketDeadlines($group, sec(3));
+            [$socket, $peer] = socketPair();
+            timeoutOr(sec(1), static fn() => $writes->write($socket, str_repeat('x', 8 * 1024 * 1024)));
+
+            Assert::true($socket->isClosed);
+            Assert::same($peer->read(1), 'x');
         });
     }
 

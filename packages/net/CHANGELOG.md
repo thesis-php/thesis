@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Socket::tryRead()` reads available bytes immediately and returns null when it would have to wait.
 
+- `Socket::tryWrite()` sends available plaintext bytes immediately and returns their count.
 - The package provides non-blocking TCP and Unix sockets, TLS and asynchronous DNS.
   The task tree controls cancellation.
 - Socket writes and half-closes run in call order. Closing during a TLS handshake raises `SocketClosed`.

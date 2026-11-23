@@ -187,7 +187,7 @@ final class Connection
                 throw new \ValueError('The handler must return a final response without a protocol switch.');
             }
 
-            $reply = ResponseHead::of(
+            [$reply, $bytes] = self::encodeHead(
                 response: $response,
                 request: $head,
                 isPersistent: $keepAlive && $state?->isStopping !== true,
@@ -209,10 +209,9 @@ final class Connection
                 || ($ignoresBody && !self::isBodyComplete($body));
 
             if ($reply->isPersistent && $mustClose) {
-                $reply = ResponseHead::of($response, $head, isPersistent: false);
+                [$reply, $bytes] = self::encodeHead($response, $head, isPersistent: false);
             }
 
-            $bytes = $reply->toString();
         } catch (Cancelled $error) {
             throw $error;
         } catch (\Throwable $error) {
@@ -258,6 +257,39 @@ final class Connection
         );
 
         return $reply->isPersistent && self::isBodyComplete($body);
+    }
+
+    /**
+     * @return array{ResponseHead, string}
+     */
+    private static function encodeHead(Response $response, RequestHead $request, bool $isPersistent): array
+    {
+        /** @var ?array{ResponseHead, string} $last */
+        static $last = null;
+        $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
+        if ($last !== null && $ordinary && $response->body instanceof StringReader) {
+            $cached = $last;
+            $head = $cached[0];
+            if ($response->status === $head->status && $response->body->size === $head->length
+                && $request->version === $head->version && ($isPersistent && $request->isPersistent) === $head->isPersistent
+                && $response->headers->toArray() === $head->headers->toArray()) {
+                $trailers = $response->trailers;
+                if ($trailers?->toArray() === []) {
+                    return $cached;
+                }
+
+                // A trailer provider is evaluated once when framing the response.
+                $response = clone($response, ['trailers' => $trailers]);
+            }
+        }
+
+        $head = ResponseHead::of($response, $request, $isPersistent);
+        $result = [$head, $head->toString()];
+        if ($ordinary && $head->framing === Framing::Length && \strlen($result[1]) <= 1024) {
+            $last = $result;
+        }
+
+        return $result;
     }
 
     private static function isBodyComplete(null|ChunkedReader|FixedLengthReader $body): bool

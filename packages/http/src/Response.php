@@ -8,6 +8,7 @@ use Thesis\Io\Reader;
 use Thesis\Io\StringReader;
 use function Thesis\Http\Internal\discardBodyAndReadTrailers;
 use function Thesis\Io\close;
+use const Thesis\Http\Internal\EMPTY_HEADERS;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this response type. The response holds a status,
@@ -49,9 +50,9 @@ final class Response
      */
     public function __construct(
         public public(set) readonly int $status = Status::OK,
-        public public(set) readonly Headers $headers = new Headers(),
+        public public(set) readonly Headers $headers = EMPTY_HEADERS,
         public public(set) readonly Reader $body = new StringReader(''),
-        null|Headers|callable $trailers = new Headers(),
+        null|Headers|callable $trailers = EMPTY_HEADERS,
     ) {
         $this->trailerSource = self::normalizeTrailers($trailers);
     }

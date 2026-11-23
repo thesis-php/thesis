@@ -82,6 +82,8 @@ and Nagle would hold back the last packet of every request.
   one after another, never interleaved, so a frame written by one call stays whole.
   A write cancelled before it has sent anything leaves the socket as it was; a write cancelled or failed half-way
   **closes the socket**, because the peer has got half a message and nothing after it would make sense.
+- `tryWrite(string $bytes)` returns how many bytes a plaintext socket accepted immediately. Pass the remainder
+  to `write()` before yielding to another writer. During and after a TLS handshake it returns zero.
 - Different fibers may take turns reading from the socket. An overlapping read throws `Thesis\Io\ConcurrentRead`.
   Writes may proceed during a pending read.
 - `close()` closes at once; reads and writes waiting in other fibers throw `SocketClosed`.
@@ -215,7 +217,7 @@ in the same event loop, without a network.
 | `listen(string $host, int $port, int $backlog = 511, bool $reusePort = false, bool $noDelay = true): Server` | TCP server on an IP address |
 | `listenUnix(string $path, int $backlog = 511): Server` | Unix server |
 | `socketPair(): array{Socket, Socket}` | two connected sockets |
-| `Socket`: `read()`, `tryRead()`, `write()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
+| `Socket`: `read()`, `tryRead()`, `write()`, `tryWrite()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
 | `Server`: `accept(): ?Socket`, `awaitClose()`, `close()`, `$address`, `$isClosed` | a listening socket |
 | `ClientTls`, `ServerTls`, `Certificate`, `TlsVersion`, `TlsInfo` | TLS |
 | `Resolver`, `DnsResolver`: `system()`, `fromFiles()` | DNS |

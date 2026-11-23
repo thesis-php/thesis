@@ -435,6 +435,16 @@ final class ChunkedTest
         );
     }
 
+    public function checksTheEmptyTrailerLineAgainstItsLimitAfterBufferedData(): void
+    {
+        $buffer = new Buffer();
+        $buffer->write("1\r\na\r\n0\r\n\r\n");
+        $reader = new ChunkedReader($buffer, new ScriptedReader(''), maxTrailersLength: 1);
+
+        Assert::same($reader->read(1), 'a');
+        Assert::same(rejection(static fn() => $reader->read(1)), '431: The trailers of a chunked body must be at most 1 bytes.');
+    }
+
     public function acceptsTrailersAsLongAsLimit(): void
     {
         $chunked = new ChunkedReader(

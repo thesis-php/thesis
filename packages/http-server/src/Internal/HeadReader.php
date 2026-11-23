@@ -26,6 +26,11 @@ final class HeadReader
     private ?RequestHead $lastHead = null;
 
     /**
+     * @var positive-int
+     */
+    private int $readSize = 8192;
+
+    /**
      * @param 'http'|'https' $scheme the scheme of the connection
      */
     public function __construct(
@@ -42,7 +47,7 @@ final class HeadReader
         try {
             if ($isKeepAlive && $buffer->count() === 0) {
                 // Once a byte arrives, the entire remainder shares one deadline.
-                $max = min(8192, $config->maxHeadBytes);
+                $max = min($this->readSize, $config->maxHeadBytes);
                 $first = $this->idle !== null && $input instanceof Socket
                     ? $this->idle->read($input, $max)
                     : timeoutOr($config->idleTimeout, static fn() => $input->read($max));
@@ -51,6 +56,8 @@ final class HeadReader
                     return null;
                 }
 
+                // A short exchange needs little read space. Grow again if the peer fills it.
+                $this->readSize = \strlen($first) < 2048 ? 2048 : 8192;
                 $buffer->drain();
                 // The delimiter is part of the match. Everything after it belongs to the body or the next request.
                 if ($this->lastWire !== null && $this->lastHead !== null && str_starts_with($first, $this->lastWire)) {

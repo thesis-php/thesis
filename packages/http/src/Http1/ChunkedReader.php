@@ -13,6 +13,7 @@ use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use function Thesis\Http\Internal\quote;
+use const Thesis\Http\Internal\EMPTY_HEADERS;
 use const Thesis\Http\Internal\TOKEN_CHARS;
 
 /**
@@ -144,6 +145,15 @@ final class ChunkedReader implements Reader
 
         if (!$this->isLastChunkRead) {
             if ($this->hasPendingChunkTerminator) {
+                // A buffered last chunk without extensions or trailers ends the body in one step.
+                if ($this->maxSizeLineLength >= 3 && $this->maxTrailersLength >= 2
+                    && $this->buffer->count() >= 7 && $this->buffer->peek(7) === "\r\n0\r\n\r\n") {
+                    $this->buffer->skip(7);
+                    $this->trailers = EMPTY_HEADERS;
+
+                    throw new UnexpectedEof();
+                }
+
                 $this->readEndOfChunk();
                 $this->hasPendingChunkTerminator = false;
             }
@@ -260,6 +270,10 @@ final class ChunkedReader implements Reader
             Fields::checkCount(\count($this->trailerLines) + 1, $this->maxTrailers);
             $this->trailerLines[] = $line;
             $this->trailersLength += \strlen($line) + 2;
+        }
+
+        if ($this->trailerLines === []) {
+            return EMPTY_HEADERS;
         }
 
         $fields = Fields::lines($this->trailerLines, $this->maxTrailers);

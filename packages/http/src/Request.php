@@ -9,6 +9,7 @@ use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
 use function Thesis\Http\Internal\discardBodyAndReadTrailers;
 use function Thesis\Io\close;
+use const Thesis\Http\Internal\EMPTY_HEADERS;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this request type. The request holds its method,
@@ -50,9 +51,9 @@ final class Request
     public function __construct(
         public public(set) readonly string $method,
         public public(set) readonly Uri $uri,
-        public public(set) readonly Headers $headers = new Headers(),
+        public public(set) readonly Headers $headers = EMPTY_HEADERS,
         public public(set) readonly Reader $body = new StringReader(''),
-        null|Headers|callable $trailers = new Headers(),
+        null|Headers|callable $trailers = EMPTY_HEADERS,
     ) {
         $this->trailerSource = self::normalizeTrailers($trailers);
     }

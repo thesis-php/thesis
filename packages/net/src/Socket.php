@@ -189,13 +189,7 @@ final class Socket implements Reader, Writer, Closer
 
             while (true) {
                 $stream = $this->stream ?? throw new SocketClosed('The socket was closed while writing.');
-                error_clear_last();
-                $sent = @fwrite($stream, $chunk);
-
-                if ($sent === false || ($sent === 0 && error_get_last() !== null)) {
-                    throw new WriteFailed(lastError('Failed to write to the socket.'));
-                }
-
+                $sent = self::send($stream, $chunk);
                 $written += $sent;
 
                 if ($written === $length) {
@@ -217,6 +211,44 @@ final class Socket implements Reader, Writer, Closer
         } finally {
             $this->endWrite();
         }
+    }
+
+    /**
+     * Tries one plaintext write. Returns the bytes sent, or zero when a writer owns the socket, the pacer
+     * would yield, or the peer has no room. During or after a TLS handshake it returns zero: only write()
+     * can keep ownership of the pending OpenSSL record until the retry.
+     *
+     * @return non-negative-int
+     * @throws SocketClosed
+     * @throws WriteFailed
+     */
+    public function tryWrite(string $bytes): int
+    {
+        if ($bytes === '') {
+            return 0;
+        }
+
+        $stream = $this->stream ?? throw new SocketClosed('The socket is closed.');
+        if ($this->writing || $this->tls !== null || $this->handshaking || !$this->pacer->tryPace()) {
+            return 0;
+        }
+
+        return self::send($stream, $bytes);
+    }
+
+    /**
+     * @param resource $stream
+     * @return non-negative-int
+     */
+    private static function send(mixed $stream, string $bytes): int
+    {
+        error_clear_last();
+        $sent = @fwrite($stream, $bytes);
+        if ($sent === false || ($sent === 0 && error_get_last() !== null)) {
+            throw new WriteFailed(lastError('Failed to write to the socket.'));
+        }
+
+        return $sent;
     }
 
     /**

@@ -44,6 +44,10 @@ final class SocketDeadlines
             if (\count($this->waiting) > 1) {
                 // Serve other ready clients while this one receives the response and sends its next request.
                 checkpoint();
+                $bytes = $socket->tryRead($max);
+                if ($bytes !== null) {
+                    return $bytes;
+                }
             }
 
             return $socket->read($max);
@@ -61,29 +65,44 @@ final class SocketDeadlines
 
     public function write(Socket $socket, string $bytes): void
     {
-        $key = $this->start($socket);
+        $start = Instant::now();
+        $sent = $socket->tryWrite($bytes);
+        if ($sent === \strlen($bytes)) {
+            return;
+        }
+
+        $key = null;
 
         try {
-            $socket->write($bytes);
+            $key = $this->start($socket, $start);
+            $socket->write(substr($bytes, $sent));
         } catch (SocketClosed $error) {
             if (\array_key_exists($key, $this->waiting)) {
                 throw $error;
             }
 
             throw new WriteFailed('The response write did not complete in time.', previous: $error);
+        } catch (\Throwable $error) {
+            if ($sent > 0) {
+                $socket->close();
+            }
+
+            throw $error;
         } finally {
-            unset($this->waiting[$key]);
+            if ($key !== null) {
+                unset($this->waiting[$key]);
+            }
         }
     }
 
-    private function start(Socket $socket): int
+    private function start(Socket $socket, ?Instant $start = null): int
     {
         if (!$this->running) {
             $this->group->daemon($this->expire(...));
             $this->running = true;
         }
 
-        $this->waiting[] = [Instant::now(), $socket];
+        $this->waiting[] = [$start ?? Instant::now(), $socket];
 
         return array_key_last($this->waiting);
     }

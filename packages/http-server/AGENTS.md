@@ -31,10 +31,13 @@
   a response write can share a timer when their timeouts match. Different durations need separate queues.
   Key each entry by operation: a second write can wait for the same socket while the first still owns it.
   Expiry closes the socket. An expired idle read ends silently and an expired write throws `WriteFailed`.
+  Timestamp a write before its immediate attempt. Queue only a write with bytes left, and close the socket
+  if cancellation interrupts the rest after a partial write.
   A zero timeout uses the cancellation scope so an operation that completes without waiting can still succeed.
 - While waiting for the next request, yield if other socket operations are pending: the peer can send its
   request while other clients run. If the first bytes match the last head including its final delimiter,
   keep only the trailing bytes in the buffer. They may include a body and a pipelined request.
+  After a read below 2 KiB, ask for 2 KiB next time. A full 2 KiB read restores the usual 8 KiB size.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
@@ -43,6 +46,9 @@
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
+- Reuse the last encoded length-framed response head up to 1 KiB for a string body when its length,
+  status, version, persistence and ordered fields match. HEAD and CONNECT have their own framing rules.
+  Read the new response's trailers before reuse. A provider returning pending fields requires chunked framing.
 - A fixed-length body already in the buffer has passed the size check and cannot wait on the transport.
   Its fixed-length reader still tracks unread bytes. Wrap it when the first read must send `100 Continue`.
 - Close after an unread body. Draining it would compete with any outstanding application read and would need
@@ -115,3 +121,13 @@
   from 36,438 to 41,750 replies/s (+14.6%) and lowered median p99 from 166.0 to 122.3 ms.
   Four interleaved runs per version used the same handler and settings. All 3,340,168 candidate replies
   were 2xx, with no transport errors or reconnects.
+- Against `f477ba2`, immediate plaintext writes, smaller keep-alive reads after short requests, and reuse
+  of checked fields and encoded response heads raised median throughput from 42,359 to 48,389 replies/s
+  (+14.2%). Median p99 fell from 122.4 to 103.8 ms. Across four interleaved runs per version, all
+  3,860,555 candidate requests got a 2xx reply with no reconnects or errors. The Baseline validator
+  passed all 13 checks and all 1047 fragmentation offsets across nine request shapes.
+- On an M1 Pro with eight Docker Desktop arm64 vCPUs, reserve CPUs 4–7 for gcannon. Give the first
+  1, 2 or 4 vCPUs to either one Thesis process per vCPU with SO_REUSEPORT or the same number of
+  true-async worker threads. With the post-f477ba2 changes, three runs per configuration gave median
+  throughput of 45k/90k/199k for Thesis and 72k/131k/344k for true-async. Both Arena handlers passed
+  validation. They do different application work on the same inputs, and macOS controls physical core placement.

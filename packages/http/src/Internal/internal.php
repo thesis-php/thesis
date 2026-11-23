@@ -9,6 +9,9 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Io\UnexpectedEof;
 
+/** @internal */
+const EMPTY_HEADERS = new Headers();
+
 /**
  * The characters allowed in a token (RFC 9110). A method and a field name are tokens.
  *

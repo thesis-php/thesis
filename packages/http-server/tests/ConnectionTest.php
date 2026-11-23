@@ -103,6 +103,29 @@ final class ConnectionTest
         Assert::same($output->writes, 2);
     }
 
+    public function matchingResponseFieldsCanAcquireTrailers(): void
+    {
+        $request = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
+        $input = new StringReader($request . $request);
+        $output = new RecordingWriter();
+        $reads = 0;
+        $requests = 0;
+        Connection::serve($input, $output, static function () use (&$reads, &$requests) {
+            $body = new StringReader('a');
+            if (++$requests === 1) {
+                return new Response(body: $body);
+            }
+
+            return new Response(body: $body, trailers: static function () use (&$reads) {
+                return ++$reads === 1 ? null : new Headers(['X-End' => 'yes']);
+            });
+        }, new Config('/test.sock'));
+
+        Assert::same($reads, 2);
+        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
+            . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-End: yes\r\n\r\n");
+    }
+
     public function sendsFirstChunkBeforeReadingSecond(): void
     {
         $exchange = new class implements Reader, Writer {

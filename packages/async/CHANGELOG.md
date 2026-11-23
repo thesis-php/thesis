@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `suppressed()` retrieves failures that a group did not rethrow.
 - `Mutex`, `Semaphore` and their keyed variants coordinate tasks. The package also provides
   `synchronized()`, rate limiters and `Backoff`.
-- `StreamWatcher` and `Pacer` support non-blocking streams. `awaitSignal()` and `trapSignals()` handle signals.
+- `StreamWatcher` and `Pacer` support non-blocking streams. `Pacer::tryPace()` checks the budget without yielding.
+- `awaitSignal()` and `trapSignals()` handle signals.
 - `Instant` reads monotonic time. `virtualTime()` and `burnCpu()` control time in tests, and a seed shuffles
   the fibers ready in each tick.
 - `Trace\observe()` dispatches scope events. The events record cancellation causes, spawn and wait sites,

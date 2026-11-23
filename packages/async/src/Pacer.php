@@ -41,16 +41,28 @@ final class Pacer
      */
     public function pace(): void
     {
-        $this->countTick();
-
-        if ($this->count >= $this->perTick && self::canYield()) {
+        if (!$this->tryPace()) {
             checkpoint();
             // Other callers of a shared pacer may have counted their calls in the new tick before this one:
             // the count is of the tick, not of this caller, and starts anew only if nobody has counted yet.
             $this->countTick();
+            ++$this->count;
+        }
+    }
+
+    /**
+     * Counts an operation if it can proceed in this tick. False leaves it for a later tick.
+     */
+    public function tryPace(): bool
+    {
+        $this->countTick();
+        if ($this->count >= $this->perTick && self::canYield()) {
+            return false;
         }
 
         ++$this->count;
+
+        return true;
     }
 
     /**

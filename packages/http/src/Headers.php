@@ -54,6 +54,23 @@ final readonly class Headers implements \IteratorAggregate
      */
     public function __construct(iterable $fields = [])
     {
+        if ($fields === []) {
+            $this->lines = [];
+
+            return;
+        }
+
+        if (\is_array($fields) && \count($fields) === 1) {
+            $key = array_key_first($fields);
+            $value = $fields[$key];
+            if (\is_string($value)) {
+                // @phpstan-ignore cast.useless (PHP turns a numeric name into an int key)
+                $this->lines = self::single((string) $key, $value);
+
+                return;
+            }
+        }
+
         $lines = [];
 
         foreach ($fields as $name => $values) {
@@ -194,17 +211,48 @@ final readonly class Headers implements \IteratorAggregate
         $trimmed = [];
 
         foreach ((array) $values as $value) {
-            if (!isFieldValue($value)) {
-                throw new \ValueError(\sprintf(
-                    'A value of the header "%s" must have no control characters, got %s.',
-                    $name,
-                    quote($value),
-                ));
-            }
-
-            $trimmed[] = trim($value, " \t");
+            $trimmed[] = self::value($name, $value);
         }
 
         return $trimmed;
+    }
+
+    /**
+     * @return array<non-empty-lowercase-string, non-empty-list<string>>
+     */
+    private static function single(string $name, string $value): array
+    {
+        /** @var ?string $lastName */
+        static $lastName = null;
+        /** @var ?string $lastValue */
+        static $lastValue = null;
+        /** @var array<non-empty-lowercase-string, non-empty-list<string>> $lines */
+        static $lines = [];
+        if ($name === $lastName && $value === $lastValue) {
+            return $lines;
+        }
+
+        $normalized = self::name($name);
+        $result = [$normalized => [self::value($normalized, $value)]];
+        if (\strlen($name) + \strlen($value) <= 1024) {
+            $lastName = $name;
+            $lastValue = $value;
+            $lines = $result;
+        }
+
+        return $result;
+    }
+
+    private static function value(string $name, string $value): string
+    {
+        if (!isFieldValue($value)) {
+            throw new \ValueError(\sprintf(
+                'A value of the header "%s" must have no control characters, got %s.',
+                $name,
+                quote($value),
+            ));
+        }
+
+        return trim($value, " \t");
     }
 }

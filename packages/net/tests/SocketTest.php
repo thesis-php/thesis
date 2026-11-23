@@ -43,6 +43,19 @@ final class SocketTest
         }
     }
 
+    public function immediateWritesStopAtThePacingLimitUntilTheNextTick(): void
+    {
+        [$socket, $peer] = socketPair();
+        for ($i = 0; $i < 16; ++$i) {
+            Assert::same($socket->tryWrite('x'), 1);
+        }
+
+        Assert::same($socket->tryWrite('y'), 0);
+        checkpoint();
+        Assert::same($socket->tryWrite('z'), 1);
+        Assert::same(readExactly($peer, 17), str_repeat('x', 16) . 'z');
+    }
+
     public function readsWhatThePeerWrites(): void
     {
         [$left, $right] = socketPair();
@@ -314,6 +327,7 @@ final class SocketTest
             delay(ms(1));
             // frees room while the first write still waits, then a second write starts before it resumes
             $received = readExactly($right, 1000);
+            Assert::same($left->tryWrite('x'), 0);
             $group->spawn(static fn() => $left->write('bcde'));
             delay(ms(1));
 

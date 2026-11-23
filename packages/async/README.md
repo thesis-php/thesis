@@ -1055,6 +1055,7 @@ public function read(): string
 
 It yields before the operation, so a `pace()` that throws `Cancelled` leaves the operation undone.
 It is a cancellation point only when it yields: the other calls only count.
+For a non-blocking operation, `tryPace()` counts a call that may proceed and returns false when it would yield.
 
 ### Delays between attempts: `Backoff`
 
@@ -1228,7 +1229,7 @@ all([user, orders])              orders fails after 50 ms
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `Backoff(Duration $initial, Duration $max, bool $jitter = true, ?Randomizer)`: `next(): Duration`, `reset()` | delays between attempts, doubled up to `$max` |
-| `Pacer(int $perTick)`: `pace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
+| `Pacer(int $perTick)`: `pace()`, `tryPace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
 | `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(Duration): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
