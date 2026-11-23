@@ -30,6 +30,10 @@ Read `README.md` for the API and design decisions.
   a retry would duplicate bytes or leave a hole. Only stdio, which has no messages, goes on after the half.
   `Buffer::flush()` puts the bytes back on a throw, before those written meanwhile: the drain comes first,
   since bytes appended by another fiber during the write must not be written or lost.
+  A second `flush()` during the wait is a `LogicException`: on a failure of both, the bytes would come back
+  in the wrong order.
+- `fill()` and `fillUntil()` count what is missing again after every read: another fiber may read from the buffer
+  while the reader waits. `fillUntil()` searches everything again once the buffer has changed meanwhile.
 - `Buffer`, `Order` and the interfaces call nothing of thesis/async: only streams that wait do
   (the interfaces name `Cancelled` in their PHPDoc only).
 - `Stream` and `SharedStream` hold the `reading` flag for the whole `read()`, `pace()` included: a second reader

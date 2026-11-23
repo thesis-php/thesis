@@ -86,6 +86,30 @@ final class BufferIoTest
         Assert::same($buffer->drain(), 'de');
     }
 
+    public function fillReadsWhatAnotherFiberHasTakenMeanwhile(): void
+    {
+        $buffer = new Buffer(bytes: 'ab');
+        $reader = new CallbackReader('cde', static function () use ($buffer) {
+            $buffer->read(2);
+        });
+
+        $buffer->fill($reader, 3);
+
+        Assert::count($buffer, 3);
+    }
+
+    public function fillUntilFindsDelimiterAfterAnotherFiberHasTakenBytesMeanwhile(): void
+    {
+        $buffer = new Buffer(bytes: 'abcdef');
+        $reader = new CallbackReader("gh\nij", static function () use ($buffer) {
+            $buffer->read(5);
+        });
+
+        $buffer->fillUntil($reader, "\n");
+
+        Assert::same($buffer->readUntil("\n"), 'fgh');
+    }
+
     public function fillUntilDoesNotReadWhenDelimiterIsBuffered(): void
     {
         $reader = new ChunkedReader('xyz');
@@ -201,6 +225,21 @@ final class BufferIoTest
 
         Assert::instanceOf($failure, WriteFailed::class);
         Assert::same($buffer->drain(), 'abce');
+    }
+
+    public function flushRejectsAnotherFlushInProgress(): void
+    {
+        $buffer = new Buffer(bytes: 'a');
+        $failure = null;
+        $writer = new FailingWriter(static function () use ($buffer, &$failure) {
+            $buffer->write('b');
+            $failure = thrown(static fn() => $buffer->flush(new RecordingWriter()));
+        });
+
+        thrown(static fn() => $buffer->flush($writer));
+
+        Assert::instanceOf($failure, \LogicException::class);
+        Assert::same($buffer->drain(), 'ab');
     }
 
     public function flushDoesNotWriteEmptyBuffer(): void

@@ -39,6 +39,11 @@ final class Buffer implements \Countable
     private string $f64 = 'E';
 
     /**
+     * Whether a {@see flush()} waits for its writer: a second one would put its bytes back before those of the first.
+     */
+    private bool $flushing = false;
+
+    /**
      * @param positive-int $chunkSize max number of bytes requested from a {@see Reader} at once in {@see fill()}
      */
     public function __construct(
@@ -147,6 +152,12 @@ final class Buffer implements \Countable
         $slice = clone $this;
         $slice->bytes = substr($this->bytes, $offset, $length);
         $slice->offset = 0;
+
+        // A buffer is sliced during a flush only by another fiber: the check is cheaper than a write on every slice.
+        if ($this->flushing) {
+            $slice->flushing = false;
+        }
+
         $this->offset = $offset + $length;
 
         return $slice;
@@ -670,9 +681,9 @@ final class Buffer implements \Countable
         $this->compact();
 
         do {
-            $bytes = $reader->read(max($missing, $this->chunkSize));
-            $this->bytes .= $bytes;
-            $missing -= \strlen($bytes);
+            $this->bytes .= $reader->read(max($missing, $this->chunkSize));
+            // Counted again: another fiber may have read from the buffer while the read waited.
+            $missing = $length - \strlen($this->bytes) + $this->offset;
         } while ($missing > 0);
     }
 
@@ -719,7 +730,19 @@ final class Buffer implements \Countable
             $this->compact();
             /** @var positive-int $missing $available < $maxLength here */
             $missing = $maxLength - $available;
-            $this->bytes .= $reader->read(min($this->chunkSize, $missing));
+            $searched = $this->bytes;
+            $offset = $this->offset;
+            $bytes = $reader->read(min($this->chunkSize, $missing));
+
+            // Another fiber may have changed the buffer while the read waited: then everything is searched again.
+            // The string is compared by identity first, so it costs nothing while no one has touched it.
+            if ($this->bytes !== $searched || $this->offset !== $offset) {
+                $scanned = 0;
+            }
+
+            // Released before the append, which would otherwise copy the string.
+            unset($searched);
+            $this->bytes .= $bytes;
         }
 
         throw new \OverflowException(\sprintf('Delimiter not found within %d bytes.', $maxLength));
@@ -730,14 +753,21 @@ final class Buffer implements \Countable
      * anything another fiber added during the wait. Retry only if the writer wrote nothing.
      *
      * @throws IoException if $writer->write() fails
+     * @throws \LogicException if another fiber is flushing this buffer
      */
     public function flush(Writer $writer): void
     {
+        if ($this->flushing) {
+            throw new \LogicException('Another fiber is flushing the buffer.');
+        }
+
         $bytes = $this->drain();
 
         if ($bytes === '') {
             return;
         }
+
+        $this->flushing = true;
 
         try {
             $writer->write($bytes);
@@ -746,6 +776,8 @@ final class Buffer implements \Countable
             $this->offset = 0;
 
             throw $error;
+        } finally {
+            $this->flushing = false;
         }
     }
 
