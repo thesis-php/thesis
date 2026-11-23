@@ -14,3 +14,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Socket writes and half-closes run in call order. Closing during a TLS handshake raises `SocketClosed`.
 - DNS cache entries expire when their earliest A or AAAA answer expires.
 - `Server::awaitClose()` waits for listener shutdown without accepting a socket.
+- `InetAddress::fromString()` parses a numeric IP address with a port.

@@ -12,6 +12,27 @@ namespace Thesis\Net;
 final readonly class InetAddress implements Address
 {
     /**
+     * @param string $address an IPv4 address with a port or a bracketed IPv6 address with a port
+     * @throws \ValueError if the address is malformed or the port is outside 0 to 65535
+     */
+    public static function fromString(string $address): self
+    {
+        if (preg_match('/\A(\[[0-9a-f:.]*:[0-9a-f:.]*\]|[0-9.]+):([0-9]+)\z/i', $address, $parts) !== 1) {
+            throw new \ValueError('Expected an IPv4 address with a port or a bracketed IPv6 address with a port.');
+        }
+
+        $ip = trim($parts[1], '[]');
+        $port = (int) $parts[2];
+        \assert($ip !== '' && $port >= 0);
+
+        if ($port > 65535) {
+            throw new \ValueError('The port must be between 0 and 65535.');
+        }
+
+        return new self($ip, $port);
+    }
+
+    /**
      * @param non-empty-string $ip IPv4 or IPv6, without brackets
      * @param int<0, 65535> $port
      * @throws \ValueError if $ip is not an IP address

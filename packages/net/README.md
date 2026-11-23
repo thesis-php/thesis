@@ -220,6 +220,7 @@ in the same event loop, without a network.
 | `ClientTls`, `ServerTls`, `Certificate`, `TlsVersion`, `TlsInfo` | TLS |
 | `Resolver`, `DnsResolver`: `system()`, `fromFiles()` | DNS |
 | `Address`: `InetAddress`, `UnixAddress` | ends of a socket |
+| `InetAddress::fromString(string $address): InetAddress` | parses `127.0.0.1:80` or `[::1]:80` |
 | `ConnectFailed`, `ListenFailed`, `TlsFailed`, `DnsFailed`, `SocketClosed` extend `Thesis\Io\IoException` | exceptions |
 
 ## Limitations

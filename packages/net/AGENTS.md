@@ -74,6 +74,8 @@ Read `README.md` for the API and its guarantees.
   not a timeout per address, and the caller bounds the whole call with `timeout()`.
 - `listen()` leaves `IPV6_V6ONLY` to the OS: `::` is dual-stack on Linux by default, which is what a server wants.
   `noDelay` is on by default, and the backlog is 511, as in nginx.
+- `InetAddress::fromString()` requires brackets around IPv6 so the address and port are distinct. The internal parser
+  splits PHP stream names at the last colon so it can also read unbracketed IPv6 names returned by PHP.
 - Happy Eyeballs is a group of attempts reporting to a `Channel` sized for all of them, so no attempt waits to report;
   sockets that connect in the same tick as the winner are drained and closed in `finally`.
 - A value of a protocol or a file keeps its unit in the internal object that mirrors it: the TTL of
