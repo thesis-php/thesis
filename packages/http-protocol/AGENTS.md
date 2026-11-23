@@ -92,7 +92,7 @@ The HTTP/1 API lives in `Http1`. Its implementation details live in `Internal\Ht
 
 ### HTTP/1 codec performance
 
-These decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.
+Unless a different base is given, these decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.
 Revisit them if a profile shows a different workload or a PHP upgrade changes the cost.
 
 - Rejected: scanning a path for escapable bytes before calling `strtr()`. Plain short paths saved
@@ -106,6 +106,11 @@ Revisit them if a profile shows a different workload or a PHP upgrade changes th
   parser instructions on a short GET. TCP throughput changed by 0.5% and batch p99 did not improve.
 - Rejected: PCRE in place of `strcspn()` for forbidden bytes in a field value. With a 3 KB Cookie,
   the parser used 28% more instructions and TCP throughput fell from 49.4k to 43.5k requests/s.
+- Rejected: trying `Buffer::readUntil()` before the bounded fill when the unread buffer fits within the chunk-size
+  or trailer line limit. Against `0a5888f`, a buffered two-byte chunk took 5.7% less time to decode in memory.
+  Splitting the CRLF of the size line across reads cost 5.7% more. Both effects held in all eight rounds.
+  Across three one-worker Arena pairs on M1 Pro, median throughput was 53.2k/53.1k replies/s (base/candidate)
+  on chunked POST and 57.1k/57.2k on the mix. The ranges overlapped on both workloads.
 - Rejected: reading a whole first chunk with a plain size line directly from the buffer on the first body read.
   Against `7eaf938`, three HTTP Arena H1 mix pairs changed throughput by −1.6%, +33.2% and −44.3%.
   The two arms had 30–33% relative standard deviation. Neither the mix nor chunked POST showed a repeatable gain.
