@@ -273,9 +273,8 @@ final class Socket implements Reader, Writer, Closer
                     throw new TlsFailed('TLS handshake failed: the peer has closed the connection.');
                 }
 
-                if (!$this->watcher->readable()) {
-                    throw new SocketClosed('The socket was closed during the TLS handshake.');
-                }
+                $this->watcher->readable();
+                $stream = $this->stream ?? throw new SocketClosed('The socket was closed during the TLS handshake.');
             }
         } catch (\Throwable $error) {
             $this->close();

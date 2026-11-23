@@ -15,6 +15,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
@@ -241,6 +242,21 @@ final class TlsTest
         ]);
 
         Assert::same($client->tls?->protocol, 'TLSv1.3');
+    }
+
+    public function localCloseAfterReadinessEndsTheHandshake(): void
+    {
+        [$client, $peer] = tcpPair();
+        timeout(sec(1), static fn() => group(static function (Group $group) use ($client, $peer) {
+            $pending = $group->spawn(static fn() => thrown(static fn() => $client->enableTls(new ClientTls())));
+            $group->spawn(static function () use ($client, $peer) {
+                $peer->close();
+                // The poll wakes the handshake. Close locally before its fiber resumes.
+                watchdog(sec(0), $client->close(...));
+            });
+
+            Assert::instanceOf($pending->await(), SocketClosed::class);
+        }));
     }
 
     public function failsIfThePeerClosesDuringTheHandshake(): void
