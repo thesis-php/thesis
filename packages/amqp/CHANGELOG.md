@@ -19,3 +19,4 @@ and [thesis/net](https://github.com/thesis-php/net): the API of 1.x is gone, see
 
 - Concurrent calls to `confirmSelect()` and `txSelect()` send one mode selection. A conflicting call throws
   `LogicException` locally and the channel stays open.
+- `Consumer::cancel()` sends one cancellation for concurrent callers. Reusing a consumer tag leaves old handles inert.

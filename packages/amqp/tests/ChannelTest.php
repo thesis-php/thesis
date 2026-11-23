@@ -507,4 +507,24 @@ final class ChannelTest
             $test($group, $channel, $peer, $id);
         });
     }
+
+    public function concurrentCancellationsSendOneCancel(): void
+    {
+        self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id) {
+            $start = $group->spawn(static fn() => $channel->consume('q', 'same'));
+            $peer->expect(BasicConsume::class);
+            $peer->send($id, new BasicConsumeOk('same'));
+            $consumer = $start->await();
+            $one = $group->spawn($consumer->cancel(...));
+            $peer->expect(BasicCancel::class);
+            $two = $group->spawn($consumer->cancel(...));
+            checkpoint();
+            $peer->send($id, new BasicCancelOk('same'));
+            $one->await();
+            $group->spawn(static fn() => $channel->qos(1));
+            $peer->expect(BasicQos::class);
+            $peer->send($id, new BasicQosOk());
+            $two->await();
+        });
+    }
 }

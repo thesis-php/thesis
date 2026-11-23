@@ -30,6 +30,7 @@ final readonly class PendingCall
         private array $replies,
         private Lock $lock,
         public bool $getNoAck = false,
+        public ?ConsumerState $cancelled = null,
     ) {
         $this->reply = new Deferred();
     }

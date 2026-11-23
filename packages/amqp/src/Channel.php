@@ -65,6 +65,7 @@ use Thesis\Amqp\Internal\Protocol\TxSelectOk;
 use Thesis\Async\Channel as AsyncChannel;
 use Thesis\Async\Deferred;
 use Thesis\Async\LocalMutex;
+use Thesis\Async\Lock;
 use Thesis\Io\Buffer;
 use function Thesis\Amqp\Internal\properties;
 use function Thesis\Async\shield;
@@ -340,7 +341,7 @@ final class Channel
 
         /** @var AsyncChannel<Delivery> $deliveries */
         $deliveries = new AsyncChannel(PHP_INT_MAX);
-        $this->consumers[$tag] = new ConsumerState($deliveries, $noAck);
+        $consumer = $this->consumers[$tag] = new ConsumerState($deliveries, $noAck);
 
         try {
             // Shielded: a consumer started for a caller that is gone would take messages nobody reads.
@@ -357,12 +358,15 @@ final class Channel
                 BasicConsumeOk::class,
             ));
         } catch (\Throwable $exception) {
-            unset($this->consumers[$tag]);
+            // @phpstan-ignore nullCoalesce.initializedProperty (the reader may have removed the tag during the RPC)
+            if (($this->consumers[$tag] ?? null) === $consumer) {
+                unset($this->consumers[$tag]);
+            }
 
             throw $exception;
         }
 
-        return new Consumer($tag, $deliveries, fn() => $this->cancelConsumer($tag));
+        return new Consumer($tag, $deliveries, fn() => $this->cancelConsumer($tag, $consumer));
     }
 
     /**
@@ -588,8 +592,19 @@ final class Channel
      */
     private function call(Method $method, string ...$replies): null|Method|Delivery
     {
-        $lock = $this->callMutex->acquire();
+        return $this->sendCall($this->callMutex->acquire(), $method, $replies);
+    }
 
+    /**
+     * @param list<class-string<Method>> $replies
+     * @throws AmqpException
+     */
+    private function sendCall(
+        Lock $lock,
+        Method $method,
+        array $replies,
+        ?ConsumerState $cancelled = null,
+    ): null|Method|Delivery {
         if ($this->closed !== null) {
             $lock->release();
 
@@ -600,6 +615,7 @@ final class Channel
             replies: $replies,
             lock: $lock,
             getNoAck: $method instanceof BasicGet && $method->noAck,
+            cancelled: $cancelled,
         );
         $this->pending = $pending;
 
@@ -698,7 +714,11 @@ final class Channel
         }
 
         if ($frame instanceof BasicCancelOk) {
-            $this->endConsumer($frame->consumerTag, null);
+            $consumer = $this->consumers[$frame->consumerTag] ?? null;
+
+            if ($consumer === $this->pending->cancelled) {
+                $this->endConsumer($frame->consumerTag, null);
+            }
         }
 
         $this->respond($frame instanceof BasicGetEmpty ? null : $frame);
@@ -823,14 +843,18 @@ final class Channel
         $this->publish($message, routingKey: $replyTo);
     }
 
-    private function cancelConsumer(string $tag): void
+    private function cancelConsumer(string $tag, ConsumerState $consumer): void
     {
-        if ($this->closed !== null || !isset($this->consumers[$tag])) {
+        $lock = $this->callMutex->acquire();
+
+        if (($this->consumers[$tag] ?? null) !== $consumer) {
+            $lock->release();
+
             return;
         }
 
         try {
-            $this->call(new BasicCancel($tag, noWait: false), BasicCancelOk::class);
+            $this->sendCall($lock, new BasicCancel($tag, noWait: false), [BasicCancelOk::class], $consumer);
         } catch (AmqpException) {
             // The channel is closed meanwhile, and so is the consumer.
         }
@@ -906,8 +930,8 @@ final class Channel
      */
     private function drain(): void
     {
-        foreach (array_keys($this->consumers) as $tag) {
-            $this->cancelConsumer((string) $tag);
+        foreach ($this->consumers as $tag => $consumer) {
+            $this->cancelConsumer((string) $tag, $consumer);
         }
 
         $this->confirms->awaitAll();

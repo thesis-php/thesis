@@ -29,6 +29,8 @@ The API and the guarantees are in `README.md` — read it first.
   otherwise RabbitMQ closes the channel with PRECONDITION_FAILED (unknown delivery tag). It and
   `Delivery::$isSettled` are set before the send, so that a concurrent second ack sends nothing,
   and restored if the send throws.
+- Consumer handles identify their registration as well as its tag, which another consumer can reuse.
+  Check the registration after obtaining the RPC lock to send a cancel and when processing its reply.
 - A mandatory message carries the header `x-thesis-return-id`: basic.return names no delivery tag, the header
   correlates the return with its confirm. It is added with `+`, not a spread (which renumbers numeric header
   names), and removed from the returned message.

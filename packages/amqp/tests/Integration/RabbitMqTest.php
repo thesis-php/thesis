@@ -170,4 +170,17 @@ final class RabbitMqTest
             Assert::null($channel->get($queue->name));
         });
     }
+
+    public function cancellingAnOldConsumerLeavesItsReplacementRunning(): void
+    {
+        withRabbitMq(static function (Client $client) {
+            $channel = $client->channel();
+            $queue = $channel->queueDeclare(exclusive: true)->name;
+            $old = $channel->consume($queue, 'same');
+            $old->cancel();
+            $channel->consume($queue, 'same');
+            $old->cancel();
+            Assert::same($channel->queueDeclare($queue, passive: true)->consumers, 1);
+        });
+    }
 }
