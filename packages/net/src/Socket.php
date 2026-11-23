@@ -94,6 +94,11 @@ final class Socket implements Reader, Writer, Closer
     private ?LocalMutex $writeMutex = null;
 
     /**
+     * Whether {@see enableTls()} is in progress: a second handshake would interleave its records with the first.
+     */
+    private bool $handshaking = false;
+
+    /**
      * @param resource $stream
      * @param ?non-empty-string $host
      */
@@ -218,7 +223,7 @@ final class Socket implements Reader, Writer, Closer
      *
      * @throws TlsFailed
      * @throws SocketClosed
-     * @throws \LogicException if TLS is already enabled or another fiber reads or writes
+     * @throws \LogicException if TLS is already enabled or being enabled, or another fiber reads or writes
      */
     public function enableTls(ClientTls|ServerTls $tls): void
     {
@@ -226,6 +231,10 @@ final class Socket implements Reader, Writer, Closer
 
         if ($this->tls !== null) {
             throw new \LogicException('TLS is already enabled.');
+        }
+
+        if ($this->handshaking) {
+            throw new \LogicException('TLS is already being enabled.');
         }
 
         if ($this->reading || $this->writers > 0) {
@@ -243,6 +252,7 @@ final class Socket implements Reader, Writer, Closer
         }
 
         stream_context_set_options($stream, ['ssl' => [...$options, 'peer_certificate' => null]]);
+        $this->handshaking = true;
 
         try {
             while (true) {
@@ -270,6 +280,8 @@ final class Socket implements Reader, Writer, Closer
             $this->close();
 
             throw $error;
+        } finally {
+            $this->handshaking = false;
         }
 
         $this->tls = TlsInfo::fromStream($stream, $captured);

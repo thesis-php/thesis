@@ -170,6 +170,28 @@ final class TlsTest
         Assert::false($server->isClosed);
     }
 
+    public function cannotBeEnabledWhileAnotherHandshakeIsInProgress(): void
+    {
+        [$client, $server] = tcpPair();
+        $clientTls = self::trusting('server.test', peerName: 'server.test');
+
+        group(static function (Group $group) use ($client, $server, $clientTls) {
+            $first = $group->spawn(static fn() => $client->enableTls($clientTls));
+            delay(ms(10));
+
+            // Without the check the second handshake waits for good.
+            $failure = thrown(static fn() => timeout(sec(1), static fn() => $client->enableTls($clientTls)));
+
+            Assert::instanceOf($failure, \LogicException::class);
+            Assert::same($failure->getMessage(), 'TLS is already being enabled.');
+            Assert::false($client->isClosed);
+            $server->enableTls(self::server('server.test'));
+            $first->await();
+        });
+
+        Assert::notNull($client->tls);
+    }
+
     public function cannotBeEnabledWhileAnotherFiberReads(): void
     {
         // the server end is kept: closed, it would end the read and the write

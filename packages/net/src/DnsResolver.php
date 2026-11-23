@@ -124,7 +124,9 @@ final class DnsResolver implements Resolver
             return ['::1', '127.0.0.1'];
         }
 
-        $cached = $this->cache[$name] ?? null;
+        // An absolute name skips the search domains: its answer may differ from that of the name without the dot.
+        $cacheKey = $absolute ? "{$name}." : $name;
+        $cached = $this->cache[$cacheKey] ?? null;
 
         // An entry that expires in this very nanosecond is as good as expired: no test can hit it.
         if ($cached !== null && /* @infection-ignore GreaterThan */ $cached->expiresAt > Instant::now()) {
@@ -150,7 +152,7 @@ final class DnsResolver implements Resolver
             }
 
             if ($addresses !== []) {
-                $this->store($name, $addresses, $ttl);
+                $this->store($cacheKey, $addresses, $ttl);
 
                 return $addresses;
             }
@@ -335,22 +337,22 @@ final class DnsResolver implements Resolver
     }
 
     /**
-     * @param non-empty-string $name
+     * @param non-empty-string $key the name, with a trailing dot if it was asked for as absolute
      * @param non-empty-list<non-empty-string> $addresses
      */
-    private function store(string $name, array $addresses, int $ttl): void
+    private function store(string $key, array $addresses, int $ttl): void
     {
         if ($ttl <= 0) {
             return;
         }
 
-        unset($this->cache[$name]);
+        unset($this->cache[$key]);
 
         if (\count($this->cache) >= self::MAX_CACHED) {
             unset($this->cache[array_key_first($this->cache)]);
         }
 
         $expiresAt = Instant::now()->add(sec(min($ttl, self::MAX_TTL)));
-        $this->cache[$name] = new Cached(addresses: $addresses, expiresAt: $expiresAt);
+        $this->cache[$key] = new Cached(addresses: $addresses, expiresAt: $expiresAt);
     }
 }

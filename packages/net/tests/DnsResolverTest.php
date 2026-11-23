@@ -111,6 +111,20 @@ final class DnsResolverTest
         Assert::same($queries, ['udp db AAAA', 'udp db A']);
     }
 
+    public function cachesAnAbsoluteNameApartFromTheSameNameWithSearchDomains(): void
+    {
+        $zone = ['db' => self::a('10.0.0.9'), 'db.cluster.test' => self::a('10.0.0.1')];
+
+        $addresses = group(static function (Group $group) use ($zone) {
+            $dns = FakeDns::start($group, $zone);
+            $resolver = new DnsResolver(nameservers: [$dns->address], search: ['cluster.test']);
+
+            return [$resolver->resolve('db'), $resolver->resolve('db.'), $resolver->resolve('db')];
+        });
+
+        Assert::same($addresses, [['10.0.0.1'], ['10.0.0.9'], ['10.0.0.1']]);
+    }
+
     public function retriesOverTcpIfTruncated(): void
     {
         $zone = new Zone(a: ['10.0.0.1'], truncated: true);

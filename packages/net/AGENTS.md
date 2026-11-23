@@ -37,6 +37,8 @@ Read `README.md` for the API and its guarantees.
   the stream: it yields for a tick after 16 calls in one tick, so a peer that never pauses, one that reads faster
   than we write (another process on the same host), or a flood of connections does not starve the event loop.
   It yields *before* the operation, so a cancelled read has taken nothing and a cancelled write has sent nothing.
+- A second `enableTls()` during a handshake is a `LogicException` (`$handshaking`): without it the second one
+  waits for good and its records mix with those of the first.
 - A second concurrent reader is a `LogicException`, never a silent race: the `reading` flag is held for the whole
   `read()`, so the second one fails even when bytes have arrived for the first, which would wait forever for them.
 - One `fread()` asks for at most 1 MiB (`MAX_READ`): PHP allocates the whole length before reading, so a length
@@ -57,7 +59,8 @@ Read `README.md` for the API and its guarantees.
   (case-insensitively: DNS 0x20); a stray datagram is skipped and the wait goes on.
 - DNS caches no negative answers (NXDOMAIN, no records), although RFC 2308 allows it: in Docker and Kubernetes
   a service registers after its clients start, and a cached "not found" would hide it for minutes.
-  A positive TTL is capped at a day.
+  A positive TTL is capped at a day. An absolute name (`db.`) is cached under its trailing dot:
+  it skips the search domains, so `db` and `db.` may resolve to different hosts.
 - DNS follows glibc: SERVFAIL and REFUSED move to the next server instead of failing the lookup; a name with
   at least `ndots` dots is asked as is first, then with the search domains, a shorter one the other way round.
 - Rejected for now: sharing one query between concurrent lookups of a host. If it is added, the query must run
