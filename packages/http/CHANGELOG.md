@@ -23,3 +23,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Http1\RequestHead` and `Http1\ResponseHead` handle HTTP/1.1 heads and record framing and persistence.
   `parse()` rejects ambiguous input, `of()` builds a head from a message, and `toString()` writes the head.
 - `Http1\ChunkedReader`, `Http1\encodeChunk()` and `Http1\encodeLastChunk()` handle chunked bodies with trailers.
+- `Request::closeBody()` and `Response::closeBody()` release a closable body without reading it.

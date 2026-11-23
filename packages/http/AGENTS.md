@@ -8,6 +8,7 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
 
 ### Messages
 
+- Requests and responses accept any `Reader`. `closeBody()` delegates to `Thesis\Io\close()` so callers can release a closable body.
 - A message carries only the meaning of HTTP and nothing about the connection: no version, no reason phrase,
   no framing. The head formatter rejects the fields in `Fields::OF_CONNECTION` in message headers,
   except for the representation length described below. On requests it also rejects `Host`, which comes

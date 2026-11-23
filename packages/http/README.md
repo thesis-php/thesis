@@ -147,6 +147,8 @@ The `$trailers` property contains ready fields, or `null` while the fields are u
 `null` or a callback that takes the current reader and returns its trailer state. The callback reads state
 without doing I/O or suspending the fiber. It can be called before and after the body is read.
 
+Use `$request->closeBody()` or `$response->closeBody()` to release a closable body without reading the remaining bytes.
+
 Use `$request->discardBodyAndReadTrailers()` or `$response->discardBodyAndReadTrailers()` when you only need the
 trailers. The method reads from the body's current position to EOF in bounded chunks, even when the trailers are
 already available. Reads may suspend and use the same limits and timeouts as reading the body yourself.

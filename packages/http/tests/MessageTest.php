@@ -27,6 +27,17 @@ final class MessageTest
         Assert::same(readAll($request->body), '');
     }
 
+    public function closesRequestBodyWithoutReadingIt(): void
+    {
+        $body = new ScriptedReader('payload');
+        $request = new Request('POST', new Uri('/'), body: $body);
+
+        $request->closeBody();
+
+        Assert::same($body->closes, 1);
+        Assert::same($body->requests, []);
+    }
+
     public function everyRequestHasBodyOfItsOwn(): void
     {
         $uri = new Uri('https://example.com/');
@@ -58,6 +69,14 @@ final class MessageTest
         Assert::same($response->status, 200);
         Assert::same(lines($response->headers), []);
         Assert::same(readAll($response->body), '');
+    }
+
+    public function closingAStringBodyLeavesItsBytesAvailable(): void
+    {
+        $response = new Response(body: new StringReader('payload'));
+        $response->closeBody();
+
+        Assert::same(readAll($response->body), 'payload');
     }
 
     public function everyResponseHasBodyOfItsOwn(): void

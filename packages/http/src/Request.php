@@ -8,6 +8,7 @@ use Thesis\Io\Reader;
 use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
 use function Thesis\Http\Internal\discardBodyAndReadTrailers;
+use function Thesis\Io\close;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this request type. The request holds its method,
@@ -54,6 +55,14 @@ final class Request
         null|Headers|callable $trailers = new Headers(),
     ) {
         $this->trailerSource = self::normalizeTrailers($trailers);
+    }
+
+    /**
+     * Closes the body if it implements Closer. A copy sharing the same body observes the close too.
+     */
+    public function closeBody(): void
+    {
+        close($this->body);
     }
 
     /**

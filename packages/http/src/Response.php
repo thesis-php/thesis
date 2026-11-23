@@ -7,6 +7,7 @@ namespace Thesis\Http;
 use Thesis\Io\Reader;
 use Thesis\Io\StringReader;
 use function Thesis\Http\Internal\discardBodyAndReadTrailers;
+use function Thesis\Io\close;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this response type. The response holds a status,
@@ -53,6 +54,14 @@ final class Response
         null|Headers|callable $trailers = new Headers(),
     ) {
         $this->trailerSource = self::normalizeTrailers($trailers);
+    }
+
+    /**
+     * Closes the body if it implements Closer. A copy sharing the same body observes the close too.
+     */
+    public function closeBody(): void
+    {
+        close($this->body);
     }
 
     /**
