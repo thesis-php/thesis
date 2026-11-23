@@ -59,7 +59,7 @@ final readonly class ResponseHead
         /** @var int<100, 999> $status */
         $status = (int) $status;
         $fields = Fields::parse($lines, $version, $maxFields);
-        $headers = new Headers($fields->endToEnd);
+        $headers = Headers::fromHttp1($fields);
         $hasBody = self::hasBody($method, $status);
 
         if (
@@ -178,18 +178,17 @@ final readonly class ResponseHead
      */
     public function toString(): string
     {
-        $lines = [\sprintf('%s %d %s', $this->version->value, $this->status, Status::reasonPhrase($this->status) ?? '')];
+        $phrase = Status::reasonPhrase($this->status) ?? '';
+        $bytes = "{$this->version->value} {$this->status} {$phrase}\r\n";
 
-        array_push($lines, ...Fields::format(
+        return $bytes . Fields::format(
             headers: $this->headers,
             version: $this->version,
             framing: $this->framing,
             length: $this->length,
             isPersistent: $this->isPersistent,
             upgrade: $this->upgrade,
-        ));
-
-        return implode("\r\n", $lines) . "\r\n\r\n";
+        );
     }
 
     private static function allowsHypotheticalLength(string $method, int $status): bool

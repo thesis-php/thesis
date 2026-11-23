@@ -32,5 +32,5 @@ function encodeLastChunk(Headers $trailers = new Headers()): string
         }
     }
 
-    return implode("\r\n", ['0', ...Fields::formatLines($trailers)]) . "\r\n\r\n";
+    return "0\r\n" . Fields::formatLines($trailers) . "\r\n";
 }

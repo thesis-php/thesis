@@ -147,6 +147,7 @@
             "Thesis\\Cache\\": "packages/cache/tests/",
             "Thesis\\Formatter\\": "packages/formatter/tests/",
             "Thesis\\HttpServer\\": "packages/http-server/tests/",
+            "Thesis\\HttpServer\\Benchmarks\\": "packages/http-server/benchmarks/",
             "Thesis\\Http\\": "packages/http/tests/",
             "Thesis\\Io\\": "packages/io/tests/",
             "Thesis\\Monorepo\\": "tools/monorepo/src/",

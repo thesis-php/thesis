@@ -21,5 +21,9 @@
 
 - The listener owns its sockets and drains active exchanges on shutdown. `Connection::serve()` also works
   with a caller-provided reader and writer; that caller closes its transport in a finally block.
+- The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
+  for the body or next request. Only a head that still needs bytes needs a head timer.
+- Write a small string body with its response head. Reading a stream can wait for the peer to receive
+  the head, so send the head before reading a streaming body.
 - Close after an unread body. Draining it would compete with any outstanding application read and would need
   a separate size limit and deadline.

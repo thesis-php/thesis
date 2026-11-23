@@ -44,23 +44,37 @@ final readonly class Fields
     public static function parse(array $lines, Version $version, int $maxFields): self
     {
         $fields = self::lines($lines, $maxFields);
-        $contentLength = self::contentLength($fields['content-length'] ?? []);
-        $isChunked = self::isChunked($fields['transfer-encoding'] ?? [], $version);
+        $contentLength = isset($fields['content-length']) ? self::contentLength($fields['content-length']) : null;
+        $isChunked = isset($fields['transfer-encoding']) && self::isChunked($fields['transfer-encoding'], $version);
 
         if ($isChunked && $contentLength !== null) {
             throw new MalformedMessage('A message must not have both Content-Length and Transfer-Encoding.');
         }
 
-        $options = self::options($fields['connection'] ?? []);
-        $upgrade = \in_array('upgrade', $options, strict: true) ? self::list($fields['upgrade'] ?? []) : [];
+        $isPersistent = $version === Version::Http11;
+        $upgrade = [];
 
-        try {
-            self::assertUpgrade($upgrade);
-        } catch (\ValueError $error) {
-            throw new MalformedMessage($error->getMessage());
+        if (isset($fields['connection'])) {
+            $options = self::options($fields['connection']);
+            $isPersistent = ($isPersistent || \in_array('keep-alive', $options, strict: true))
+                && !\in_array('close', $options, strict: true);
+
+            if (isset($fields['upgrade']) && \in_array('upgrade', $options, strict: true)) {
+                $upgrade = self::list($fields['upgrade']);
+
+                try {
+                    self::assertUpgrade($upgrade);
+                } catch (\ValueError $error) {
+                    throw new MalformedMessage($error->getMessage());
+                }
+            }
+
+            foreach ($options as $name) {
+                unset($fields[$name]);
+            }
         }
 
-        foreach ([...self::OF_CONNECTION, ...$options] as $name) {
+        foreach (self::OF_CONNECTION as $name) {
             unset($fields[$name]);
         }
 
@@ -68,17 +82,13 @@ final readonly class Fields
             endToEnd: $fields,
             contentLength: $contentLength,
             isChunked: $isChunked,
-            isPersistent: match ($version) {
-                Version::Http10 => \in_array('keep-alive', $options, strict: true)
-                    && !\in_array('close', $options, strict: true),
-                Version::Http11 => !\in_array('close', $options, strict: true),
-            },
+            isPersistent: $isPersistent,
             upgrade: $upgrade,
         );
     }
 
     /**
-     * @param array<string, non-empty-list<string>> $endToEnd the lines by lowercase name, without the fields
+     * @param array<non-empty-lowercase-string, non-empty-list<string>> $endToEnd the lines by lowercase name, without the fields
      *     that belong to the connection and the fields that `Connection` names
      * @param ?non-negative-int $contentLength
      * @param list<non-empty-string> $upgrade the protocols from `Upgrade`, empty unless `Connection` has `upgrade`
@@ -93,7 +103,7 @@ final readonly class Fields
 
     public static function hasTrailers(Headers $headers, ?Headers $trailers): bool
     {
-        return $headers->has('trailer') || $trailers === null || $trailers->getIterator()->valid();
+        return isset($headers->toArray()['trailer']) || $trailers === null || $trailers->toArray() !== [];
     }
 
     /**
@@ -121,8 +131,10 @@ final readonly class Fields
      */
     public static function assertEndToEnd(Headers $headers, bool $allowContentLength = false): void
     {
+        $lines = $headers->toArray();
+
         foreach (self::OF_CONNECTION as $name) {
-            if (!$headers->has($name)) {
+            if (!isset($lines[$name])) {
                 continue;
             }
 
@@ -146,7 +158,6 @@ final readonly class Fields
      *
      * @param ?non-negative-int $length
      * @param list<non-empty-string> $upgrade
-     * @return list<string>
      */
     public static function format(
         Headers $headers,
@@ -155,13 +166,13 @@ final readonly class Fields
         ?int $length,
         bool $isPersistent,
         array $upgrade,
-    ): array {
-        $lines = self::formatLines($headers);
+    ): string {
+        $bytes = self::formatLines($headers);
 
         if ($framing === Framing::Length) {
-            $lines[] = "Content-Length: {$length}";
+            $bytes .= "Content-Length: {$length}\r\n";
         } elseif ($framing === Framing::Chunked) {
-            $lines[] = 'Transfer-Encoding: chunked';
+            $bytes .= "Transfer-Encoding: chunked\r\n";
         }
 
         // Only the choice that is not the default is written: HTTP/1.1 keeps a connection open, HTTP/1.0 closes it.
@@ -172,37 +183,35 @@ final readonly class Fields
 
         if ($upgrade !== []) {
             $options[] = 'upgrade';
-            $lines[] = 'Upgrade: ' . implode(', ', $upgrade);
+            $bytes .= 'Upgrade: ' . implode(', ', $upgrade) . "\r\n";
         }
 
         if ($options !== []) {
-            $lines[] = 'Connection: ' . implode(', ', $options);
+            $bytes .= 'Connection: ' . implode(', ', $options) . "\r\n";
         }
 
-        return $lines;
+        return $bytes . "\r\n";
     }
 
-    /**
-     * @return list<string>
-     */
-    public static function formatLines(Headers $headers): array
+    public static function formatLines(Headers $headers): string
     {
-        $lines = [];
+        $bytes = '';
 
-        foreach ($headers as $name => $values) {
+        foreach ($headers->toArray() as $name => $values) {
+            $name = ucwords((string) $name, '-');
+
             foreach ($values as $value) {
-                // Lowercase names are valid, but some peers compare names case-sensitively.
-                $lines[] = ucwords($name, '-') . ": {$value}";
+                $bytes .= "{$name}: {$value}\r\n";
             }
         }
 
-        return $lines;
+        return $bytes;
     }
 
     /**
      * @param list<string> $lines
      * @param positive-int $maxFields
-     * @return array<string, non-empty-list<string>>
+     * @return array<non-empty-lowercase-string, non-empty-list<string>>
      * @throws MalformedMessage
      */
     public static function lines(array $lines, int $maxFields): array

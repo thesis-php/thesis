@@ -20,7 +20,7 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   The class itself prevents response splitting, there is no "escape it later". Its state is private
   and changes only through its own methods.
 - PHP turns a numeric name of `Headers` (`1`) into an int key of the array. The keys are cast back to strings
-  wherever they leave the class, and a test covers it.
+  when iterating. The codec reads the underlying array and casts names when it writes them.
 - A message clone shares the reader and its position unless the clone supplies a new reader.
   Pass an unread reader to the sender. A short body requires closing the connection before another head is written.
 - The `$trailers` property reads the current reader state without I/O or suspension. `null` means the fields are
@@ -105,8 +105,8 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   the current reader and runs without caching or waiting.
 - Rejected: a lazy `Headers` proxy. If its initializer suspends, another reader of the proxy can see an
   uninitialized object. The codec publishes a complete immutable `Headers` at the end of the trailer section.
-- The trailer hook stores a normalized closure in a private readonly property. The constructor initializes
-  that property, and `clone()` allows the setter to replace it on the copy. An ordinary write fails.
+- The trailer hook stores ready fields and null directly. Only a callable needs a closure. The source stays
+  in a private readonly property, and `clone()` allows the setter to replace it on the copy. An ordinary write fails.
 - A head is a value with a private constructor, two static constructors (`parse()` from bytes, `of()` from
   a message) and `toString()`. So every head is either what a peer has sent or what a message allows.
   The server and the client read from the same value what they must do after they write the head (chunk
@@ -134,9 +134,10 @@ Read `README.md` for the codec API and `ideas/http.md` for client design notes.
   from a string, which the caller has cut at the empty line (`Buffer::fillUntil()` does it with a limit
   and without rescanning). A chunked body is parsed by a `Reader` that wraps a `Reader`. Both run in tests
   on strings, with no socket and no fiber, and a timeout is just the cancellation of the caller.
-- Rejected: `Headers` that a parser validates once and then creates without a check. The parser checks
-  the fields to throw `MalformedMessage`, and the constructor of `Headers` checks them again. This costs
-  a second validation of each name and value, until a benchmark shows that it matters.
+- Rejected: one regular expression to split and validate each field line. It made a request with a 3 KB
+  cookie slower and gave no consistent gain across header sizes on PHP 8.6.
+- The HTTP/1 parser checks each field once. `Headers::fromHttp1()` takes the immutable `Fields` object
+  created by the parser. Accepting an array here would let callers put unchecked names and values on the wire.
 
 ## Tests
 

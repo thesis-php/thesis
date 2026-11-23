@@ -6,6 +6,7 @@ namespace Thesis\HttpServer;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
+use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
@@ -13,6 +14,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\Io\Reader;
+use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
 use Thesis\Io\Writer;
 
@@ -105,10 +107,26 @@ final class ConnectionTest
             ? new Response(headers: new Headers(['content-length' => '5']))
             : new Response(body: new StringReader('hello')));
 
+        Assert::same($output->writes, 2);
         Assert::same(
             "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",
             $output->bytes,
         );
+    }
+
+    public function partiallyReadStringBodyCommitsOnlyTheAvailableBytes(): void
+    {
+        $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
+        $output = new RecordingWriter();
+        $body = new StringReader('abc');
+        $body->read(1);
+        Expect::exception(ReadFailed::class);
+
+        try {
+            Connection::serve($input, $output, static fn() => new Response(body: $body));
+        } finally {
+            Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nbc");
+        }
     }
 
     public function http10EndsUnknownLengthResponseAtConnectionClose(): void

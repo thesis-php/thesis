@@ -33,13 +33,26 @@ final class HeadReader
         try {
             if ($isKeepAlive && $buffer->count() === 0) {
                 // Once a byte arrives, the entire remainder shares one deadline.
-                $first = timeoutOr($options->idleTimeout, static fn() => $input->read(1));
+                $first = timeoutOr(
+                    duration: $options->idleTimeout,
+                    body: static fn() => $input->read(min(8192, $options->maxHeadBytes)),
+                );
 
                 if ($first === null) {
                     return null;
                 }
 
+                $buffer->drain();
                 $buffer->write($first);
+            }
+
+            $bytes = $buffer->readUntil(self::END);
+            if ($bytes !== null) {
+                if (\strlen($bytes) + \strlen(self::END) > $options->maxHeadBytes) {
+                    throw new \OverflowException();
+                }
+
+                return RequestHead::parse($bytes, $scheme);
             }
 
             $filled = timeoutOr($options->headTimeout, static function () use ($buffer, $input, $options) {

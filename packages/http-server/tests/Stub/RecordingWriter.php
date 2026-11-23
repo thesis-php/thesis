@@ -12,6 +12,8 @@ final class RecordingWriter implements Writer
 {
     public string $bytes = '';
 
+    public int $writes = 0;
+
     public function __construct(
         private readonly ?Duration $wait = null,
     ) {}
@@ -22,6 +24,7 @@ final class RecordingWriter implements Writer
             delay($this->wait);
         }
 
+        ++$this->writes;
         $this->bytes .= $bytes;
     }
 }

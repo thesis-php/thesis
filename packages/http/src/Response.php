@@ -22,20 +22,22 @@ use function Thesis\Http\Internal\discardBodyAndReadTrailers;
 final class Response
 {
     /**
-     * @var \Closure(Reader): ?Headers
+     * @var null|Headers|(\Closure(Reader): ?Headers)
      */
-    private readonly \Closure $trailersLoader;
+    private readonly null|Headers|\Closure $trailerSource;
 
     /**
      * The trailer fields, or null while the reader has yet to receive them.
      * A copy can replace the trailer fields with `clone()`.
      */
     public ?Headers $trailers {
-        get => ($this->trailersLoader)($this->body);
+        get => $this->trailerSource instanceof \Closure
+            ? ($this->trailerSource)($this->body)
+            : $this->trailerSource;
         /** @param null|Headers|(callable(Reader): ?Headers) $value */
         set(Headers|callable|null $value) {
             // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() lets the hook reinitialize this field)
-            $this->trailersLoader = self::normalizeTrailers($value);
+            $this->trailerSource = self::normalizeTrailers($value);
         }
     }
 
@@ -50,7 +52,7 @@ final class Response
         public public(set) readonly Reader $body = new StringReader(''),
         null|Headers|callable $trailers = new Headers(),
     ) {
-        $this->trailersLoader = self::normalizeTrailers($trailers);
+        $this->trailerSource = self::normalizeTrailers($trailers);
     }
 
     /**
@@ -65,12 +67,12 @@ final class Response
 
     /**
      * @param null|Headers|(callable(Reader): ?Headers) $trailers
-     * @return \Closure(Reader): ?Headers
+     * @return null|Headers|(\Closure(Reader): ?Headers)
      */
-    private static function normalizeTrailers(null|Headers|callable $trailers): \Closure
+    private static function normalizeTrailers(null|Headers|callable $trailers): null|Headers|\Closure
     {
         if ($trailers === null || $trailers instanceof Headers) {
-            return static fn() => $trailers;
+            return $trailers;
         }
 
         return $trailers(...);

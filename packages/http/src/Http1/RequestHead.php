@@ -79,9 +79,7 @@ final readonly class RequestHead
                 : Status::BAD_REQUEST,
         );
         $fields = Fields::parse($lines, $version, $maxFields);
-        $endToEnd = $fields->endToEnd;
-        $hosts = $endToEnd['host'] ?? [];
-        unset($endToEnd['host']);
+        $hosts = $fields->endToEnd['host'] ?? [];
 
         if (\count($hosts) > 1 || ($hosts === [] && $version === Version::Http11)) {
             throw new MalformedMessage(\sprintf('An HTTP/1.1 request must have one Host, got %d.', \count($hosts)));
@@ -89,14 +87,21 @@ final readonly class RequestHead
 
         $host = $hosts[0] ?? null;
 
-        if ($host !== null && self::authority($host) === null) {
-            throw new MalformedMessage(\sprintf('Host must be a host and an optional port, got %s.', quote($host)));
+        /** @var ?string $lastValidHost */
+        static $lastValidHost = null;
+        if ($host !== null && $host !== $lastValidHost) {
+            if (self::authority($host) === null) {
+                throw new MalformedMessage(\sprintf('Host must be a host and an optional port, got %s.', quote($host)));
+            }
+
+            // Keep at most one short authority across requests, regardless of how many hosts a peer sends.
+            $lastValidHost = \strlen($host) <= 255 ? $host : null;
         }
 
         return new self(
             method: $method,
             uri: self::uri($method, $target, $scheme, $host),
-            headers: new Headers($endToEnd),
+            headers: Headers::fromHttp1($fields, withoutHost: true),
             version: $version,
             framing: match (true) {
                 $fields->isChunked => Framing::Chunked,
@@ -200,23 +205,21 @@ final readonly class RequestHead
      */
     public function toString(): string
     {
-        $lines = ["{$this->method} {$this->target()} {$this->version->value}"];
+        $bytes = "{$this->method} {$this->target()} {$this->version->value}\r\n";
         $authority = self::authorityOf($this->uri);
 
         if ($authority !== null) {
-            $lines[] = "Host: {$authority}";
+            $bytes .= "Host: {$authority}\r\n";
         }
 
-        array_push($lines, ...Fields::format(
+        return $bytes . Fields::format(
             headers: $this->headers,
             version: $this->version,
             framing: $this->framing,
             length: $this->length,
             isPersistent: $this->isPersistent,
             upgrade: $this->upgrade,
-        ));
-
-        return implode("\r\n", $lines) . "\r\n\r\n";
+        );
     }
 
     /**

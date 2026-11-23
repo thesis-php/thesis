@@ -137,17 +137,26 @@ final class Connection
         $continue = $head->version === Version::Http11 && $expect !== null && $head->length !== 0
             ? new ContinueResponse($output)
             : null;
-        $body = $head->length === null
-            ? new ChunkedReader($buffer, $input)
-            : new FixedLengthReader($buffer, $input, $head->length);
-        $bodyReader = new BodyReader($body, $maxBodyBytes, $continue);
-        $reader = $body instanceof FixedLengthReader ? new SizedBodyReader($bodyReader, $body->size) : $bodyReader;
+        if ($head->length === 0) {
+            $body = null;
+            $bodyReader = null;
+            $reader = new StringReader('');
+        } else {
+            $body = $head->length === null
+                ? new ChunkedReader($buffer, $input)
+                : new FixedLengthReader($buffer, $input, $head->length);
+            $bodyReader = new BodyReader($body, $maxBodyBytes, $continue);
+            $reader = $body instanceof FixedLengthReader ? new SizedBodyReader($bodyReader, $body->size) : $bodyReader;
+        }
+
+        /** @var Headers $emptyTrailers */
+        static $emptyTrailers = new Headers();
         $request = new Request(
             method: $head->method,
             uri: $head->uri,
             headers: $head->headers,
             body: $reader,
-            trailers: $body instanceof ChunkedReader ? static fn() => $body->trailers : new Headers(),
+            trailers: $body instanceof ChunkedReader ? static fn() => $body->trailers : $emptyTrailers,
         );
 
         try {
@@ -160,7 +169,7 @@ final class Connection
                 throw $continue->failure;
             }
 
-            if ($bodyReader->failure !== null) {
+            if ($bodyReader?->failure !== null) {
                 throw $bodyReader->failure;
             }
 
@@ -201,20 +210,21 @@ final class Connection
                 throw $continue->failure;
             }
 
-            if ($bodyReader->failure instanceof MalformedMessage) {
-                self::writeError($output, $bodyReader->failure->status, $head);
+            $failure = $bodyReader?->failure;
+            if ($failure instanceof MalformedMessage) {
+                self::writeError($output, $failure->status, $head);
 
                 return false;
             }
 
-            if ($bodyReader->failure instanceof ReadFailed && $bodyReader->failure->getPrevious() instanceof UnexpectedEof) {
+            if ($failure instanceof ReadFailed && $failure->getPrevious() instanceof UnexpectedEof) {
                 self::writeError($output, Status::BAD_REQUEST, $head);
 
                 return false;
             }
 
-            if ($bodyReader->failure !== null) {
-                throw $bodyReader->failure;
+            if ($failure !== null) {
+                throw $failure;
             }
 
             try {
@@ -227,15 +237,18 @@ final class Connection
         }
 
         $continue?->commit();
-        $output->write($bytes);
-        self::writeBody(response: $response, head: $reply, output: $output, first: $first);
+        self::writeResponse(response: $response, head: $reply, bytes: $bytes, output: $output, first: $first);
 
         return $reply->isPersistent && self::isBodyComplete($body);
     }
 
-    private static function isBodyComplete(ChunkedReader|FixedLengthReader $body): bool
+    private static function isBodyComplete(null|ChunkedReader|FixedLengthReader $body): bool
     {
-        return $body instanceof ChunkedReader ? $body->trailers !== null : $body->remaining === 0;
+        return match (true) {
+            $body === null => true,
+            $body instanceof ChunkedReader => $body->trailers !== null,
+            $body instanceof FixedLengthReader => $body->remaining === 0,
+        };
     }
 
     /**
@@ -254,13 +267,31 @@ final class Connection
         $output->write(ResponseHead::of($response, $head, isPersistent: false)->toString());
     }
 
-    private static function writeBody(Response $response, ResponseHead $head, Writer $output, ?string $first): void
-    {
+    private static function writeResponse(
+        Response $response,
+        ResponseHead $head,
+        string $bytes,
+        Writer $output,
+        ?string $first,
+    ): void {
+        $remaining = $head->length;
+        if ($response->body instanceof StringReader && $remaining !== null && $remaining > 0 && $remaining <= 8192) {
+            try {
+                $chunk = self::readBody($response->body, $remaining);
+            } catch (ReadFailed $error) {
+                $output->write($bytes);
+
+                throw $error;
+            }
+
+            $bytes .= $chunk;
+            $remaining -= \strlen($chunk);
+        }
+
+        $output->write($bytes);
         if ($head->framing === Framing::None) {
             return;
         }
-
-        $remaining = $head->length;
 
         while ($remaining === null || $remaining > 0) {
             $bytes = $first ?? self::readBody($response->body, $remaining);

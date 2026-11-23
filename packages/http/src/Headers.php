@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Thesis\Http\Internal\Http1\Fields;
 use function Thesis\Http\Internal\isFieldValue;
 use function Thesis\Http\Internal\isToken;
 use function Thesis\Http\Internal\quote;
@@ -21,6 +22,24 @@ use function Thesis\Http\Internal\quote;
  */
 final readonly class Headers implements \IteratorAggregate
 {
+    /**
+     * Field names and values were checked by the HTTP/1 parser.
+     *
+     * @internal
+     */
+    public static function fromHttp1(Fields $fields, bool $withoutHost = false): self
+    {
+        /** @var self $empty */
+        static $empty = new self();
+        $lines = $fields->endToEnd;
+
+        if ($withoutHost) {
+            unset($lines['host']);
+        }
+
+        return $lines === [] ? $empty : clone($empty, ['lines' => $lines]);
+    }
+
     /**
      * PHP turns a numeric name into an int key, whatever the type says.
      *
@@ -47,6 +66,17 @@ final readonly class Headers implements \IteratorAggregate
         }
 
         $this->lines = $lines;
+    }
+
+    /**
+     * PHP represents numeric field names as integer keys.
+     *
+     * @internal
+     * @return array<int|non-empty-lowercase-string, non-empty-list<string>>
+     */
+    public function toArray(): array
+    {
+        return $this->lines;
     }
 
     public function has(string $name): bool
