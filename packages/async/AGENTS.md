@@ -214,9 +214,11 @@ or the process loop. `virtualTime()` runs a separate loop.
   is never lost, the error waits for its next wait. One left when that fiber ends is thrown from `run()`.
 - Nothing ready and no referenced timer, no stream wait and no signal handler while the fiber of `run()` waits:
   `Deadlock` (`@api`, an `\Error`) is thrown into its wait, with the place of every suspended fiber.
-- Timers are a heap with lazy deletion: a cancel nulls the waiter, and the heap is rebuilt once outdated entries
-  outnumber the pending ones (at least 64). A cancelled timer at the top leaves at once: the timer of a timeout
-  is mostly the nearest one, and so a timeout costs no rebuilds (`TimeoutBench`). Expirations saturate
+- The newest timer stays outside the heap until another timer is registered or the loop needs the heap.
+  A synchronous operation can cancel its deadline without inserting or extracting a heap entry.
+  A timer registered by a waking timer can still fire in the same tick. A cancel nulls the waiter,
+  and the heap is rebuilt once outdated entries outnumber the pending ones (at least 64).
+  A cancelled timer at the top leaves at once. Expirations saturate
   at `PHP_INT_MAX`, the timeout of a wait is capped at `Scope::LONGEST_DURATION`. An unreferenced timer fires
   but keeps nothing from a deadlock (`Trace\watchdog()`).
 - `Io\Poll` takes a stream once per context (`HandleAlreadyWatchedException`), so the readers and the writers

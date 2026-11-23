@@ -208,6 +208,48 @@ final class LoopTest
         Assert::same($log, ['a', 'b', 'c']);
     }
 
+    public function cancellingTimerBeforeLoopWaitsLeavesHeapEmpty(): void
+    {
+        $loop = self::loop();
+        $waiter = new ContinuationImpl();
+        $timer = $loop->delay(toNs(sec(1)), $waiter);
+
+        Assert::same(self::timers($loop), [1, 1, 0]);
+        Assert::same(self::heaped($loop), 0);
+        $loop->cancel($timer);
+        $loop->cancel($timer);
+
+        Assert::true($loop->isIdle);
+        Assert::null($timer->waiter);
+        Assert::same(self::timers($loop), [0, 0, 0]);
+        Assert::same(self::heaped($loop), 0);
+        Assert::true($waiter->resume());
+    }
+
+    public function timerRegisteredByDueTimerCanFireInTheSameTick(): void
+    {
+        $loop = self::loop();
+        $ticks = [];
+
+        $loop->run(static function () use ($loop, &$ticks) {
+            $done = new ContinuationImpl();
+            $next = new Callback(static function () use ($loop, $done, &$ticks) {
+                $ticks[] = $loop->tick;
+                $done->wake();
+            });
+
+            $loop->delay(0, new Callback(static function () use ($loop, $next, &$ticks) {
+                $ticks[] = $loop->tick;
+                $loop->delay(0, $next);
+            }));
+
+            $done->park();
+        });
+
+        Assert::count($ticks, 2);
+        Assert::count(array_unique($ticks), 1);
+    }
+
     public function cancelledTimerNeverWakes(): void
     {
         $clock = new VirtualClock(0);
@@ -786,11 +828,15 @@ final class LoopTest
         $loop = self::loop();
         $timers = $loop->run(static fn() => self::delays($loop, 2));
         $loop->release();
+        $current = $loop->delay(toNs(sec(1)), new ContinuationImpl());
 
         foreach ($timers as $timer) {
+            Assert::null($timer->waiter);
             $loop->cancel($timer);
         }
 
+        Assert::same(self::timers($loop), [1, 1, 0]);
+        $loop->cancel($current);
         Assert::same(self::timers($loop), [0, 0, 0]);
         Assert::same(self::heaped($loop), 0);
     }

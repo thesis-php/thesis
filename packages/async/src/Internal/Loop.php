@@ -148,6 +148,9 @@ final class Loop
      */
     private \SplMinHeap $timers;
 
+    // A synchronous operation can cancel its timeout before the loop needs the timer's heap entry.
+    private ?Timer $latestTimer = null;
+
     private int $order = 0;
 
     private int $pendingTimers = 0;
@@ -344,6 +347,7 @@ final class Loop
 
         // Done, as if fired: a cancel that comes later (a fiber destroyed in its wait, the cancel of a watchdog)
         // finds nothing to do, and the counters of the next run stay right.
+        $this->insertLatestTimer();
         foreach ($this->timers as [, , $timer]) {
             $timer->waiter = null;
         }
@@ -422,7 +426,11 @@ final class Loop
         // @phpstan-ignore function.alreadyNarrowedType (an int overflow turns the sum into a float)
         $expiration = \is_int($expiration) ? $expiration : PHP_INT_MAX;
         $timer = new Timer(expiration: $expiration, order: ++$this->order, waiter: $waiter, referenced: $referenced);
-        $this->timers->insert([$expiration, $timer->order, $timer]);
+        if ($this->latestTimer !== null) {
+            $this->insertLatestTimer();
+        }
+
+        $this->latestTimer = $timer;
         ++$this->pendingTimers;
 
         if ($referenced) {
@@ -444,7 +452,14 @@ final class Loop
         $timer->waiter = null;
         $this->leave($timer);
 
-        // The timer of a timeout is cancelled while it is the nearest one, mostly: gone at once, it is not outdated.
+        if ($timer === $this->latestTimer) {
+            $this->latestTimer = null;
+
+            return;
+        }
+
+        $this->insertLatestTimer();
+        // Remove the nearest timer at once instead of keeping an outdated heap entry.
         if ($this->timers->top()[2] === $timer) {
             $this->timers->extract();
 
@@ -771,8 +786,19 @@ final class Loop
         }
     }
 
+    private function insertLatestTimer(): void
+    {
+        $timer = $this->latestTimer;
+        if ($timer !== null) {
+            $this->timers->insert([$timer->expiration, $timer->order, $timer]);
+            $this->latestTimer = null;
+        }
+    }
+
     private function fireTimers(int $now): void
     {
+        $this->insertLatestTimer();
+
         while (!$this->timers->isEmpty()) {
             [$expiration, , $timer] = $this->timers->top();
             $waiter = $timer->waiter;
@@ -792,6 +818,8 @@ final class Loop
             $timer->waiter = null;
             $this->leave($timer);
             $this->wake($waiter);
+            // The waiter can register a timer due in this tick.
+            $this->insertLatestTimer();
         }
     }
 
@@ -835,6 +863,8 @@ final class Loop
      */
     private function nextTimer(): ?Timer
     {
+        $this->insertLatestTimer();
+
         while (!$this->timers->isEmpty()) {
             $timer = $this->timers->top()[2];
 
