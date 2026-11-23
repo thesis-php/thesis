@@ -18,6 +18,7 @@ use Thesis\Net\TlsFailed;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Time\sec;
 
 /**
  * @internal
@@ -53,7 +54,10 @@ final class Listener
     public function run(): void
     {
         group(function (Group $group) {
-            $acceptor = $group->spawn(fn() => $this->accept($group));
+            $idle = $this->config->idleTimeout > sec(0)
+                ? new IdleConnections($group, $this->config->idleTimeout)
+                : null;
+            $acceptor = $group->spawn(fn() => $this->accept($group, $idle));
 
             try {
                 $this->listener->awaitClose();
@@ -77,7 +81,7 @@ final class Listener
         });
     }
 
-    private function accept(Group $group): void
+    private function accept(Group $group, ?IdleConnections $idle): void
     {
         while (!$this->listener->isClosed) {
             $permit = $this->capacity->acquire();
@@ -88,7 +92,7 @@ final class Listener
                 return;
             }
 
-            $connection = new ConnectionState($this->listener, $socket);
+            $connection = new ConnectionState($this->listener, $socket, $idle);
             $id = spl_object_id($connection);
             $this->connections[$id] = $connection;
             $group->spawn(function () use ($connection, $id, $permit) {

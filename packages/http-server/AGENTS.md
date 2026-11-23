@@ -27,6 +27,10 @@
 - Each connection keeps its last parsed head if the wire head fits in 1 KiB, excluding the final delimiter.
   A byte-for-byte match can reuse the immutable head. The scheme belongs to the connection after the TLS handshake.
   Create the request and its body reader anew even when two heads match.
+- A listener tracks positive keep-alive idle timeouts in the order the reads began. All have the same duration,
+  so one task can sleep until the oldest deadline. Remove a socket as soon as its first read finishes or throws.
+  When several sockets are waiting, yield before reading: the peer can send its next request while other clients run.
+  A zero timeout keeps the immediate read: bytes already available can still be consumed.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
@@ -80,3 +84,24 @@
   responses/s on plaintext and 37.4k vs 9.45k on a 4 KiB streaming echo. Both used TCP_NODELAY,
   Date and Content-Length. For a cross-server ranking, rerun the peers together. Workerman and
   Node's HTTP server are open comparisons; the local Amp result covers neither.
+
+### HTTP Arena H1 Baseline
+
+- Run `examples/baseline11.php` with one PHP process, CLI OPcache on and Xdebug off. Use the same
+  handler and listener settings for both revisions. The active connection limit and the TCP listen
+  backlog are separate. Set both to 4096 for this profile: the default backlog of 511 overflowed
+  when the clients connected together. One run then lost 33 replies across reconnects.
+- At `b308384` the Baseline section of HTTP Arena's `scripts/validate.sh` at `3eb74a7` passed its
+  13 checks. Its `validate-frag.py` passed all 1047 splits across nine request shapes.
+- Use Arena's `requests/get.raw,post_cl.raw,post_chunked.raw` as the three paths in gcannon's
+  `--raw` list, in that order. On Docker Desktop Linux arm64 (8 CPUs shared by server and client),
+  gcannon 0.8.4 ran on the server's loopback with `-c 4096 -t 4 -p 1 -s 200 --settle 5s -d 20s --json`.
+  Across five runs at `b308384`, median throughput was 29,426 replies/s (27,512–32,557).
+  Median p99 was 173.6 ms (145.4–231.2). All 2,965,257 requests got a 2xx reply, with no reconnects
+  or errors. Compare candidates with interleaved base runs on the same machine.
+- Sharing the idle timer across sockets raised throughput from 30,386 to 38,429 replies/s (26.5%)
+  and lowered median p99 from 182.2 to 120.9 ms, across four interleaved runs of each version.
+  All three request templates returned 2xx with no errors or reconnects.
+- Rejected: keeping four parsed heads per connection. In the first 700,000 Baseline requests the single-entry
+  cache missed exactly 4096 times, once per connection. The load generator uses different templates across
+  connections but keeps sending the same one on each connection in this run.

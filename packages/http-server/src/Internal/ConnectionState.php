@@ -28,6 +28,7 @@ final class ConnectionState
     public function __construct(
         private readonly Server $listener,
         public readonly Socket $socket,
+        public readonly ?IdleConnections $idle,
     ) {}
 
     public function beginRequest(): bool

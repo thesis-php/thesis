@@ -49,7 +49,7 @@ final class Connection
         Config $config,
         ?ConnectionState $state = null,
     ): void {
-        $headReader = new HeadReader($state->scheme ?? 'http');
+        $headReader = new HeadReader($state->scheme ?? 'http', $state?->idle);
         $buffer = new Buffer();
         $output = new ResponseWriter($output, $config->writeTimeout);
         $bodyInput = new BodyInput($input, $config->bodyIdleTimeout);

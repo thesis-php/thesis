@@ -11,6 +11,7 @@ use Thesis\HttpServer\Config;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 use Thesis\Io\UnexpectedEof;
+use Thesis\Net\Socket;
 use function Thesis\Async\timeoutOr;
 
 /**
@@ -29,6 +30,7 @@ final class HeadReader
      */
     public function __construct(
         private readonly string $scheme,
+        private readonly ?IdleConnections $idle,
     ) {}
 
     public function read(
@@ -40,10 +42,10 @@ final class HeadReader
         try {
             if ($isKeepAlive && $buffer->count() === 0) {
                 // Once a byte arrives, the entire remainder shares one deadline.
-                $first = timeoutOr(
-                    duration: $config->idleTimeout,
-                    body: static fn() => $input->read(min(8192, $config->maxHeadBytes)),
-                );
+                $max = min(8192, $config->maxHeadBytes);
+                $first = $this->idle !== null && $input instanceof Socket
+                    ? $this->idle->read($input, $max)
+                    : timeoutOr($config->idleTimeout, static fn() => $input->read($max));
 
                 if ($first === null) {
                     return null;
