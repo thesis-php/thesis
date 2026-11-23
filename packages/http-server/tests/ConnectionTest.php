@@ -8,12 +8,13 @@ use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\StringBody;
 use Thesis\HttpServer\Internal\Connection;
+use Thesis\HttpServer\Stub\PrefixedBody;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\HttpServer\Stub\TimedReader;
 use Thesis\Io\Reader;
@@ -109,20 +110,15 @@ final class ConnectionTest
         $request = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
         $input = new StringReader($request . $request);
         $output = new RecordingWriter();
-        $reads = 0;
         $requests = 0;
-        Connection::serve($input, $output, static function () use (&$reads, &$requests) {
-            $body = new StringReader('a');
+        Connection::serve($input, $output, static function () use (&$requests) {
             if (++$requests === 1) {
-                return new Response(body: $body);
+                return new Response(body: 'a');
             }
 
-            return new Response(body: new Body($body, static function () use (&$reads) {
-                return ++$reads === 1 ? null : new Headers(['X-End' => 'yes']);
-            }));
+            return new Response(body: new StringBody('a', new Headers(['X-End' => 'yes'])));
         }, new Config('/test.sock'));
 
-        Assert::same($reads, 2);
         Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
             . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-End: yes\r\n\r\n");
     }
@@ -204,7 +200,7 @@ final class ConnectionTest
     {
         $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
         $output = new RecordingWriter();
-        $body = new StringReader('abc');
+        $body = new StringBody('abc');
         $body->read(1);
         Expect::exception(ReadFailed::class);
 
@@ -219,20 +215,8 @@ final class ConnectionTest
     {
         $input = new StringReader("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\nGET /next HTTP/1.0\r\n\r\n");
         $output = new RecordingWriter();
-        $body = new readonly class implements Reader {
-            private StringReader $source;
-
-            public function __construct()
-            {
-                $this->source = new StringReader('hello');
-            }
-
-            public function read(int $max): ?string
-            {
-                return $this->source->read($max);
-            }
-        };
+        $body = new PrefixedBody(new StringBody('hello'));
         Connection::serve($input, $output, static fn() => new Response(body: $body), new Config('/test.sock'));
-        Assert::same("HTTP/1.0 200 OK\r\n\r\nhello", $output->bytes);
+        Assert::same("HTTP/1.0 200 OK\r\n\r\n!hello", $output->bytes);
     }
 }

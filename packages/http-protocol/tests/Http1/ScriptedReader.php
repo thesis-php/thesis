@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http;
+namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Io\Closer;
 use Thesis\Io\ConcurrentRead;

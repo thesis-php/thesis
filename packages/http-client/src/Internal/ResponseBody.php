@@ -4,18 +4,35 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Io\Closer;
+use Thesis\Http\Body;
+use Thesis\Http\Headers;
+use Thesis\HttpProtocol\Http1\ChunkedReader;
+use Thesis\HttpProtocol\Http1\FixedLengthReader;
 use Thesis\Io\IoException;
-use Thesis\Io\Reader;
 use Thesis\Io\StreamClosed;
 use Thesis\Net\Socket;
+use const Thesis\Http\EMPTY_HEADERS;
 
 /**
  * @internal
  */
-final class ResponseBody implements Reader, Closer
+final class ResponseBody implements Body
 {
+    #[\Override]
+    public ?int $size {
+        get => $this->reader->size;
+    }
+
+    #[\Override]
+    public bool $isBuffered {
+        get => $this->reader->isBuffered;
+    }
+
+    #[\Override]
+    public bool $mayHaveTrailers {
+        get => $this->reader->mayHaveTrailers;
+    }
+
     private bool $isClosed = false;
 
     private ?IoException $failure = null;
@@ -24,7 +41,7 @@ final class ResponseBody implements Reader, Closer
      * @param \Closure(Socket): void $release called once at the message boundary
      */
     public function __construct(
-        private readonly Reader $reader,
+        private readonly FixedLengthReader|ChunkedReader|UntilCloseReader $reader,
         private readonly Socket $socket,
         private ?\Closure $release,
     ) {
@@ -34,11 +51,6 @@ final class ResponseBody implements Reader, Closer
     }
 
     private function __clone() {}
-
-    public function __destruct()
-    {
-        $this->abort();
-    }
 
     public function close(): void
     {
@@ -76,6 +88,13 @@ final class ResponseBody implements Reader, Closer
         return $bytes;
     }
 
+    public function discard(): Headers
+    {
+        while ($this->read(8192) !== null);
+
+        return $this->reader instanceof ChunkedReader ? $this->reader->discard() : EMPTY_HEADERS;
+    }
+
     private function finish(): void
     {
         $release = $this->release;
@@ -91,5 +110,10 @@ final class ResponseBody implements Reader, Closer
             $this->socket->close();
             $this->release = null;
         }
+    }
+
+    public function __destruct()
+    {
+        $this->abort();
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Internal;
 
-use Thesis\Http\Http1\MalformedMessage;
 use Thesis\Http\Status;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
 use Thesis\Io\Reader;
 use Time\Duration;
 use function Thesis\Async\timeoutOr;

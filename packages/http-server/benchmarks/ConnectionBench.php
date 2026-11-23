@@ -43,7 +43,7 @@ final class ConnectionBench
             output: $output,
             handler: static fn() => new Response(
                 headers: new Headers(['Content-Type' => 'text/plain']),
-                body: new StringReader('Hello, World!'),
+                body: 'Hello, World!',
             ),
             config: new Config('/test.sock', maxRequestsPerConnection: $count),
         ));

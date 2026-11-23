@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 /**
  * The framing tells the recipient where the message body ends on the connection.

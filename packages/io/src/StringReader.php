@@ -9,17 +9,20 @@ namespace Thesis\Io;
  *
  * @api
  */
-final class StringReader implements SizedReader
+final class StringReader implements Reader
 {
-    public readonly int $size;
+    /**
+     * @var non-negative-int
+     */
+    public int $size {
+        get => \strlen($this->bytes);
+    }
 
     private int $offset = 0;
 
     public function __construct(
         private readonly string $bytes,
-    ) {
-        $this->size = \strlen($bytes);
-    }
+    ) {}
 
     public function read(int $max): ?string
     {

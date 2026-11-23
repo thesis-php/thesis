@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Internal;
 
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
 use Thesis\Http\Status;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
+use Thesis\HttpProtocol\Http1\RequestHead;
 use Thesis\HttpServer\Config;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;

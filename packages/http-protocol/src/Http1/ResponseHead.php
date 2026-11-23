@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use function Thesis\Http\Internal\isFieldValue;
-use function Thesis\Http\Internal\quote;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
+use function Thesis\HttpProtocol\Internal\Http1\isFieldValue;
+use function Thesis\HttpProtocol\Internal\Http1\quote;
+use const Thesis\Http\EMPTY_HEADERS;
 
 /**
  * An HTTP/1.1 response head contains the status line and header lines. A server writes the head to a
@@ -24,8 +25,7 @@ final readonly class ResponseHead
     /**
      * `parse()` parses the head of a response read from a connection, as strictly as {@see RequestHead::parse()}.
      *
-     * A response without a body (to `HEAD`, or a 304) may still have `Content-Length`. There it frames nothing:
-     * it is the length the body would have, so it stays among the headers.
+     * An eligible HEAD or 304 response keeps Content-Length in its headers as representation metadata.
      *
      * @param string $bytes the head up to the empty line that ends it, without that line
      * @param non-empty-string $method the method of the request, needed to find the end of the response:
@@ -58,19 +58,13 @@ final readonly class ResponseHead
         /** @var int<100, 999> $status */
         $status = (int) $status;
         $fields = Fields::parse($lines, $version, $maxFields);
-        $headers = Headers::fromHttp1($fields);
-        $hasBody = self::hasBody($method, $status);
-
-        if (
-            !$hasBody
-            && $fields->contentLength !== null
-            && self::allowsHypotheticalLength($method, $status)
-        ) {
+        $headers = $fields->toHeaders();
+        if ($fields->contentLength !== null && self::allowsRepresentationLength($method, $status)) {
             $headers = $headers->with('content-length', (string) $fields->contentLength);
         }
 
         $framing = match (true) {
-            !$hasBody => Framing::None,
+            !self::hasBody($method, $status) => Framing::None,
             $fields->isChunked => Framing::Chunked,
             $fields->contentLength !== null => Framing::Length,
             default => Framing::UntilClose,
@@ -95,13 +89,14 @@ final readonly class ResponseHead
      * `of()` builds a response head using the request's HTTP version. HTTP/1.1 uses chunked framing for
      * trailers or an unknown body length. HTTP/1.0 uses close-delimited framing for an unknown length.
      *
-     * A response to `HEAD` or a 304 response can carry the length the body would have in `content-length`.
+     * An eligible HEAD or 304 response can supply Content-Length as representation metadata.
      *
      * @param bool $isPersistent false closes the connection after the response. The connection is also closed
      *     if the request asked for it, or if the body lasts until the connection is closed
      * @param list<non-empty-string> $upgrade the protocols a 101 response switches the connection to
      * @throws \ValueError if the headers contain a field that belongs to the connection, or if a response
      *     that cannot have a body (to `HEAD`, 1xx, 204, 304) has one. Trailers require a body and HTTP/1.1.
+     *     An explicit Content-Length requires an eligible response and at most 18 decimal digits.
      */
     public static function of(
         Response $response,
@@ -110,11 +105,15 @@ final readonly class ResponseHead
         array $upgrade = [],
     ): self {
         Fields::assertUpgrade($upgrade);
+        $hasBody = self::hasBody($request->method, $response->status);
+        Fields::assertEndToEnd(
+            headers: $response->headers,
+            allowContentLength: !$hasBody && self::allowsRepresentationLength($request->method, $response->status),
+        );
         $length = $response->body->size;
-        $hasTrailers = Fields::hasTrailers($response->headers, $response->body->trailers);
+        $hasTrailers = Fields::hasTrailers($response->headers, $response->body->mayHaveTrailers);
 
-        if (self::hasBody($request->method, $response->status)) {
-            Fields::assertEndToEnd($response->headers);
+        if ($hasBody) {
             if ($hasTrailers && $request->version === Version::Http10) {
                 throw new \ValueError('An HTTP/1.0 response cannot have trailers.');
             }
@@ -135,10 +134,6 @@ final readonly class ResponseHead
         } elseif ($hasTrailers) {
             throw new \ValueError('A response without a body cannot have trailers.');
         } else {
-            Fields::assertEndToEnd(
-                headers: $response->headers,
-                allowContentLength: self::allowsHypotheticalLength($request->method, $response->status),
-            );
             $framing = Framing::None;
         }
 
@@ -154,9 +149,26 @@ final readonly class ResponseHead
     }
 
     /**
+     * Builds an empty HTTP/1.1 error response that closes the connection when the request head is unavailable.
+     *
+     * @param int<400, 599> $status
+     */
+    public static function forInvalidRequest(int $status): self
+    {
+        return new self(
+            status: $status,
+            headers: EMPTY_HEADERS,
+            version: Version::Http11,
+            framing: Framing::Length,
+            length: 0,
+            isPersistent: false,
+            upgrade: [],
+        );
+    }
+
+    /**
      * @param int<100, 999> $status
-     * @param Headers $headers without the fields that belong to the connection and the fields that `Connection`
-     *     names
+     * @param Headers $headers message fields, including the optional Content-Length for an eligible HEAD or 304
      * @param ?non-negative-int $length the number of bytes in the body, null if the body is chunked
      *     or lasts until the connection is closed
      * @param bool $isPersistent whether the connection stays open for the next request
@@ -190,7 +202,7 @@ final readonly class ResponseHead
         );
     }
 
-    private static function allowsHypotheticalLength(string $method, int $status): bool
+    private static function allowsRepresentationLength(string $method, int $status): bool
     {
         return $status === Status::NOT_MODIFIED
             || ($method === Method::HEAD && $status >= 200 && $status !== Status::NO_CONTENT);

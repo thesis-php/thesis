@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
-use Thesis\Io\Reader;
 use Uri\Rfc3986\Uri;
-use const Thesis\Http\Internal\EMPTY_HEADERS;
 
 /**
  * HTTP/1.1 and HTTP/2 clients and servers share this request type. The request holds its method,
@@ -15,7 +13,7 @@ use const Thesis\Http\Internal\EMPTY_HEADERS;
  *
  * `clone($request, ['uri' => $uri])` derives the query from the new URI.
  * `clone($request, ['query' => $query])` updates the query component of the URI.
- * The copy shares the reader with the original.
+ * The copy shares the body with the original.
  *
  * @api
  */
@@ -45,9 +43,9 @@ final class Request
         public public(set) readonly string $method,
         public public(set) readonly Uri $uri,
         public public(set) readonly Headers $headers = EMPTY_HEADERS,
-        string|Reader $body = '',
+        string|Body $body = '',
     ) {
-        $this->body = $body instanceof Body ? $body : new Body($body);
+        $this->body = \is_string($body) ? new StringBody($body) : $body;
     }
 
     public function __clone(): void

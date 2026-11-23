@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Http\Status;
 use Thesis\Io\IoException;

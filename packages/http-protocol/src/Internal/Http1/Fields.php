@@ -2,16 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Internal\Http1;
+namespace Thesis\HttpProtocol\Internal\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\Version;
 use Thesis\Http\Status;
-use function Thesis\Http\Internal\isFieldValue;
-use function Thesis\Http\Internal\isToken;
-use function Thesis\Http\Internal\quote;
+use Thesis\HttpProtocol\Http1\Framing;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
+use Thesis\HttpProtocol\Http1\Version;
+use const Thesis\Http\EMPTY_HEADERS;
 
 /**
  * The field lines of a head, parsed strictly. The fields that frame the message are separated from the headers.
@@ -101,9 +99,19 @@ final readonly class Fields
         public array $upgrade,
     ) {}
 
-    public static function hasTrailers(Headers $headers, ?Headers $trailers): bool
+    public function toHeaders(bool $withoutHost = false): Headers
     {
-        return isset($headers->toArray()['trailer']) || $trailers === null || $trailers->toArray() !== [];
+        $lines = $this->endToEnd;
+        if ($withoutHost) {
+            unset($lines['host']);
+        }
+
+        return $lines === [] ? EMPTY_HEADERS : new Headers($lines);
+    }
+
+    public static function hasTrailers(Headers $headers, bool $mayHaveTrailers): bool
+    {
+        return $mayHaveTrailers || $headers->has('trailer');
     }
 
     /**
@@ -124,8 +132,7 @@ final readonly class Fields
     }
 
     /**
-     * `assertEndToEnd()` checks that the headers have no fields that belong to the connection: the codec writes
-     * those itself.
+     * Checks the fields supplied by the application. An eligible HEAD or 304 may include the representation length.
      *
      * @throws \ValueError
      */
@@ -138,17 +145,17 @@ final readonly class Fields
                 continue;
             }
 
-            if ($allowContentLength && $name === 'content-length') {
-                try {
-                    self::contentLength($headers->all($name));
-                } catch (MalformedMessage $error) {
-                    throw new \ValueError($error->getMessage(), previous: $error);
-                }
-            } else {
+            if ($name !== 'content-length' || !$allowContentLength) {
                 throw new \ValueError(\sprintf(
                     'The header "%s" belongs to an HTTP/1.1 connection and is written by the codec.',
                     $name,
                 ));
+            }
+
+            try {
+                self::contentLength($lines[$name]);
+            } catch (MalformedMessage $error) {
+                throw new \ValueError($error->getMessage(), previous: $error);
             }
         }
     }
@@ -156,7 +163,7 @@ final readonly class Fields
     /**
      * The field lines of a head: the headers first, then the fields that belong to the connection.
      *
-     * @param ?non-negative-int $length
+     * @param ?non-negative-int $length the number of bytes in the body when known
      * @param list<non-empty-string> $upgrade
      */
     public static function format(

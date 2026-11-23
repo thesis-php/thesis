@@ -14,11 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Method` and `Status` define constants for common methods and status codes.
 - `Headers` is immutable. It treats names as case-insensitive and stores several lines per name.
   It throws `\ValueError` for an invalid name or a forbidden control character in a value.
+- `Headers::$isEmpty` reports whether it holds any fields.
 - `Request::$query` exposes ordered query parameters. Replacing the query on a copy updates its URI.
-- `Body` reads bytes and exposes trailer fields. Pass a string, a reader or another message's body to a constructor.
-- `Body::discard()` consumes the remaining bytes and returns the trailers. `Body::close()` releases a closable reader.
-- `Http1\FixedLengthReader` reads exactly the declared size and reports a premature EOF. Its read-only
-  remaining byte count reaches zero on delivery of the last byte.
-- `Http1\RequestHead` and `Http1\ResponseHead` handle HTTP/1.1 heads and record framing and persistence.
-  `parse()` rejects ambiguous input, `of()` builds a head from a message, and `toString()` writes the head.
-- `Http1\ChunkedReader`, `Http1\encodeChunk()` and `Http1\encodeLastChunk()` handle chunked bodies with trailers.
+- Pass a string or a `Body` to a message constructor. `StringBody` accepts a string with optional trailer fields.
+- `Body::$mayHaveTrailers` signals possible trailers before reading. `Body::discard()` returns the final fields at EOF.
+- `Body::close()` releases body resources.

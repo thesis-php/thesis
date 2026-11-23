@@ -2,27 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Request;
-use Thesis\Http\ScriptedReader;
+use Thesis\Http\Response;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\ReadFailed;
+use Thesis\Io\StringReader;
 use Thesis\Io\UnexpectedEof;
 use Uri\Rfc3986\Uri;
-use function Thesis\Http\chunked;
-use function Thesis\Http\failure;
-use function Thesis\Http\lines;
-use function Thesis\Http\readAll;
-use function Thesis\Http\rejection;
 
 #[Test]
 #[Covers(ChunkedReader::class)]
@@ -109,8 +104,11 @@ final class ChunkedTest
     {
         $chunked = chunked(self::HELLO_WORLD);
 
+        Assert::true($chunked->mayHaveTrailers);
         Assert::same(readAll($chunked), 'hello world');
-        Assert::same(lines($chunked->trailers ?? throw new \LogicException('Expected trailers.')), []);
+        Assert::true($chunked->isComplete);
+        Assert::false($chunked->mayHaveTrailers);
+        Assert::same(lines($chunked->discard()), []);
     }
 
     public function readsAtMostMaxBytesAndNeverAcrossChunks(): void
@@ -131,7 +129,7 @@ final class ChunkedTest
         $chunked = chunked($bytes);
 
         Assert::same(readAll($chunked), 'hello' . str_repeat('a', 1000) . "\r\n0\r\n\r\n");
-        $trailers = $chunked->trailers ?? throw new \LogicException('Expected trailers.');
+        $trailers = $chunked->discard();
         Assert::same(lines($trailers), [['x-checksum', 'abc']]);
     }
 
@@ -178,7 +176,7 @@ final class ChunkedTest
         $chunked = new ChunkedReader($buffer, new ScriptedReader($bytes, $chunkSize));
 
         Assert::same(readAll($chunked, max: 4), 'hello world');
-        $trailers = $chunked->trailers ?? throw new \LogicException('Expected trailers.');
+        $trailers = $chunked->discard();
         Assert::same(lines($trailers), [['x-a', '1'], ['x-b', '2']]);
     }
 
@@ -242,16 +240,38 @@ final class ChunkedTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            body: new Body($chunked, static fn() => $chunked->trailers),
+            body: $chunked,
         );
 
-        Assert::null($request->body->trailers);
+        Assert::same($request->body, $chunked);
+        Assert::false($chunked->isComplete);
         Assert::same($request->body->read(3), 'abc');
-        Assert::null($request->body->trailers);
+        Assert::false($chunked->isComplete);
         Assert::same(readAll($request->body), '');
 
-        Assert::same($request->body->trailers, $chunked->trailers);
-        Assert::same($chunked->trailers?->get('x-checksum'), '900150983cd24fb0');
+        Assert::true($chunked->isComplete);
+        Assert::same($request->body->discard()->get('x-checksum'), '900150983cd24fb0');
+    }
+
+    public function discardsRemainingRequestBodyThroughItsTrailers(): void
+    {
+        $buffer = new Buffer(bytes: "3\r\nabc\r\n0\r\nX-End: yes\r\n\r\nnext");
+        $body = new ChunkedReader($buffer, new StringReader(''));
+        $request = new Request('POST', new Uri('/'), body: $body);
+
+        Assert::same($request->body->read(1), 'a');
+        Assert::false($body->isComplete);
+        $trailers = $request->body->discard();
+        Assert::same($trailers->get('x-end'), 'yes');
+        Assert::same($request->body->discard(), $trailers);
+        Assert::same($buffer->drain(), 'next');
+    }
+
+    public function truncatedBodyFailsWhileDiscarding(): void
+    {
+        $response = new Response(body: chunked("3\r\nab"));
+        Expect::exception(ReadFailed::class);
+        $response->body->discard();
     }
 
     public function goesOnAfterReadThatHasFailed(): void
@@ -279,7 +299,7 @@ final class ChunkedTest
         }
 
         Assert::same($decoded, 'hello world');
-        $trailers = $chunked->trailers ?? throw new \LogicException('Expected trailers.');
+        $trailers = $chunked->discard();
         Assert::same(lines($trailers), [['x-a', '1'], ['x-b', '2']]);
         Assert::same($failures, \strlen($bytes));
     }
@@ -382,7 +402,7 @@ final class ChunkedTest
 
         Assert::same(rejection(static fn() => $reader->read(1)), $expected);
         Assert::same(rejection(static fn() => $reader->read(1)), $expected);
-        Assert::null($reader->trailers);
+        Assert::false($reader->isComplete);
     }
 
     public function rejectsExcessTrailerBeforeWaitingForAnotherLine(): void
@@ -452,7 +472,7 @@ final class ChunkedTest
 
         readAll($chunked);
 
-        $trailers = $chunked->trailers ?? throw new \LogicException('Expected trailers.');
+        $trailers = $chunked->discard();
         Assert::same(lines($trailers), [['a', '1'], ['b', '2']]);
     }
 

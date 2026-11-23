@@ -2,23 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\Body;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Response;
-use Thesis\Http\ScriptedReader;
-use function Thesis\Http\failure;
-use function Thesis\Http\head;
-use function Thesis\Http\lines;
-use function Thesis\Http\rejection;
-use function Thesis\Http\requestHead;
+use Thesis\Http\StringBody;
+use Thesis\HttpProtocol\Http1\Stub\StubUnknownLengthBody;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
 
 #[Test]
 #[Covers(ResponseHead::class)]
@@ -161,7 +156,7 @@ final class ResponseHeadTest
      * @param list<string> $fields
      */
     #[DataProvider('lengthsOfAbsentBody')]
-    public function keepsHypotheticalContentLength(string $method, string $line, array $fields, ?string $length): void
+    public function keepsRepresentationLengthInHeaders(string $method, string $line, array $fields, ?string $length): void
     {
         $head = ResponseHead::parse(head($line, ...$fields), $method);
 
@@ -301,7 +296,7 @@ final class ResponseHeadTest
     public function writesBodyOfUnknownLengthInChunks(): void
     {
         $head = ResponseHead::of(
-            response: new Response(body: new ScriptedReader('abc')),
+            response: new Response(body: new StubUnknownLengthBody('abc')),
             request: requestHead('GET / HTTP/1.1'),
         );
 
@@ -314,7 +309,7 @@ final class ResponseHeadTest
     public function endsBodyOfUnknownLengthWithConnectionForHttp10(): void
     {
         $head = ResponseHead::of(
-            response: new Response(body: new ScriptedReader('abc')),
+            response: new Response(body: new StubUnknownLengthBody('abc')),
             request: requestHead('GET / HTTP/1.0', 'Connection: keep-alive'),
         );
 
@@ -326,17 +321,18 @@ final class ResponseHeadTest
 
     public function usesChunkedFramingForAnEmptyReaderWithPendingTrailers(): void
     {
-        $response = new Response(body: new Body('', static fn() => null));
+        $response = new Response(body: chunked("0\r\nX-End: yes\r\n\r\n"));
         $head = ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
 
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
         Assert::same($head->toString(), head('HTTP/1.1 200 OK', 'Transfer-Encoding: chunked', '', ''));
+        Assert::same($response->body->discard()->get('x-end'), 'yes');
     }
 
     public function rejectsTrailersForHttp10(): void
     {
-        $response = new Response(body: new Body('', new Headers(['x-count' => '1'])));
+        $response = new Response(body: new StringBody('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('An HTTP/1.0 response cannot have trailers.');
 
         ResponseHead::of($response, requestHead('GET / HTTP/1.0'));
@@ -344,7 +340,7 @@ final class ResponseHeadTest
 
     public function rejectsTrailersForAResponseWithoutABody(): void
     {
-        $response = new Response(204, body: new Body('', new Headers(['x-count' => '1'])));
+        $response = new Response(204, body: new StringBody('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('A response without a body cannot have trailers.');
 
         ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
@@ -403,6 +399,7 @@ final class ResponseHeadTest
 
         Assert::same($head->framing, Framing::None);
         Assert::same($head->length, 0);
+        Assert::same($head->headers, $response->headers);
         Assert::true($head->isPersistent);
         Assert::same($head->toString(), $bytes);
     }
@@ -424,6 +421,11 @@ final class ResponseHeadTest
             'GET / HTTP/1.1',
             new Response(304, $length),
             head('HTTP/1.1 304 Not Modified', 'Content-Length: 1024', '', ''),
+        ];
+        yield 'HEAD with zero representation length' => [
+            'HEAD / HTTP/1.1',
+            new Response(headers: new Headers(['content-length' => '0'])),
+            head('HTTP/1.1 200 OK', 'Content-Length: 0', '', ''),
         ];
         yield '204' => ['GET / HTTP/1.1', new Response(204), head('HTTP/1.1 204 No Content', '', '')];
         yield '100' => ['POST / HTTP/1.1', new Response(100), head('HTTP/1.1 100 Continue', '', '')];
@@ -477,7 +479,7 @@ final class ResponseHeadTest
     {
         $get = 'GET / HTTP/1.1';
         $connection = 'The header "%s" belongs to an HTTP/1.1 connection and is written by the codec.';
-        $stream = new ScriptedReader('abc');
+        $stream = new StubUnknownLengthBody('abc');
 
         foreach (['content-length', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade'] as $name) {
             yield $name => [$get, new Response(headers: new Headers([$name => '1'])), \sprintf($connection, $name)];
@@ -502,6 +504,11 @@ final class ResponseHeadTest
             $get,
             new Response(304, new Headers(['content-length' => ['0', '1']])),
             'Content-Length must be one number of at most 18 digits, got "0, 1".',
+        ];
+        yield '304 with a representation length of 19 digits' => [
+            $get,
+            new Response(304, new Headers(['content-length' => '1000000000000000000'])),
+            'Content-Length must be one number of at most 18 digits, got "1000000000000000000".',
         ];
         yield 'HEAD with coding' => [
             'HEAD / HTTP/1.1',

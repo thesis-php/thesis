@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
@@ -10,16 +10,13 @@ use Testo\Data\DataProvider;
 use Testo\Test;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Request;
-use Thesis\Http\ScriptedReader;
-use Thesis\Io\Reader;
-use Thesis\Io\SizedReader;
+use Thesis\Http\StringBody;
+use Thesis\HttpProtocol\Http1\Stub\StubUnknownLengthBody;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
+use Thesis\Io\Buffer;
 use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
-use function Thesis\Http\failure;
-use function Thesis\Http\head;
-use function Thesis\Http\lines;
 
 #[Test]
 #[Covers(RequestHead::class)]
@@ -103,38 +100,52 @@ final class RequestHeadFormatTest
      * @param non-empty-string $method
      */
     #[DataProvider('bodies')]
-    public function framesBodyByItsLength(string $method, Reader $reader, Framing $framing, ?string $field): void
-    {
-        $head = RequestHead::of(new Request($method, new Uri('http://example.com/'), body: $reader));
+    public function framesBodyByItsLength(
+        string $method,
+        string|Body $body,
+        Framing $framing,
+        ?int $length,
+        ?string $field,
+    ): void {
+        $head = RequestHead::of(new Request($method, new Uri('http://example.com/'), body: $body));
 
         Assert::same($head->framing, $framing);
-        Assert::same($head->length, $reader instanceof SizedReader ? $reader->size : null);
+        Assert::same($head->length, $length);
         $fields = [...(array) $field, '', ''];
         Assert::same($head->toString(), head("{$method} / HTTP/1.1", 'Host: example.com', ...$fields));
     }
 
     /**
-     * @return iterable<string, array{non-empty-string, Reader, Framing, ?string}>
+     * @return iterable<string, array{non-empty-string, string|Body, Framing, ?int, ?string}>
      */
     public static function bodies(): iterable
     {
-        yield 'GET without body' => ['GET', new StringReader(''), Framing::None, null];
-        yield 'DELETE without body' => ['DELETE', new StringReader(''), Framing::None, null];
-        yield 'POST without body' => ['POST', new StringReader(''), Framing::Length, 'Content-Length: 0'];
-        yield 'PUT without body' => ['PUT', new StringReader(''), Framing::Length, 'Content-Length: 0'];
-        yield 'PATCH without body' => ['PATCH', new StringReader(''), Framing::Length, 'Content-Length: 0'];
-        yield 'POST of string' => ['POST', new StringReader('hello'), Framing::Length, 'Content-Length: 5'];
-        yield 'GET of string' => ['GET', new StringReader('a'), Framing::Length, 'Content-Length: 1'];
+        yield 'GET without body' => ['GET', '', Framing::None, 0, null];
+        yield 'DELETE without body' => ['DELETE', '', Framing::None, 0, null];
+        yield 'POST without body' => ['POST', '', Framing::Length, 0, 'Content-Length: 0'];
+        yield 'PUT without body' => ['PUT', '', Framing::Length, 0, 'Content-Length: 0'];
+        yield 'PATCH without body' => ['PATCH', '', Framing::Length, 0, 'Content-Length: 0'];
+        yield 'POST of string' => ['POST', 'hello', Framing::Length, 5, 'Content-Length: 5'];
+        yield 'GET of string' => ['GET', 'a', Framing::Length, 1, 'Content-Length: 1'];
+        yield 'POST of a fixed-length decoder' => [
+            'POST',
+            new FixedLengthReader(new Buffer(), new StringReader('abc'), size: 3),
+            Framing::Length,
+            3,
+            'Content-Length: 3',
+        ];
         yield 'POST of unknown length' => [
             'POST',
-            new ScriptedReader('abc'),
+            new StubUnknownLengthBody('abc'),
             Framing::Chunked,
+            null,
             'Transfer-Encoding: chunked',
         ];
         yield 'GET of unknown length' => [
             'GET',
-            new ScriptedReader('abc'),
+            new StubUnknownLengthBody('abc'),
             Framing::Chunked,
+            null,
             'Transfer-Encoding: chunked',
         ];
     }
@@ -152,7 +163,7 @@ final class RequestHeadFormatTest
         $request = new Request(
             method: 'POST',
             uri: new Uri('http://example.com/'),
-            body: new Body('abc', new Headers(['x-count' => '1'])),
+            body: new StringBody('abc', new Headers(['x-count' => '1'])),
         );
 
         $head = RequestHead::of($request);

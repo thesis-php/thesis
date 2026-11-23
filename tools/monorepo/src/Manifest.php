@@ -32,10 +32,10 @@ final readonly class Manifest
      *     the class Thesis\<PascalCaseDir> in src/<PascalCaseDir>.php or the function Thesis\<camelCaseDir>()
      *     in src/api.php. The psr-4 prefix of src/ and tests/ is then Thesis\, the rest of them is
      *     in src/<PascalCaseDir>/ and tests/<PascalCaseDir>/, the test of the entry is tests/<PascalCaseDir>Test.php
-     * @param list<non-empty-string> $files autoload files outside src/, relative to the package. The PHP files
-     *     of src/ without a class, an interface, a trait or an enum are autoloaded without being listed
-     * @param list<non-empty-string> $devFiles autoload-dev files outside tests/, relative to the package.
-     *     The PHP files in tests/ without a class, interface, trait or enum are autoloaded without being listed.
+     * @param list<non-empty-string> $files additional autoload files, relative to the package. PHP files in
+     *     src/ without a class, an interface, a trait or an enum are discovered automatically.
+     * @param list<non-empty-string> $devFiles additional autoload-dev files, relative to the package. PHP files
+     *     in tests/ without a class, interface, trait or enum are discovered automatically.
      * @param array<non-empty-string, non-empty-string> $suggest
      * @param array<non-empty-string, non-empty-string> $conflict
      * @param list<non-empty-string> $optional packages and extensions of requireDev that src/ uses only when

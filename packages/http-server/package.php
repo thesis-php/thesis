@@ -15,6 +15,7 @@ return new Manifest(
     require: [
         'thesis/async' => '*',
         'thesis/http' => '*',
+        'thesis/http-protocol' => '*',
         'thesis/io' => '*',
         'thesis/net' => '*',
         'thesis/time' => '*',

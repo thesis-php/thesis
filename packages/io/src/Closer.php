@@ -10,7 +10,8 @@ namespace Thesis\Io;
 interface Closer
 {
     /**
-     * `close()` releases the underlying resource. Repeated calls must have no further effect.
+     * Releases the resources it owns without reading any remaining input.
+     * Repeated calls have no further effect.
      */
     public function close(): void;
 }

@@ -1,7 +1,7 @@
 # thesis/io
 
 `Buffer` supports typed big-endian and little-endian encoding and varints. The package defines `Reader`,
-`SizedReader`, `Writer` and `Closer` interfaces. `StringReader` reads a string in memory. `Stream` wraps a
+`Writer` and `Closer` interfaces. `StringReader` reads a string in memory. `Stream` wraps a
 non-blocking PHP resource, while `stdin()`, `stdout()` and `stderr()` expose the standard streams.
 Streams wait through thesis/async.
 Read `README.md` for the API and design decisions.
@@ -20,12 +20,12 @@ Read `README.md` for the API and design decisions.
 - `Reader::read()` returns 1 to `$max` bytes, returns `null` at the end and throws `ReadFailed` on a transport error
   (a reset is not an end: a protocol may treat an EOF between messages as a clean close). If `close()` is called
   on the reader before or during a read, the read throws the reader's own `IoException` (`StreamClosed`,
-  `SocketClosed`). `Writer::write()` writes all bytes, `Closer::close()` is idempotent.
+  `SocketClosed`). `Writer::write()` writes all bytes. `Closer::close()` is idempotent and does not drain input.
 - At most one `read()` per reader may be in progress. Different fibers may take turns. Every reader rejects an
   overlapping call immediately with `ConcurrentRead` and leaves the pending read in progress. A reader that can
   suspend or call user code guards the read before it can yield or be reentered. The write and close contracts
   apply during a pending read.
-- `SizedReader::$size` is the total size in bytes, including bytes already read. `StringReader` advances an
+- `StringReader::$size` is the total size in bytes, including bytes already read. `StringReader` advances an
   offset into the original string and reads without suspending the fiber.
 - A read that throws, `Cancelled` included, has taken nothing: `Buffer::fill()` loses no bytes only because of it.
   A decorator keeps it too: it changes its state only after the inner read has returned.

@@ -48,9 +48,12 @@
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
 - Reuse the last encoded length-framed response head up to 1 KiB for a string body when its length,
   status, version, persistence and ordered fields match. HEAD and CONNECT have their own framing rules.
-  Read the new response's trailers before reuse. A provider returning pending fields requires chunked framing.
+  A string body with trailer fields uses the head formatter. The formatter reads a custom body's trailer state once.
 - A fixed-length body already in the buffer has passed the size check and cannot wait on the transport.
   Its fixed-length reader still tracks unread bytes. Wrap it when the first read must send `100 Continue`.
+- A partially buffered fixed-length body still needs failure tracking and may need to send 100 Continue.
+  Its declared length has passed the size limit, so the server passes a running decoded-byte budget to
+  `BodyReader` only for chunked input.
 - Close after an unread body. Draining it would compete with any outstanding application read and would need
   a separate size limit and deadline.
 
@@ -71,7 +74,7 @@
   reuse it. A complete buffered head already takes one search. The prototype sped up a 24 KB head
   in memory (22.11 to 20.45 µs), but slowed a head arriving 32 bytes at a time and a fragmented
   TCP request (904 to 836 requests/s). Reconsider if production profiles show large heads dominate.
-- For codec experiments see the [HTTP package decisions](../http/AGENTS.md#http1-codec-performance).
+- For codec experiments see the [HTTP protocol package decisions](../http-protocol/AGENTS.md#http1-codec-performance).
   For timer tradeoffs see the [async package decisions](../async/AGENTS.md).
 
 ### Comparing with earlier measurements

@@ -6,18 +6,13 @@ namespace Thesis\Http;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
-use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Io\Buffer;
-use Thesis\Io\ReadFailed;
-use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
 
 #[Test]
 #[Covers(Request::class)]
 #[Covers(Response::class)]
-#[Covers(Body::class)]
+#[Covers(StringBody::class)]
 #[Covers(Query::class)]
 final class MessageTest
 {
@@ -29,15 +24,16 @@ final class MessageTest
         Assert::same(readAll($request->body), '');
     }
 
-    public function closesRequestBodyWithoutReadingIt(): void
+    public function stringBodyKeepsItsSizeAndSharesItsPositionWithTheMessageCopy(): void
     {
-        $body = new ScriptedReader('payload');
-        $request = new Request('POST', new Uri('/'), body: $body);
+        $request = new Request('POST', new Uri('/'), body: "a\0b");
+        $copy = clone $request;
 
-        $request->body->close();
-
-        Assert::same($body->closes, 1);
-        Assert::same($body->requests, []);
+        Assert::true($request->body->isBuffered);
+        Assert::same($request->body->read(2), "a\0");
+        Assert::same($copy->body->read(2), 'b');
+        Assert::same($request->body->size, 3);
+        Assert::null($request->body->read(1));
     }
 
     public function everyRequestHasBodyOfItsOwn(): void
@@ -104,7 +100,7 @@ final class MessageTest
     {
         $response = new Response(headers: new Headers(['content-type' => 'text/plain']));
 
-        $copy = clone($response, ['status' => 404, 'body' => new Body('Not found.')]);
+        $copy = clone($response, ['status' => 404, 'body' => new StringBody('Not found.')]);
 
         Assert::same($copy->status, 404);
         Assert::same($copy->headers, $response->headers);
@@ -114,47 +110,25 @@ final class MessageTest
 
     public function replacesTrailersOnACopyOfTheResponse(): void
     {
-        $response = new Response(body: new Body('', static fn() => null));
+        $originalTrailers = new Headers(['x-original' => 'yes']);
+        $response = new Response(body: new StringBody('', $originalTrailers));
         $trailers = new Headers(['x-count' => '1']);
 
-        $copy = clone($response, ['body' => new Body('', $trailers)]);
+        $copy = clone($response, ['body' => new StringBody('', $trailers)]);
 
-        Assert::null($response->body->trailers);
-        Assert::same($copy->body->trailers, $trailers);
+        Assert::same($response->body->discard(), $originalTrailers);
+        Assert::same($copy->body->discard(), $trailers);
     }
 
-    public function discardsRemainingRequestBodyThroughItsTrailers(): void
+    public function discardsTheRestOfAStringBodyAndReturnsItsTrailers(): void
     {
-        $buffer = new Buffer(bytes: "3\r\nabc\r\n0\r\nX-End: yes\r\n\r\nnext");
-        $body = new ChunkedReader($buffer, new StringReader(''));
-        $request = new Request('POST', new Uri('/'), body: new Body($body, static fn() => $body->trailers));
+        $trailers = new Headers(['x-count' => '1']);
+        $response = new Response(body: new StringBody('payload', $trailers));
+        $copy = clone $response;
 
-        Assert::same($request->body->read(1), 'a');
-        Assert::null($request->body->trailers);
-        Assert::same($request->body->discard()->get('x-end'), 'yes');
-        Assert::same($request->body->trailers, $request->body->discard());
-        Assert::same($buffer->drain(), 'next');
-    }
-
-    public function discardsResponseBodyEvenWhenTrailersAreReady(): void
-    {
-        $response = new Response(body: 'payload');
-
-        Assert::same($response->body->discard(), $response->body->trailers);
-        Assert::same(readAll($response->body), '');
-    }
-
-    public function truncatedBodyFailsWhileDiscarding(): void
-    {
-        $response = new Response(body: chunked("3\r\nab"));
-        Expect::exception(ReadFailed::class);
-        $response->body->discard();
-    }
-
-    public function pendingTrailersAtEndOfBodyAreAnError(): void
-    {
-        $response = new Response(body: new Body('', static fn() => null));
-        Expect::exception(\LogicException::class);
-        $response->body->discard();
+        Assert::same($response->body->read(3), 'pay');
+        Assert::same($response->body->discard(), $trailers);
+        Assert::null($copy->body->read(1));
+        Assert::same($response->body->size, 7);
     }
 }

@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 
 /**
@@ -59,52 +55,4 @@ function failure(callable $call): ?string
     }
 
     return null;
-}
-
-/**
- * The status and the message of the MalformedMessage that the call throws, null if the call does not throw it.
- *
- * @param callable(): mixed $call
- */
-function rejection(callable $call): ?string
-{
-    try {
-        $call();
-    } catch (MalformedMessage $malformed) {
-        return "{$malformed->status}: {$malformed->getMessage()}";
-    }
-
-    return null;
-}
-
-/**
- * Joins the lines of a head with CRLF, without the empty line that ends the head.
- *
- * @no-named-arguments
- */
-function head(string ...$lines): string
-{
-    return implode("\r\n", $lines);
-}
-
-/**
- * `requestHead()` parses the head of a request as a server does. An HTTP/1.1 request gets `Host: example.com` added.
- *
- * @no-named-arguments
- */
-function requestHead(string $requestLine, string ...$fields): RequestHead
-{
-    if (str_ends_with($requestLine, 'HTTP/1.1')) {
-        $fields = ['Host: example.com', ...$fields];
-    }
-
-    return RequestHead::parse(head($requestLine, ...$fields));
-}
-
-/**
- * A ChunkedReader over the given bytes, with the default limits.
- */
-function chunked(string $bytes): ChunkedReader
-{
-    return new ChunkedReader(new Buffer(), new ScriptedReader($bytes));
 }

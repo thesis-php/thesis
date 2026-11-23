@@ -14,6 +14,7 @@ return new Manifest(
     keywords: ['php', 'async', 'http', 'http1', 'http-client', 'streaming', 'keep-alive', 'tcp', 'tls'],
     require: [
         'thesis/http' => '*',
+        'thesis/http-protocol' => '*',
         'thesis/io' => '*',
         'thesis/net' => '*',
     ],

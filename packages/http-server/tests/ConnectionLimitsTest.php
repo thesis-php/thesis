@@ -167,7 +167,7 @@ final class ConnectionLimitsTest
                     }
 
                     Assert::same($body, 'ab');
-                    Assert::same($request->body->trailers?->get('x-end'), 'yes');
+                    Assert::same($request->body->discard()->get('x-end'), 'yes');
 
                     return new Response();
                 },

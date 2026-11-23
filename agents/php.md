@@ -137,6 +137,8 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
 
 ### Classes and state
 
+- Do not use traits. Related classes can share behavior in an abstract base class.
+
 - `readonly` wherever possible: `final readonly class` for immutable classes, `readonly` on individual properties
   for partially mutable ones and for a class with a `get` hook (PHP forbids hooks on `readonly` properties).
 - A value without arguments that is an attribute of the object is a property, a method is for work.

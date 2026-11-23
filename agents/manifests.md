@@ -66,8 +66,9 @@ or changing the public API of a package that others use. How the generator works
   `vendor/autoload.php` and prevents `make sync` from running: remove its line from the `composer.json` files by hand
   and run `composer dump-autoload` first. A constant declared next to a class (`const ROOT_SCOPE = new Scope()`)
   is loaded with it by PSR-4. The files are sorted by path and must not depend on each other at load time.
-  `files`/`devFiles` of the manifest list eager files outside `src/` and `tests/`: a file that belongs
-  to a directory of its own and goes away with it (`time/polyfill/load.php`, `amqp/codegen/generate.php`).
+  `files`/`devFiles` of the manifest list additional eager files. This includes files outside `src/` and `tests/`
+  (`time/polyfill/load.php`, `amqp/codegen/generate.php`) and class files with constants that callers need
+  before the class is autoloaded. Leave automatically discovered paths out of the manifest.
 - A function of `internal.php` is a helper that several classes or `api.php` share. Functions with helpers
   of their own that nobody else calls are a class with `private static` helpers instead
   (`Amqp\Internal\Protocol\Fields`): PHP has no private functions.

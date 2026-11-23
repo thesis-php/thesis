@@ -53,7 +53,7 @@ final class ClientTest
             $request = new Request('POST', new Uri("http://{$address}/upload?q=1"), body: 'data');
             $end = new Client()->withResponse($request, static function (Response $response) {
                 Assert::false(new \ReflectionObject($response->body)->isCloneable());
-                Assert::null($response->body->trailers);
+                Assert::true($response->body->mayHaveTrailers);
                 Assert::same($response->body->read(2), 'ok');
 
                 return $response->body->discard()->get('x-end');
@@ -72,6 +72,8 @@ final class ClientTest
                     "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx",
                     "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\ny\r\n0\r\nX-End: yes\r\n\r\n",
                     "HTTP/1.1 204 No Content\r\n\r\n",
+                    "HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\n",
+                    "HTTP/1.1 304 Not Modified\r\nContent-Length: 0\r\n\r\n",
                     "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
                 ] as $wire) {
                     $buffer = new Buffer();
@@ -85,7 +87,7 @@ final class ClientTest
 
                 $next = $listener->accept() ?? throw new \LogicException();
                 new Buffer()->fillUntil($next, "\r\n\r\n");
-                $next->write("HTTP/1.1 204 No Content\r\n\r\n");
+                $next->write("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nlast");
                 $next->close();
                 $listener->close();
             });
@@ -99,8 +101,20 @@ final class ClientTest
             Assert::same($second->body->read(1), 'y');
             Assert::same($second->body->discard()->get('x-end'), 'yes');
             Assert::same($client->send($request)->status, 204);
+            Assert::same($second->body->discard()->get('x-end'), 'yes');
+            $head = $client->send(new Request('HEAD', $request->uri));
+            Assert::same($head->headers->get('content-length'), '7');
+            Assert::same($head->body->size, 0);
+            Assert::null($head->body->read(1));
+            $notModified = $client->send($request);
+            Assert::same($notModified->status, 304);
+            Assert::same($notModified->headers->get('content-length'), '0');
+            Assert::null($notModified->body->read(1));
             Assert::same($client->send($request)->status, 200);
-            Assert::same($client->send($request)->status, 204);
+            $last = $client->send($request);
+            Assert::false($last->body->mayHaveTrailers);
+            Assert::same($last->body->discard()->toArray(), []);
+            Assert::null($last->body->read(1));
         }));
     }
 

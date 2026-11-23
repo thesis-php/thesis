@@ -6,29 +6,29 @@ namespace Thesis\HttpServer\Internal;
 
 use Thesis\Async\Cancelled;
 use Thesis\Http\Body;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
-use Thesis\Http\Http1\Version;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
+use Thesis\Http\StringBody;
+use Thesis\HttpProtocol\Http1\ChunkedReader;
+use Thesis\HttpProtocol\Http1\FixedLengthReader;
+use Thesis\HttpProtocol\Http1\Framing;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
+use Thesis\HttpProtocol\Http1\RequestHead;
+use Thesis\HttpProtocol\Http1\ResponseHead;
+use Thesis\HttpProtocol\Http1\Version;
 use Thesis\HttpServer\Config;
 use Thesis\Io\Buffer;
 use Thesis\Io\IoException;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
-use Thesis\Io\StringReader;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Io\Writer;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\isCancelled;
-use function Thesis\Http\Http1\encodeChunk;
-use function Thesis\Http\Http1\encodeLastChunk;
+use function Thesis\HttpProtocol\Http1\encodeChunk;
+use function Thesis\HttpProtocol\Http1\encodeLastChunk;
 
 /**
  * @internal
@@ -139,23 +139,16 @@ final class Connection
         $continue = $head->version === Version::Http11 && $expect !== null && $head->length !== 0
             ? new ContinueResponse($output)
             : null;
+        $bodyReader = null;
         if ($head->length === 0) {
-            $body = null;
-            $bodyReader = null;
-            $reader = new StringReader('');
+            $decoder = null;
+        } elseif ($head->length === null) {
+            $decoder = new ChunkedReader($buffer, $input);
+            $bodyReader = new BodyReader($decoder, $continue, remaining: $maxBodyBytes);
         } else {
-            $body = $head->length === null
-                ? new ChunkedReader($buffer, $input)
-                : new FixedLengthReader($buffer, $input, $head->length);
-            if ($body instanceof FixedLengthReader && $continue === null && $buffer->count() >= $body->size) {
-                // Its length passed the limit above and the complete body can be read without touching the transport.
-                $bodyReader = null;
-                $reader = $body;
-            } else {
-                $bodyReader = new BodyReader($body, $maxBodyBytes, $continue);
-                $reader = $body instanceof FixedLengthReader
-                    ? new SizedBodyReader($bodyReader, $body->size)
-                    : $bodyReader;
+            $decoder = new FixedLengthReader($buffer, $input, $head->length);
+            if ($continue !== null || $buffer->count() < $head->length) {
+                $bodyReader = new BodyReader($decoder, $continue);
             }
         }
 
@@ -163,7 +156,7 @@ final class Connection
             method: $head->method,
             uri: $head->uri,
             headers: $head->headers,
-            body: $body instanceof ChunkedReader ? new Body($reader, static fn() => $body->trailers) : $reader,
+            body: $bodyReader ?? $decoder ?? '',
         );
 
         try {
@@ -203,7 +196,7 @@ final class Connection
 
             $ignoresBody = $reply->length === 0 || $response->body->isBuffered;
             $mustClose = $continue?->isPending === true || $state?->isStopping === true
-                || ($ignoresBody && !self::isBodyComplete($body));
+                || ($ignoresBody && !self::isBodyComplete($decoder));
 
             if ($reply->isPersistent && $mustClose) {
                 [$reply, $bytes] = self::encodeHead($response, $head, isPersistent: false);
@@ -249,11 +242,11 @@ final class Connection
             bytes: $bytes,
             output: $output,
             first: $first,
-            bufferedEcho: $response->body === $request->body && $body instanceof FixedLengthReader
-                && $buffer->count() >= $body->remaining,
+            bufferedEcho: $response->body === $request->body && $decoder instanceof FixedLengthReader
+                && $buffer->count() >= $decoder->remaining,
         );
 
-        return $reply->isPersistent && self::isBodyComplete($body);
+        return $reply->isPersistent && self::isBodyComplete($decoder);
     }
 
     /**
@@ -264,19 +257,14 @@ final class Connection
         /** @var ?array{ResponseHead, string} $last */
         static $last = null;
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
-        if ($last !== null && $ordinary && $response->body->isBuffered) {
+        $body = $response->body;
+        if ($last !== null && $ordinary && $body instanceof StringBody) {
             $cached = $last;
             $head = $cached[0];
-            if ($response->status === $head->status && $response->body->size === $head->length
+            if ($response->status === $head->status && $body->size === $head->length
                 && $request->version === $head->version && ($isPersistent && $request->isPersistent) === $head->isPersistent
-                && $response->headers->toArray() === $head->headers->toArray()) {
-                $trailers = $response->body->trailers;
-                if ($trailers?->toArray() === []) {
-                    return $cached;
-                }
-
-                // A trailer provider is evaluated once when framing the response.
-                $response = clone($response, ['body' => new Body($response->body, static fn() => $trailers)]);
+                && $response->headers->toArray() === $head->headers->toArray() && !$body->mayHaveTrailers) {
+                return $cached;
             }
         }
 
@@ -293,7 +281,7 @@ final class Connection
     {
         return match (true) {
             $body === null => true,
-            $body instanceof ChunkedReader => $body->trailers !== null,
+            $body instanceof ChunkedReader => $body->isComplete,
             $body instanceof FixedLengthReader => $body->remaining === 0,
         };
     }
@@ -303,15 +291,10 @@ final class Connection
      */
     private static function writeError(Writer $output, int $status, ?RequestHead $head = null): void
     {
-        if ($head === null) {
-            $reason = Status::reasonPhrase($status) ?? '';
-            $output->write("HTTP/1.1 {$status} {$reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-
-            return;
-        }
-
-        $response = new Response($status);
-        $output->write(ResponseHead::of($response, $head, isPersistent: false)->toString());
+        $reply = $head === null
+            ? ResponseHead::forInvalidRequest($status)
+            : ResponseHead::of(new Response($status), $head, isPersistent: false);
+        $output->write($reply->toString());
     }
 
     private static function writeResponse(
@@ -358,9 +341,7 @@ final class Connection
         }
 
         if ($head->framing === Framing::Chunked) {
-            $trailers = $response->body->trailers
-                ?? throw new \ValueError('Response trailers are still pending at EOF.');
-            $output->write(encodeLastChunk($trailers));
+            $output->write(encodeLastChunk($response->body->discard()));
         }
     }
 

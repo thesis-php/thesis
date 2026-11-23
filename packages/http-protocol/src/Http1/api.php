@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
+use const Thesis\Http\EMPTY_HEADERS;
 
 /**
  * Encodes a chunk of a body sent with `Transfer-Encoding: chunked`.
@@ -24,7 +25,7 @@ function encodeChunk(string $bytes): string
  * @api
  * @throws \ValueError if the trailers contain a field that frames or routes a message
  */
-function encodeLastChunk(Headers $trailers = new Headers()): string
+function encodeLastChunk(Headers $trailers = EMPTY_HEADERS): string
 {
     foreach (Fields::NOT_IN_TRAILERS as $name) {
         if ($trailers->has($name)) {

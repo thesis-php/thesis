@@ -13,7 +13,7 @@ use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\ContinueReader;
-use Thesis\HttpServer\Stub\PrefixedReader;
+use Thesis\HttpServer\Stub\PrefixedBody;
 use Thesis\HttpServer\Stub\RecordingWriter;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
@@ -48,7 +48,7 @@ final class ExchangeTest
         Connection::serve(
             input: $input,
             output: $output,
-            handler: static fn(Request $request) => new Response(body: new PrefixedReader($request->body)),
+            handler: static fn(Request $request) => new Response(body: new PrefixedBody($request->body)),
             config: new Config('/test.sock', maxRequestsPerConnection: 1),
         );
 

@@ -11,6 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The package provides a byte buffer with typed encoding, non-blocking streams and standard I/O.
 - Concurrent writes to a `Stream` run in call order.
-- `SizedReader` exposes the total size in bytes. `StringReader` reads bytes from a string in memory.
+- `StringReader` reads bytes from a string in memory and exposes its total size.
 - `Reader::read()` returns `null` at EOF and throws `ConcurrentRead` if a read is already in progress on the same reader.
 - `close()` closes a reader or writer when it implements `Closer`.

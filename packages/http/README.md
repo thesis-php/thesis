@@ -21,10 +21,6 @@
 HTTP clients and servers share `Request`, `Response` and `Headers`. Each message holds HTTP data independent
 of the connection, including a streaming body that carries its trailer fields.
 
-The strict HTTP/1.1 codec reads and writes message heads and chunked bodies. It rejects input that
-two recipients could interpret differently. Clients and servers use the codec and manage their
-own sockets and timeouts.
-
 ```php
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
@@ -49,7 +45,7 @@ $response = new Response(status: Status::CREATED, headers: new Headers(['locatio
 composer require thesis/http
 ```
 
-This package requires 64-bit PHP 8.6+ and needs no additional PHP extensions.
+This package requires PHP 8.6+. The [HTTP/1 codec](https://github.com/thesis-php/http-protocol) uses these messages.
 
 ## Messages
 
@@ -57,21 +53,16 @@ This package requires 64-bit PHP 8.6+ and needs no additional PHP extensions.
 
 ```php
 $forwarded = clone($request, ['uri' => $request->uri->withHost('backend.internal')]);
-$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new \Thesis\Http\Body('Not found.')]);
+$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new \Thesis\Http\StringBody('Not found.')]);
 ```
 
 The copy shares the reader with the original unless it supplies a new one. Reading from a shared reader
 advances the position for both messages.
 
-The HTTP/1 codec handles the version and the fields that control the connection. On output it uses
-`Status::reasonPhrase($code)`, which returns `null` for unknown codes. The codec writes an empty phrase for those codes.
-`RequestHead::of()` and `ResponseHead::of()` reject `Transfer-Encoding`, `Connection`,
-`Keep-Alive` and `Upgrade` in message headers. The codec derives the request's `Host` from `$uri`.
-For a fixed-length body, the codec derives `Content-Length` from the reader's size. A response to
-`HEAD` or a 304 response can instead carry the length the representation would have had.
-Status 1xx and 204 always forbid that field.
-
 A response status is an integer from 100 to 999.
+
+An eligible `HEAD` or `304` response can include `Content-Length` in its headers to advertise the size of
+the selected representation. The response body stays empty.
 
 `Status` defines constants for common status codes, including `Status::OK`, `Status::CREATED`
 and `Status::NOT_FOUND`.
@@ -132,7 +123,7 @@ foreach ($headers as $name => $lines) {
 
 ## Body readers and trailers
 
-Pass an unread `Thesis\Io\Reader` to the sender and give it exclusive access until the send finishes.
+Give the sender exclusive access to the unread body until the send finishes.
 For fixed-length framing, the sender counts the bytes
 written and closes the connection if the reader ends before the advertised length.
 
@@ -142,134 +133,13 @@ while (($bytes = $request->body->read(8192)) !== null) {
 }
 ```
 
-Read `$body->trailers` to see the available fields. Pending fields return `null`.
-An empty `Headers` means the body has no trailers. Use `new Body($reader, $trailers)` to supply
-ready fields or a callback that observes the current fields without I/O or suspension.
+`Request` and `Response` accept a string or a `Body`. Implement `Body` for a custom byte source and expose
+its length, buffering guarantee and trailer state.
 
-Use `$body->close()` to release a closable reader or `$body->discard()` when you only need the
-trailers. The method reads from the body's current position to EOF in bounded chunks, even when the trailers are
-already available. Reads may suspend and use the same limits and timeouts as reading the body yourself.
-An empty `Headers` means there are no trailers. Read errors propagate. If a custom trailer source still returns
-`null` at EOF, the method throws `LogicException`.
+Use `new StringBody($bytes, $trailers)` for a string with trailers. `$body->mayHaveTrailers` tells the codec
+whether trailer fields are possible before it reads the body.
 
-## HTTP/1.1
-
-`Thesis\Http\Http1` has what an HTTP/1.1 server and an HTTP/1.1 client have in common. A head is parsed
-from a string and written to a string. A chunked body is read from any `Thesis\Io\Reader`. The caller reads
-the bytes from a connection, sets the timeouts and decides what to do with a malformed message.
-
-### Heads
-
-A server parses the head of a request, then writes the head of the response:
-
-```php
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
-use Thesis\Http\Response;
-use Thesis\Http\Status;
-use Thesis\Io\Buffer;
-
-$buffer = new Buffer();
-$buffer->fillUntil($connection, "\r\n\r\n", maxLength: 16 * 1024);
-
-// The bytes up to the empty line: "POST /users HTTP/1.1\r\nHost: example.com\r\nContent-Length: 17"
-$requestHead = RequestHead::parse($buffer->readUntil("\r\n\r\n"), scheme: 'https');
-
-$requestHead->method;       // 'POST'
-$requestHead->uri;          // Uri of https://example.com/users
-$requestHead->headers;      // no Host, no Content-Length, no other fields that belong to the connection
-$requestHead->framing;      // Framing::Length
-$requestHead->length;       // 17
-$requestHead->isPersistent; // true: the connection stays open for the next request
-
-$response = new Response(status: Status::CREATED, body: 'created');
-$responseHead = ResponseHead::of($response, $requestHead);
-
-$connection->write($responseHead->toString());
-// "HTTP/1.1 201 Created\r\nContent-Length: 7\r\n\r\n"
-```
-
-A client does the same in the opposite direction: `RequestHead::of($request)->toString()`, then
-`ResponseHead::parse($bytes, $request->method)`. The parser needs the method to find the end of the response:
-a response to `HEAD` has no body, whatever its fields say.
-
-Besides the parts of a message, a head holds what belongs to the connection:
-
-- `$version`: `Version::Http10` or `Version::Http11`. A response is written in the version of its request.
-- `$framing` and `$length`: how a recipient finds the end of the body. `Framing::None` means no body,
-  `Length` means `Content-Length`, `Chunked` means `Transfer-Encoding: chunked`, and `UntilClose` means
-  a response body that lasts until the connection is closed. With a known size and no trailers,
-  `of()` uses `Length` for a body. Empty requests without trailers use `None`, except that `POST`, `PUT` and `PATCH` use `Length`.
-  An HTTP/1.1 body with trailers or an unknown size uses `Chunked`.
-  An HTTP/1.0 response with an unknown size uses `UntilClose`.
-- `$isPersistent`: whether the connection stays open. Pass `isPersistent: false` to `of()` to close it.
-- `$upgrade`: the protocols from `Upgrade` (`websocket`), when `Connection` names `upgrade`.
-
-`of()` throws `\ValueError` for a message that cannot be written: the method is not a token, the URI has
-no host, the headers contain a field that belongs to the connection, or a response that cannot have a body
-(to `HEAD`, 1xx, 204, 304 or a successful `CONNECT`) has one.
-
-### What is rejected
-
-`parse()` throws `MalformedMessage` and guesses nothing. A server should answer with the `$status`
-of the exception (400, 431, 501 or 505) and close the connection, because the end of the message is unknown.
-Some of what is rejected:
-
-- a line that ends with a bare `\n` or contains a bare `\r`, a folded line, a space before the colon of a field;
-- a name that is not a token, a control character in a value;
-- `Content-Length` together with `Transfer-Encoding`; a `Content-Length` that is repeated, is a list (`5, 5`),
-  has a sign or an embedded space, or has more than 18 digits;
-- a transfer coding other than exactly `chunked` (`gzip, chunked` is rejected too), and any transfer coding
-  in HTTP/1.0;
-- an HTTP/1.1 request without `Host` or with two, a `Host` that is not a host with an optional port;
-- a target that is none of these: an RFC 3986 path, an `http` or `https` URI, `*` for `OPTIONS`, a host
-  and a port for `CONNECT`; a target with a fragment or user info;
-- more than `maxFields` fields, 100 by default.
-
-For a request-target starting with a slash, the parser percent-encodes `[ ] \ ^ `` ` `` { | }` in the path or query.
-Browsers send these bytes unescaped (`?filter[name]=x`), and an RFC 3986 URI cannot hold them.
-
-The fields that belong to the connection, and the fields that `Connection` names, are removed from the headers:
-they are meant for this hop only, and a proxy must not forward them.
-
-### Body framing
-
-For a parsed head with `Framing::Length`, use `new FixedLengthReader($buffer, $connection, size: $length)`,
-where `$length` is the length from the head. The reader stops at that boundary and preserves buffered
-bytes of the next message. A connection EOF before the declared size raises `Thesis\Io\ReadFailed`.
-Overlapping reads on the same `FixedLengthReader` or `ChunkedReader` throw `Thesis\Io\ConcurrentRead`.
-
-For `Framing::Chunked`, use `ChunkedReader` and expose its trailer state on the message:
-
-```php
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Response;
-use Thesis\Http\Body;
-use function Thesis\Http\Http1\encodeChunk;
-use function Thesis\Http\Http1\encodeLastChunk;
-
-// Reading. The bytes after the last chunk and the trailers stay in the buffer: they belong to the next message.
-$chunked = new ChunkedReader($buffer, $connection);
-$response = new Response(
-    status: $responseHead->status,
-    headers: $responseHead->headers,
-    body: new Body($chunked, static fn() => $chunked->trailers),
-);
-
-// A proxy can forward the decoded payload and then the trailer section.
-while (($bytes = $response->body->read(8192)) !== null) {
-    $downstream->write(encodeChunk($bytes));
-}
-$trailers = $response->body->trailers ?? throw new \LogicException('The response trailers are unavailable.');
-$downstream->write(encodeLastChunk($trailers));
-```
-
-Outgoing HTTP/1.1 messages use chunked framing if trailers are present, announced by `Trailer`,
-or still pending, even when the reader has a known size. HTTP/1.0 responses and responses without a body
-reject trailers.
-
-If the connection ends before the last chunk, the read fails with `Thesis\Io\ReadFailed`, so a truncated body
-does not look complete. After malformed chunk framing or trailers, the reader throws `MalformedMessage` on this and every later read.
-`ChunkedReader` has three limits: the length of a chunk size line (256 bytes, including chunk extensions, which are ignored), the total
-length of the trailers (16 KiB) and the number of trailer lines (100). The size of the body is not limited here:
-the code that reads the body limits it.
+Use `$body->close()` to release resources, or `$body->discard()` to advance to EOF and return the final trailers.
+Call `discard()` after a read returns `null` to get the trailers of a body you have already read.
+A string body moves its offset directly. A streaming body reads in bounded chunks and uses the same limits
+and timeouts as ordinary reads. Read errors propagate.

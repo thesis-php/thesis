@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Status;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
 use Uri\Rfc3986\Uri;
-use function Thesis\Http\Internal\isToken;
-use function Thesis\Http\Internal\quote;
+use function Thesis\HttpProtocol\Internal\Http1\isToken;
+use function Thesis\HttpProtocol\Internal\Http1\quote;
 
 /**
  * An HTTP/1.1 request head contains the request line and header lines. A client writes the head to a
@@ -100,7 +100,7 @@ final readonly class RequestHead
         return new self(
             method: $method,
             uri: self::uri($method, $target, $scheme, $host),
-            headers: Headers::fromHttp1($fields, withoutHost: true),
+            headers: $fields->toHeaders(withoutHost: true),
             version: $version,
             framing: match (true) {
                 $fields->isChunked => Framing::Chunked,
@@ -159,7 +159,7 @@ final readonly class RequestHead
 
         $length = $request->body->size;
         $framing = match (true) {
-            $length === null || Fields::hasTrailers($request->headers, $request->body->trailers) => Framing::Chunked,
+            $length === null || Fields::hasTrailers($request->headers, $request->body->mayHaveTrailers) => Framing::Chunked,
             // POST, PUT and PATCH are expected to have content, so an empty body is sent as Content-Length: 0.
             $length > 0,
             \in_array($request->method, [Method::POST, Method::PUT, Method::PATCH], strict: true) => Framing::Length,

@@ -1,6 +1,6 @@
 {
     "name": "thesis/http",
-    "description": "HTTP messages shared by clients and servers: requests with query parameters, responses, headers, streamed bodies with trailers, and a strict HTTP/1.1 codec that refuses what request smuggling is made of.",
+    "description": "HTTP messages shared by clients and servers: requests with query parameters, responses, headers, and streamed bodies with trailers.",
     "keywords": [
         "php",
         "async",
@@ -8,11 +8,7 @@
         "http-message",
         "http-headers",
         "query-string",
-        "http-trailers",
-        "http1",
-        "http-parser",
-        "chunked-encoding",
-        "request-smuggling"
+        "http-trailers"
     ],
     "license": "MIT",
     "type": "library",
@@ -37,12 +33,9 @@
     },
     "require": {
         "php": "^8.6",
-        "php-64bit": "*",
         "thesis/io": "^0.1"
     },
     "require-dev": {
-        "amphp/http-client": "^5.3",
-        "amphp/http-server": "^3.4",
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
@@ -54,8 +47,7 @@
             "Thesis\\Http\\": "src/"
         },
         "files": [
-            "src/Http1/api.php",
-            "src/Internal/internal.php"
+            "src/Headers.php"
         ]
     },
     "autoload-dev": {

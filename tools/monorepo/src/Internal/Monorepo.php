@@ -121,10 +121,11 @@ final readonly class Monorepo
         string $argument,
         array $listed,
     ): array {
+        $discovered = EagerFiles::in($root . '/' . $package, $dir);
         $errors = [];
 
         foreach ($listed as $file) {
-            if (str_starts_with($file, $dir . '/')) {
+            if (\in_array($file, $discovered, strict: true)) {
                 $errors[] = \sprintf(
                     '%s/%s: %s is autoloaded as a file without classes in src/ or tests/, remove it from %s.',
                     $package,
@@ -139,7 +140,7 @@ final readonly class Monorepo
             throw new MonorepoException(implode("\n", $errors));
         }
 
-        return [...EagerFiles::in($root . '/' . $package, $dir), ...$listed];
+        return [...$discovered, ...$listed];
     }
 
     /**

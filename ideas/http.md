@@ -1,7 +1,8 @@
 # HTTP client and server design
 
-The shared messages and HTTP/1 codec are implemented in [thesis/http](../packages/http/README.md).
-Its [package notes](../packages/http/AGENTS.md) record the decisions behind them.
+The shared messages live in [thesis/http](../packages/http/README.md), and the shared codec lives in
+[thesis/http-protocol](../packages/http-protocol/README.md). The [message notes](../packages/http/AGENTS.md) and
+[codec notes](../packages/http-protocol/AGENTS.md) record their decisions.
 The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
 binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http-client/README.md) pools
 persistent connections by origin once the response body is complete. The server extensions below remain proposals.
@@ -110,11 +111,11 @@ is cancelled.
 
 A message is the same for HTTP/1.1 and HTTP/2, otherwise grpc rewrites it:
 
-- The HTTP/1 codec derives body framing from the reader and trailers. A response to `HEAD` or a 304 can
-  carry `Content-Length` as representation metadata. Status 1xx and 204 always forbid the field.
+- The HTTP/1 codec derives body framing from the body and trailers. Eligible `HEAD` and `304` responses may
+  carry `Content-Length` in their headers as representation metadata. Status 1xx and 204 forbid sending the field.
 - The request URI supplies the authority for `Host` and, in a future HTTP/2 codec, `:authority`.
-- **trailers are in the model from the first version**, gRPC needs them. On a message, `$trailers` holds ready
-  fields or reports that they are pending. A callback may read the current reader's state without I/O or suspension.
+- **trailers are in the model from the first version**, gRPC needs them. `Body::$mayHaveTrailers` lets the codec
+  choose framing before the body is read. `Body::discard()` returns the final fields.
 
 ### Choosing HTTP/1 framing when sending trailers
 
@@ -186,7 +187,7 @@ flowchart TD
     drain -->|Failure or limit reached| close
 ```
 
-The existing `Thesis\Http\Http1` codec lives in `thesis/http`. The client formats request heads and
+The `Thesis\HttpProtocol\Http1` codec lives in `thesis/http-protocol`. The client formats request heads and
 parses response heads. The server does the reverse. Both need the same framing rules. For example, a response
 to HEAD ends after the fields even when Content-Length describes the size of the representation.
 
@@ -197,8 +198,7 @@ bytes already in the buffer, and constructing the appropriate body reader. The H
 share this work between client and server. Timeouts, pooling and the choice to drain or close a connection
 belong to its owner.
 
-If HTTP/2 is planned, consider extracting `thesis/http1` when the first client or server uses it.
-Both `thesis/http1` and a future `thesis/http2` could depend on the shared messages in `thesis/http`.
+The codec depends on the shared messages in `thesis/http`. The protocol package can hold other HTTP versions.
 An HTTP/2 implementation needs connection-wide HPACK state, flow control and dispatch of interleaved frames
 to individual streams. Applications can still read each stream through the same `Reader`. Defer a common codec
 interface until both implementations have callers that need one.
@@ -209,9 +209,9 @@ The reference versions are `amphp/http` 2.1.2, `amphp/http-client` 5.3.8 and `am
 
 - **Common HTTP.** Amp shares abstract message classes, header and query helpers, status codes,
   and request and response cookie syntax. Its HTTP/1 helper parses and formats header fields.
-  Its HTTP/2 parser sends frame events to a processor implemented on each side. In Thesis the shared
-  package already has concrete messages, immutable multi-value headers, and HTTP/1
-  request and response heads, framing and chunked bodies. Cookie field parsing could also be shared:
+  Its HTTP/2 parser sends frame events to a processor implemented on each side. Thesis shares concrete
+  messages and immutable multi-value headers in `thesis/http`, and HTTP/1 heads, framing and chunked bodies
+  in `thesis/http-protocol`. Cookie field parsing could also be shared:
   each Set-Cookie field is a separate value. Cookie storage and selection for an outgoing request
   would be client policy.
 - **Client.** Amp owns concrete messages, upload content and multipart forms, connection factories and pools,

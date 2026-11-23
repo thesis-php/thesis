@@ -5,26 +5,25 @@ declare(strict_types=1);
 namespace Thesis\HttpClient;
 
 use Thesis\Http\Body;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpClient\Internal\ConnectionPool;
 use Thesis\HttpClient\Internal\ResponseBody;
-use Thesis\HttpClient\Internal\SizedResponseBody;
 use Thesis\HttpClient\Internal\UntilCloseReader;
+use Thesis\HttpProtocol\Http1\ChunkedReader;
+use Thesis\HttpProtocol\Http1\FixedLengthReader;
+use Thesis\HttpProtocol\Http1\Framing;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
+use Thesis\HttpProtocol\Http1\RequestHead;
+use Thesis\HttpProtocol\Http1\ResponseHead;
 use Thesis\Io\Buffer;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
 use Thesis\Net\ClientTls;
 use Thesis\Net\Socket;
-use function Thesis\Http\Http1\encodeChunk;
-use function Thesis\Http\Http1\encodeLastChunk;
+use function Thesis\HttpProtocol\Http1\encodeChunk;
+use function Thesis\HttpProtocol\Http1\encodeLastChunk;
 use function Thesis\Net\connect;
 
 /**
@@ -110,8 +109,7 @@ final readonly class Client
         }
 
         if ($head->framing === Framing::Chunked) {
-            $trailers = $request->body->trailers ?? throw new \ValueError('Missing request trailers.');
-            $socket->write(encodeLastChunk($trailers));
+            $socket->write(encodeLastChunk($request->body->discard()));
         }
     }
 
@@ -139,8 +137,11 @@ final readonly class Client
         } while ($head->status < 200);
 
         $reader = match ($head->framing) {
-            Framing::None => new FixedLengthReader($buffer, $socket, 0),
-            Framing::Length => new FixedLengthReader($buffer, $socket, $head->length ?? throw new \LogicException()),
+            Framing::None, Framing::Length => new FixedLengthReader(
+                buffer: $buffer,
+                reader: $socket,
+                size: $head->length ?? throw new \LogicException(),
+            ),
             Framing::Chunked => new ChunkedReader($buffer, $socket),
             Framing::UntilClose => new UntilCloseReader($buffer, $socket),
         };
@@ -154,16 +155,11 @@ final readonly class Client
                 $socket->close();
             }
         };
-        $body = new ResponseBody($reader, $socket, $release);
 
         return new Response(
             status: $head->status,
             headers: $head->headers,
-            body: match (true) {
-                $reader instanceof FixedLengthReader => new SizedResponseBody($body, $reader->size),
-                $reader instanceof ChunkedReader => new Body($body, static fn() => $reader->trailers),
-                default => $body,
-            },
+            body: new ResponseBody($reader, $socket, $release),
         );
     }
 }

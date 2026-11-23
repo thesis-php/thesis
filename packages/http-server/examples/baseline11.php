@@ -11,7 +11,6 @@ use Thesis\Http\Status;
 use Thesis\HttpServer\Config;
 use Thesis\HttpServer\Server;
 use Thesis\HttpServer\TcpEndpoint;
-use Thesis\Io\StringReader;
 use Thesis\Net\InetAddress;
 use function Thesis\Async\awaitSignal;
 use function Thesis\Async\group;
@@ -54,7 +53,7 @@ $server = new Server(
 
         return new Response(
             headers: new Headers(['Content-Type' => 'text/plain']),
-            body: new StringReader((string) $sum),
+            body: (string) $sum,
         );
     },
 );

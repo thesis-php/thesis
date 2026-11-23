@@ -7,3 +7,5 @@
 - Reserve idle sockets per scheme, host and effective port. Probe before reuse. EOF, pending data and
   transport errors retire an idle socket. A write or response failure never replays a request.
 - A close-delimited response starts with any bytes the head reader already buffered.
+- `ResponseBody::discard()` drains through `read()` to finish the lease. The chunked decoder then supplies its
+  saved trailers. A close-delimited response returns empty headers without reading the released socket again.

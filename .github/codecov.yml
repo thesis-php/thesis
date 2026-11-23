@@ -64,6 +64,12 @@ component_management:
         - packages/http-client/src/**
       flag_regexes:
         - '^http-client$'
+    - component_id: http-protocol
+      name: thesis/http-protocol
+      paths:
+        - packages/http-protocol/src/**
+      flag_regexes:
+        - '^http-protocol$'
     - component_id: http-server
       name: thesis/http-server
       paths:

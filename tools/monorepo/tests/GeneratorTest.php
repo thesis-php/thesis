@@ -632,7 +632,7 @@ final readonly class GeneratorTest
             ->file('packages/async/src/README.md', "# Not PHP\n")
             ->file('packages/async/tests/helpers.php', "<?php\n\nfunction fixture(): void {}\n")
             ->file('packages/async/codegen/generate.php', "<?php\n\nfunction generate(): void {}\n")
-            ->package('async', "devFiles: ['codegen/generate.php']")
+            ->package('async', "files: ['src/Task.php'], devFiles: ['codegen/generate.php']")
         ;
 
         $files = Generator::generate($fixture->load());
@@ -646,6 +646,7 @@ final readonly class GeneratorTest
                 'src/api.php',
                 'src/name.php',
                 'src/platform.php',
+                'src/Task.php',
             ],
         ]);
         Assert::same($composer['autoload-dev'] ?? null, [
@@ -661,9 +662,12 @@ final readonly class GeneratorTest
 
     #[DataSet(['files', 'src/api.php'])]
     #[DataSet(['devFiles', 'tests/helpers.php'])]
-    public static function failsOnAutoloadFileOfManifestInSrcOrTests(string $argument, string $path): void
+    public static function failsOnAutoloadFileAlreadyDiscovered(string $argument, string $path): void
     {
-        $fixture = new Fixture()->package('async', "{$argument}: ['{$path}']");
+        $fixture = new Fixture()
+            ->package('async', "{$argument}: ['{$path}']")
+            ->file("packages/async/{$path}", "<?php\n\nfunction helper(): void {}\n")
+        ;
 
         Expect::exception(MonorepoException::class)->withMessage(\sprintf(
             'packages/async/package.php: %s is autoloaded as a file without classes in src/ or tests/, remove it from %s.',

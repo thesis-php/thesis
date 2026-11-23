@@ -2,34 +2,57 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Status;
+use Thesis\HttpProtocol\Internal\Http1\Fields;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
-use function Thesis\Http\Internal\quote;
-use const Thesis\Http\Internal\EMPTY_HEADERS;
-use const Thesis\Http\Internal\TOKEN_CHARS;
+use function Thesis\HttpProtocol\Internal\Http1\quote;
+use const Thesis\Http\EMPTY_HEADERS;
+use const Thesis\HttpProtocol\Internal\Http1\TOKEN_CHARS;
 
 /**
  * Reads a chunked body through the last chunk and its trailers.
- * Buffered bytes after the trailers belong to the next message.
+ * Buffered bytes after the trailers belong to the next message. Closing the body leaves the connection open.
  *
  * If the connection ends earlier, the read fails with {@see ReadFailed}: a truncated body must not look complete.
  *
  * @api
  */
-final class ChunkedReader implements Reader
+final class ChunkedReader implements Body
 {
+    #[\Override]
+    public ?int $size {
+        get => null;
+    }
+
     /**
      * Any 15-digit hexadecimal size fits in a signed 64-bit integer.
      */
     private const int MAX_SIZE_DIGITS = 15;
+
+    #[\Override]
+    public bool $isBuffered {
+        get => false;
+    }
+
+    #[\Override]
+    public bool $mayHaveTrailers {
+        get => $this->trailers === null || !$this->trailers->isEmpty;
+    }
+
+    /**
+     * The reader has consumed the last chunk and trailer section.
+     */
+    public bool $isComplete {
+        get => $this->trailers !== null;
+    }
 
     /**
      * @var non-negative-int unread bytes in the current chunk
@@ -53,7 +76,7 @@ final class ChunkedReader implements Reader
     /**
      * The trailer fields, or null until the last chunk and the trailer section have been read.
      */
-    public private(set) ?Headers $trailers = null;
+    private ?Headers $trailers = null;
 
     private ?MalformedMessage $failure = null;
 
@@ -71,6 +94,8 @@ final class ChunkedReader implements Reader
         private readonly int $maxTrailersLength = 16 * 1024,
         private readonly int $maxTrailers = 100,
     ) {}
+
+    private function __clone() {}
 
     /**
      * Invalid chunk framing or trailers cause MalformedMessage on this and every later read.
@@ -97,6 +122,19 @@ final class ChunkedReader implements Reader
             $this->isReading = false;
         }
     }
+
+    public function discard(): Headers
+    {
+        while (true) {
+            if ($this->trailers !== null) {
+                return $this->trailers;
+            }
+
+            $this->read(8192);
+        }
+    }
+
+    public function close(): void {}
 
     /**
      * @param positive-int $max

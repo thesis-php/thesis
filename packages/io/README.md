@@ -157,8 +157,7 @@ if ($line === null) {
 
 ### Reading a string
 
-`new StringReader($bytes)` reads a string in memory without suspending the fiber. It implements `SizedReader`,
-whose `$size` gives the total number of bytes, including bytes already read.
+`new StringReader($bytes)` reads a string in memory without suspending the fiber. Its `$size` gives the total number of bytes, including bytes already read.
 
 ### Streams over resources and stdio
 

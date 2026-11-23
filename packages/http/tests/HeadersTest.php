@@ -17,6 +17,7 @@ final class HeadersTest
     {
         $headers = new Headers();
 
+        Assert::true($headers->isEmpty);
         Assert::same(lines($headers), []);
         Assert::false($headers->has('accept'));
         Assert::null($headers->get('accept'));
@@ -156,6 +157,8 @@ final class HeadersTest
         $removed = $headers->without('C', 'a', 'missing');
 
         Assert::same(lines($removed), [['b', '2']]);
+        Assert::false($removed->isEmpty);
+        Assert::true($removed->without('b')->isEmpty);
         Assert::same(lines($headers), [['a', '1'], ['b', '2'], ['c', '3']]);
     }
 

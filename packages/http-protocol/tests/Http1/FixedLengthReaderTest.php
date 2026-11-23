@@ -2,17 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\HttpProtocol\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\ScriptedReader;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
 use Thesis\Io\ReadFailed;
-use function Thesis\Http\readAll;
 
 #[Test]
 #[Covers(FixedLengthReader::class)]

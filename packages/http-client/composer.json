@@ -36,6 +36,7 @@
     "require": {
         "php": "^8.6",
         "thesis/http": "^0.1",
+        "thesis/http-protocol": "^0.1",
         "thesis/io": "^0.1",
         "thesis/net": "^0.1"
     },

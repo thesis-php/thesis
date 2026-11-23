@@ -2,12 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Internal;
-
-use Thesis\Http\Headers;
-
-/** @internal */
-const EMPTY_HEADERS = new Headers();
+namespace Thesis\HttpProtocol\Internal\Http1;
 
 /**
  * The characters allowed in a token (RFC 9110). A method and a field name are tokens.

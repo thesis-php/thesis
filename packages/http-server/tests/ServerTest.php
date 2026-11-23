@@ -13,7 +13,6 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;
-use Thesis\Io\StringReader;
 use Thesis\Io\WriteFailed;
 use Thesis\Net\Certificate;
 use Thesis\Net\ClientTls;
@@ -40,7 +39,7 @@ final class ServerTest
             $failure = new Deferred();
             $server = new Server(
                 config: new Config(0, idleTimeout: sec(5), writeTimeout: ms(20)),
-                handler: static fn() => new Response(body: new StringReader(str_repeat('x', 16 * 1024 * 1024))),
+                handler: static fn() => new Response(body: str_repeat('x', 16 * 1024 * 1024)),
                 onError: static function (\Throwable $error) use ($failure) {
                     $failure->complete($error);
                 },
