@@ -237,7 +237,15 @@ final class Connection
         }
 
         $continue?->commit();
-        self::writeResponse(response: $response, head: $reply, bytes: $bytes, output: $output, first: $first);
+        self::writeResponse(
+            response: $response,
+            head: $reply,
+            bytes: $bytes,
+            output: $output,
+            first: $first,
+            bufferedEcho: $response->body === $reader && $body instanceof FixedLengthReader
+                && $buffer->count() >= $body->remaining,
+        );
 
         return $reply->isPersistent && self::isBodyComplete($body);
     }
@@ -273,12 +281,15 @@ final class Connection
         string $bytes,
         Writer $output,
         ?string $first,
+        bool $bufferedEcho,
     ): void {
         $remaining = $head->length;
-        if ($response->body instanceof StringReader && $remaining !== null && $remaining > 0 && $remaining <= 8192) {
+        if ($remaining !== null && $remaining > 0 && $remaining <= 8192
+            && ($first !== null || $bufferedEcho || $response->body instanceof StringReader)) {
             try {
-                $chunk = self::readBody($response->body, $remaining);
-            } catch (ReadFailed $error) {
+                $chunk = $first ?? self::readBody($response->body, $remaining);
+                $first = null;
+            } catch (\Throwable $error) {
                 $output->write($bytes);
 
                 throw $error;

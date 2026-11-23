@@ -66,6 +66,18 @@ final class ConnectionTest
         }
     }
 
+    public function writesBufferedEchoBeforeTheNextRequest(): void
+    {
+        $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\none"
+            . "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\ntwo");
+        $output = new RecordingWriter();
+        Connection::serve($input, $output, static fn(Request $request) => new Response(body: $request->body));
+
+        $head = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n";
+        Assert::same($output->bytes, $head . 'one' . $head . 'two');
+        Assert::same($output->writes, 2);
+    }
+
     public function sendsFirstChunkBeforeReadingSecond(): void
     {
         $exchange = new class implements Reader, Writer {
