@@ -149,6 +149,28 @@ final class ScopeTest
         Assert::same($wait->park(), 'value');
     }
 
+    public function cancellationInterruptsOnlyTheRemainingWaits(): void
+    {
+        $scope = new Scope();
+        /** @var ContinuationImpl<null> */
+        $removed = new ContinuationImpl();
+        /** @var ContinuationImpl<null> */
+        $pending = new ContinuationImpl();
+        /** @var ContinuationImpl<null> */
+        $last = new ContinuationImpl();
+        $scope->subscribe($removed);
+        $scope->subscribe($pending);
+        $scope->subscribe($removed);
+        $scope->unsubscribe($removed);
+        $scope->subscribe($last);
+
+        $scope->cancel(CancelCause::Handle, by: null);
+
+        Assert::true($removed->resume());
+        Assert::false($pending->resume());
+        Assert::false($last->resume());
+    }
+
     public function throwIfCancelledThrowsOnlyInCancelledScope(): void
     {
         $scope = new Scope();
@@ -174,11 +196,14 @@ final class ScopeTest
 
     public function rootStoresNoWaits(): void
     {
-        $fiber = new \Fiber(static fn() => \Thesis\Async\Tests\never());
-        $fiber->start();
-        $waits = (fn() => $this->waits)->call(ROOT_SCOPE);
+        /** @var ContinuationImpl<null> */
+        $wait = new ContinuationImpl();
+        $reference = \WeakReference::create($wait);
 
-        Assert::same($waits, []);
+        ROOT_SCOPE->subscribe($wait);
+        unset($wait);
+
+        Assert::null($reference->get());
     }
 
     public function closedScopeStoresNoCallbacks(): void

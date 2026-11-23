@@ -47,7 +47,14 @@ final class Scope implements Waiter
     public private(set) bool $isCancelled = false;
 
     /**
-     * @var array<int, ContinuationImpl<*>> the waits to interrupt on cancellation, keyed by spl_object_id()
+     * A task normally has only one pending wait.
+     *
+     * @var ?ContinuationImpl<*>
+     */
+    private ?ContinuationImpl $firstWait = null;
+
+    /**
+     * @var array<int, ContinuationImpl<*>> further waits in subscription order, keyed by spl_object_id()
      */
     private array $waits = [];
 
@@ -208,8 +215,12 @@ final class Scope implements Waiter
             $wait->interrupt();
         } elseif ($this !== ROOT_SCOPE) {
             // The root scope is never cancelled: holding its waits would only keep abandoned fibers alive.
-            // A subscribed continuation is alive, so its object id is unique among the subscribed ones.
-            $this->waits[spl_object_id($wait)] = $wait;
+            // While older waits remain in the array, a new wait goes after them.
+            if ($this->firstWait === null && $this->waits === []) {
+                $this->firstWait = $wait;
+            } elseif ($wait !== $this->firstWait) {
+                $this->waits[spl_object_id($wait)] = $wait;
+            }
         }
     }
 
@@ -218,7 +229,11 @@ final class Scope implements Waiter
      */
     public function unsubscribe(ContinuationImpl $wait): void
     {
-        unset($this->waits[spl_object_id($wait)]);
+        if ($wait === $this->firstWait) {
+            $this->firstWait = null;
+        } else {
+            unset($this->waits[spl_object_id($wait)]);
+        }
     }
 
     /**
@@ -352,8 +367,12 @@ final class Scope implements Waiter
     private function notify(): void
     {
         $this->isCancelled = true;
+        $firstWait = $this->firstWait;
+        $this->firstWait = null;
         $waits = $this->waits;
         $this->waits = [];
+
+        $firstWait?->interrupt();
 
         foreach ($waits as $wait) {
             $wait->interrupt();

@@ -109,6 +109,10 @@ The model, the API and the guarantees are described in `README.md` — read it f
   inherits the mark from its parent unless it is a shield. `Scope::$isCancelled` stays a flag read; do not walk the
   tree. One `cancelled` flag per scope is enough because it never goes back; `cancel()` on a cancelled scope is a no-op.
   A wait subscribes its `ContinuationImpl` itself (`Scope::subscribe()`/`unsubscribe()`), without allocating closures.
+  A scope holds its first wait in a field. If other waits are already queued, append to the array to keep their
+  cancellation order. Against `4c70eb6` on PHP 8.6 arm64, 4096 idle HTTP connections used 1.47 MiB less PHP heap.
+  With 4096 runnable tasks, a checkpoint took 4–8% less time in three process pairs. HTTP Arena GET and mixed
+  throughput ranges overlapped across three pairs each.
 - The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`Scope::now()`, null if
   none), the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the
   clock; `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
