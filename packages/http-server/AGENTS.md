@@ -27,10 +27,14 @@
 - Each connection keeps its last parsed head if the wire head fits in 1 KiB, excluding the final delimiter.
   A byte-for-byte match can reuse the immutable head. The scheme belongs to the connection after the TLS handshake.
   Create the request and its body reader anew even when two heads match.
-- A listener tracks positive keep-alive idle timeouts in the order the reads began. All have the same duration,
-  so one task can sleep until the oldest deadline. Remove a socket as soon as its first read finishes or throws.
-  When several sockets are waiting, yield before reading: the peer can send its next request while other clients run.
-  A zero timeout keeps the immediate read: bytes already available can still be consumed.
+- The listener tracks socket operations with the same positive timeout in start order. A keep-alive read and
+  a response write can share a timer when their timeouts match. Different durations need separate queues.
+  Key each entry by operation: a second write can wait for the same socket while the first still owns it.
+  Expiry closes the socket. An expired idle read ends silently and an expired write throws `WriteFailed`.
+  A zero timeout uses the cancellation scope so an operation that completes without waiting can still succeed.
+- While waiting for the next request, yield if other socket operations are pending: the peer can send its
+  request while other clients run. If the first bytes match the last head including its final delimiter,
+  keep only the trailing bytes in the buffer. They may include a body and a pipelined request.
 - The keep-alive read can receive a whole head under the idle timeout. Keep bytes after its delimiter
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
@@ -39,12 +43,14 @@
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
+- A fixed-length body already in the buffer has passed the size check and cannot wait on the transport.
+  Its fixed-length reader still tracks unread bytes. Wrap it when the first read must send `100 Continue`.
 - Close after an unread body. Draining it would compete with any outstanding application read and would need
   a separate size limit and deadline.
 
 ## Where to resume HTTP/1 performance work
 
-- Profile the cancellation scope around each response write. In `ConnectionBench` with 512 requests
+- For writers other than sockets, measure the cancellation scope around each response write. In `ConnectionBench` with 512 requests
   and an in-memory writer, bypassing the entire write deadline saved 19.1% of instructions. This
   measures the scope, timer and call together. The heap change in `f39fec8` saved about 1% on the
   same exchange. On PHP 8.6 a synchronous timeout took 1.36 µs, constructing, binding and closing its
@@ -105,3 +111,7 @@
 - Rejected: keeping four parsed heads per connection. In the first 700,000 Baseline requests the single-entry
   cache missed exactly 4096 times, once per connection. The load generator uses different templates across
   connections but keeps sending the same one on each connection in this run.
+- Against `0a5923c`, the socket write deadlines and buffered head and body changes together raised the median
+  from 36,438 to 41,750 replies/s (+14.6%) and lowered median p99 from 166.0 to 122.3 ms.
+  Four interleaved runs per version used the same handler and settings. All 3,340,168 candidate replies
+  were 2xx, with no transport errors or reconnects.

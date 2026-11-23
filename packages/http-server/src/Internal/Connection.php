@@ -51,7 +51,7 @@ final class Connection
     ): void {
         $headReader = new HeadReader($state->scheme ?? 'http', $state?->idle);
         $buffer = new Buffer();
-        $output = new ResponseWriter($output, $config->writeTimeout);
+        $output = new ResponseWriter($output, $config->writeTimeout, $state?->writes);
         $bodyInput = new BodyInput($input, $config->bodyIdleTimeout);
         $requestsRemaining = $config->maxRequestsPerConnection;
         $reused = false;
@@ -147,8 +147,16 @@ final class Connection
             $body = $head->length === null
                 ? new ChunkedReader($buffer, $input)
                 : new FixedLengthReader($buffer, $input, $head->length);
-            $bodyReader = new BodyReader($body, $maxBodyBytes, $continue);
-            $reader = $body instanceof FixedLengthReader ? new SizedBodyReader($bodyReader, $body->size) : $bodyReader;
+            if ($body instanceof FixedLengthReader && $continue === null && $buffer->count() >= $body->size) {
+                // Its length passed the limit above and the complete body can be read without touching the transport.
+                $bodyReader = null;
+                $reader = $body;
+            } else {
+                $bodyReader = new BodyReader($body, $maxBodyBytes, $continue);
+                $reader = $body instanceof FixedLengthReader
+                    ? new SizedBodyReader($bodyReader, $body->size)
+                    : $bodyReader;
+            }
         }
 
         /** @var Headers $emptyTrailers */

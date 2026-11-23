@@ -13,7 +13,9 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;
+use Thesis\Io\StringReader;
 use Thesis\Io\UnexpectedEof;
+use Thesis\Io\WriteFailed;
 use Thesis\Net\Certificate;
 use Thesis\Net\ClientTls;
 use Thesis\Net\InetAddress;
@@ -32,6 +34,35 @@ use function Thesis\Time\sec;
 #[Test]
 final class ServerTest
 {
+    public function aClientThatStopsReadingExpiresAtTheWriteDeadline(): void
+    {
+        timeout(sec(2), static fn() => group(static function (Group $group) {
+            /** @var Deferred<\Throwable> $failure */
+            $failure = new Deferred();
+            $server = new Server(
+                config: new Config(0, idleTimeout: sec(5), writeTimeout: ms(20)),
+                handler: static fn() => new Response(body: new StringReader(str_repeat('x', 16 * 1024 * 1024))),
+                onError: static function (\Throwable $error) use ($failure) {
+                    $failure->complete($error);
+                },
+            );
+            $server->run($group);
+            $address = $server->address;
+            \assert($address instanceof InetAddress);
+            $client = connect('127.0.0.1', $address->port);
+
+            try {
+                $client->write("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
+                $error = $failure->await();
+                Assert::instanceOf($error, WriteFailed::class);
+                Assert::same('The response write did not complete in time.', $error->getMessage());
+            } finally {
+                $client->close();
+                $server->close();
+            }
+        }));
+    }
+
     public function drainsAnActiveResponseWhenTheListenerClosesAtCapacity(): void
     {
         timeout(sec(2), static fn() => group(static function (Group $group) {

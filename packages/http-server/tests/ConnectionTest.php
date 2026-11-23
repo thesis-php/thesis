@@ -14,6 +14,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpServer\Internal\Connection;
 use Thesis\HttpServer\Stub\RecordingWriter;
+use Thesis\HttpServer\Stub\TimedReader;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
@@ -66,6 +67,23 @@ final class ConnectionTest
             Assert::same(['/first', '/second'], $paths);
             Assert::same($expected, $output->bytes);
         }
+    }
+
+    public function aRepeatedHeadLeavesItsNewBodyAndTheNextRequestInTheBuffer(): void
+    {
+        $head = "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 2\r\n\r\n";
+        $last = "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\n";
+        $input = new TimedReader([[null, $head . 'ab'], [null, $head . 'cd' . $last . 'xyz']]);
+        $output = new RecordingWriter();
+        Connection::serve(
+            input: $input,
+            output: $output,
+            handler: static fn(Request $request) => new Response(body: $request->body),
+            config: new Config('/test.sock'),
+        );
+
+        $short = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n";
+        Assert::same($short . 'ab' . $short . 'cd' . "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nxyz", $output->bytes);
     }
 
     public function writesBufferedEchoBeforeTheNextRequest(): void

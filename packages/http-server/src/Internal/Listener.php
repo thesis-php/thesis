@@ -15,6 +15,7 @@ use Thesis\HttpServer\Context;
 use Thesis\Net\Server;
 use Thesis\Net\SocketClosed;
 use Thesis\Net\TlsFailed;
+use Time\Duration;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
@@ -54,10 +55,11 @@ final class Listener
     public function run(): void
     {
         group(function (Group $group) {
-            $idle = $this->config->idleTimeout > sec(0)
-                ? new IdleConnections($group, $this->config->idleTimeout)
-                : null;
-            $acceptor = $group->spawn(fn() => $this->accept($group, $idle));
+            $idle = self::deadlines($group, $this->config->idleTimeout);
+            $writes = ($this->config->writeTimeout <=> $this->config->idleTimeout) === 0
+                ? $idle
+                : self::deadlines($group, $this->config->writeTimeout);
+            $acceptor = $group->spawn(fn() => $this->accept($group, $idle, $writes));
 
             try {
                 $this->listener->awaitClose();
@@ -81,7 +83,12 @@ final class Listener
         });
     }
 
-    private function accept(Group $group, ?IdleConnections $idle): void
+    private static function deadlines(Group $group, Duration $timeout): ?SocketDeadlines
+    {
+        return $timeout > sec(0) ? new SocketDeadlines($group, $timeout) : null;
+    }
+
+    private function accept(Group $group, ?SocketDeadlines $idle, ?SocketDeadlines $writes): void
     {
         while (!$this->listener->isClosed) {
             $permit = $this->capacity->acquire();
@@ -92,7 +99,7 @@ final class Listener
                 return;
             }
 
-            $connection = new ConnectionState($this->listener, $socket, $idle);
+            $connection = new ConnectionState($this->listener, $socket, $idle, $writes);
             $id = spl_object_id($connection);
             $this->connections[$id] = $connection;
             $group->spawn(function () use ($connection, $id, $permit) {

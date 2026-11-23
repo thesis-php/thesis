@@ -21,7 +21,7 @@ final class HeadReader
 {
     private const string END = "\r\n\r\n";
 
-    private ?string $lastBytes = null;
+    private ?string $lastWire = null;
 
     private ?RequestHead $lastHead = null;
 
@@ -30,7 +30,7 @@ final class HeadReader
      */
     public function __construct(
         private readonly string $scheme,
-        private readonly ?IdleConnections $idle,
+        private readonly ?SocketDeadlines $idle,
     ) {}
 
     public function read(
@@ -52,6 +52,13 @@ final class HeadReader
                 }
 
                 $buffer->drain();
+                // The delimiter is part of the match. Everything after it belongs to the body or the next request.
+                if ($this->lastWire !== null && $this->lastHead !== null && str_starts_with($first, $this->lastWire)) {
+                    $buffer->write(substr($first, \strlen($this->lastWire)));
+
+                    return $this->lastHead;
+                }
+
                 $buffer->write($first);
             }
 
@@ -93,20 +100,21 @@ final class HeadReader
 
     private function parse(string $bytes): RequestHead
     {
-        if ($this->lastBytes === $bytes && $this->lastHead !== null) {
+        if (\strlen($bytes) > 1024) {
+            $this->lastWire = null;
+            $this->lastHead = null;
+
+            return RequestHead::parse($bytes, $this->scheme);
+        }
+
+        $wire = $bytes . self::END;
+        if ($wire === $this->lastWire && $this->lastHead !== null) {
             return $this->lastHead;
         }
 
         $head = RequestHead::parse($bytes, $this->scheme);
-
-        // Keep one short head for a client that polls the same resource on this connection.
-        if (\strlen($bytes) <= 1024) {
-            $this->lastBytes = $bytes;
-            $this->lastHead = $head;
-        } else {
-            $this->lastBytes = null;
-            $this->lastHead = null;
-        }
+        $this->lastWire = $wire;
+        $this->lastHead = $head;
 
         return $head;
     }

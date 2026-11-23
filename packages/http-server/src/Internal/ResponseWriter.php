@@ -6,6 +6,7 @@ namespace Thesis\HttpServer\Internal;
 
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
+use Thesis\Net\Socket;
 use Time\Duration;
 use function Thesis\Async\timeoutOr;
 
@@ -17,11 +18,18 @@ final readonly class ResponseWriter implements Writer
     public function __construct(
         private Writer $output,
         private Duration $timeout,
+        private ?SocketDeadlines $deadlines,
     ) {}
 
     public function write(string $bytes): void
     {
         if ($bytes === '') {
+            return;
+        }
+
+        if ($this->deadlines !== null && $this->output instanceof Socket) {
+            $this->deadlines->write($this->output, $bytes);
+
             return;
         }
 
