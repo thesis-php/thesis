@@ -165,6 +165,8 @@ cancelling the group stops it as well. It performs no handshake: one slow client
 A process out of file descriptors does not spin: `accept()` backs off for up to a second and tries again.
 A flood of connections does not starve the connections already accepted: `accept()` yields now and then too.
 
+`$server->awaitClose()` lets a supervisor wait for shutdown even while the accept loop is waiting for a free slot.
+
 To limit the connections, take a `LocalSemaphore` before `accept()` and release it when the task of the connection
 ends.
 
@@ -214,7 +216,7 @@ in the same event loop, without a network.
 | `listenUnix(string $path, int $backlog = 511): Server` | Unix server |
 | `socketPair(): array{Socket, Socket}` | two connected sockets |
 | `Socket`: `read()`, `write()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
-| `Server`: `accept(): ?Socket`, `close()`, `$address`, `$isClosed` | a listening socket |
+| `Server`: `accept(): ?Socket`, `awaitClose()`, `close()`, `$address`, `$isClosed` | a listening socket |
 | `ClientTls`, `ServerTls`, `Certificate`, `TlsVersion`, `TlsInfo` | TLS |
 | `Resolver`, `DnsResolver`: `system()`, `fromFiles()` | DNS |
 | `Address`: `InetAddress`, `UnixAddress` | ends of a socket |

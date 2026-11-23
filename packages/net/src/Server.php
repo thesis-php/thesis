@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Net;
 
 use Thesis\Async\Backoff;
+use Thesis\Async\Deferred;
 use Thesis\Async\Pacer;
 use Thesis\Async\StreamWatcher;
 use function Thesis\Net\Internal\address;
@@ -56,6 +57,11 @@ final class Server
     private mixed $stream;
 
     private readonly Pacer $pacer;
+
+    /**
+     * @var ?Deferred<null>
+     */
+    private ?Deferred $closed = null;
 
     /**
      * @param resource $stream
@@ -117,6 +123,16 @@ final class Server
     }
 
     /**
+     * Waits for {@see close()} without accepting a connection. Returns immediately if already closed.
+     */
+    public function awaitClose(): void
+    {
+        if (!$this->isClosed) {
+            ($this->closed ??= new Deferred())->await();
+        }
+    }
+
+    /**
      * Stops listening: waiting {@see accept()} calls return null, accepted sockets stay open.
      * The file of a Unix socket is removed. Idempotent.
      */
@@ -135,5 +151,8 @@ final class Server
         if ($this->unixPath !== null) {
             @unlink($this->unixPath);
         }
+
+        $this->closed?->complete();
+        $this->closed = null;
     }
 }

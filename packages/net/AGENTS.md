@@ -44,6 +44,8 @@ Read `README.md` for the API and its guarantees.
   from a header would cost its size in memory before a byte has arrived.
 - `Server::accept()` never spins: a failed accept after a readiness wake-up backs off (5 ms doubling to 1 s),
   in a wait that `close()` ends.
+- `Server::awaitClose()` wakes on close even when nobody is accepting. A server can stop listening while all
+  its connection permits are in use.
 - A host name never reaches `stream_socket_client()`/`stream_socket_server()`: PHP resolves it with a blocking
   `getaddrinfo()`. `connect()` resolves through a `Resolver`, `listen()` takes IP addresses only.
 

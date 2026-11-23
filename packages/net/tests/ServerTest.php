@@ -52,6 +52,22 @@ final class ServerTest
         $server->close();
     }
 
+    public function closeWakesWaitersWithoutAccepting(): void
+    {
+        $server = listen('127.0.0.1', 0);
+
+        group(static function (Group $group) use ($server) {
+            $closing = $group->spawn($server->awaitClose(...));
+            delay(ms(10));
+            Assert::false($closing->isDone);
+
+            $server->close();
+            $closing->await();
+            $server->awaitClose();
+            Assert::true($server->isClosed);
+        });
+    }
+
     public function acceptsConnectionsUntilClosed(): void
     {
         $server = listen('127.0.0.1', 0);
