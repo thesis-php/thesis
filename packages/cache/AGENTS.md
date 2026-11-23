@@ -19,6 +19,8 @@ Read `README.md` for the API.
   skipped at the top, and the heap is rebuilt from its live nodes once it holds more than twice as many as there are
   entries with a TTL. A test checks a `\WeakReference` for each way out.
   `count()` drops the expired entries the same way, so it never counts an entry that `get()` would miss.
+- The destructor of a value may suspend the fiber. `set()` and `count()` keep the entries that leave the cache
+  in local variables until the cache is consistent again, so the destructors run only when the method returns.
 - A TTL that `Instant::add()` cannot represent is no expiry, and nothing changes before it is computed:
   `set()` never throws for a TTL and never loses the old value on a failure.
 - A numeric string key becomes an int as an array key: `LocalCache` takes keys from `Entry::$key`, never from

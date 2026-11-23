@@ -92,12 +92,15 @@ final class LocalCache implements Cache, \Countable
     {
         $now = Instant::now();
         $expiresAt = $ttl === null ? null : self::expiresAt($now, $ttl);
+        // The entries that leave the cache are held by local variables until set() returns: the destructor
+        // of a value may suspend the fiber, and another set() must not find the cache half-changed.
+        $replaced = $this->entries[$key] ?? null;
 
-        if (isset($this->entries[$key])) {
-            $this->remove($this->entries[$key]);
+        if ($replaced !== null) {
+            $this->remove($replaced);
         }
 
-        $this->dropExpired($now);
+        $expired = $this->dropExpired($now);
 
         if ($expiresAt === false) {
             return;
@@ -111,9 +114,12 @@ final class LocalCache implements Cache, \Countable
             $this->expiries->insert(new Expiry($expiresAt, \WeakReference::create($entry)));
         }
 
+        $evicted = null;
+
         if ($this->capacity !== null && \count($this->entries) > $this->capacity) {
-            \assert($this->leastRecentlyUsed !== null);
-            $this->remove($this->leastRecentlyUsed);
+            $evicted = $this->leastRecentlyUsed;
+            \assert($evicted !== null);
+            $this->remove($evicted);
         }
 
         // Frees the memory of the dead nodes of the heap: when and whether it is rebuilt changes no entry.
@@ -135,7 +141,7 @@ final class LocalCache implements Cache, \Countable
      */
     public function count(): int
     {
-        $this->dropExpired(Instant::now());
+        $expired = $this->dropExpired(Instant::now());
 
         return \count($this->entries);
     }
@@ -227,15 +233,23 @@ final class LocalCache implements Cache, \Countable
         return ($this->entries[$entry->key] ?? null) === $entry;
     }
 
-    private function dropExpired(Instant $now): void
+    /**
+     * @return list<Entry<V>> the dropped entries, for the caller to free once the cache is consistent
+     */
+    private function dropExpired(Instant $now): array
     {
+        $dropped = [];
+
         while (!$this->expiries->isEmpty() && $this->expiries->top()->at <= $now) {
             $entry = $this->expiries->extract()->entry->get();
 
             if ($entry !== null && $this->isCached($entry)) {
                 $this->remove($entry);
+                $dropped[] = $entry;
             }
         }
+
+        return $dropped;
     }
 
     private function rebuildExpiries(): void

@@ -8,9 +8,12 @@ use Random\Engine\Mt19937;
 use Random\Randomizer;
 use Testo\Assert;
 use Testo\Test;
+use Thesis\Async\Group;
 use Time\Duration;
 use function Thesis\Async\delay;
+use function Thesis\Async\group;
 use function Thesis\Time\hours;
+use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 
@@ -358,6 +361,28 @@ final class LocalCacheTest extends CacheContract
         Assert::same($cache->get('live'), 1);
         Assert::same($cache->get('new a'), 4);
         Assert::same($cache->get('new b'), 5);
+    }
+
+    public function setOfSameKeyWhileDestructorOfReplacedValueWaitsKeepsTheLaterValue(): void
+    {
+        $cache = new LocalCache();
+        $cache->set('a', new class {
+            public function __destruct()
+            {
+                delay(sec(1));
+            }
+        });
+
+        group(static function (Group $group) use ($cache) {
+            $group->spawn(static fn() => $cache->set('a', 2));
+            $group->spawn(static function () use ($cache) {
+                delay(ms(1));
+                $cache->set('a', 3);
+            });
+        });
+
+        Assert::same($cache->get('a'), 3);
+        Assert::count($cache, 1);
     }
 
     /**
