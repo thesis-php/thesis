@@ -153,6 +153,9 @@ whose `$size` gives the total number of bytes, including bytes already read.
 
 ### Streams over resources and stdio
 
+Use `Thesis\Io\close($stream)` when a reader or writer may implement `Closer`. It calls the
+stream's `close()` method when available through that interface.
+
 `Stream` adapts a PHP stream resource that the process owns (a pipe of `proc_open()`, a file, a socket without TLS)
 to `Reader`, `Writer` and `Closer`. It makes the resource non-blocking: a read waits for bytes and a write
 for room in the pipe without blocking the event loop.

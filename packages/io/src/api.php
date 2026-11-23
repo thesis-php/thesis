@@ -8,6 +8,18 @@ use Thesis\Io\Internal\SharedStream;
 use function Thesis\Io\Internal\stdio;
 
 /**
+ * Closes the stream if it implements Closer. Other readers and writers have nothing to release here.
+ *
+ * @api
+ */
+function close(Reader|Writer|Closer $stream): void
+{
+    if ($stream instanceof Closer) {
+        $stream->close();
+    }
+}
+
+/**
  * The standard input of the process, the same object on every call. A read waits through the event loop
  * without making the descriptor non-blocking: it is shared with the shell and other processes.
  *
