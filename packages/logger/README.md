@@ -70,7 +70,7 @@ including the terminator.
 
 ## Time and timezone
 
-`Logger` reads its PSR-20 `ClockInterface` in the calling fiber. The default `Thesis\Time\WallClock` uses the
+`Logger` snapshots the time from its PSR-20 `ClockInterface` in the calling fiber before converting the message. The default `Thesis\Time\WallClock` uses the
 PHP default timezone. Both built-in formatters preserve the offset returned by the clock. Pass your own clock
 to control the timestamp, or use `WallClock` with a fixed timezone.
 
@@ -86,14 +86,17 @@ Scalar context values fill matching `{key}` placeholders in every format. Missin
 The context keeps its fields after interpolation. An exception under
 `exception` becomes an object with `type`, `message`, `file` and `line`. Other objects, arrays and resources in the context
 are represented by their type. A `Stringable` message is cast to a string on the calling fiber.
-Non-finite floats are written as `null`. Context is capped at 32 entries, keys at 128 bytes and
-text at 1024 bytes.
+Non-finite floats are written as `null`. The logger considers the first 32 entries, skips keys with invalid
+UTF-8, a leading NUL or more than 128 bytes, and limits text to 1024 bytes. If an exception carries a
+non-scalar message, the exception summary uses its type. Unset file and line fields become `''` and `0`.
 
 ## Buffering and shutdown
 
 The default minimum level is `info` and the default queue holds 1024 lines. Pass `minLevel` or `capacity`
 to change these. A full queue drops the incoming record. `$dropped` counts records refused or lost, including
-before `run()` or after `close()`. Records filtered by level do not count.
+before `run()` or after `close()`. Logging to the same logger from its writer task or a task started by the
+writer also counts as a drop. This prevents a formatter, output or trace listener from feeding records back
+into the queue. Records filtered by level do not count.
 
 Read `$logger->failure` to check whether formatting or writing stopped the background task. It holds the
 original throwable as soon as the writer catches it, and `close()` rethrows it. Queue overflow, normal

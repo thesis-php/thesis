@@ -17,6 +17,9 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\TaskCancelled;
 use Thesis\Async\Trace\Ended;
+use Thesis\Async\Trace\Suspended;
+use Thesis\Async\Trace\TaskCreated;
+use Thesis\Async\Trace\TaskStarted;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
 use Thesis\Logger\Formatter\Json;
@@ -66,6 +69,119 @@ final class LoggerTest
             Assert::same($output->writes, ["First\n", "Second\n"]);
             Assert::same($logger->dropped, 3);
         });
+    }
+
+    public function refusesToCloneTheWriterAndItsQueue(): void
+    {
+        $logger = new Logger(new RecordingWriter());
+
+        Assert::false(new \ReflectionObject($logger)->isCloneable());
+    }
+
+    public function dropsCallsFromItsOwnFormatterWhileOtherLoggersAcceptThem(): void
+    {
+        $formatted = new Deferred();
+        $output = new RecordingWriter();
+        $otherOutput = new RecordingWriter();
+        $plain = new CallbackFormatter(static fn(Record $record) => $record->message);
+        $other = new Logger($otherOutput, formatter: $plain);
+        $formatter = new CallbackFormatter(static function (Record $record) use (&$logger, $other, $formatted) {
+            if (!$formatted->isDone) {
+                /** @var Logger $logger The callback first runs after run(). */
+                $logger->info('From this formatter');
+                $other->info('From another formatter');
+                $formatted->complete();
+            }
+
+            return $record->message;
+        });
+        $logger = new Logger($output, formatter: $formatter);
+
+        group(static function (Group $group) use ($logger, $other, $formatted) {
+            $logger->run($group);
+            $other->run($group);
+            $logger->info('From a producer');
+            $formatted->await();
+            $logger->close();
+            $other->close();
+        });
+
+        Assert::same($output->writes, ["From a producer\n"]);
+        Assert::same($logger->dropped, 1);
+        Assert::same($otherOutput->writes, ["From another formatter\n"]);
+        Assert::same($other->dropped, 0);
+    }
+
+    public function dropsTaskStartedFeedbackFromFormatterChildren(): void
+    {
+        $formatted = new Deferred();
+        $output = new RecordingWriter();
+        $formatter = new CallbackFormatter(static function (Record $record) use ($formatted) {
+            group(static fn(Group $group) => $group->spawn(static fn() => null, name: 'format record'));
+
+            if (!$formatted->isDone) {
+                $formatted->complete();
+            }
+
+            return $record->message;
+        });
+        $logger = new Logger($output, formatter: $formatter);
+        $child = null;
+        $attempts = 0;
+        $observer = new Dispatcher([
+            static function (TaskCreated $event) use (&$child) {
+                if ($event->name === 'format record') {
+                    $child = $event->scope;
+                }
+            },
+            static function (TaskStarted $event) use ($logger, &$child, &$attempts) {
+                // Bound the feedback loop so a regression fails without hanging.
+                if ($event->scope === $child && ++$attempts <= 3) {
+                    $logger->info('Formatter child started');
+                }
+            },
+        ]);
+
+        observe($observer, static fn() => group(static function (Group $group) use ($logger, $formatted) {
+            $logger->run($group);
+            $logger->info('From a producer');
+            $formatted->await();
+            $logger->close();
+        }));
+
+        Assert::same($output->writes, ["From a producer\n"]);
+        Assert::same($attempts, 1);
+        Assert::same($logger->dropped, 1);
+    }
+
+    public function dropsTraceRecordsFromAWriterWaitingForInput(): void
+    {
+        $waiting = new Deferred();
+        $output = new RecordingWriter();
+        $formatter = new CallbackFormatter(static fn(Record $record) => $record->message);
+        $logger = new Logger($output, formatter: $formatter);
+        $writerScope = null;
+        $observer = new Dispatcher([
+            static function (TaskCreated $event) use (&$writerScope) {
+                $writerScope = $event->scope;
+            },
+            static function (Suspended $event) use (&$writerScope, $waiting, $logger) {
+                if ($event->scope === $writerScope && !$waiting->isDone) {
+                    $logger->info('The writer is waiting');
+                    $waiting->complete();
+                }
+            },
+        ]);
+
+        observe($observer, static fn() => group(static function (Group $group) use ($logger, $waiting) {
+            $logger->run($group);
+            $waiting->await();
+            $logger->info('From a producer');
+            $logger->close();
+        }));
+
+        Assert::same($output->writes, ["From a producer\n"]);
+        Assert::same($logger->dropped, 1);
     }
 
     public function interpolatesOnceAndPreservesStructuredContext(): void
@@ -164,6 +280,91 @@ final class LoggerTest
         ]);
     }
 
+    public function snapshotsExceptionFieldsWithoutCallingUserCode(): void
+    {
+        $message = new class implements \Stringable {
+            public function __toString(): string
+            {
+                throw new \LogicException('The logger cast an exception message.');
+            }
+        };
+        $exception = new class extends \Exception {
+            protected string $file = '' {
+                get => 'A hooked filename: ' . $this->file;
+            }
+        };
+        $error = new \Error();
+        new \ReflectionProperty($exception, 'message')->setRawValue($exception, $message);
+        new \ReflectionProperty($error, 'message')->setRawValue($error, ['bad message']);
+        $time = new \DateTimeImmutable();
+
+        $first = RecordFactory::capture($time, LogLevel::ERROR, 'First', ['exception' => $exception]);
+        $second = RecordFactory::capture($time, LogLevel::ERROR, 'Second', ['exception' => $error]);
+
+        Assert::same($first->context['exception'] ?? null, [
+            'type' => $exception::class,
+            'message' => '[' . get_debug_type($message) . ']',
+            'file' => __FILE__,
+            'line' => $exception->getLine(),
+        ]);
+        Assert::same($second->context['exception'] ?? null, [
+            'type' => \Error::class,
+            'message' => '[array]',
+            'file' => __FILE__,
+            'line' => $error->getLine(),
+        ]);
+    }
+
+    public function handlesUnsetExceptionFieldsWithoutCallingMagicGet(): void
+    {
+        $exception = new class extends \Exception {
+            final protected $message = '';
+
+            final protected string $file = '';
+
+            final protected int $line = 0;
+
+            public function __construct()
+            {
+                parent::__construct();
+                unset($this->message, $this->file, $this->line);
+            }
+
+            public function __get(string $name): never
+            {
+                throw new \LogicException("The logger read unset property {$name}.");
+            }
+        };
+
+        $record = RecordFactory::capture(
+            time: new \DateTimeImmutable(),
+            level: LogLevel::ERROR,
+            message: 'Failure',
+            context: ['exception' => $exception],
+        );
+
+        Assert::same($record->context['exception'] ?? null, [
+            'type' => $exception::class,
+            'message' => '',
+            'file' => '',
+            'line' => 0,
+        ]);
+    }
+
+    public function dropsInvalidUtf8KeysBeforeEncodingJson(): void
+    {
+        $output = new RecordingWriter();
+        $logger = new Logger($output);
+
+        group(static function (Group $group) use ($logger) {
+            $logger->run($group);
+            $logger->info('Context', ["\u{FFFD}" => 'valid key', "\xff" => 'invalid key']);
+            $logger->close();
+        });
+
+        Assert::string($output->writes[0] ?? '')->endsWith("\"context\":{\"\u{FFFD}\":\"valid key\"}}\n");
+    }
+
     public function rendersStringableMessagesLikeMonologWithPsr3Interpolation(): void
     {
         $referenceOutput = new TestHandler();
@@ -213,8 +414,20 @@ final class LoggerTest
 
         group(static function (Group $group) use ($logger, $clock) {
             $logger->run($group);
-            $logger->info('First');
-            $clock->now = new \DateTimeImmutable('2026-11-23T14:13:00.012345-05:00');
+            $message = new readonly class ($clock) implements \Stringable {
+                public function __construct(
+                    private FrozenClock $clock,
+                ) {}
+
+                public function __toString(): string
+                {
+                    // @phpstan-ignore constructor.call (A clock can return an object its owner reinitializes.)
+                    $this->clock->now->__construct('2026-11-23T14:13:00.012345-05:00');
+
+                    return 'First';
+                }
+            };
+            $logger->info($message);
             $logger->info('Second');
             $logger->close();
         });

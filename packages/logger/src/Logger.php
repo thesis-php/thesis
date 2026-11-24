@@ -11,6 +11,7 @@ use Psr\Log\LogLevel;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Channel;
 use Thesis\Async\Group;
+use Thesis\Async\ScopedValue;
 use Thesis\Async\SendResult;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
@@ -64,6 +65,11 @@ final class Logger extends AbstractLogger
      */
     private ?Task $task = null;
 
+    /**
+     * @var ScopedValue<bool>
+     */
+    private readonly ScopedValue $writing;
+
     private readonly int $minPriority;
 
     /**
@@ -83,7 +89,10 @@ final class Logger extends AbstractLogger
     ) {
         $this->minPriority = self::PRIORITIES[self::checkedLevel($minLevel)];
         $this->queue = new Channel($capacity);
+        $this->writing = new ScopedValue(false);
     }
+
+    private function __clone() {}
 
     /**
      * Starts the writer in the supplied group. Call {@see close()} while the group can still run the writer.
@@ -96,13 +105,13 @@ final class Logger extends AbstractLogger
             throw new \LogicException('The logger has already started or closed.');
         }
 
-        $this->task = $group->daemon($this->write(...), name: 'write logs');
+        $this->task = $this->writing->with(true, fn() => $group->daemon($this->write(...), name: 'write logs'));
     }
 
     /**
      * Records a message without waiting for the writer. The configured clock and a Stringable message's
      * conversion run in the calling fiber.
-     * Before {@see run()}, after close, or when the queue is full, counts the record as dropped.
+     * Before {@see run()}, after close, from its own writer or when the queue is full, counts the record as dropped.
      * Unsupported context values are summarized without calling user code.
      *
      * @param array<array-key, mixed> $context
@@ -117,7 +126,7 @@ final class Logger extends AbstractLogger
             return;
         }
 
-        if (!$this->hasActiveWriter() || $this->queue->isClosed) {
+        if (!$this->hasActiveWriter() || $this->queue->isClosed || $this->writing->get()) {
             ++$this->dropped;
 
             return;

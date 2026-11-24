@@ -63,6 +63,8 @@ The model, the API and the guarantees are described in `README.md` — read it f
   cancellation that comes while it unwinds: the result of the body stands. Who cancelled first is kept
   in `TaskImpl::$cancelledByHandle` and `GroupImpl::$tasksCancelled`, the flags of the scopes cannot tell.
 - A task cancelled before it started never runs.
+- Install inherited scoped values before dispatching task lifecycle events and restore them after cleanup.
+  A trace listener can depend on the same scoped value as the task, including a logger feedback guard.
 - `race()` is `some(1, ...)`. `some()` decides once: after `$count` successes failures are dropped, after more than
   `count($tasks) - $count` failures successes are dropped and every later failure goes to `suppressed()` of the first.
   `allSettled()` never records `Cancelled` as an outcome: it cancels nothing, so a cancelled task means the caller is

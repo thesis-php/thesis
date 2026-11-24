@@ -29,10 +29,17 @@ final class RecordFactory
         string|\Stringable $message,
         array $context,
     ): Record {
+        $time = \DateTimeImmutable::createFromInterface($time);
         $fields = [];
 
         foreach (\array_slice($context, 0, self::MAX_FIELDS, preserve_keys: true) as $key => $value) {
-            if (\strlen((string) $key) > self::MAX_KEY_BYTES || str_starts_with((string) $key, "\0")) {
+            $name = (string) $key;
+
+            if (
+                \strlen($name) > self::MAX_KEY_BYTES
+                || str_starts_with($name, "\0")
+                || preg_match('//u', $name) !== 1
+            ) {
                 continue;
             }
 
@@ -55,17 +62,44 @@ final class RecordFactory
     private static function field(int|string $key, mixed $value): null|int|float|bool|string|array
     {
         return match (true) {
-            $key === 'exception' && $value instanceof \Throwable => [
-                'type' => self::text($value::class),
-                'message' => self::text($value->getMessage()),
-                'file' => self::text($value->getFile()),
-                'line' => $value->getLine(),
-            ],
+            $key === 'exception' && $value instanceof \Throwable => self::exception($value),
             \is_string($value) => self::text($value),
             \is_float($value) && !is_finite($value) => null,
             \is_scalar($value), $value === null => $value,
-            default => self::text('[' . get_debug_type($value) . ']'),
+            default => self::typeSummary($value),
         };
+    }
+
+    /**
+     * @return array{type: string, message: string, file: string, line: int}
+     */
+    private static function exception(\Throwable $error): array
+    {
+        $message = self::rawProperty($error, 'message');
+        $file = self::rawProperty($error, 'file');
+        $line = self::rawProperty($error, 'line');
+
+        return [
+            'type' => self::text($error::class),
+            'message' => \is_scalar($message) || $message === null
+                ? self::text((string) $message)
+                : self::typeSummary($message),
+            'file' => \is_string($file) ? self::text($file) : '',
+            'line' => \is_int($line) ? $line : 0,
+        ];
+    }
+
+    // Even the final throwable getters can call property hooks, __get() or a message object's __toString().
+    private static function rawProperty(\Throwable $error, string $name): mixed
+    {
+        $property = new \ReflectionProperty($error, $name);
+
+        return $property->isInitialized($error) ? $property->getRawValue($error) : null;
+    }
+
+    private static function typeSummary(mixed $value): string
+    {
+        return self::text('[' . get_debug_type($value) . ']');
     }
 
     private static function text(string $value): string

@@ -290,15 +290,12 @@ final class GroupImpl implements Group
             ++$this->tasks;
         }
 
-        Loop::get()->start(function () use ($task, $scope, $handle, $daemon, $values) {
+        $run = function () use ($task, $scope, $handle, $daemon) {
             try {
                 // A task cancelled before it started does not run at all.
                 $scope->throwIfCancelled();
                 Scope::$tracer?->taskStarted($scope);
-                // Most tasks inherit nothing: they pay neither for a closure nor for a binding then.
-                $value = $values === []
-                    ? $scope->run($task)
-                    : Context::run($values, static fn() => $scope->run($task));
+                $value = $scope->run($task);
                 Scope::$tracer?->ended($scope, $value, null);
                 $handle->complete($value);
             } catch (\Throwable $error) {
@@ -350,7 +347,9 @@ final class GroupImpl implements Group
                     $joiner?->resume();
                 }
             }
-        });
+        };
+        // Trace listeners for the start and end run with the same bindings as the task body.
+        Loop::get()->start($values === [] ? $run : static fn() => Context::run($values, $run));
 
         return $handle;
     }
