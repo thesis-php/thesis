@@ -47,7 +47,7 @@
             "Thesis\\Http\\": "src/"
         },
         "files": [
-            "src/Headers.php"
+            "src/api.php"
         ]
     },
     "autoload-dev": {

@@ -43,11 +43,7 @@ final class ResponseBody extends StreamingBody
         private readonly FixedLengthReader|ChunkedReader|UntilCloseReader $reader,
         private readonly Socket $socket,
         private ?\Closure $release,
-    ) {
-        if ($reader instanceof FixedLengthReader && $reader->remaining === 0) {
-            $this->finish(complete: true);
-        }
-    }
+    ) {}
 
     private function __clone() {}
 

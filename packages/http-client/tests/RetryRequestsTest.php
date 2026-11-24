@@ -10,7 +10,6 @@ use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Thesis\Http\StringBody;
 use Thesis\HttpProtocol\Http1\MalformedMessage;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\WriteFailed;
@@ -18,6 +17,7 @@ use Thesis\Net\ConnectFailed;
 use Thesis\Net\TlsFailed;
 use Uri\Rfc3986\Uri;
 use function Thesis\Net\socketPair;
+use const Thesis\Http\EMPTY_BODY;
 
 #[Test]
 #[Covers(RetryRequests::class)]
@@ -104,7 +104,7 @@ final class RetryRequestsTest
     public function preservesNonReplayableOperationsAndPermanentFailures(): void
     {
         $uri = new Uri('https://example.com');
-        $stream = new Internal\DecodedBody(new StringBody(''), ZLIB_ENCODING_GZIP);
+        $stream = new Internal\DecodedBody(EMPTY_BODY, ZLIB_ENCODING_GZIP);
         foreach ([
             [new Request('POST', $uri), new ConnectFailed()],
             [new Request('GET', $uri, body: $stream), new ReadFailed()],

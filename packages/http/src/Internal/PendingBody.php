@@ -6,24 +6,33 @@ namespace Thesis\Http\Internal;
 
 use Thesis\Http\Body;
 use Thesis\Http\StringBody;
+use const Thesis\Http\EMPTY_BODY;
 
 /**
  * @internal
  */
 final class PendingBody
 {
-    private ?Body $body;
-
-    public function __construct(string|Body $body)
-    {
-        $this->body = \is_string($body) ? new StringBody($body) : $body;
-    }
+    public function __construct(
+        private null|string|Body $body,
+    ) {}
 
     public function take(): Body
     {
         $body = $this->body ?? throw new \LogicException('The message body has already been taken.');
         $this->body = null;
 
-        return $body;
+        if ($body === '') {
+            return EMPTY_BODY;
+        }
+
+        return \is_string($body) ? new StringBody($body) : $body;
+    }
+
+    public function __destruct()
+    {
+        if ($this->body instanceof Body) {
+            $this->body->close();
+        }
     }
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Thesis\HttpServer\Internal;
 
 use Thesis\Http\Headers;
-use Thesis\Http\StreamingBody;
 use Thesis\Http\Status;
+use Thesis\Http\StreamingBody;
 use Thesis\HttpProtocol\Http1\ChunkedReader;
 use Thesis\HttpProtocol\Http1\FixedLengthReader;
 use Thesis\HttpProtocol\Http1\MalformedMessage;

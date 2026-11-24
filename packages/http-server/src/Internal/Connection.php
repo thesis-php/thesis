@@ -29,6 +29,7 @@ use function Thesis\Async\checkpoint;
 use function Thesis\Async\isCancelled;
 use function Thesis\HttpProtocol\Http1\encodeChunk;
 use function Thesis\HttpProtocol\Http1\encodeLastChunk;
+use const Thesis\Http\EMPTY_BODY;
 
 /**
  * @internal
@@ -157,7 +158,7 @@ final class Connection
             method: $head->method,
             uri: $head->uri,
             headers: $head->headers,
-            body: $incoming ?? '',
+            body: $incoming ?? EMPTY_BODY,
         );
 
         $body = null;

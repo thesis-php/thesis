@@ -37,12 +37,14 @@ $bytes = $body->readAll();
 $trailers = $body->trailers();
 ```
 
-Pass a string or an unread body to a message constructor. Give the message exclusive access until
-`takeBody()` transfers the reader to its caller. A second call through any metadata copy raises
+Requests and responses default to `Thesis\Http\EMPTY_BODY`, a reusable empty body with empty trailers.
+Pass a string or an unread body to supply a payload. Give the message exclusive access until
+`takeBody()` transfers the reader to its caller. Dropping the last message copy closes an unclaimed body. A second call through any metadata copy raises
 `LogicException`. A proxy can pass `$request->withUri($upstream)` to the client and return its response
 directly. Taking either body also transfers its trailers. Use `withBody()` to supply a replacement.
 
-Read incrementally or call `readAll()` for the whole payload. After any bytes have been consumed,
+Read incrementally or call `readAll()` for the whole payload (8 MiB by default). Pass `limit:` to choose a byte limit.
+Overflow and read failures close the body. After any bytes have been consumed,
 collecting the whole body raises `LogicException`. Close the reader to release its resources.
 Supply ready trailer fields with `new StringBody($bytes, $trailers)`. A streaming body can determine
 its fields while reading. Calling `trailers()` while fields are still pending raises `LogicException`.

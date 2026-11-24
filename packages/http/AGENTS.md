@@ -7,11 +7,15 @@ Clients and servers share the same request and response types so proxies can for
 - Client middleware passes an outgoing request on each call to the next handler. Server middleware can call
   the next handler at most once, with the same incoming request bound to the call.
 
+- Messages share `EMPTY_BODY` for an empty payload without trailers. Each message still owns its body handoff.
 - Trailer fields may be pending until the reader finishes.
 - All metadata copies of a message share one body handoff. A replacement body has its own handoff.
+  Dropping the last copy closes an unclaimed body. After handoff the recipient owns its cleanup.
 - Changing metadata leaves the original intact. Replacing the payload replaces its trailers as well.
 - `readAll()` returns the whole body or fails once bytes have been consumed. Streaming implementations
   can extend `StreamingBody` to enforce this across partial reads and keep exclusive access until a read finishes.
+- Whole-body collection limits payload bytes after decoding (8 MiB by default). When an active collection
+  fails or is cancelled, close the reader to release its resources. A competing read leaves the owner alone.
 - A message carries the meaning of HTTP. Protocol version, reason phrase and framing belong to the codec.
   A codec depends on the message package. Messages use no codec types.
 - An eligible HEAD or 304 response can carry `Content-Length` in its headers as representation metadata.

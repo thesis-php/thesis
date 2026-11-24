@@ -161,16 +161,6 @@ final readonly class Http1Transport
             }
         } while ($head->status < 200);
 
-        $reader = match ($head->framing) {
-            Framing::None, Framing::Length => new FixedLengthReader(
-                buffer: $buffer,
-                reader: $socket,
-                size: $head->length ?? throw new \LogicException(),
-            ),
-            Framing::Chunked => new ChunkedReader($buffer, $socket),
-            Framing::UntilClose => new UntilCloseReader($buffer, $socket),
-        };
-
         $pool = \WeakReference::create($this->pool);
         $release = static function (Socket $socket, bool $complete) use ($pool, $origin, $buffer, $head, $slot) {
             $owner = $pool->get();
@@ -181,6 +171,22 @@ final readonly class Http1Transport
             }
 
             $slot->release();
+        };
+
+        if ($head->length === 0) {
+            $release($socket, true);
+
+            return new Response(status: $head->status, headers: $head->headers);
+        }
+
+        $reader = match ($head->framing) {
+            Framing::None, Framing::Length => new FixedLengthReader(
+                buffer: $buffer,
+                reader: $socket,
+                size: $head->length ?? throw new \LogicException(),
+            ),
+            Framing::Chunked => new ChunkedReader($buffer, $socket),
+            Framing::UntilClose => new UntilCloseReader($buffer, $socket),
         };
 
         return new Response(

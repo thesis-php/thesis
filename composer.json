@@ -141,7 +141,7 @@
             "packages/exceptionally/src/api.php",
             "packages/formatter/src/Internal/internal.php",
             "packages/formatter/src/api.php",
-            "packages/http/src/Headers.php",
+            "packages/http/src/api.php",
             "packages/http-protocol/src/Http1/api.php",
             "packages/http-protocol/src/Internal/Http1/internal.php",
             "packages/io/src/Internal/internal.php",

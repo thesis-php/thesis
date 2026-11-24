@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
+use Thesis\Async\TimedOut;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpProtocol\Http1\MalformedMessage;
@@ -21,6 +22,8 @@ use Uri\Rfc3986\Uri;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Net\listen;
+use function Thesis\Net\socketPair;
+use const Thesis\Http\EMPTY_BODY;
 
 #[Test]
 #[Covers(Client::class)]
@@ -39,6 +42,27 @@ final class ClientTest
                 Expect::exception(MalformedMessage::class);
                 $client->send('http://example.test');
             }
+        }
+    }
+
+    public function cancellingAWholeBodyReadReleasesTheOriginSlot(): void
+    {
+        [$first, $peer] = socketPair();
+        [$second, $nextPeer] = socketPair();
+        $peer->write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nx");
+        $nextPeer->write("HTTP/1.1 204 No Content\r\n\r\n");
+        $sockets = [$second, $first];
+        $client = new Client(maxConnectionsPerOrigin: 1, connector: static function () use (&$sockets) {
+            return array_pop($sockets) ?? throw new \LogicException();
+        });
+        $body = $client->send('http://example.test')->takeBody();
+
+        try {
+            timeout(Duration::fromSeconds(0), $body->readAll(...));
+            Assert::fail('The incomplete response must wait for more bytes.');
+        } catch (TimedOut) {
+            $next = timeout(Duration::fromSeconds(1), static fn() => $client->send('http://example.test'));
+            Assert::same($next->status, 204);
         }
     }
 
@@ -151,7 +175,7 @@ final class ClientTest
             $head = $client->send(new Request('HEAD', $uri));
             Assert::same($head->headers->get('content-length'), '7');
             $headBody = $head->takeBody();
-            Assert::same($headBody->size, 0);
+            Assert::same($headBody, EMPTY_BODY);
             Assert::null($headBody->read(1));
             $notModified = $client->send(Request::get($uri));
             Assert::same($notModified->status, 304);

@@ -13,11 +13,24 @@ use Thesis\Http\Response;
 use Thesis\HttpClient\Stub\ReplayableUpload;
 use Thesis\Io\WriteFailed;
 use Uri\Rfc3986\Uri;
+use function Thesis\Net\socketPair;
 
 #[Test]
 #[Covers(FollowRedirects::class)]
 final class FollowRedirectsTest
 {
+    public function closesAnUnclaimedUploadWhenMiddlewareShortCircuits(): void
+    {
+        [$upload, $peer] = socketPair();
+        $request = Form::multipart('http://example.test', [new FormPart('file', $upload)]);
+        $cached = new Response(body: 'cached');
+        $response = new FollowRedirects()->handle($request, static fn() => $cached);
+
+        Assert::same($response, $cached);
+        Assert::true($upload->isClosed);
+        $peer->close();
+    }
+
     public function resolvesRelativeTargetsAndRewritesPost(): void
     {
         $request = new Request(

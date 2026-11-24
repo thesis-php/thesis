@@ -10,8 +10,8 @@ use Thesis\Http\Method;
 use Thesis\Http\ReplayableBody;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Thesis\Http\StringBody;
 use Uri\Rfc3986\Uri;
+use const Thesis\Http\EMPTY_BODY;
 use const Thesis\Http\EMPTY_HEADERS;
 
 /**
@@ -59,21 +59,23 @@ final readonly class FollowRedirects implements ClientMiddleware
             }
 
             $method = $request->method;
+            $rewrite = $response->status === 303 || ($response->status <= 302 && $method === Method::POST);
+            if (!$rewrite && !$upload instanceof ReplayableBody) {
+                return $response;
+            }
+
+            $response->takeBody()->close();
             $headers = self::headers($request, $target);
-            if ($response->status === 303 || ($response->status <= 302 && $method === Method::POST)) {
+            if ($rewrite) {
                 $method = $method === Method::HEAD ? Method::HEAD : Method::GET;
-                $response->takeBody()->close();
-                $upload = new StringBody('');
+                $upload = EMPTY_BODY;
                 foreach ($headers as $name => $values) {
                     if (str_starts_with($name, 'content-') || \in_array($name, ['expect', 'trailer', 'digest'], true)) {
                         $headers = $headers->without($name);
                     }
                 }
-            } elseif ($upload instanceof ReplayableBody) {
-                $response->takeBody()->close();
-                $upload = $upload->fresh();
             } else {
-                return $response;
+                $upload = $upload->fresh();
             }
 
             $request = new Request(method: $method, uri: $target->withFragment(null), headers: $headers, body: $upload);

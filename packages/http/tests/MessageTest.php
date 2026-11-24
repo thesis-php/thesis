@@ -87,6 +87,23 @@ final class MessageTest
         $incoming->takeBody();
     }
 
+    public function messagesShareTheEmptyReaderAndHandItOffSeparately(): void
+    {
+        $request = Request::get('/');
+        $copy = $request->withHeader('accept', '*/*');
+        Assert::same($copy->takeBody(), EMPTY_BODY);
+        EMPTY_BODY->close();
+        Assert::same(new Response()->takeBody(), EMPTY_BODY);
+        Assert::same($request->withBody('')->takeBody(), EMPTY_BODY);
+        Assert::same(EMPTY_BODY->fresh(), EMPTY_BODY);
+        Assert::null(EMPTY_BODY->read(1));
+        Assert::same(EMPTY_BODY->readAll(limit: 0), '');
+        Assert::same(EMPTY_BODY->trailers(), EMPTY_HEADERS);
+
+        Expect::exception(\LogicException::class);
+        $request->takeBody();
+    }
+
     public function replayPreservesTrailersEvenForAnEmptyPayload(): void
     {
         $fields = new Headers(['x-final' => 'yes']);

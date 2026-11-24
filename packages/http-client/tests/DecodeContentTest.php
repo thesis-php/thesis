@@ -42,6 +42,18 @@ final class DecodeContentTest
         Assert::same($body->trailers()->get('x-end'), 'ok');
     }
 
+    public function limitsWholeBodyReadsAfterDecompression(): void
+    {
+        $wire = gzencode(str_repeat('x', 9000));
+        \assert($wire !== false);
+        $response = new DecodeContent()->handle(Request::get('/'), static fn() => new Response(
+            headers: new Headers(['content-encoding' => 'gzip']),
+            body: $wire,
+        ));
+        Expect::exception(\OverflowException::class);
+        $response->takeBody()->readAll(limit: 8192);
+    }
+
     public function decodesDeflateAndRejectsTruncation(): void
     {
         $request = new Request('GET', new Uri('https://example.org'));

@@ -40,6 +40,10 @@ final class StringBody implements ReplayableBody
 
     public function fresh(): self
     {
+        if ($this->bytes === '' && $this->trailers->isEmpty) {
+            return EMPTY_BODY;
+        }
+
         return new self($this->bytes, $this->trailers);
     }
 
@@ -55,10 +59,14 @@ final class StringBody implements ReplayableBody
         return $bytes;
     }
 
-    public function readAll(): string
+    public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
         if ($this->offset !== 0) {
             throw new \LogicException('The body has already been read.');
+        }
+
+        if ($this->size > $limit) {
+            throw new \OverflowException("The body exceeds {$limit} bytes.");
         }
 
         $this->offset = \strlen($this->bytes);

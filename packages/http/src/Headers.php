@@ -254,6 +254,3 @@ final class Headers implements \IteratorAggregate
         return '"' . addcslashes($bytes, "\0..\37\"\\\177..\377") . '"';
     }
 }
-
-/** @api */
-const EMPTY_HEADERS = new Headers();

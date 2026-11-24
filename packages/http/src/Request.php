@@ -34,7 +34,7 @@ final class Request
         public readonly string $method,
         public readonly Uri $uri,
         public readonly Headers $headers = EMPTY_HEADERS,
-        string|Body $body = '',
+        string|Body $body = EMPTY_BODY,
     ) {
         $this->pendingBody = new PendingBody($body);
     }

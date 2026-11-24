@@ -33,23 +33,27 @@ abstract class StreamingBody implements Body
         }
     }
 
-    final public function readAll(): string
+    final public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
-        $this->beginRead();
+        $this->beginRead(whole: true);
 
         try {
-            if ($this->consumed) {
-                throw new \LogicException('The body has already been read.');
-            }
-
             $payload = '';
 
             while (($bytes = $this->readPayload(8192)) !== null) {
                 $this->consumed = true;
+                if (\strlen($bytes) > $limit - \strlen($payload)) {
+                    throw new \OverflowException("The body exceeds {$limit} bytes.");
+                }
+
                 $payload .= $bytes;
             }
 
             return $payload;
+        } catch (\Throwable $error) {
+            $this->close();
+
+            throw $error;
         } finally {
             $this->reading = false;
         }
@@ -61,10 +65,14 @@ abstract class StreamingBody implements Body
      */
     abstract protected function readPayload(int $max): ?string;
 
-    private function beginRead(): void
+    private function beginRead(bool $whole = false): void
     {
         if ($this->reading) {
             throw new ConcurrentRead('A read is already in progress on the body.');
+        }
+
+        if ($whole && $this->consumed) {
+            throw new \LogicException('The body has already been read.');
         }
 
         $this->reading = true;

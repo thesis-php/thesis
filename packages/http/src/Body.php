@@ -14,6 +14,8 @@ use Thesis\Io\Reader;
  */
 interface Body extends Reader, Closer
 {
+    public const int DEFAULT_BUFFER_LIMIT = 8 * 1024 * 1024;
+
     /**
      * Length of the payload in bytes, excluding trailers, or null if unknown.
      * Reading the body does not change this value.
@@ -47,7 +49,11 @@ interface Body extends Reader, Closer
     /**
      * Reads the entire payload into a string.
      *
+     * A read failure or limit violation closes the body.
+     *
+     * @param non-negative-int $limit maximum payload bytes to collect
+     * @throws \OverflowException if the payload exceeds the limit
      * @throws \LogicException if any bytes have already been consumed
      */
-    public function readAll(): string;
+    public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string;
 }
