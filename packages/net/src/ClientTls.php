@@ -24,7 +24,7 @@ final readonly class ClientTls
      * @param ?non-empty-string $ciphers OpenSSL cipher list for TLS 1.2, the OpenSSL default if null
      */
     public function __construct(
-        public ?string $peerName = null,
+        public public(set) ?string $peerName = null,
         public bool $verifyPeer = true,
         public bool $verifyPeerName = true,
         public ?string $caFile = null,

@@ -30,6 +30,14 @@ final class StringBody implements Body
 
     private function __clone() {}
 
+    /**
+     * Returns an independent reader at the beginning, including the original trailers.
+     */
+    public function fresh(): self
+    {
+        return new self($this->bytes, $this->trailers);
+    }
+
     public function read(int $max): ?string
     {
         $bytes = substr($this->bytes, $this->offset, $max);

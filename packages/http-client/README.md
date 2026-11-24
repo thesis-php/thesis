@@ -18,6 +18,18 @@
 
 <!-- head:end -->
 
+A URL string sends a GET. Reuse the client across calls. Wrap both the request and the read in an async
+timeout to apply one deadline to connection acquisition, redirects and downloading the body.
+
+```php
+use Thesis\HttpClient\Client;
+use function Thesis\Async\timeout;
+use function Thesis\Time\sec;
+
+$client = new Client();
+$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->buffer(limit: 1024 * 1024));
+```
+
 Send an HTTP/1.1 request inside a Thesis async scope. The final response head is available as soon as
 `send()` returns. Read the body under the deadline you want for the download. The client supplies a body that implements
 `Closer`. Close an unfinished body to close its connection immediately. A permanent read failure or dropping the last
@@ -47,10 +59,74 @@ $status = $client->withResponse($request, static fn(Response $response) => $resp
 Reuse the same client across requests to share connections for the same scheme, host and port.
 A fixed-length body releases its socket on the last byte. A chunked body releases it after the trailers.
 `$response->body->discard()` consumes any remaining bytes. A bodyless response releases it immediately.
-An outstanding body keeps its own socket. The client retains one idle socket per origin, up to 32 in total.
+The byte limit `maxResponseHeadBytes` covers informational and final response headers together (default 64 KiB).
+An outstanding body keeps its own socket and counts toward `maxConnectionsPerOrigin` (default 10).
+Further callers for that origin wait for a slot. The client retains up to `maxIdleConnections` sockets across
+all origins (default 32). Set it to zero to close each socket after its exchange.
 If a peer closes an idle connection, the next request opens a new one. A disconnect during a request
-propagates to the caller. The client never replays an upload.
+propagates to the caller. Automatic retries are opt-in.
 
 HTTPS verifies the peer through thesis/net.
 Pass a Net ClientTls configuration to the constructor to use a private CA.
-The client sends the request body before reading the response. Redirects are returned to the caller.
+The client sends the request body before reading the response.
+
+## Middleware
+
+Pass `middleware: []` for a single exchange with the original content encoding. By default the client runs
+`FollowRedirects` then `DecodeContent`. Supplying a list replaces the defaults. A middleware implements
+`handle(Request $request, callable $next): Response`. It can return a cached response, change the request
+using `clone()`, call `$next($request)`, or wrap the response body. Close intermediate responses before
+sending another request. Middleware before `FollowRedirects` sees the application request once.
+Middleware after it sees each destination. Scope credential injection to the intended origin.
+
+`FollowRedirects` follows up to ten redirects. It resolves relative locations, turns a POST into a GET on
+301/302, and drops the body on 303. For 307/308 it can resend a string body with its original method.
+It returns the intermediate response when the body cannot be replayed, the limit is reached, the location
+is unusable, or HTTPS would downgrade to HTTP. Across origins only allowlisted negotiation and content
+headers carry over.
+
+`DecodeContent` negotiates gzip and deflate, decompresses the stream as it is read, and preserves trailers.
+Set `Accept-Encoding` yourself or send a range request to keep control of the encoded bytes.
+
+Place `new RetryRequests(maxRetries: 1)` last in the middleware list to retry an idempotent method with
+a string body on a connection, read or write failure before the response arrives. It opens an independent
+reader on each attempt. After `send()` returns, download errors propagate to the consumer.
+
+A custom `connector` receives the origin host, port and optional `ClientTls` and returns a connected
+`Thesis\Net\Socket`. It runs only when the pool needs a new socket. Each client owns its pool.
+
+## Form uploads
+
+`Form::urlEncoded()` builds a POST request. Use a list of values to repeat a name.
+`Form::multipart()` accepts ordered fields and files. Pass an unread `Thesis\Io\Reader` to upload a file or
+forward a stream. Construction only prepares the part headers. Sending the request reads the payload in chunks.
+
+```php
+use Thesis\HttpClient\Form;
+use Thesis\HttpClient\FormPart;
+
+$request = Form::urlEncoded('https://example.com/search', ['tag' => ['news', 'science']]);
+$upload = Form::multipart('https://example.com/files', [
+    new FormPart('description', 'Monthly report'),
+    new FormPart('file', $reader, filename: 'report.pdf', contentType: 'application/pdf'),
+]);
+$status = $client->withResponse($upload, static fn($response) => $response->status);
+```
+
+A string, an unread `StringReader`, or a `Body` of known size contributes its length automatically.
+For another reader, pass `size:` to send exactly that many bytes. An unknown length selects chunked transfer.
+Closing the multipart request body closes every part reader that implements `Closer`.
+
+## HTTP proxy
+
+```php
+use Thesis\Http\Headers;
+use Thesis\HttpClient\Client;
+use Thesis\HttpClient\HttpProxy;
+
+$proxy = new HttpProxy('proxy.internal', 3128, new Headers(['Proxy-Authorization' => $proxyCredential]));
+$response = (new Client(connector: $proxy))->send('https://example.com/');
+```
+
+The client connects to the proxy over plaintext HTTP and requests a CONNECT tunnel for the origin.
+For HTTPS it negotiates TLS inside the tunnel and verifies the origin's certificate.

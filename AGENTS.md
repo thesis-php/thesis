@@ -97,7 +97,7 @@ the whole monorepo is for the final check.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
 - `hot-reload`: Restart a development server on file changes or SIGHUP, including after a failed launch. Requires: async, exceptionally, io, process, time.
 - `http`: HTTP messages shared by clients and servers: requests with query parameters, responses, headers, and streamed bodies with trailers. Requires: io.
-- `http-client`: Asynchronous HTTP/1 client for HTTP and HTTPS with connection pooling, streaming bodies and trailers. Requires: http, http-protocol, io, net.
+- `http-client`: Asynchronous HTTP/1 client with pooled HTTP and HTTPS connections, proxy tunnels, middleware, redirects, retries, streaming decompression and multipart uploads. Requires: async, http, http-protocol, io, net.
 - `http-protocol`: HTTP wire protocols for clients and servers, with a strict HTTP/1 codec for heads, bodies and trailers. Requires: http, io.
 - `http-server`: Asynchronous HTTP/1 server for TCP and Unix sockets with streaming bodies, trailers, TLS and graceful shutdown. Requires: async, http, http-protocol, io, net, time.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.

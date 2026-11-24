@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Reuse persistent connections for requests to the same origin after consuming the response body.
-
-- Send HTTP and HTTPS requests with streaming bodies and trailers through `Client::send()`.
+- Send an HTTP or HTTPS GET by URL, or send a request with streaming bodies and trailers through `Client::send()`.
 - `Client::withResponse()` closes the body when the response callback returns or throws.
+- Limit concurrent connections per origin and pool persistent connections across exchanges.
+- Customize requests and responses with ordered middleware. The defaults follow redirects and decode gzip and deflate.
+- Enable bounded retries of idempotent requests with `RetryRequests`.
+- Submit URL-encoded and streaming multipart forms.
+- Use a custom socket connector or tunnel requests through an HTTP CONNECT proxy.

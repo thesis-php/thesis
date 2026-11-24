@@ -6,6 +6,7 @@ namespace Thesis\Http;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
+use Testo\Expect;
 use Testo\Test;
 use Uri\Rfc3986\Uri;
 
@@ -34,6 +35,17 @@ final class MessageTest
         Assert::same($copy->body->read(2), 'b');
         Assert::same($request->body->size, 3);
         Assert::null($request->body->read(1));
+    }
+
+    public function bufferingUsesTheRemainingBodyAndChecksItsLimit(): void
+    {
+        $response = new Response(body: 'abcd');
+        Assert::same($response->body->read(1), 'a');
+        Assert::same($response->buffer(limit: 3), 'bcd');
+        Assert::same($response->buffer(limit: 0), '');
+
+        Expect::exception(\OverflowException::class);
+        new Response(body: 'abcd')->buffer(limit: 3);
     }
 
     public function everyRequestHasBodyOfItsOwn(): void

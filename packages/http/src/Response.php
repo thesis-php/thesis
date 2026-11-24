@@ -29,4 +29,31 @@ final readonly class Response
     ) {
         $this->body = \is_string($body) ? new StringBody($body) : $body;
     }
+
+    /**
+     * Reads the remaining body. A read failure or a size limit violation closes the body.
+     *
+     * @param non-negative-int $limit maximum bytes to keep in memory
+     * @throws \OverflowException if the remaining body exceeds the limit
+     */
+    public function buffer(int $limit = 8 * 1024 * 1024): string
+    {
+        $result = '';
+
+        try {
+            while (($bytes = $this->body->read(8192)) !== null) {
+                if (\strlen($bytes) > $limit - \strlen($result)) {
+                    throw new \OverflowException("The response body exceeds {$limit} bytes.");
+                }
+
+                $result .= $bytes;
+            }
+        } catch (\Throwable $error) {
+            $this->body->close();
+
+            throw $error;
+        }
+
+        return $result;
+    }
 }

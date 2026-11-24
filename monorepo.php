@@ -59,6 +59,7 @@ return new Config(
     ],
     autoloadDev: [
         'Thesis\Async\Benchmarks\\' => 'packages/async/benchmarks/',
+        'Thesis\HttpClient\Benchmarks\\' => 'packages/http-client/benchmarks/',
         'Thesis\HttpServer\Benchmarks\\' => 'packages/http-server/benchmarks/',
         'Thesis\Monorepo\\' => 'tools/monorepo/src/',
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',

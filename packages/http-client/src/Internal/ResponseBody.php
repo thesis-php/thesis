@@ -38,7 +38,7 @@ final class ResponseBody implements Body
     private ?IoException $failure = null;
 
     /**
-     * @param \Closure(Socket): void $release called once at the message boundary
+     * @param \Closure(Socket, bool): void $release called once with whether the message boundary was reached
      */
     public function __construct(
         private readonly FixedLengthReader|ChunkedReader|UntilCloseReader $reader,
@@ -46,7 +46,7 @@ final class ResponseBody implements Body
         private ?\Closure $release,
     ) {
         if ($reader instanceof FixedLengthReader && $reader->remaining === 0) {
-            $this->finish();
+            $this->finish(complete: true);
         }
     }
 
@@ -55,7 +55,7 @@ final class ResponseBody implements Body
     public function close(): void
     {
         $this->isClosed = true;
-        $this->abort();
+        $this->finish(complete: false);
     }
 
     public function read(int $max): ?string
@@ -76,13 +76,13 @@ final class ResponseBody implements Body
             $bytes = $this->reader->read($max);
         } catch (IoException $failure) {
             $this->failure = $failure;
-            $this->abort();
+            $this->finish(complete: false);
 
             throw $failure;
         }
 
         if ($bytes === null || ($this->reader instanceof FixedLengthReader && $this->reader->remaining === 0)) {
-            $this->finish();
+            $this->finish(complete: true);
         }
 
         return $bytes;
@@ -95,25 +95,17 @@ final class ResponseBody implements Body
         return $this->reader instanceof ChunkedReader ? $this->reader->discard() : EMPTY_HEADERS;
     }
 
-    private function finish(): void
+    private function finish(bool $complete): void
     {
         $release = $this->release;
         $this->release = null;
         if ($release !== null) {
-            $release($this->socket);
-        }
-    }
-
-    private function abort(): void
-    {
-        if ($this->release !== null) {
-            $this->socket->close();
-            $this->release = null;
+            $release($this->socket, $complete);
         }
     }
 
     public function __destruct()
     {
-        $this->abort();
+        $this->finish(complete: false);
     }
 }

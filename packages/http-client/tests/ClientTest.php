@@ -12,6 +12,7 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpProtocol\Http1\MalformedMessage;
 use Thesis\Io\Buffer;
 use Thesis\Io\StreamClosed;
 use Thesis\Net\InetAddress;
@@ -25,6 +26,47 @@ use function Thesis\Net\listen;
 #[Covers(Client::class)]
 final class ClientTest
 {
+    public function informationalAndFinalHeadsShareOneByteLimit(): void
+    {
+        $wire = "HTTP/1.1 103 Early Hints\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n";
+        foreach ([\strlen($wire), \strlen($wire) - 1] as $limit) {
+            [$socket, $peer] = \Thesis\Net\socketPair();
+            $peer->write($wire);
+            $client = new Client(connector: static fn() => $socket, maxResponseHeadBytes: $limit);
+            if ($limit === \strlen($wire)) {
+                Assert::same($client->send('http://example.test')->status, 204);
+            } else {
+                Expect::exception(MalformedMessage::class);
+                $client->send('http://example.test');
+            }
+        }
+    }
+
+    public function followsRedirectAndBuffersDecodedBodyOnOneConnection(): void
+    {
+        timeout(Duration::fromSeconds(3), static fn() => group(static function (Group $group) {
+            $listener = listen('127.0.0.1', 0);
+            $group->spawn(static function () use ($listener) {
+                $peer = $listener->accept() ?? throw new \LogicException();
+                $buffer = new Buffer();
+                $buffer->fillUntil($peer, "\r\n\r\n");
+                Assert::string($buffer->drain())->startsWith('GET /start HTTP/1.1');
+                $peer->write("HTTP/1.1 302 Found\r\nLocation: /end\r\nContent-Length: 0\r\n\r\n");
+                $buffer->fillUntil($peer, "\r\n\r\n");
+                Assert::string($buffer->drain())->startsWith('GET /end HTTP/1.1')->contains('Accept-Encoding: gzip');
+                $encoded = gzencode('done');
+                \assert($encoded !== false);
+                $length = \strlen($encoded);
+                $peer->write("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: {$length}\r\n\r\n{$encoded}");
+                $peer->close();
+                $listener->close();
+            });
+
+            $client = new Client(maxConnectionsPerOrigin: 1);
+            Assert::same($client->send("http://{$listener->address}/start")->buffer(limit: 4), 'done');
+        }));
+    }
+
     public function sendsPostAndReadsChunkedResponseAfterEarlyHints(): void
     {
         group(static function (Group $group) {
@@ -176,6 +218,72 @@ final class ClientTest
             $second = $group->spawn($send);
             Assert::same($first->await(), 'x');
             Assert::same($second->await(), 'x');
+        }));
+    }
+
+    public function aQueuedRequestUsesTheConnectionReleasedByTheBody(): void
+    {
+        timeout(Duration::fromSeconds(3), static fn() => group(static function (Group $group) {
+            $listener = listen('127.0.0.1', 0);
+            $group->spawn(static function () use ($listener) {
+                $peer = $listener->accept() ?? throw new \LogicException();
+                new Buffer()->fillUntil($peer, "\r\n\r\n");
+                $peer->write("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx");
+                new Buffer()->fillUntil($peer, "\r\n\r\n");
+                $peer->write("HTTP/1.1 204 No Content\r\n\r\n");
+                $peer->close();
+                $listener->close();
+            });
+
+            $client = new Client(maxConnectionsPerOrigin: 1);
+            $request = new Request('GET', new Uri("http://{$listener->address}/"));
+            $first = $client->send($request);
+            /** @var Deferred<null> $started */
+            $started = new Deferred();
+            $waiting = $group->spawn(static function () use ($client, $request, $started) {
+                $started->complete();
+
+                return $client->send($request);
+            });
+            $started->await();
+            Assert::false($waiting->isDone);
+            Assert::same($first->body->read(1), 'x');
+            Assert::same($waiting->await()->status, 204);
+        }));
+    }
+
+    public function reusesBothIdleSocketsAfterConcurrentDownloads(): void
+    {
+        timeout(Duration::fromSeconds(3), static fn() => group(static function (Group $group) {
+            $listener = listen('127.0.0.1', 0);
+            $group->spawn(static function () use ($listener) {
+                $peers = [];
+                foreach (['a', 'b'] as $byte) {
+                    $peer = $listener->accept() ?? throw new \LogicException();
+                    $peers[] = $peer;
+                    new Buffer()->fillUntil($peer, "\r\n\r\n");
+                    $peer->write("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n{$byte}");
+                }
+
+                foreach (array_reverse($peers) as $peer) {
+                    new Buffer()->fillUntil($peer, "\r\n\r\n");
+                    $peer->write("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx");
+                    $peer->close();
+                }
+
+                $listener->close();
+            });
+
+            $client = new Client(maxConnectionsPerOrigin: 2);
+            $request = new Request('GET', new Uri("http://{$listener->address}/"));
+            $first = $client->send($request);
+            $second = $client->send($request);
+            Assert::same($first->body->read(1), 'a');
+            Assert::same($second->body->read(1), 'b');
+            $third = $client->send($request);
+            $fourth = $client->send($request);
+            Assert::same($third->body->read(1), 'x');
+            Assert::same($fourth->body->read(1), 'x');
         }));
     }
 

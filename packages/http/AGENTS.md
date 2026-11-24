@@ -60,8 +60,7 @@ Read `README.md` for the message API and `ideas/http.md` for client and server d
   It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives
   `Host` from the URI, and `Headers` stores lowercase names. Interoperability belongs in adapters at the
   application boundary, where the adapter can define which streams and message fields it supports.
-- Rejected: lazy reader factories and replay on the body. They make reading responsible for opening resources,
-  including races between a suspended open and closing the body. Revisit fresh readers when a client needs to
-  resend a body on redirects or retries.
+- A string body can open an independent reader with `fresh()` for another network attempt.
+  A general body is one-shot. Reading a streaming body never opens a replacement stream.
 - Rejected: using `Once` for incoming trailers. Reading before EOF must leave later reads able to see the final fields.
   `Once` can cache a premature exception or an unavailable value. The body exposes the current trailer state.
