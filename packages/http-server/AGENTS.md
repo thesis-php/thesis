@@ -204,3 +204,12 @@
   Against JIT disabled, median throughput rose from 54,850 to 58,086 replies/s and p99 fell from 106.0 to 103.1 ms.
   Check JIT status in each server process and use the same runtime flags on both arms of a server comparison.
   With tracing JIT enabled for both servers, three fresh pairs gave Thesis 81.8%, 77.7% and 81.6% of true-async RPS.
+- Rejected: dropping the next keep-alive read from 2048 to 256 bytes after two reads below 256 bytes.
+  The first six JIT-enabled mix pairs showed a small gain, but a third block changed RPS by −3.8%, −2.6% and −0.03%.
+  A 1 KiB head after consecutive short heads required two reads instead of one.
+- Rejected: returning hot connections to the end of a shared worker queue and checking up to 128 before yielding.
+  Against `d3043d3` with tracing JIT, all six mixed pairs gained RPS and reduced p99 (58.7k to 66.8k replies/s,
+  108.4 to 81.2 ms at the medians). A connection changed fibers across requests and lost an earlier `onCancel`
+  callback at shutdown. Keeping each connection's task and resuming batches of subscribed continuations gained
+  only 0.47% in total mixed replies over six pairs, while GET p99 rose from 94.5 to 159.3 ms at the medians.
+  The stock server and both candidates installed no further read watchers after the first 10k hot GET exchanges.
