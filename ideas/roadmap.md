@@ -26,7 +26,7 @@ agent topic or package `AGENTS.md`. Remove steps from the roadmap as they are co
 
 What amphp has, then what thesis makes of it.
 
-- HTTP on top of the shared `http` package: `http-server` and `http-client`;
+- The `http` package contains the client, server, messages and codec;
   HPACK inside HTTP/2, CONNECT inside the client.
 - HTTP client extensions (`http-client-cookies`, `http-client-cache`, `http-client-psr7`): cookies and cache
   as interceptors of the client, a PSR-18 bridge.
@@ -68,8 +68,8 @@ an HTTP server with SSE, cookies and static files, an HTTP client for checks, po
 A pool of connections is written in each package that needs it (`agents/services.md`).
 
 1. **HTTP.** [`http`](../packages/http/README.md) provides the shared messages, headers, body readers and HTTP/1 codec.
-   Next comes `http-server` (graceful shutdown with `trapSignals()`, middleware, streamed responses for SSE and static files),
-   then `http-client` (HTTP/1.1, keep-alive, its own pool, redirects and CONNECT). Cookie support,
+   Next comes the HTTP server (graceful shutdown with `trapSignals()`, middleware, streamed responses for SSE and static files),
+   then the HTTP client (HTTP/1.1, keep-alive, its own pool, redirects and CONNECT). Cookie support,
    HTTP/2 with HPACK for grpc, and WebSocket are planned. See the [client and server design](http.md).
    `Content-Encoding` needs zlib streams (decorators of `Reader`/`Writer`, in `io` or `http`). A first version
    found: `deflate_add()` ignores a flush with empty input, so a writer keeps the last bytes to flush them with;
@@ -84,10 +84,10 @@ A pool of connections is written in each package that needs it (`agents/services
    protocol (its own pool, transactions, prepared statements, `LISTEN`/`NOTIFY`, errors with SQLSTATE, `COPY`),
    designed with norm in mind. Then `pgmq`.
 3. **Processes.** `process`, then `parallel` (ideas: [parallel.md](parallel.md)).
-4. **`hot-reload`** on `process`, `trapSignals()` and `http-server`, instead of the one on amphp.
+4. **`hot-reload`** on `process`, `trapSignals()` and the HTTP server, instead of the one on amphp.
 5. **Later**, in no fixed order:
    - `net`: UDP, passing sockets between processes; check the hosts file and `resolv.conf` of the resolver;
-   - a common pool, once `http-client` and `postgres` have their own;
+   - a common pool, once the HTTP client and `postgres` have their own;
    - what protocol clients share, a topic drawn from `amqp` (framing, reconnects with `Async\Backoff`,
      configuration from a DSN, `ConnectionFailed`/`ConnectionClosed`), and a convention for a package
      to declare its service in `compose.yaml`;
@@ -117,7 +117,7 @@ grow from what `async` already has and amphp lacks, so they come first.
   `postgres`, `nats`) runs thousands of times, a failure is replayed by its seed.
 - **Observability of the task tree**: a dump of the live tasks with where each is suspended (as a goroutine dump),
   a task suspended longer than a threshold, a deadlock on `Lock`/`Channel`. Trace context carried by `ScopedValue`
-  along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over `http-server`.
+  along the tree, the OpenTelemetry API without the grpc transport, metrics for Prometheus over the HTTP server.
   The tools around `Trace\observe()`: [trace.md](trace.md).
 - **Other models of concurrency** on top of the task tree: lazy tasks, `select()` over operations, effects,
   transparent futures, actors: [async.md](async.md). The next stages of the event loop: [loop.md](loop.md).
@@ -127,12 +127,12 @@ grow from what `async` already has and amphp lacks, so they come first.
   local and distributed (redis, postgres advisory locks) behind one interface, as `Mutex` and `RateLimiter`.
   Leader election on postgres, redis or etcd.
 - **Protocols**: on `net`: SMTP, MQTT, StatsD and syslog (the first users of UDP), ClickHouse native, LDAP.
-  On `http-client`: S3 with streamed bodies, the Docker and Kubernetes APIs (a watch as an iterator), ACME
-  for the certificates of `http-server`. On `http-server`: Server-Sent Events, later HTTP/3.
+  On the HTTP client: S3 with streamed bodies, the Docker and Kubernetes APIs (a watch as an iterator), ACME
+  for the certificates of the HTTP server. On the HTTP server: Server-Sent Events, later HTTP/3.
 - **Formats** as decorators of `Reader`/`Writer`: streamed JSON, msgpack, CBOR, CSV; zstd and brotli beside zlib.
 - **Application level**: a job queue with retries, a dead letter queue and idempotency on `pgmq`, `amqp`
   and `redis`; the outbox pattern (`postgres` with `amqp`), a bridge to message-bus. An application server
-  on `cluster`, `http-server`, `hot-reload` and `trapSignals()`, with PSR-15 and Symfony Runtime bridges.
+  on `cluster`, the HTTP server, `hot-reload` and `trapSignals()`, with PSR-15 and Symfony Runtime bridges.
 - **Tooling**: PHPStan rules in `phpstan-extension` for async code (a blocking call in a fiber: `sleep()`,
   network `file_get_contents()`, PDO; a task nobody awaits; the reference cycles of
   [memory.md](memory.md)). Rector rules to migrate from amphp. A documentation site and benchmarks

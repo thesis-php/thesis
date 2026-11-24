@@ -1,10 +1,15 @@
 {
     "name": "thesis/http",
-    "description": "HTTP messages shared by clients and servers: requests with query parameters, responses, headers, and streamed bodies with trailers.",
+    "description": "Asynchronous HTTP client and server with a strict HTTP/1 codec, pooled connections, TLS, middleware and streamed bodies with trailers.",
     "keywords": [
         "php",
         "async",
         "http",
+        "http1",
+        "http-client",
+        "http-server",
+        "streaming",
+        "tls",
         "http-message",
         "http-headers",
         "query-string",
@@ -33,20 +38,31 @@
     },
     "require": {
         "php": "^8.6",
-        "thesis/io": "^0.1"
+        "php-64bit": "*",
+        "ext-zlib": "*",
+        "thesis/async": "^0.1",
+        "thesis/io": "^0.1",
+        "thesis/net": "^0.1",
+        "thesis/time": "^0.4"
     },
     "require-dev": {
+        "ext-openssl": "*",
+        "amphp/http-client": "^5.3",
+        "amphp/http-server": "^3.4",
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29"
+        "testo/testo": "^0.10.29",
+        "thesis/testo-plugin": "^0.1"
     },
     "autoload": {
         "psr-4": {
             "Thesis\\Http\\": "src/"
         },
         "files": [
+            "src/Http1/api.php",
+            "src/Internal/Http1/internal.php",
             "src/api.php"
         ]
     },
@@ -55,6 +71,7 @@
             "Thesis\\Http\\": "tests/"
         },
         "files": [
+            "tests/Http1/helpers.php",
             "tests/helpers.php"
         ]
     },

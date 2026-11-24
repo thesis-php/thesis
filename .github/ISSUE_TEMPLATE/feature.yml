@@ -17,9 +17,6 @@ body:
         - thesis/formatter
         - thesis/hot-reload
         - thesis/http
-        - thesis/http-client
-        - thesis/http-protocol
-        - thesis/http-server
         - thesis/io
         - thesis/logger
         - thesis/net

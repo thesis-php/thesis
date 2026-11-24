@@ -229,7 +229,7 @@ into the TLS handshake, which fails. `TlsInfo::$peerCertificate` for SCRAM-SHA-2
 Missing:
 
 1. A pool: inside `Postgres\Client` on `LocalSemaphore` and a list of idle connections, a common pool only
-   once `http-client` has its own too (`agents/services.md`).
+   once the HTTP client has its own too (`agents/services.md`).
 2. `Buffer` keeps `$bytes` and `$offset` private, the generated decoder needs the raw string and an offset
    (`peek()` per column is the ~45 ns per call we measured). Proposed: the reader of postgres keeps its own
    read string, `Buffer` is for writing. `io` is not changed for one package.

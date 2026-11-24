@@ -39,7 +39,7 @@ $client->start($group);        // handshake in the calling fiber, then $group->d
 
 ## Decisions
 
-- A pool of connections lives in the package that needs it (`http-client`, `postgres`). A common pool
+- A pool of connections lives in the package that needs it (the HTTP client, `postgres`). A common pool
   (in `async` or `net`) is extracted only once two of them show what they share: a pool designed before its users
   guesses their needs (health checks, a connection tied to a transaction, keep-alive by host).
 - Rejected: a lazy connect on the first call (`Sync\Once` of the old clients): the background tasks would start

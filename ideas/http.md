@@ -1,16 +1,14 @@
 # HTTP client and server design
 
-The shared messages live in [thesis/http](../packages/http/README.md), and the shared codec lives in
-[thesis/http-protocol](../packages/http-protocol/README.md). The [message notes](../packages/http/AGENTS.md) and
-[codec notes](../packages/http-protocol/AGENTS.md) record their decisions.
-The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
-binds its configured endpoint when `start()` runs, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http-client/README.md) pools
+The client, server, messages and HTTP/1 codec live in [thesis/http](../packages/http/README.md).
+The [package notes](../packages/http/AGENTS.md) record their design decisions. The server
+binds its configured endpoint when `start()` runs, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http/README.md) pools
 persistent connections by origin once the response body is complete. The server extensions below remain proposals.
 
 ## One set of messages for both directions
 
 `Request` and `Response` live in `thesis/http` and are used by the client and the server alike: there is no
-`ServerRequest` or `ClientResponse`. The reason is proxies and gateways: in amphp `http-client` and `http-server`
+`ServerRequest` or `ClientResponse`. The reason is proxies and gateways: `amphp/http-client` and `amphp/http-server`
 have a `Request` each, and proxying means converting one into the other. Go has one `http.Request` for both
 sides and it works, but its request also carries fields that mean something on the server only (`RemoteAddr`,
 `TLS`, `RequestURI`): empty and meaningless in a request the client builds. We don't repeat that.
@@ -33,24 +31,17 @@ Reader $body;
 ?Headers $trailers;
 ```
 
-The proposed server passes connection information to the handler as a second argument:
+The server passes connection information as the handler's second argument:
 
 ```php
-// thesis/http-server, the server only
-final readonly class Context
-{
-    public SocketAddress $remoteAddress;
-    public SocketAddress $localAddress;
-    public ?TlsInfo $tls;
-    // later: upgrade for WebSocket, 103 Early Hints, the parameters of the router
-}
+use Thesis\Http;
 
-HttpServer\listen(
-    address: '0.0.0.0:8080',
-    handler: static function (Request $request, Context $context): Response {
-        return new Response(status: 200, body: new StringReader("hello {$context->remoteAddress}"));
-    },
+$server = new Http\Server(
+    config: new Http\Server\Config(endpoint: '0.0.0.0:8080'),
+    handler: static fn(Http\Request $request, Http\Server\Context $context) =>
+        new Http\Response(body: new Http\StringBody("hello {$context->remoteAddress}")),
 );
+$server->start($group);
 ```
 
 A handler that does not need the context does not declare it: PHP passes an extra argument to a closure
@@ -140,7 +131,7 @@ The [two-message test](#two-messages-on-one-http1-connection) below exercises th
 
 ### Who reads the request body on an HTTP/1 server?
 
-In Amp's `http-server` 3.4.9, `Driver/Http1Driver.php` owns the socket for the whole connection.
+In `amphp/http-server` 3.4.9, `Driver/Http1Driver.php` owns the socket for the whole connection.
 Once it has the request head, it starts the handler with `async()` and feeds decoded payload to a
 `Queue` behind `RequestBody`. A handler reading an empty queue waits. The driver pushing to the
 default zero-capacity queue can also wait until the consumer takes the chunk. If the consumer disposes
@@ -187,7 +178,7 @@ flowchart TD
     drain -->|Failure or limit reached| close
 ```
 
-The `Thesis\HttpProtocol\Http1` codec lives in `thesis/http-protocol`. The client formats request heads and
+The `Thesis\Http\Http1` codec lives in `thesis/http`. The client formats request heads and
 parses response heads. The server does the reverse. Both need the same framing rules. For example, a response
 to HEAD ends after the fields even when Content-Length describes the size of the representation.
 
@@ -211,7 +202,7 @@ The reference versions are `amphp/http` 2.1.2, `amphp/http-client` 5.3.8 and `am
   and request and response cookie syntax. Its HTTP/1 helper parses and formats header fields.
   Its HTTP/2 parser sends frame events to a processor implemented on each side. Thesis shares concrete
   messages and immutable multi-value headers in `thesis/http`, and HTTP/1 heads, framing and chunked bodies
-  in `thesis/http-protocol`. Cookie field parsing could also be shared:
+  in `thesis/http`. Cookie field parsing could also be shared:
   each Set-Cookie field is a separate value. Cookie storage and selection for an outgoing request
   would be client policy.
 - **Client.** Amp owns concrete messages, upload content and multipart forms, connection factories and pools,

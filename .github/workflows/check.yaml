@@ -97,9 +97,6 @@ jobs:
           - formatter
           - hot-reload
           - http
-          - http-client
-          - http-protocol
-          - http-server
           - io
           - logger
           - net

@@ -37,8 +37,6 @@
         "thesis/dispatcher": "dev-main",
         "thesis/formatter": "dev-main",
         "thesis/http": "dev-main",
-        "thesis/http-protocol": "dev-main",
-        "thesis/http-server": "dev-main",
         "thesis/io": "dev-main",
         "thesis/logger": "dev-main",
         "thesis/net": "dev-main",

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Thesis\Async\Group;
 use Thesis\Demo\Internal\DelayedResponse;
-use Thesis\HttpServer\Config;
-use Thesis\HttpServer\Server;
+use Thesis\Http\Server;
+use Thesis\Http\Server\Config;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
 use function Thesis\Async\awaitSignal;

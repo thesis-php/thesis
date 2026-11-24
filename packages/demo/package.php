@@ -13,7 +13,6 @@ return new Manifest(
         'ext-pcntl' => '*',
         'thesis/async' => '*',
         'thesis/http' => '*',
-        'thesis/http-server' => '*',
         'thesis/io' => '*',
         'thesis/logger' => '*',
         'thesis/time' => '*',

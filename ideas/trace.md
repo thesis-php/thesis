@@ -81,7 +81,7 @@ of the losses: the program never slows down for its observer.
 - **Exercises of the course checked by the trace**: "the program must cancel X by its deadline, not by a failure",
   a check in the style of `testo-plugin`.
 
-### Production, after `http-server`
+### Production, after the HTTP server
 
 - **Metrics**: the number of live tasks, a histogram of the waits, the cancellations by cause. The lifecycle events
   are enough, without `Suspended` and `Resumed`: those cost about 4 µs a wait for the backtrace.
