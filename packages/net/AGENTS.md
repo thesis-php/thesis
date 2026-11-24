@@ -95,6 +95,11 @@ Read `README.md` for the API and its guarantees.
 - Rejected: `ALPN` together with SNI certificates is not refused at construction: PHP loses ALPN only on connections
   that pick an SNI certificate, which degrades to the default protocol instead of failing (documented in README).
 
+- Rejected: importing a plaintext TCP stream into ext-sockets for `socket_recv()` and `socket_send()`,
+  then using the original stream for readiness and TLS. Against `d3043d3`, a ready write saved about 56 ns
+  in a local TCP control. On the HTTP Arena mix, nine equal-duration pairs returned only 0.19% more responses
+  in total, and the last block lost throughput in two of three pairs.
+
 ## Tests
 
 - Real sockets over loopback, real time: keep delays at 10–50 ms. `tests/FakeDns.php` is a name server

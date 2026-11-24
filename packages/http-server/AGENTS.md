@@ -189,3 +189,18 @@
   of the entire HTTP path.
   A response body wrapping the input body can forward its `isBuffered` property. Marking the input buffered
   made that response close the connection after the first of two pipelined POSTs. The base served both.
+- Rejected: releasing the connection fiber between requests and spawning a new task when the plaintext socket
+  becomes readable. Against `d3043d3`, mixed Arena throughput fell 20–23% in all three pairs. The readiness
+  callback also spawned the task outside the listener's scoped values.
+- Rejected: processing up to 128 ready connections per worker with a second worker available for a waiting handler.
+  Restoring the listener's scoped values fixed the repeated-request probe, but mixed p99 rose in all three pairs
+  (median 94.4 to 205.4 ms). Two pairs lost throughput.
+- Rejected for throughput: sharing identical short parsed request heads across live connections through weak references.
+  Against `d3043d3`, 4096 sockets sending identical GETs used 3.40 MiB less PHP heap. Across nine mixed pairs the
+  medians were 56,219 and 56,209 replies/s. Replacing each head with a unique GET cost 7.8% more time per head
+  at the paired median. Keep the memory result specific to workloads with many identical requests.
+- At `d3043d3` on the one-vCPU Arena mix, PHP 8.6 tracing JIT raised throughput in five of six pairs.
+  Use CLI OPcache with `-d opcache.jit=tracing -d opcache.jit_buffer_size=64M` to reproduce this mode.
+  Against JIT disabled, median throughput rose from 54,850 to 58,086 replies/s and p99 fell from 106.0 to 103.1 ms.
+  Check JIT status in each server process and use the same runtime flags on both arms of a server comparison.
+  With tracing JIT enabled for both servers, three fresh pairs gave Thesis 81.8%, 77.7% and 81.6% of true-async RPS.
