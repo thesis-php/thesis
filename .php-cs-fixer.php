@@ -90,7 +90,9 @@ return new Config()
             'function' => 'multi',
             'method' => 'multi',
             'property' => 'multi',
-            'other' => 'single',
+            // PHP CS Fixer treats namespace constants as 'other'. Keep their multiline PHPDoc.
+            // https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/issues/9962
+            'other' => null,
         ],
         'phpdoc_list_type' => false,
         'phpdoc_no_alias_tag' => ['replacements' => [

@@ -9,25 +9,39 @@ use Time\TimeException;
 use function Thesis\Time\formatDuration;
 use function Thesis\Time\isZero;
 
-/** @internal */
+/**
+ * @internal
+ */
 const NANOSECONDS_PER_MICROSECOND = 1000;
 
-/** @internal */
+/**
+ * @internal
+ */
 const NANOSECONDS_PER_MILLISECOND = 1000 * NANOSECONDS_PER_MICROSECOND;
 
-/** @internal */
+/**
+ * @internal
+ */
 const NANOSECONDS_PER_SECOND = 1000 * NANOSECONDS_PER_MILLISECOND;
 
-/** @internal */
+/**
+ * @internal
+ */
 const MICROSECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MICROSECOND;
 
-/** @internal */
+/**
+ * @internal
+ */
 const MILLISECONDS_PER_SECOND = NANOSECONDS_PER_SECOND / NANOSECONDS_PER_MILLISECOND;
 
-/** @internal */
+/**
+ * @internal
+ */
 const SECONDS_PER_MINUTE = 60;
 
-/** @internal */
+/**
+ * @internal
+ */
 const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
 
 /**
