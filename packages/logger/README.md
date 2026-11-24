@@ -84,7 +84,7 @@ $logger = new Logger(stderr(), clock: new WallClock(new DateTimeZone('UTC')));
 
 Scalar context values fill matching `{key}` placeholders in every format. Missing keys stay in the message.
 The context keeps its fields after interpolation. An exception under
-`exception` becomes an object with `type` and `message`. Other objects, arrays and resources in the context
+`exception` becomes an object with `type`, `message`, `file` and `line`. Other objects, arrays and resources in the context
 are represented by their type. A `Stringable` message is cast to a string on the calling fiber.
 Non-finite floats are written as `null`. Context is capped at 32 entries, keys at 128 bytes and
 text at 1024 bytes.
@@ -94,6 +94,10 @@ text at 1024 bytes.
 The default minimum level is `info` and the default queue holds 1024 lines. Pass `minLevel` or `capacity`
 to change these. A full queue drops the incoming record. `$dropped` counts records refused or lost, including
 before `run()` or after `close()`. Records filtered by level do not count.
+
+Read `$logger->failure` to check whether formatting or writing stopped the background task. It holds the
+original throwable as soon as the writer catches it, and `close()` rethrows it. Queue overflow, normal
+shutdown and task cancellation leave this property null.
 
 Stop producers first and then call `close()` while the group is still running. `close()` stops accepting
 records and drains the queue. It leaves the destination open and throws if formatting or writing failed. In a cancelled

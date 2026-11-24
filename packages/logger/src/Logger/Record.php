@@ -11,7 +11,7 @@ use Psr\Log\LogLevel;
  *
  * @api
  * @see https://www.php-fig.org/psr/psr-3/#1-specification
- * @phpstan-type Context array<array-key, scalar|null|array{type: string, message: string}>
+ * @phpstan-type Context array<array-key, scalar|null|array{type: string, message: string, file: string, line: int}>
  */
 final readonly class Record
 {

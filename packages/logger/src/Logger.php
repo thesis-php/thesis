@@ -50,6 +50,11 @@ final class Logger extends AbstractLogger
     public private(set) int $dropped = 0;
 
     /**
+     * The formatting or output error that stopped the writer, available before close().
+     */
+    public private(set) ?\Throwable $failure = null;
+
+    /**
      * @var Channel<Record>
      */
     private readonly Channel $queue;
@@ -192,7 +197,7 @@ final class Logger extends AbstractLogger
         } catch (Cancelled $cancelled) {
             throw $cancelled;
         } catch (\Throwable $failure) {
-            return $failure;
+            return $this->failure = $failure;
         } finally {
             if ($inFlight) {
                 ++$this->dropped;

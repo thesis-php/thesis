@@ -13,8 +13,8 @@
 - The supplied group owns the writer. `close()` closes the queue and waits for the same task on every call.
   A cancelled wait does not cancel the writer. The logger borrows its destination and never closes it.
 - The writer closes its queue before discarding pending records. A trace listener can log after the writer
-  returns and before its task handle is marked done. The task returns a failure to `close()` so it does not
-  cancel unrelated tasks.
+  returns and before its task handle is marked done. The writer stores a formatting or output error in `$failure` before cleanup.
+  It returns the error to `close()` so unrelated tasks can continue.
   A daemon cancelled before it starts runs no cleanup, so `close()` also discards pending records after joining it.
 
 ## Decisions

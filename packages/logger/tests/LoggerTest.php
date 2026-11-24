@@ -57,6 +57,7 @@ final class LoggerTest
 
             Assert::same($output->writes, []);
             Assert::same($logger->dropped, 2);
+            Assert::null($logger->failure);
 
             $logger->close();
             $logger->close();
@@ -119,7 +120,8 @@ final class LoggerTest
         $logger = new Logger(new RecordingWriter(), formatter: $formatter);
         $logger->error($contextValue);
 
-        group(static function (Group $group) use ($logger, $contextValue) {
+        $error = new \RuntimeException('Connection lost');
+        group(static function (Group $group) use ($logger, $contextValue, $error) {
             $logger->run($group);
             $logger->debug($contextValue);
             $timezone = date_default_timezone_get();
@@ -127,7 +129,7 @@ final class LoggerTest
 
             try {
                 $logger->log(LogLevel::ERROR, 'Connection lost', [
-                    'exception' => new \RuntimeException('Connection lost'),
+                    'exception' => $error,
                     'value' => $contextValue,
                     'array' => [1, 2],
                     'number' => INF,
@@ -149,7 +151,12 @@ final class LoggerTest
         Assert::same($record->time->getTimezone()->getName(), 'Asia/Tokyo');
         Assert::same($record->message, 'Connection lost');
         Assert::same($record->context, [
-            'exception' => ['type' => \RuntimeException::class, 'message' => 'Connection lost'],
+            'exception' => [
+                'type' => \RuntimeException::class,
+                'message' => 'Connection lost',
+                'file' => __FILE__,
+                'line' => $error->getLine(),
+            ],
             'value' => '[' . get_debug_type($contextValue) . ']',
             'array' => '[array]',
             'number' => null,
@@ -239,13 +246,14 @@ final class LoggerTest
         $long = str_repeat('a', 1100);
         $key = str_repeat('k', 128);
 
-        group(static function (Group $group) use ($logger, $long, $key) {
+        $error = new \ErrorException($long, filename: $long, line: 42);
+        group(static function (Group $group) use ($logger, $long, $key, $error) {
             $logger->run($group);
             $logger->info(str_repeat('a', 1020) . '{field}', [
                 $key => 'Kept',
                 'field' => 'Value',
             ] + array_fill(1, 31, true));
-            $logger->info('{message}{message}', ['message' => $long, 'exception' => new \RuntimeException($long)]);
+            $logger->info('{message}{message}', ['message' => $long, 'exception' => $error]);
             $logger->info('Summarized', ['exception' => 'Reason', 'other' => new \RuntimeException('Text')]);
             $logger->close();
         });
@@ -258,7 +266,7 @@ final class LoggerTest
         Assert::same($first->message, str_repeat('a', 1020) . '{fie');
         Assert::same($first->context, [$key => 'Kept', 'field' => 'Value'] + array_fill(1, 30, true));
         Assert::same($second->message, $clipped);
-        $exception = ['type' => \RuntimeException::class, 'message' => $clipped];
+        $exception = ['type' => \ErrorException::class, 'message' => $clipped, 'file' => $clipped, 'line' => 42];
         Assert::same($second->context['exception'] ?? null, $exception);
         Assert::same($third->context, ['exception' => 'Reason', 'other' => '[RuntimeException]']);
     }
@@ -329,6 +337,8 @@ final class LoggerTest
             $logger->info('First');
             $logger->info('Second');
             $failed->await();
+
+            Assert::same($logger->failure, $failure);
 
             Assert::same($logger->dropped, 3);
             Assert::same(thrown($logger->close(...)), $failure);

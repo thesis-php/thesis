@@ -50,7 +50,7 @@ final class RecordFactory
     }
 
     /**
-     * @return scalar|null|array{type: string, message: string}
+     * @return scalar|null|array{type: string, message: string, file: string, line: int}
      */
     private static function field(int|string $key, mixed $value): null|int|float|bool|string|array
     {
@@ -58,6 +58,8 @@ final class RecordFactory
             $key === 'exception' && $value instanceof \Throwable => [
                 'type' => self::text($value::class),
                 'message' => self::text($value->getMessage()),
+                'file' => self::text($value->getFile()),
+                'line' => $value->getLine(),
             ],
             \is_string($value) => self::text($value),
             \is_float($value) && !is_finite($value) => null,
