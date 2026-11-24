@@ -21,6 +21,11 @@
 - Both endpoint types own their backlog. TCP owns `reusePort` and `noDelay`. TLS, limits and timeouts live on `Config`.
 - Like the AMQP client, the server starts a daemon in the group passed to `run()`. It returns once the daemon
   has registered shutdown. A handler may call `close()`: the group joins active exchanges after it returns.
+- Rejected: opening a group for every request. Even with lazy task and daemon scopes from `499def1`,
+  an unused group raised the median time per in-memory plaintext GET from 3.67 to 5.01 µs.
+  A handler can open its own group for parallel work that finishes before it returns. A streaming body
+  can produce bytes as the server reads it. Few tasks need to keep running independently after the handler
+  returns. Revisit this if middleware needs the server to own such a task until the response has been sent.
 
 - The listener owns its sockets and drains active exchanges on shutdown. The internal `Connection::serve()`
   runs HTTP/1 exchanges on a reader and writer so tests and benchmarks can run without sockets.
