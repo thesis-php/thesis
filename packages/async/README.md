@@ -205,9 +205,9 @@ of every suspended fiber.
 Build a `Thesis\Async\Service` along with its consumers, then call `start($group)` when the application starts.
 Once it returns, the service is ready to use. For example, a listening server already has a bound address.
 
-Call `stop()` while the group can still run the tasks needed for shutdown. Each service documents what
-has finished when the call returns. A logger drains its queue before returning. An HTTP server stops accepting
-connections and lets its group join active handlers, so a handler can call `stop()` itself.
+Call `stop()` from outside the service while its group can still run the tasks needed for shutdown.
+On successful return, its background work has finished and its dependencies can stop.
+For example, stop the HTTP server before the logger so active handlers can log their final messages.
 
 ### Failures that were not rethrown: `suppressed()`
 

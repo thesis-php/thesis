@@ -101,7 +101,7 @@ In amphp `Execution::await($cancellation)` stops waiting while the task goes on.
   `timeout(sec(5), fn() => $pool->execute(...))` needs no parameter of its own.
 - Rejected: carrying `ScopedValue`s over: they are not serializable in general.
 
-## The pool: a client of `agents/clients.md`
+## The pool: a client of `agents/services.md`
 
 - `new Pool(...)` does no I/O; `start($group)` starts the background work (the reader of every worker,
   watching the processes) as daemons of `$group`. Workers start lazily, their daemons go to the same group.

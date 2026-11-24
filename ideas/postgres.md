@@ -16,7 +16,7 @@ What we get that libpq does not give:
   when the task waiting for a query is cancelled.
 - Pipelining for free: the extended protocol sends Parse/Bind/Execute of many queries before one Sync.
 - The binary format per column, rows streamed instead of a buffered result, `COPY` as `io\Reader`/`Writer`,
-  `NOTIFY` as asynchronous messages in the reader loop of `agents/clients.md`.
+  `NOTIFY` as asynchronous messages in the reader loop of `agents/services.md`.
 - Tests on a fake server and on the virtual time of `testo-plugin`. No extension to install.
 
 Rejected:
@@ -135,7 +135,7 @@ Here: one driver, no `sql` until the second driver (the roadmap), no `@template`
 one interface, the rest `final` classes. About 15 types:
 
 - `Executor`, the only interface: what user code takes, so a repository works in a transaction and outside it.
-- `Client` (the pool, `start($group)`/`stop()` of `agents/clients.md`), `Config`, `Connection`, `Transaction`,
+- `Client` (the pool, `start($group)`/`stop()` of `agents/services.md`), `Config`, `Connection`, `Transaction`,
   `Result`, `Listener`, `Notification`. `Connection` and `Transaction` have `@internal` constructors.
 - `PostgresException`, `ConnectionFailed`, `ConnectionClosed`, `QueryFailed`, `SqlState`, `IsolationLevel`.
 
@@ -229,7 +229,7 @@ into the TLS handshake, which fails. `TlsInfo::$peerCertificate` for SCRAM-SHA-2
 Missing:
 
 1. A pool: inside `Postgres\Client` on `LocalSemaphore` and a list of idle connections, a common pool only
-   once `http-client` has its own too (`agents/clients.md`).
+   once `http-client` has its own too (`agents/services.md`).
 2. `Buffer` keeps `$bytes` and `$offset` private, the generated decoder needs the raw string and an offset
    (`peek()` per column is the ~45 ns per call we measured). Proposed: the reader of postgres keeps its own
    read string, `Buffer` is for writing. `io` is not changed for one package.
@@ -321,7 +321,7 @@ Cheap now, breaking later:
    a Unix socket needs no TLS. `#[\SensitiveParameter]` on the password, parameters of a query never
    in the message of an exception, `channel_binding=require` as an option.
 4. NoticeResponse (`RAISE NOTICE`, the warnings of the server) goes to `Result::$notices`, not to a callback:
-   the reader never runs user code (`agents/clients.md`).
+   the reader never runs user code (`agents/services.md`).
 5. The message of `QueryFailed` shows the line of the SQL with a caret at the `Position` of ErrorResponse,
    as psql does.
 

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Set the endpoint and HTTP limits in `Config`. Use `TcpEndpoint` or `UnixEndpoint` to tune socket settings.
-  Start listening with `Server::start($group)` and stop accepting with `stop()`.
+  Start listening with `Server::start($group)` and wait for active exchanges with `stop()`.
 - Serve TCP and Unix connections concurrently with a bounded number of open sockets.
 - Stream HTTP/1 requests and responses with fixed-length and chunked bodies, trailers and keep-alive.
   Set `maxRequestsPerConnection` to limit keep-alive reuse.

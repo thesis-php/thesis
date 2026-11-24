@@ -220,6 +220,7 @@ final class ClientTest
             $peer->start();
             $closed = $group->spawn($client->stop(...));
             delay(ms(10));
+            Assert::false($closed->isDone);
             $peer->tune();
             $closed->await();
 

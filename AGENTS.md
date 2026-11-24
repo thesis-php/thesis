@@ -50,7 +50,7 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 - `fibers.md`: keeping state per fiber, a test that depends on the order of callbacks.
 - `manifests.md`: a manifest, a dependency, a new package or file of functions or constants, the public API of a package
   that others use, a feature added to or removed from a package (its `description` and `keywords` follow).
-- `clients.md`: a client with work in the background (a connection, a reader loop, reconnects).
+- `services.md`: a background service, its startup and shutdown, and clients with reader loops or reconnects.
 - `repositories.md`: the split, the repositories of the packages and their settings on GitHub.
 - `versions.md`: the version of a package (`version:` of a manifest), a constraint on a monorepo package.
 - `changelogs.md`: writing or editing a `CHANGELOG.md` of a package.

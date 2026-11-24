@@ -6,6 +6,7 @@ namespace Thesis\HttpServer;
 
 use Thesis\Async\Group;
 use Thesis\Async\Service;
+use Thesis\Async\Task;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpServer\Internal\Listener;
@@ -25,6 +26,11 @@ use function Thesis\Net\listenUnix;
  */
 final class Server implements Service
 {
+    /**
+     * @var ?Task<void>
+     */
+    private ?Task $task = null;
+
     private ?SocketListener $listener = null;
 
     /**
@@ -70,7 +76,7 @@ final class Server implements Service
         }
 
         $endpoint = $this->config->endpoint;
-        $this->listener = match (true) {
+        $listener = match (true) {
             $endpoint instanceof TcpEndpoint => listen(
                 host: $endpoint->address->ip,
                 port: $endpoint->address->port,
@@ -80,26 +86,29 @@ final class Server implements Service
             ),
             $endpoint instanceof UnixEndpoint => listenUnix($endpoint->path, $endpoint->backlog),
         };
+        $this->listener = $listener;
         $ready = false;
 
         try {
             $driver = new Listener(
-                listener: $this->listener,
+                listener: $listener,
                 handler: $this->handler,
                 config: $this->config,
                 onError: $this->onError,
             );
-            $task = $group->daemon(function () use ($driver, &$ready) {
-                $unsubscribe = onCancel($this->stop(...));
+            $task = $group->daemon(static function () use ($listener, $driver, &$ready) {
+                $unsubscribe = onCancel($listener->close(...));
 
                 try {
                     $ready = true;
                     shield($driver->run(...));
                 } finally {
                     $unsubscribe();
-                    $this->stop();
+                    $listener->close();
                 }
             });
+
+            $this->task = $task;
 
             // A group may finish as soon as start() returns. A daemon cancelled before it starts never runs its finally.
             while (!$ready && !$task->isDone) {
@@ -110,7 +119,7 @@ final class Server implements Service
                 $task->await();
             }
         } catch (\Throwable $error) {
-            $this->stop();
+            $listener->close();
             $this->listener = null;
 
             throw $error;
@@ -118,10 +127,15 @@ final class Server implements Service
     }
 
     /**
-     * Stops accepting requests. Safe to call from a handler or more than once.
+     * Stops accepting connections and waits for the server and its active exchanges to finish.
+     * Returns immediately before startup.
+     * Call from outside request handlers.
+     *
+     * @throws \Throwable if the serving task fails or was cancelled
      */
     public function stop(): void
     {
         $this->listener?->close();
+        $this->task?->await();
     }
 }

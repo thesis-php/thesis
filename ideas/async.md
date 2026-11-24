@@ -71,7 +71,7 @@ a supervisor is a group that restarts instead of failing fast, an exit signal is
 - A restart intensity (at most N in a period), exceeding it fails the supervisor.
 
 The price: `call()` is slower and longer than a call, two actors calling each other synchronously deadlock.
-Owners of resources only, not every function. Compare with the clients of `agents/clients.md`, which already
+Owners of resources only, not every function. Compare with the clients of `agents/services.md`, which already
 own their background work.
 
 ## An event loop on `Io\Poll` of PHP 8.6

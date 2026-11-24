@@ -5,7 +5,7 @@
 - Run the same entry point from the monorepo and the installed project. The split ships `run.php` through `dist`.
 - Listen on loopback by default. Accept an explicit address for Docker port forwarding.
 - The handler uses an async delay so the curl example can show waits overlapping.
-- The HTTP server finishes before the logger drains. Both run in groups owned by the entry point.
+- The HTTP server finishes before the logger drains. Both share one group. Stop the server first so every handler can log its final message.
 
 ## Decisions
 

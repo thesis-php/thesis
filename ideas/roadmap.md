@@ -65,7 +65,7 @@ What amphp has, then what thesis makes of it.
 The order follows an [uptime monitor](uptime-monitor.md) to be written on thesis without amphp:
 an HTTP server with SSE, cookies and static files, an HTTP client for checks, postgres with
 `LISTEN`/`NOTIFY`, password hashing in workers.
-A pool of connections is written in each package that needs it (`agents/clients.md`).
+A pool of connections is written in each package that needs it (`agents/services.md`).
 
 1. **HTTP.** [`http`](../packages/http/README.md) provides the shared messages, headers, body readers and HTTP/1 codec.
    Next comes `http-server` (graceful shutdown with `trapSignals()`, middleware, streamed responses for SSE and static files),

@@ -67,8 +67,8 @@ group(static function (Group $group) use ($client) {
 `auth_mechanism`, the TLS files), and several hosts separated by commas: they are tried in order.
 `new Config(...)` takes the same with durations of thesis/time: `heartbeat: sec(30)`, `connectTimeout: sec(5)`.
 
-`stop()` ends the consumers, waits for the confirms that are due and closes the connection. Nothing in the API
-has a timeout parameter: bound any call with `timeout()`, and a cancelled group stops the client.
+`stop()` ends the consumers, waits for the confirms that are due and closes the connection.
+It returns once the reader and reconnect loop have exited. Nothing in the API has a timeout parameter: bound any call with `timeout()`, and a cancelled group stops the client.
 
 ### Publishing
 

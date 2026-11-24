@@ -73,8 +73,9 @@ For Unix, pass an absolute socket path such as `'/run/app.sock'`. Use `UnixEndpo
 Both endpoint types let you set `backlog`, which defaults to 511. `TcpEndpoint` also takes `reusePort` and `noDelay`.
 
 `$server->start($group)` binds the endpoint and returns once the server is ready. A bind failure throws
-`Thesis\Net\ListenFailed` from `start()`. With TCP port zero, `$server->address` gives the assigned port. Call `$server->stop()` to stop accepting clients.
-The group waits for shutdown to finish. The server closes idle sockets and lets active handlers
+`Thesis\Net\ListenFailed` from `start()`. With TCP port zero, `$server->address` gives the assigned port.
+Call `$server->stop()` outside request handlers to stop accepting clients and wait for shutdown.
+The server closes idle sockets and lets active handlers
 and response writers finish until the shutdown deadline. Cancelling the serving scope also stops the server.
 The example uses ext-pcntl and handles SIGINT and SIGTERM by closing the listener.
 

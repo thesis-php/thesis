@@ -30,17 +30,14 @@ group(static function (Group $group) use ($logger, $server) {
     $logger->start($group);
 
     try {
-        group(static function (Group $group) use ($logger, $server) {
-            $server->start($group);
-
-            try {
-                $logger->info('Listening on {address}', ['address' => (string) $server->address]);
-                awaitSignal(SIGINT, SIGTERM);
-            } finally {
-                $server->stop();
-            }
-        });
+        $server->start($group);
+        $logger->info('Listening on {address}', ['address' => (string) $server->address]);
+        awaitSignal(SIGINT, SIGTERM);
     } finally {
-        shield(static fn() => timeout(sec(2), $logger->stop(...)));
+        try {
+            shield($server->stop(...));
+        } finally {
+            shield(static fn() => timeout(sec(2), $logger->stop(...)));
+        }
     }
 });

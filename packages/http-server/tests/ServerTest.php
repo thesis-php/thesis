@@ -90,8 +90,18 @@ final class ServerTest
                 Assert::same((string) $client->localAddress, (string) $context->remoteAddress);
                 Assert::null($context->tls);
 
-                $server->stop();
+                /** @var Deferred<null> $waiting */
+                $waiting = new Deferred();
+                $stopped = $group->spawn(static function () use ($server, $waiting) {
+                    $waiting->complete();
+                    $server->stop();
+                });
+                $waiting->await();
+                Assert::null($server->address);
+                Assert::false($stopped->isDone);
                 $release->complete();
+                $stopped->await();
+                $server->stop();
 
                 $buffer = new Buffer();
                 $buffer->fillUntil($client, "\r\n\r\n");
@@ -101,9 +111,9 @@ final class ServerTest
                 );
                 Assert::null($client->read(1));
             } finally {
+                $release->complete();
                 $server->stop();
                 $client->close();
-                $release->complete();
             }
         }));
     }

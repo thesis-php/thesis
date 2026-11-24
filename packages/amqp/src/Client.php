@@ -12,6 +12,7 @@ use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\LocalMutex;
 use Thesis\Async\Service;
+use Thesis\Async\Task;
 use Thesis\Async\TimedOut;
 use Thesis\Io\IoException;
 use function Thesis\Amqp\Internal\address;
@@ -23,7 +24,7 @@ use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 /**
- * A connection to RabbitMQ that reconnects. A passive object until {@see start()} (agents/clients.md):
+ * A connection to RabbitMQ that reconnects. A passive object until {@see start()} (agents/services.md):
  *
  *     $client = new Client(Config::fromUri('amqp://guest:guest@localhost:5672/'));
  *
@@ -47,7 +48,12 @@ use function Thesis\Time\sec;
  */
 final class Client implements Service
 {
-    private bool $started = false;
+    /**
+     * Resolves after the initial handshake, even if stop() arrives during startup.
+     *
+     * @var ?Deferred<Task<void>|null>
+     */
+    private ?Deferred $supervisor = null;
 
     private bool $closing = false;
 
@@ -89,17 +95,21 @@ final class Client implements Service
      */
     public function start(Group $group): void
     {
-        if ($this->started) {
+        if ($this->supervisor !== null) {
             throw new \LogicException('The client has already started.');
         }
 
-        $this->started = true;
+        /** @var Deferred<Task<void>|null> $supervisor */
+        $supervisor = new Deferred();
+        $this->supervisor = $supervisor;
 
         try {
             $connection = $this->connect();
 
             if ($this->closing) {
                 $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
+
+                $supervisor->complete();
 
                 return;
             }
@@ -116,12 +126,14 @@ final class Client implements Service
             }
 
             $this->up($connection);
+            $supervisor->complete($task);
         } catch (\Throwable $exception) {
             if (isset($connection)) {
                 $connection->terminate(new ConnectionClosed('The client failed to start.'));
             }
 
-            $this->started = false;
+            $supervisor->complete();
+            $this->supervisor = null;
             $waiting = $this->next;
             $this->next = new Deferred();
             $waiting->fail($exception instanceof Cancelled
@@ -159,11 +171,12 @@ final class Client implements Service
     /**
      * Closes gracefully: cancels the consumers (their iterations end), waits for the confirms of the publishes
      * in flight, closes the connection with the server. Bound it with `timeout()` and `shield()`.
-     * The daemons end by themselves afterwards. Later calls do nothing.
+     * Waits for the reader and reconnect loop to finish.
      */
     public function stop(): void
     {
-        if (!$this->started) {
+        $supervisor = $this->supervisor;
+        if ($supervisor === null) {
             return;
         }
 
@@ -175,6 +188,8 @@ final class Client implements Service
         } finally {
             $this->next->fail(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
         }
+
+        $supervisor->await()?->await();
     }
 
     /**
@@ -183,7 +198,7 @@ final class Client implements Service
      */
     private function connection(): Connection
     {
-        if (!$this->started) {
+        if ($this->supervisor === null) {
             throw new \LogicException('The client is not running: call start() first.');
         }
 

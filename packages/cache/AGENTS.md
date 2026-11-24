@@ -8,7 +8,7 @@ Read `README.md` for the API.
 - A TTL is `?Time\Duration`: null keeps the entry, zero or negative deletes it (as in PSR-16).
 - A miss is told from a stored null only by the default of `get()`: no method may treat null as a miss.
 - Nothing in the package runs in the background: no timers, no spawned tasks, so a cache needs no `Group`
-  and no `start()` (`clients.md`).
+  and no `start()` (`services.md`).
 - `LocalCache` keeps the order of use in a list through the entries (`Entry::$newer`, `Entry::$olderKey`),
   the array is only an index: `array_key_first()` of an array in LRU order scans the holes that unset() leaves
   at its start, O(n) per eviction until PHP compacts the table. The link back is a key, not the entry,
