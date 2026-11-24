@@ -78,8 +78,7 @@ the whole monorepo is for the final check.
 
 - Work on the branch checked out in the current worktree. Commit there only when asked,
   with a short imperative subject like the existing history.
-- Sync only when asked. Rebase the worktree branch onto local `main`, then fast-forward `main`
-  to that branch with `git merge --ff-only <branch>` in the worktree where `main` is checked out.
+- Sync with local `main` only when asked. Follow [sync-worktree](skills/sync-worktree/SKILL.md).
 - The user handles all pushes and pushes only `main`.
 - Undo a pushed commit with `git revert`, never by rewriting history.
 - No trailers in commit messages or PR descriptions.
