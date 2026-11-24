@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1\Stub;
 
-use Thesis\Http\AbstractBody;
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\StringBody;
 
-final class StubUnknownLengthBody extends AbstractBody
+final class StubUnknownLengthBody implements Body
 {
     #[\Override]
     public ?int $size {
@@ -37,9 +37,14 @@ final class StubUnknownLengthBody extends AbstractBody
         return $this->body->read($max);
     }
 
-    public function discard(): Headers
+    public function readAll(): string
     {
-        return $this->body->discard();
+        return $this->body->readAll();
+    }
+
+    public function trailers(): Headers
+    {
+        return $this->body->trailers();
     }
 
     public function close(): void {}

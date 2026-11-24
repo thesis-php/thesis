@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\HttpClient\FormPart;
 use Thesis\Io\Closer;
-use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StreamClosed;
@@ -19,7 +18,7 @@ use const Thesis\Http\EMPTY_HEADERS;
 /**
  * @internal
  */
-final class MultipartBody extends AbstractBody
+final class MultipartBody extends StreamingBody
 {
     #[\Override]
     public readonly ?int $size;
@@ -40,8 +39,6 @@ final class MultipartBody extends AbstractBody
     private int $index = 0;
 
     private int $offset = 0;
-
-    private bool $reading = false;
 
     private bool $closed = false;
 
@@ -95,49 +92,39 @@ final class MultipartBody extends AbstractBody
 
     private function __clone() {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
         if ($this->closed) {
             throw new StreamClosed('The multipart body is closed.');
         }
-        if ($this->reading) {
-            throw new ConcurrentRead('The multipart body already has a read in progress.');
-        }
-        $this->reading = true;
 
-        try {
-            while (isset($this->segments[$this->index])) {
-                [$reader, $size] = $this->segments[$this->index];
-                $remaining = $size === null ? null : $size - $this->offset;
-                if ($remaining === null || $remaining > 0) {
-                    $bytes = $reader->read(min($max, $remaining ?? $max));
-                    // @phpstan-ignore if.alwaysFalse (another fiber may close the body during read)
-                    if ($this->closed) {
-                        throw new StreamClosed('The multipart body was closed during a read.');
-                    }
-                    if ($bytes !== null) {
-                        $this->offset += \strlen($bytes);
-
-                        return $bytes;
-                    }
-                    if ($remaining !== null) {
-                        throw new ReadFailed('A multipart field ended before its declared length.');
-                    }
+        while (isset($this->segments[$this->index])) {
+            [$reader, $size] = $this->segments[$this->index];
+            $remaining = $size === null ? null : $size - $this->offset;
+            if ($remaining === null || $remaining > 0) {
+                $bytes = $reader->read(min($max, $remaining ?? $max));
+                // @phpstan-ignore if.alwaysFalse (another fiber may close the body during read)
+                if ($this->closed) {
+                    throw new StreamClosed('The multipart body was closed during a read.');
                 }
-                ++$this->index;
-                $this->offset = 0;
-            }
+                if ($bytes !== null) {
+                    $this->offset += \strlen($bytes);
 
-            return null;
-        } finally {
-            $this->reading = false;
+                    return $bytes;
+                }
+                if ($remaining !== null) {
+                    throw new ReadFailed('A multipart field ended before its declared length.');
+                }
+            }
+            ++$this->index;
+            $this->offset = 0;
         }
+
+        return null;
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
         return EMPTY_HEADERS;
     }
 

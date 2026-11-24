@@ -152,12 +152,16 @@ final class Connection
             }
         }
 
+        $incoming = $bodyReader ?? $decoder;
         $request = new Request(
             method: $head->method,
             uri: $head->uri,
             headers: $head->headers,
-            body: $bodyReader ?? $decoder ?? '',
+            body: $incoming ?? '',
         );
+
+        $body = null;
+        $committed = false;
 
         try {
             if (isCancelled()) {
@@ -165,6 +169,7 @@ final class Connection
             }
 
             $response = $handler($request);
+            $body = $response->takeBody();
             if ($continue?->failure !== null) {
                 throw $continue->failure;
             }
@@ -179,32 +184,50 @@ final class Connection
 
             [$reply, $bytes] = self::encodeHead(
                 response: $response,
+                body: $body,
                 request: $head,
                 isPersistent: $keepAlive && $state?->isStopping !== true,
             );
             $first = null;
 
             if ($continue !== null && $continue->isPending && $reply->length !== 0) {
-                if ($response->body === $request->body) {
+                if ($body === $incoming) {
                     // The client may abandon the body on seeing a final head before it has sent any bytes.
-                    $first = self::readBody($response->body, $reply->length);
-                } elseif ($response->status < Status::BAD_REQUEST && !$response->body->isBuffered) {
+                    $first = self::readBody($body, $reply->length);
+                } elseif ($response->status < Status::BAD_REQUEST && !$body->isBuffered) {
                     // A streaming response may read from the request only after producing response bytes.
                     $continue->send();
                 }
             }
 
-            $ignoresBody = $reply->length === 0 || $response->body->isBuffered;
+            $ignoresBody = $reply->length === 0 || $body->isBuffered;
             $mustClose = $continue?->isPending === true || $state?->isStopping === true
                 || ($ignoresBody && !self::isBodyComplete($decoder));
 
             if ($reply->isPersistent && $mustClose) {
-                [$reply, $bytes] = self::encodeHead($response, $head, isPersistent: false);
+                [$reply, $bytes] = self::encodeHead($response, $body, $head, isPersistent: false);
             }
 
+            $continue?->commit();
+            $committed = true;
+            self::writeResponse(
+                body: $body,
+                head: $reply,
+                bytes: $bytes,
+                output: $output,
+                first: $first,
+                bufferedEcho: $body === $incoming && $decoder instanceof FixedLengthReader
+                    && $buffer->count() >= $decoder->remaining,
+            );
+
+            return $reply->isPersistent && self::isBodyComplete($decoder);
         } catch (Cancelled $error) {
             throw $error;
         } catch (\Throwable $error) {
+            if ($committed) {
+                throw $error;
+            }
+
             if ($continue?->failure !== null) {
                 throw $continue->failure;
             }
@@ -233,31 +256,19 @@ final class Connection
             }
 
             throw $error;
+        } finally {
+            $body?->close();
         }
-
-        $continue?->commit();
-        self::writeResponse(
-            response: $response,
-            head: $reply,
-            bytes: $bytes,
-            output: $output,
-            first: $first,
-            bufferedEcho: $response->body === $request->body && $decoder instanceof FixedLengthReader
-                && $buffer->count() >= $decoder->remaining,
-        );
-
-        return $reply->isPersistent && self::isBodyComplete($decoder);
     }
 
     /**
      * @return array{ResponseHead, string}
      */
-    private static function encodeHead(Response $response, RequestHead $request, bool $isPersistent): array
+    private static function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
         /** @var ?array{ResponseHead, string} $last */
         static $last = null;
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
-        $body = $response->body;
         if ($last !== null && $ordinary && $body instanceof StringBody) {
             $cached = $last;
             $head = $cached[0];
@@ -268,7 +279,7 @@ final class Connection
             }
         }
 
-        $head = ResponseHead::of($response, $request, $isPersistent);
+        $head = ResponseHead::of($response, $request, $body, $isPersistent);
         $result = [$head, $head->toString()];
         if ($ordinary && $head->framing === Framing::Length && \strlen($result[1]) <= 1024) {
             $last = $result;
@@ -291,14 +302,18 @@ final class Connection
      */
     private static function writeError(Writer $output, int $status, ?RequestHead $head = null): void
     {
-        $reply = $head === null
-            ? ResponseHead::forInvalidRequest($status)
-            : ResponseHead::of(new Response($status), $head, isPersistent: false);
+        if ($head === null) {
+            $reply = ResponseHead::forInvalidRequest($status);
+        } else {
+            $response = new Response($status);
+            $reply = ResponseHead::of($response, $head, $response->takeBody(), isPersistent: false);
+        }
+
         $output->write($reply->toString());
     }
 
     private static function writeResponse(
-        Response $response,
+        Body $body,
         ResponseHead $head,
         string $bytes,
         Writer $output,
@@ -307,9 +322,9 @@ final class Connection
     ): void {
         $remaining = $head->length;
         if ($remaining !== null && $remaining > 0 && $remaining <= 8192
-            && ($first !== null || $bufferedEcho || $response->body->isBuffered)) {
+            && ($first !== null || $bufferedEcho || $body->isBuffered)) {
             try {
-                $chunk = $first ?? self::readBody($response->body, $remaining);
+                $chunk = $first ?? self::readBody($body, $remaining);
                 $first = null;
             } catch (\Throwable $error) {
                 $output->write($bytes);
@@ -327,7 +342,7 @@ final class Connection
         }
 
         while ($remaining === null || $remaining > 0) {
-            $bytes = $first ?? self::readBody($response->body, $remaining);
+            $bytes = $first ?? self::readBody($body, $remaining);
             $first = null;
 
             if ($bytes === '') {
@@ -341,7 +356,7 @@ final class Connection
         }
 
         if ($head->framing === Framing::Chunked) {
-            $output->write(encodeLastChunk($response->body->discard()));
+            $output->write(encodeLastChunk($body->trailers()));
         }
     }
 

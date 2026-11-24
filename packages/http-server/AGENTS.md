@@ -4,6 +4,8 @@
 
 - One buffer belongs to the connection. Finish writing the response before checking whether the incoming body
   ended. An echo response can consume the request reader after the handler returns.
+- The writer takes the response body once, uses it for framing and writing, and closes it even on failure.
+  Keep the incoming decoder to check for a direct echo and to decide whether the connection can be reused.
 - Reuse requires zero remaining bytes for fixed-length input or ready trailers for chunked input.
 - A final response head commits the response. If writing the body or its trailers fails, close the connection.
   A second status line would become part of the first response.

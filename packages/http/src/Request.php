@@ -4,53 +4,109 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Thesis\Http\Internal\PendingBody;
 use Uri\Rfc3986\Uri;
 
 /**
- * HTTP/1.1 and HTTP/2 clients and servers share this request type. The request holds its method,
- * URI, message headers and body. The codec gets the host from the URI and the length from the body.
- * The headers exclude connection fields such as `Host`, `Content-Length`, `Transfer-Encoding` and `Connection`.
- *
- * `clone($request, ['uri' => $uri])` derives the query from the new URI.
- * `clone($request, ['query' => $query])` updates the query component of the URI.
- * The copy shares the body with the original.
+ * HTTP request shared by clients and servers. Metadata copies share one body handoff.
  *
  * @api
  */
 final class Request
 {
-    public public(set) readonly Body $body;
+    public static function get(string|Uri $uri): self
+    {
+        return new self(Method::GET, \is_string($uri) ? new Uri($uri) : $uri);
+    }
 
-    // @phpstan-ignore property.uninitializedReadonly (parsed on first access)
-    private readonly Query $parsedQuery;
+    private ?Query $parsedQuery = null;
 
     public Query $query {
-        // @phpstan-ignore property.readOnlyAssignNotInConstructor (first access initializes the cache)
         get => $this->parsedQuery ??= Query::parse($this->uri->getRawQuery() ?? '');
-        set {
-            $encoded = $value->toString();
-            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() permits replacing the URI)
-            $this->uri = $this->uri->withQuery($encoded === '' ? null : $encoded);
-            // @phpstan-ignore property.readOnlyAssignNotInConstructor (clone() initializes its own cache)
-            $this->parsedQuery = $value;
-        }
     }
+
+    private readonly PendingBody $pendingBody;
 
     /**
      * @param non-empty-string $method
      */
     public function __construct(
-        public public(set) readonly string $method,
-        public public(set) readonly Uri $uri,
-        public public(set) readonly Headers $headers = EMPTY_HEADERS,
+        public readonly string $method,
+        public readonly Uri $uri,
+        public readonly Headers $headers = EMPTY_HEADERS,
         string|Body $body = '',
     ) {
-        $this->body = \is_string($body) ? new StringBody($body) : $body;
+        $this->pendingBody = new PendingBody($body);
     }
 
-    public function __clone(): void
+    /**
+     * @param non-empty-string $method
+     */
+    public function withMethod(string $method): self
     {
-        // @phpstan-ignore unset.readOnlyProperty (a clone may replace its URI)
-        unset($this->parsedQuery);
+        return clone($this, ['method' => $method]);
+    }
+
+    public function withUri(Uri $uri): self
+    {
+        return clone($this, ['uri' => $uri, 'parsedQuery' => null]);
+    }
+
+    public function withQuery(Query $query): self
+    {
+        $encoded = $query->toString();
+
+        $uri = $this->uri->withQuery($encoded === '' ? null : $encoded);
+
+        return clone($this, ['uri' => $uri, 'parsedQuery' => $query]);
+    }
+
+    /**
+     * @param string|list<string> $values
+     */
+    public function withQueryParameter(string $name, string|array $values): self
+    {
+        return $this->withQuery($this->query->with($name, $values));
+    }
+
+    public function withHeaders(Headers $headers): self
+    {
+        return clone($this, ['headers' => $headers]);
+    }
+
+    /**
+     * @param string|list<string> $values
+     */
+    public function withHeader(string $name, string|array $values): self
+    {
+        return $this->withHeaders($this->headers->with($name, $values));
+    }
+
+    /**
+     * @param string|list<string> $values
+     */
+    public function withAddedHeader(string $name, string|array $values): self
+    {
+        return $this->withHeaders($this->headers->withAdded($name, $values));
+    }
+
+    public function withoutHeader(string $name): self
+    {
+        return $this->withHeaders($this->headers->without($name));
+    }
+
+    /**
+     * Transfers the body to the caller. All metadata copies share this single handoff.
+     *
+     * @throws \LogicException if this request or a copy has already handed off the body
+     */
+    public function takeBody(): Body
+    {
+        return $this->pendingBody->take();
+    }
+
+    public function withBody(string|Body $body): self
+    {
+        return clone($this, ['pendingBody' => new PendingBody($body)]);
     }
 }

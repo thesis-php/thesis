@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\Io\Buffer;
-use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
@@ -19,7 +18,7 @@ use const Thesis\Http\EMPTY_HEADERS;
  *
  * @api
  */
-final class FixedLengthReader extends AbstractBody
+final class FixedLengthReader extends StreamingBody
 {
     #[\Override]
     public bool $isBuffered {
@@ -36,8 +35,6 @@ final class FixedLengthReader extends AbstractBody
      */
     public private(set) int $remaining;
 
-    private bool $isReading = false;
-
     /**
      * @param non-negative-int $size the total number of body bytes
      */
@@ -52,25 +49,15 @@ final class FixedLengthReader extends AbstractBody
 
     private function __clone() {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
-        if ($this->isReading) {
-            throw new ConcurrentRead('A read is already in progress on the body.');
-        }
-
         if ($this->remaining === 0) {
             return null;
         }
 
         $length = min($max, $this->remaining);
         $buffered = $this->buffer->count();
-        $this->isReading = true;
-
-        try {
-            $bytes = $buffered > 0 ? $this->buffer->read(min($length, $buffered)) : $this->reader->read($length);
-        } finally {
-            $this->isReading = false;
-        }
+        $bytes = $buffered > 0 ? $this->buffer->read(min($length, $buffered)) : $this->reader->read($length);
 
         if ($bytes === null) {
             $received = $this->size - $this->remaining;
@@ -88,10 +75,8 @@ final class FixedLengthReader extends AbstractBody
         return $bytes;
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
         return EMPTY_HEADERS;
     }
 

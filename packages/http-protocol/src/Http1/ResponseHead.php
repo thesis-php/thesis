@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
 use Thesis\Http\Response;
@@ -91,6 +92,7 @@ final readonly class ResponseHead
      *
      * An eligible HEAD or 304 response can supply Content-Length as representation metadata.
      *
+     * @param Body $body the body taken from the message, used again to write the payload
      * @param bool $isPersistent false closes the connection after the response. The connection is also closed
      *     if the request asked for it, or if the body lasts until the connection is closed
      * @param list<non-empty-string> $upgrade the protocols a 101 response switches the connection to
@@ -101,6 +103,7 @@ final readonly class ResponseHead
     public static function of(
         Response $response,
         RequestHead $request,
+        Body $body,
         bool $isPersistent = true,
         array $upgrade = [],
     ): self {
@@ -110,8 +113,8 @@ final readonly class ResponseHead
             headers: $response->headers,
             allowContentLength: !$hasBody && self::allowsRepresentationLength($request->method, $response->status),
         );
-        $length = $response->body->size;
-        $hasTrailers = Fields::hasTrailers($response->headers, $response->body->mayHaveTrailers);
+        $length = $body->size;
+        $hasTrailers = Fields::hasTrailers($response->headers, $body->mayHaveTrailers);
 
         if ($hasBody) {
             if ($hasTrailers && $request->version === Version::Http10) {

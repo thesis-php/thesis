@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient;
 
+use Thesis\Http\ClientMiddleware;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
+use Thesis\Http\ReplayableBody;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\StringBody;
@@ -17,7 +19,7 @@ use const Thesis\Http\EMPTY_HEADERS;
  *
  * @api
  */
-final readonly class FollowRedirects implements Middleware
+final readonly class FollowRedirects implements ClientMiddleware
 {
     /**
      * @param non-negative-int $maxRedirects
@@ -28,6 +30,12 @@ final readonly class FollowRedirects implements Middleware
 
     public function handle(Request $request, callable $next): Response
     {
+        if ($this->maxRedirects === 0) {
+            return $next($request);
+        }
+
+        $upload = $request->takeBody();
+        $request = $request->withBody($upload);
         for ($followed = 0;; ++$followed) {
             $response = $next($request);
             if ($followed === $this->maxRedirects || !\in_array($response->status, [301, 302, 303, 307, 308], true)) {
@@ -54,20 +62,21 @@ final readonly class FollowRedirects implements Middleware
             $headers = self::headers($request, $target);
             if ($response->status === 303 || ($response->status <= 302 && $method === Method::POST)) {
                 $method = $method === Method::HEAD ? Method::HEAD : Method::GET;
-                $body = '';
+                $response->takeBody()->close();
+                $upload = new StringBody('');
                 foreach ($headers as $name => $values) {
                     if (str_starts_with($name, 'content-') || \in_array($name, ['expect', 'trailer', 'digest'], true)) {
                         $headers = $headers->without($name);
                     }
                 }
-            } elseif ($request->body instanceof StringBody) {
-                $body = $request->body->fresh();
+            } elseif ($upload instanceof ReplayableBody) {
+                $response->takeBody()->close();
+                $upload = $upload->fresh();
             } else {
                 return $response;
             }
 
-            $response->body->close();
-            $request = new Request(method: $method, uri: $target->withFragment(null), headers: $headers, body: $body);
+            $request = new Request(method: $method, uri: $target->withFragment(null), headers: $headers, body: $upload);
         }
     }
 

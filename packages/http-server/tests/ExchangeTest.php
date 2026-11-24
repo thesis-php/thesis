@@ -30,7 +30,7 @@ final class ExchangeTest
         Connection::serve($input, $output, static function (Request $request) use ($output) {
             Assert::same(actual: $output->bytes, expected: '');
 
-            return new Response(body: $request->body);
+            return new Response(body: $request->takeBody());
         }, new Config('/test.sock', maxRequestsPerConnection: 1));
 
         Assert::same(
@@ -48,7 +48,7 @@ final class ExchangeTest
         Connection::serve(
             input: $input,
             output: $output,
-            handler: static fn(Request $request) => new Response(body: new PrefixedBody($request->body)),
+            handler: static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())),
             config: new Config('/test.sock', maxRequestsPerConnection: 1),
         );
 
@@ -81,7 +81,7 @@ final class ExchangeTest
         Connection::serve(
             input: $input,
             output: $output,
-            handler: static fn(Request $request) => new Response(body: $request->body),
+            handler: static fn(Request $request) => new Response(body: $request->takeBody()),
             config: new Config('/test.sock'),
         );
 
@@ -125,8 +125,9 @@ final class ExchangeTest
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\na");
 
         Connection::serve($input, $output, static function (Request $request) {
-            $request->body->read(3);
-            $request->body->read(2);
+            $body = $request->takeBody();
+            $body->read(3);
+            $body->read(2);
 
             return new Response();
         }, new Config('/test.sock'));
@@ -147,7 +148,7 @@ final class ExchangeTest
             Connection::serve(
                 input: $input,
                 output: $output,
-                handler: static fn(Request $request) => new Response(body: $request->body),
+                handler: static fn(Request $request) => new Response(body: $request->takeBody()),
                 config: new Config('/test.sock'),
             );
         } finally {
@@ -171,6 +172,29 @@ final class ExchangeTest
             actual: $output->bytes,
             expected: "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
+    }
+
+    public function rejectsAResponseWhoseBodyWasAlreadySent(): void
+    {
+        $output = new RecordingWriter();
+        $input = new StringReader(str_repeat("GET / HTTP/1.1\r\nHost: local\r\n\r\n", 2));
+        $response = new Response(body: 'ok');
+        Expect::exception(\LogicException::class);
+
+        try {
+            Connection::serve(
+                input: $input,
+                output: $output,
+                handler: static fn() => $response->withStatus(Status::OK),
+                config: new Config('/test.sock'),
+            );
+        } finally {
+            Assert::same(
+                actual: $output->bytes,
+                expected: "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+                    . "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            );
+        }
     }
 
     public function sendsAnEmpty500AndPropagatesTheHandlerError(): void

@@ -13,6 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Client::withResponse()` closes the body when the response callback returns or throws.
 - Limit concurrent connections per origin and pool persistent connections across exchanges.
 - Customize requests and responses with ordered middleware. The defaults follow redirects and decode gzip and deflate.
-- Enable bounded retries of idempotent requests with `RetryRequests`.
+- Enable bounded retries of idempotent requests with replayable uploads with `RetryRequests`.
 - Submit URL-encoded and streaming multipart forms.
 - Use a custom socket connector or tunnel requests through an HTTP CONNECT proxy.

@@ -4,29 +4,74 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Thesis\Http\Internal\PendingBody;
+
 /**
- * HTTP/1.1 and HTTP/2 clients and servers share this response type. The response holds a status,
- * message headers and a body. `Content-Length` can describe the representation on a HEAD or 304 response.
- * The codec derives the transmitted body length from the body. The response has no reason phrase because
- * HTTP/2 does not use reason phrases.
- *
- * The properties are `public(set)` so that `clone($response, ['status' => Status::NOT_FOUND])` can make a changed copy.
- * The copy shares the body with the original.
+ * HTTP response shared by clients and servers. Metadata copies share one body handoff.
  *
  * @api
  */
 final readonly class Response
 {
-    public public(set) Body $body;
+    private PendingBody $pendingBody;
 
     /**
-     * @param int<100, 999> $status anyone may define a status code
+     * @param int<100, 999> $status
      */
     public function __construct(
-        public public(set) int $status = Status::OK,
-        public public(set) Headers $headers = EMPTY_HEADERS,
+        public int $status = Status::OK,
+        public Headers $headers = EMPTY_HEADERS,
         string|Body $body = '',
     ) {
-        $this->body = \is_string($body) ? new StringBody($body) : $body;
+        $this->pendingBody = new PendingBody($body);
+    }
+
+    /**
+     * @param int<100, 999> $status
+     */
+    public function withStatus(int $status): self
+    {
+        return clone($this, ['status' => $status]);
+    }
+
+    public function withHeaders(Headers $headers): self
+    {
+        return clone($this, ['headers' => $headers]);
+    }
+
+    /**
+     * @param string|list<string> $values
+     */
+    public function withHeader(string $name, string|array $values): self
+    {
+        return $this->withHeaders($this->headers->with($name, $values));
+    }
+
+    /**
+     * @param string|list<string> $values
+     */
+    public function withAddedHeader(string $name, string|array $values): self
+    {
+        return $this->withHeaders($this->headers->withAdded($name, $values));
+    }
+
+    public function withoutHeader(string $name): self
+    {
+        return $this->withHeaders($this->headers->without($name));
+    }
+
+    /**
+     * Transfers the body to the caller. All metadata copies share this single handoff.
+     *
+     * @throws \LogicException if this response or a copy has already handed off the body
+     */
+    public function takeBody(): Body
+    {
+        return $this->pendingBody->take();
+    }
+
+    public function withBody(string|Body $body): self
+    {
+        return new self(status: $this->status, headers: $this->headers, body: $body);
     }
 }

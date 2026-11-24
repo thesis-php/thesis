@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\HttpProtocol\Http1\ChunkedReader;
 use Thesis\HttpProtocol\Http1\FixedLengthReader;
 use Thesis\Io\IoException;
 use Thesis\Io\StreamClosed;
 use Thesis\Net\Socket;
-use const Thesis\Http\EMPTY_HEADERS;
 
 /**
  * @internal
  */
-final class ResponseBody extends AbstractBody
+final class ResponseBody extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -58,7 +57,7 @@ final class ResponseBody extends AbstractBody
         $this->finish(complete: false);
     }
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
         if ($this->isClosed) {
             throw new StreamClosed('The response body is closed.');
@@ -88,11 +87,9 @@ final class ResponseBody extends AbstractBody
         return $bytes;
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
-        return $this->reader instanceof ChunkedReader ? $this->reader->discard() : EMPTY_HEADERS;
+        return $this->reader->trailers();
     }
 
     private function finish(bool $complete): void

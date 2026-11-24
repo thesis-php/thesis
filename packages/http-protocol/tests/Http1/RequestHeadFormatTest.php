@@ -25,7 +25,7 @@ final class RequestHeadFormatTest
 {
     public function writesRequestWithoutBody(): void
     {
-        $head = RequestHead::of(new Request(
+        $head = outgoingRequestHead(new Request(
             method: 'GET',
             uri: new Uri('https://example.com/users/42?fields=name'),
             headers: new Headers(['accept' => ['text/html', 'text/plain'], 'x-request-id' => 'abc', 'etag' => '"1"']),
@@ -54,7 +54,7 @@ final class RequestHeadFormatTest
     #[DataProvider('targets')]
     public function writesTargetAndHostOfUri(string $method, string $uri, string $target, string $host): void
     {
-        $head = RequestHead::of(new Request($method, new Uri($uri)));
+        $head = outgoingRequestHead(new Request($method, new Uri($uri)));
 
         Assert::same($head->toString(), head("{$method} {$target} HTTP/1.1", "Host: {$host}", '', ''));
     }
@@ -107,7 +107,7 @@ final class RequestHeadFormatTest
         ?int $length,
         ?string $field,
     ): void {
-        $head = RequestHead::of(new Request($method, new Uri('http://example.com/'), body: $body));
+        $head = outgoingRequestHead(new Request($method, new Uri('http://example.com/'), body: $body));
 
         Assert::same($head->framing, $framing);
         Assert::same($head->length, $length);
@@ -152,7 +152,7 @@ final class RequestHeadFormatTest
 
     public function asksToCloseConnection(): void
     {
-        $head = RequestHead::of(new Request('GET', new Uri('http://example.com/')), isPersistent: false);
+        $head = outgoingRequestHead(new Request('GET', new Uri('http://example.com/')), isPersistent: false);
 
         Assert::false($head->isPersistent);
         Assert::same($head->toString(), head('GET / HTTP/1.1', 'Host: example.com', 'Connection: close', '', ''));
@@ -166,7 +166,7 @@ final class RequestHeadFormatTest
             body: new StringBody('abc', new Headers(['x-count' => '1'])),
         );
 
-        $head = RequestHead::of($request);
+        $head = outgoingRequestHead($request);
 
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
@@ -181,14 +181,15 @@ final class RequestHeadFormatTest
         $request = new Request('GET', new Uri('http://example.com/'));
 
         Assert::same(
-            actual: failure(static fn() => RequestHead::of($request, upgrade: ['two words'])),
+            actual: failure(static fn() => outgoingRequestHead($request, upgrade: ['two words'])),
             expected: 'An Upgrade protocol must be a token with an optional token version, got "two words".',
         );
     }
 
     public function offersProtocolsToSwitchTo(): void
     {
-        $head = RequestHead::of(new Request('GET', new Uri('http://example.com/chat')), upgrade: ['websocket', 'h2c']);
+        $request = Request::get('http://example.com/chat');
+        $head = outgoingRequestHead($request, upgrade: ['websocket', 'h2c']);
 
         Assert::same($head->upgrade, ['websocket', 'h2c']);
         Assert::same($head->toString(), head(
@@ -203,7 +204,7 @@ final class RequestHeadFormatTest
 
     public function writesFieldsOfConnectionAfterHeaders(): void
     {
-        $head = RequestHead::of(
+        $head = outgoingRequestHead(
             request: new Request(
                 method: 'POST',
                 uri: new Uri('http://example.com/'),
@@ -229,7 +230,7 @@ final class RequestHeadFormatTest
     #[DataProvider('invalidRequests')]
     public function refusesRequestItCannotWrite(Request $request, string $message): void
     {
-        Assert::same(failure(static fn() => RequestHead::of($request)), $message);
+        Assert::same(failure(static fn() => outgoingRequestHead($request)), $message);
     }
 
     /**
@@ -304,7 +305,7 @@ final class RequestHeadFormatTest
             headers: new Headers(['content-type' => 'text/plain', 'accept' => ['a/b', 'c/d']]),
             body: 'hello',
         );
-        $written = RequestHead::of($request, isPersistent: false, upgrade: ['h2c']);
+        $written = outgoingRequestHead($request, isPersistent: false, upgrade: ['h2c']);
 
         $parsed = RequestHead::parse(substr($written->toString(), 0, -4), scheme: 'https');
 

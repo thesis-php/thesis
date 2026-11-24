@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 use const Thesis\Http\EMPTY_HEADERS;
@@ -13,7 +13,7 @@ use const Thesis\Http\EMPTY_HEADERS;
 /**
  * @internal
  */
-final class UntilCloseReader extends AbstractBody
+final class UntilCloseReader extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -37,17 +37,15 @@ final class UntilCloseReader extends AbstractBody
 
     private function __clone() {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
         $available = $this->buffer->count();
 
         return $available > 0 ? $this->buffer->read(min($available, $max)) : $this->source->read($max);
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
         return EMPTY_HEADERS;
     }
 

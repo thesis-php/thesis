@@ -105,10 +105,19 @@ final class ChunkedTest
         $chunked = chunked(self::HELLO_WORLD);
 
         Assert::true($chunked->mayHaveTrailers);
-        Assert::same(readAll($chunked), 'hello world');
+        Assert::same($chunked->readAll(), 'hello world');
         Assert::true($chunked->isComplete);
         Assert::false($chunked->mayHaveTrailers);
-        Assert::same(lines($chunked->discard()), []);
+        Assert::same(lines($chunked->trailers()), []);
+    }
+
+    public function rejectsReadingTrailersBeforeTheLastChunk(): void
+    {
+        $reader = chunked(self::HELLO_WORLD);
+        $reader->read(1);
+        Expect::exception(\LogicException::class)->withMessage('The trailer fields are still pending.');
+
+        $reader->trailers();
     }
 
     public function readsAtMostMaxBytesAndNeverAcrossChunks(): void
@@ -129,7 +138,7 @@ final class ChunkedTest
         $chunked = chunked($bytes);
 
         Assert::same(readAll($chunked), 'hello' . str_repeat('a', 1000) . "\r\n0\r\n\r\n");
-        $trailers = $chunked->discard();
+        $trailers = $chunked->trailers();
         Assert::same(lines($trailers), [['x-checksum', 'abc']]);
     }
 
@@ -176,7 +185,7 @@ final class ChunkedTest
         $chunked = new ChunkedReader($buffer, new ScriptedReader($bytes, $chunkSize));
 
         Assert::same(readAll($chunked, max: 4), 'hello world');
-        $trailers = $chunked->discard();
+        $trailers = $chunked->trailers();
         Assert::same(lines($trailers), [['x-a', '1'], ['x-b', '2']]);
     }
 
@@ -243,35 +252,38 @@ final class ChunkedTest
             body: $chunked,
         );
 
-        Assert::same($request->body, $chunked);
+        $body = $request->takeBody();
+        Assert::same($body, $chunked);
         Assert::false($chunked->isComplete);
-        Assert::same($request->body->read(3), 'abc');
+        Assert::same($body->read(3), 'abc');
         Assert::false($chunked->isComplete);
-        Assert::same(readAll($request->body), '');
+        Assert::same(readAll($body), '');
 
         Assert::true($chunked->isComplete);
-        Assert::same($request->body->discard()->get('x-checksum'), '900150983cd24fb0');
+        Assert::same($body->trailers()->get('x-checksum'), '900150983cd24fb0');
     }
 
-    public function discardsRemainingRequestBodyThroughItsTrailers(): void
+    public function readsRemainingRequestBodyThroughItsTrailers(): void
     {
         $buffer = new Buffer(bytes: "3\r\nabc\r\n0\r\nX-End: yes\r\n\r\nnext");
         $body = new ChunkedReader($buffer, new StringReader(''));
         $request = new Request('POST', new Uri('/'), body: $body);
 
-        Assert::same($request->body->read(1), 'a');
+        $reader = $request->takeBody();
+        Assert::same($reader->read(1), 'a');
         Assert::false($body->isComplete);
-        $trailers = $request->body->discard();
+        Assert::same(readAll($reader), 'bc');
+        $trailers = $reader->trailers();
         Assert::same($trailers->get('x-end'), 'yes');
-        Assert::same($request->body->discard(), $trailers);
+        Assert::same($reader->trailers(), $trailers);
         Assert::same($buffer->drain(), 'next');
     }
 
-    public function truncatedBodyFailsWhileDiscarding(): void
+    public function truncatedBodyFailsWhileReadingTheWholePayload(): void
     {
         $response = new Response(body: chunked("3\r\nab"));
         Expect::exception(ReadFailed::class);
-        $response->body->discard();
+        $response->takeBody()->readAll();
     }
 
     public function goesOnAfterReadThatHasFailed(): void
@@ -299,7 +311,7 @@ final class ChunkedTest
         }
 
         Assert::same($decoded, 'hello world');
-        $trailers = $chunked->discard();
+        $trailers = $chunked->trailers();
         Assert::same(lines($trailers), [['x-a', '1'], ['x-b', '2']]);
         Assert::same($failures, \strlen($bytes));
     }
@@ -472,7 +484,7 @@ final class ChunkedTest
 
         readAll($chunked);
 
-        $trailers = $chunked->discard();
+        $trailers = $chunked->trailers();
         Assert::same(lines($trailers), [['a', '1'], ['b', '2']]);
     }
 

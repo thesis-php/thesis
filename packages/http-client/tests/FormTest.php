@@ -21,7 +21,7 @@ final class FormTest
     {
         $request = Form::urlEncoded('https://example.com', ['a b' => ['+', '']]);
         Assert::same($request->headers->get('content-type'), 'application/x-www-form-urlencoded');
-        Assert::same($request->body->read(100), 'a+b=%2B&a+b=');
+        Assert::same($request->takeBody()->read(100), 'a+b=%2B&a+b=');
     }
 
     public function emitsTheDeclaredNumberOfBytesAcrossPartBoundaries(): void
@@ -36,26 +36,30 @@ final class FormTest
         $expected = "--{$boundary}\r\nContent-Disposition: form-data; name=\"plain\"\r\n\r\nvalue\r\n"
             . "--{$boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a%22b.txt\"\r\n"
             . "Content-Type: application/octet-stream\r\n\r\ndata\r\n--{$boundary}--\r\n";
-        Assert::same($request->body->size, \strlen($expected));
+        $body = $request->takeBody();
+        Assert::same($body->size, \strlen($expected));
         $actual = '';
 
-        while (($chunk = $request->body->read(2)) !== null) {
+        while (($chunk = $body->read(2)) !== null) {
             Assert::true(\strlen($chunk) <= 2);
             $actual .= $chunk;
         }
         Assert::same($actual, $expected);
-        Assert::true($request->body->discard()->isEmpty);
+        Assert::true($body->trailers()->isEmpty);
     }
 
     public function forwardsAnUnknownLengthStream(): void
     {
         $source = new ChunkedReader(new Buffer(), new StringReader("4\r\ndata\r\n0\r\n\r\n"));
         $request = Form::multipart('https://example.com', [new FormPart('file', $source)]);
-        Assert::null($request->body->size);
-        Assert::false($request->body->isBuffered);
-        $request->body->read(8192);
-        Assert::same($request->body->read(8192), 'data');
-        $request->body->discard();
+        $body = $request->takeBody();
+        Assert::null($body->size);
+        Assert::false($body->isBuffered);
+        $body->read(8192);
+        Assert::same($body->read(8192), 'data');
+
+        while ($body->read(8192) !== null);
+
         Assert::true($source->isComplete);
     }
 
@@ -63,6 +67,6 @@ final class FormTest
     {
         $request = Form::multipart('https://example.com', [new FormPart('file', new StringReader('a'), size: 2)]);
         Expect::exception(ReadFailed::class);
-        $request->body->discard();
+        $request->takeBody()->readAll();
     }
 }

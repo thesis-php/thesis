@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Internal;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\Http\Status;
 use Thesis\HttpProtocol\Http1\ChunkedReader;
 use Thesis\HttpProtocol\Http1\FixedLengthReader;
 use Thesis\HttpProtocol\Http1\MalformedMessage;
-use Thesis\Io\ConcurrentRead;
 use Thesis\Io\IoException;
 
 /**
  * @internal
  */
-final class BodyReader extends AbstractBody
+final class BodyReader extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -35,8 +34,6 @@ final class BodyReader extends AbstractBody
 
     public private(set) ?IoException $failure = null;
 
-    private bool $isReading = false;
-
     /**
      * @param ?non-negative-int $remaining the remaining decoded-byte budget for a chunked body
      */
@@ -48,38 +45,26 @@ final class BodyReader extends AbstractBody
 
     private function __clone() {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
-        if ($this->isReading) {
-            throw new ConcurrentRead('A read is already in progress on the body.');
-        }
-
         if ($this->failure !== null) {
             throw $this->failure;
         }
 
-        $this->isReading = true;
+        $this->sendContinue();
 
         try {
-            $this->sendContinue();
+            return $this->readBody($max);
+        } catch (IoException $failure) {
+            $this->failure = $failure;
 
-            try {
-                return $this->readBody($max);
-            } catch (IoException $failure) {
-                $this->failure = $failure;
-
-                throw $failure;
-            }
-        } finally {
-            $this->isReading = false;
+            throw $failure;
         }
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
-        return $this->body->discard();
+        return $this->body->trailers();
     }
 
     public function close(): void

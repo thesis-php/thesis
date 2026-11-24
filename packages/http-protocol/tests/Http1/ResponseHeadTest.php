@@ -255,7 +255,7 @@ final class ResponseHeadTest
 
     public function writesResponseWithBodyOfKnownLength(): void
     {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(
                 headers: new Headers(['content-type' => 'text/plain']),
                 body: 'hello',
@@ -280,7 +280,7 @@ final class ResponseHeadTest
 
     public function writesEmptyBodyAsLengthOfZero(): void
     {
-        $head = ResponseHead::of(new Response(404), requestHead('GET / HTTP/1.1'));
+        $head = outgoingResponseHead(new Response(404), requestHead('GET / HTTP/1.1'));
 
         Assert::same($head->framing, Framing::Length);
         Assert::same($head->toString(), head('HTTP/1.1 404 Not Found', 'Content-Length: 0', '', ''));
@@ -288,14 +288,14 @@ final class ResponseHeadTest
 
     public function writesStatusWithoutKnownReasonWithEmptyOne(): void
     {
-        $head = ResponseHead::of(new Response(299), requestHead('GET / HTTP/1.1'));
+        $head = outgoingResponseHead(new Response(299), requestHead('GET / HTTP/1.1'));
 
         Assert::same($head->toString(), head('HTTP/1.1 299 ', 'Content-Length: 0', '', ''));
     }
 
     public function writesBodyOfUnknownLengthInChunks(): void
     {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(body: new StubUnknownLengthBody('abc')),
             request: requestHead('GET / HTTP/1.1'),
         );
@@ -308,7 +308,7 @@ final class ResponseHeadTest
 
     public function endsBodyOfUnknownLengthWithConnectionForHttp10(): void
     {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(body: new StubUnknownLengthBody('abc')),
             request: requestHead('GET / HTTP/1.0', 'Connection: keep-alive'),
         );
@@ -322,12 +322,14 @@ final class ResponseHeadTest
     public function usesChunkedFramingForAnEmptyReaderWithPendingTrailers(): void
     {
         $response = new Response(body: chunked("0\r\nX-End: yes\r\n\r\n"));
-        $head = ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
+        $body = $response->takeBody();
+        $head = ResponseHead::of($response, requestHead('GET / HTTP/1.1'), $body);
 
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
         Assert::same($head->toString(), head('HTTP/1.1 200 OK', 'Transfer-Encoding: chunked', '', ''));
-        Assert::same($response->body->discard()->get('x-end'), 'yes');
+        Assert::same($body->readAll(), '');
+        Assert::same($body->trailers()->get('x-end'), 'yes');
     }
 
     public function rejectsTrailersForHttp10(): void
@@ -335,7 +337,7 @@ final class ResponseHeadTest
         $response = new Response(body: new StringBody('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('An HTTP/1.0 response cannot have trailers.');
 
-        ResponseHead::of($response, requestHead('GET / HTTP/1.0'));
+        outgoingResponseHead($response, requestHead('GET / HTTP/1.0'));
     }
 
     public function rejectsTrailersForAResponseWithoutABody(): void
@@ -343,7 +345,7 @@ final class ResponseHeadTest
         $response = new Response(204, body: new StringBody('', new Headers(['x-count' => '1'])));
         Expect::exception(\ValueError::class)->withMessage('A response without a body cannot have trailers.');
 
-        ResponseHead::of($response, requestHead('GET / HTTP/1.1'));
+        outgoingResponseHead($response, requestHead('GET / HTTP/1.1'));
     }
 
     /**
@@ -356,7 +358,7 @@ final class ResponseHeadTest
         bool $isPersistent,
         string $bytes,
     ): void {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(body: 'a'),
             request: requestHead(...$requestLines),
             isPersistent: $serverKeeps,
@@ -395,7 +397,7 @@ final class ResponseHeadTest
     #[DataProvider('responsesWithoutBody')]
     public function writesNoFramingOfResponseWithoutBody(string $requestLine, Response $response, string $bytes): void
     {
-        $head = ResponseHead::of($response, requestHead($requestLine));
+        $head = outgoingResponseHead($response, requestHead($requestLine));
 
         Assert::same($head->framing, Framing::None);
         Assert::same($head->length, 0);
@@ -442,14 +444,14 @@ final class ResponseHeadTest
         $request = requestHead('GET / HTTP/1.1');
 
         Assert::same(
-            actual: failure(static fn() => ResponseHead::of(new Response(101), $request, upgrade: ['HTTP/'])),
+            actual: failure(static fn() => outgoingResponseHead(new Response(101), $request, upgrade: ['HTTP/'])),
             expected: 'An Upgrade protocol must be a token with an optional token version, got "HTTP/".',
         );
     }
 
     public function switchesProtocols(): void
     {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(101, new Headers(['sec-websocket-accept' => 'abc'])),
             request: requestHead('GET /chat HTTP/1.1', 'Connection: upgrade', 'Upgrade: websocket'),
             upgrade: ['websocket'],
@@ -469,7 +471,7 @@ final class ResponseHeadTest
     #[DataProvider('invalidResponses')]
     public function refusesResponseItCannotWrite(string $requestLine, Response $response, string $message): void
     {
-        Assert::same(failure(static fn() => ResponseHead::of($response, requestHead($requestLine))), $message);
+        Assert::same(failure(static fn() => outgoingResponseHead($response, requestHead($requestLine))), $message);
     }
 
     /**
@@ -564,7 +566,7 @@ final class ResponseHeadTest
 
     public function writesBodyOfRefusedConnect(): void
     {
-        $head = ResponseHead::of(
+        $head = outgoingResponseHead(
             response: new Response(300, body: 'a'),
             request: requestHead('CONNECT example.com:443 HTTP/1.1'),
         );

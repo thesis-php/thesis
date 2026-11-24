@@ -36,11 +36,7 @@ $server = new Server(
 
         $sum = (int) $a + (int) $b;
         if ($request->method === Method::POST) {
-            $body = '';
-
-            while (($chunk = $request->body->read(8192)) !== null) {
-                $body .= $chunk;
-            }
+            $body = $request->takeBody()->readAll();
 
             if (!is_numeric($body)) {
                 return new Response(status: Status::BAD_REQUEST);

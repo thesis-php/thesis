@@ -29,6 +29,19 @@ final class FixedLengthReaderTest
         Assert::same($source->requests, []);
     }
 
+    public function readAllRejectsAPartiallyReadPayloadAndLeavesTheRemainingBytes(): void
+    {
+        $reader = new FixedLengthReader(new Buffer(), new ScriptedReader('abc'), size: 3);
+        Assert::same($reader->read(1), 'a');
+        Expect::exception(\LogicException::class)->withMessage('The body has already been read.');
+
+        try {
+            $reader->readAll();
+        } finally {
+            Assert::same($reader->read(2), 'bc');
+        }
+    }
+
     public function readsOnlyTheRemainingBodyBytesFromTheSource(): void
     {
         $source = new ScriptedReader('bcnext');

@@ -27,7 +27,7 @@ use function Thesis\Async\timeout;
 use function Thesis\Time\sec;
 
 $client = new Client();
-$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->body->buffer(limit: 1024 * 1024));
+$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->takeBody()->readAll());
 ```
 
 Send an HTTP/1.1 request inside a Thesis async scope. The final response head is available as soon as
@@ -47,18 +47,18 @@ $request = new Request('GET', new Uri('https://example.com/'));
 $client = new Client();
 $response = timeout(sec(5), static fn() => $client->send($request));
 $status = $response->status;
-$response->body->close();
+$response->takeBody()->close();
 ```
 
 Use `withResponse()` to close the body when a callback returns or throws:
 
 ```php
-$status = $client->withResponse($request, static fn(Response $response) => $response->status);
+$status = $client->withResponse('https://example.com/', static fn(Response $response) => $response->status);
 ```
 
 Reuse the same client across requests to share connections for the same scheme, host and port.
 A fixed-length body releases its socket on the last byte. A chunked body releases it after the trailers.
-`$response->body->discard()` consumes any remaining bytes. A bodyless response releases it immediately.
+Take the body once, read until EOF to reuse the connection, then call `$body->trailers()` for the final fields. A bodyless response releases it immediately.
 The byte limit `maxResponseHeadBytes` covers informational and final response headers together (default 64 KiB).
 An outstanding body keeps its own socket and counts toward `maxConnectionsPerOrigin` (default 10).
 Further callers for that origin wait for a slot. The client retains up to `maxIdleConnections` sockets across
@@ -68,19 +68,20 @@ propagates to the caller. Automatic retries are opt-in.
 
 HTTPS verifies the peer through thesis/net.
 Pass a Net ClientTls configuration to the constructor to use a private CA.
-The client sends the request body before reading the response.
+The transport takes and closes the request body before it reads the response.
+For another send, supply a new body with `withBody()` or build a new request.
 
 ## Middleware
 
 Pass `middleware: []` for a single exchange with the original content encoding. By default the client runs
 `FollowRedirects` then `DecodeContent`. Supplying a list replaces the defaults. A middleware implements
-`handle(Request $request, callable $next): Response`. It can return a cached response, change the request
-using `clone()`, call `$next($request)`, or wrap the response body. Close intermediate responses before
+`Thesis\Http\ClientMiddleware` with `handle(Request $request, callable $next): Response`. It can return a cached response, change the request
+using `withHeader()` or `withBody()`, call `$next($request)`, or wrap the response body. Close intermediate responses before
 sending another request. Middleware before `FollowRedirects` sees the application request once.
 Middleware after it sees each destination. Scope credential injection to the intended origin.
 
 `FollowRedirects` follows up to ten redirects. It resolves relative locations, turns a POST into a GET on
-301/302, and drops the body on 303. For 307/308 it can resend a string body with its original method.
+301/302, and drops the body on 303. For 307/308 it can resend a `ReplayableBody` with its original method.
 It returns the intermediate response when the body cannot be replayed, the limit is reached, the location
 is unusable, or HTTPS would downgrade to HTTP. Across origins only allowlisted negotiation and content
 headers carry over.
@@ -89,8 +90,8 @@ headers carry over.
 Set `Accept-Encoding` yourself or send a range request to keep control of the encoded bytes.
 
 Place `new RetryRequests(maxRetries: 1)` last in the middleware list to retry an idempotent method with
-a string body on a connection, read or write failure before the response arrives. It opens an independent
-reader on each attempt. After `send()` returns, download errors propagate to the consumer.
+a `ReplayableBody` on a connection, read or write failure before the response arrives. It opens an independent
+reader on each retry. After `send()` returns, download errors propagate to the consumer.
 
 A custom `connector` receives the origin host, port and optional `ClientTls` and returns a connected
 `Thesis\Net\Socket`. It runs only when the pool needs a new socket. Each client owns its pool.

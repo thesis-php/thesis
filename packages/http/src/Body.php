@@ -8,14 +8,15 @@ use Thesis\Io\Closer;
 use Thesis\Io\Reader;
 
 /**
- * A message's byte stream and the trailer fields that follow it.
+ * A message's byte stream.
  *
  * @api
  */
 interface Body extends Reader, Closer
 {
     /**
-     * Total length in bytes when known.
+     * Length of the payload in bytes, excluding trailers, or null if unknown.
+     * Reading the body does not change this value.
      *
      * @var ?non-negative-int
      */
@@ -27,20 +28,26 @@ interface Body extends Reader, Closer
     public bool $isBuffered { get; }
 
     /**
-     * The body can produce trailer fields. False guarantees that discard() will return empty headers.
+     * An HTTP/1.1 sender chooses the framing before it writes the headers. If trailers are possible,
+     * it must use chunked encoding even when the body size is known. For example, a body can compute
+     * a digest as it streams and supply the digest as a trailer after the last byte.
+     *
+     * False guarantees empty trailers on successful completion. With true, the final fields may
+     * still be empty. Read them with trailers() once the body has finished.
      */
     public bool $mayHaveTrailers { get; }
 
     /**
-     * Reads the remaining body. A read failure or a size limit violation closes the body.
+     * Returns the final fields without advancing the reader.
      *
-     * @param non-negative-int $limit maximum bytes to keep in memory
-     * @throws \OverflowException if the remaining body exceeds the limit
+     * @throws \LogicException if the fields are still pending
      */
-    public function buffer(int $limit = 8 * 1024 * 1024): string;
+    public function trailers(): Headers;
 
     /**
-     * Advances the read position to EOF and returns the final trailer fields, including after EOF was read.
+     * Reads the entire payload into a string.
+     *
+     * @throws \LogicException if any bytes have already been consumed
      */
-    public function discard(): Headers;
+    public function readAll(): string;
 }

@@ -10,6 +10,8 @@ use Testo\Test;
 use Thesis\Http\Headers;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\HttpClient\Stub\ReplayableUpload;
+use Thesis\Io\WriteFailed;
 use Uri\Rfc3986\Uri;
 
 #[Test]
@@ -33,7 +35,7 @@ final class FollowRedirectsTest
             Assert::same($sent->uri->toRawString(), 'https://example.com/end?q=1');
             Assert::same($sent->headers->get('authorization'), 'token');
             Assert::false($sent->headers->has('content-type'));
-            Assert::null($sent->body->read(1));
+            Assert::null($sent->takeBody()->read(1));
 
             return new Response(status: 204);
         });
@@ -50,7 +52,7 @@ final class FollowRedirectsTest
         );
         $response = new FollowRedirects()->handle($request, static function (Request $sent) {
             Assert::same($sent->method, 'PUT');
-            Assert::same($sent->body->read(10), 'payload');
+            Assert::same($sent->takeBody()->read(10), 'payload');
             if ($sent->uri->getHost() === 'example.com') {
                 return new Response(status: 307, headers: new Headers(['location' => '//other.test/upload']));
             }
@@ -62,22 +64,44 @@ final class FollowRedirectsTest
         Assert::same($response->status, 201);
     }
 
+    public function retriesARedirectedUploadAndFollowsAnotherRedirect(): void
+    {
+        $request = new Request('PUT', new Uri('http://example.com/start'), body: new ReplayableUpload('payload'));
+        $paths = [];
+        $send = static function (Request $attempt) use (&$paths) {
+            $paths[] = $attempt->uri->getRawPath();
+            Assert::same($attempt->takeBody()->readAll(), 'payload');
+
+            return match (\count($paths)) {
+                1 => new Response(status: 307, headers: new Headers(['location' => '/second'])),
+                2 => throw new WriteFailed(),
+                3 => new Response(status: 308, headers: new Headers(['location' => '/last'])),
+                default => new Response(status: 204),
+            };
+        };
+
+        $retry = new RetryRequests();
+        $response = new FollowRedirects()->handle($request, static fn(Request $hop) => $retry->handle($hop, $send));
+        Assert::same($response->status, 204);
+        Assert::same($paths, ['/start', '/second', '/second', '/last']);
+    }
+
     public function leavesTheLastRedirectBodyAvailable(): void
     {
-        $request = new Request('GET', new Uri('https://example.com'));
+        $uri = new Uri('https://example.com');
         foreach (['http://example.com', 'ftp://other.test', 'https://user@example.com', 'invalid path'] as $location) {
             $redirect = new Response(status: 301, headers: new Headers(['location' => $location]), body: 'redirect');
-            Assert::same(new FollowRedirects()->handle($request, static fn() => $redirect), $redirect);
-            Assert::same($redirect->body->read(10), 'redirect');
+            Assert::same(new FollowRedirects()->handle(Request::get($uri), static fn() => $redirect), $redirect);
+            Assert::same($redirect->takeBody()->read(10), 'redirect');
         }
 
         $calls = 0;
-        $last = new FollowRedirects(maxRedirects: 2)->handle($request, static function () use (&$calls) {
+        $last = new FollowRedirects(maxRedirects: 2)->handle(Request::get($uri), static function () use (&$calls) {
             ++$calls;
 
             return new Response(status: 308, headers: new Headers(['location' => '/loop']), body: 'last');
         });
         Assert::same($calls, 3);
-        Assert::same($last->body->read(4), 'last');
+        Assert::same($last->takeBody()->read(4), 'last');
     }
 }

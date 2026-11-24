@@ -23,7 +23,8 @@ The HTTP/1 API lives in `Http1`. Its implementation details live in `Internal\Ht
   for this hop only. This happens while parsing, before any code adds a header, so a client cannot make a proxy
   drop a header that the proxy has added (the hop-by-hop attack).
 - Trailers stay separate from headers. `ChunkedReader::$isComplete` becomes true after the reader consumes
-  the zero chunk and the entire trailer section. At completion, `discard()` returns the saved fields.
+  the zero chunk and the entire trailer section. `trailers()` returns the saved fields at completion
+  and throws while they are pending.
 - The HTTP/1.1 formatter uses chunked framing when trailers are present, announced by `Trailer`, or still pending.
   HTTP/1.0 responses and responses without a body reject trailers.
 - `FixedLengthReader` consumes exactly the declared body bytes, preserves the next message in the connection
@@ -58,7 +59,7 @@ The HTTP/1 API lives in `Http1`. Its implementation details live in `Internal\Ht
   PHP 8.6.0), while `getRawHost()` returns it as it was written. The codec writes `Host` and the target
   from the getters, never from `toRawString()`.
 - A head is a value with a private constructor, two static constructors (`parse()` from bytes, `of()` from
-  a message) and `toString()`. So every head is either what a peer has sent or what a message allows.
+  a message and the body taken by the sender) and `toString()`. So every head is either what a peer has sent or what a message allows.
   The server and the client read from the same value what they must do after they write the head (chunk
   the body, close the connection): it is not decided twice.
 - `Framing` is an enum, not `?int $length` with flags. A response to `HEAD` (no body, maybe a `content-length`

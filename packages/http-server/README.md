@@ -36,7 +36,7 @@ use function Thesis\Async\group;
 $server = new Server(
     config: new Config(8080),
     handler: static fn(Request $request) => new Response(
-        body: $request->body,
+        body: $request->takeBody(),
     ),
 );
 
@@ -48,7 +48,7 @@ group(static function (Group $group) use ($server) {
 ```
 
 The response reads from the incoming body as it is written. A chunked request's trailers become available
-after its terminating chunk. The callback then supplies them for the last chunk of the response.
+after its terminating chunk. The server reads them from the body and writes them in the last chunk of the response.
 
 From the Thesis monorepo, run the example in Docker.
 

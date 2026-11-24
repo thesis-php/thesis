@@ -59,7 +59,8 @@ final class ConnectionLimitsTest
             input: $input,
             output: $output,
             handler: static function (Request $request) {
-                Assert::same($request->body->read(1) . $request->body->read(1), 'ab');
+                $body = $request->takeBody();
+                Assert::same($body->read(1) . $body->read(1), 'ab');
 
                 return new Response();
             },
@@ -83,7 +84,7 @@ final class ConnectionLimitsTest
             input: $input,
             output: $output,
             handler: static function (Request $request) {
-                $request->body->read(1);
+                $request->takeBody()->read(1);
 
                 return new Response();
             },
@@ -160,14 +161,15 @@ final class ConnectionLimitsTest
                 input: new StringReader($wire),
                 output: $output,
                 handler: static function (Request $request) {
+                    $reader = $request->takeBody();
                     $body = '';
 
-                    while (($chunk = $request->body->read(2)) !== null) {
+                    while (($chunk = $reader->read(2)) !== null) {
                         $body .= $chunk;
                     }
 
                     Assert::same($body, 'ab');
-                    Assert::same($request->body->discard()->get('x-end'), 'yes');
+                    Assert::same($reader->trailers()->get('x-end'), 'yes');
 
                     return new Response();
                 },

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Thesis\HttpProtocol\Http1;
 
 use Thesis\Http\Headers;
+use Thesis\Http\Request;
+use Thesis\Http\Response;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 
@@ -105,4 +107,24 @@ function requestHead(string $requestLine, string ...$fields): RequestHead
 function chunked(string $bytes): ChunkedReader
 {
     return new ChunkedReader(new Buffer(), new ScriptedReader($bytes));
+}
+
+/**
+ * @param list<non-empty-string> $upgrade
+ */
+function outgoingRequestHead(Request $request, bool $isPersistent = true, array $upgrade = []): RequestHead
+{
+    return RequestHead::of($request, $request->takeBody(), $isPersistent, $upgrade);
+}
+
+/**
+ * @param list<non-empty-string> $upgrade
+ */
+function outgoingResponseHead(
+    Response $response,
+    RequestHead $request,
+    bool $isPersistent = true,
+    array $upgrade = [],
+): ResponseHead {
+    return ResponseHead::of($response, $request, $response->takeBody(), $isPersistent, $upgrade);
 }

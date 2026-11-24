@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient;
 
+use Thesis\Http\ClientMiddleware;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpClient\Internal\Http1Transport;
 use Thesis\HttpClient\Internal\Pipeline;
 use Thesis\Net\ClientTls;
 use Thesis\Net\Socket;
-use Uri\Rfc3986\Uri;
 
 /**
  * @api
@@ -25,7 +25,7 @@ final readonly class Client
     /**
      * @param positive-int $maxConnectionsPerOrigin
      * @param non-negative-int $maxIdleConnections
-     * @param list<Middleware> $middleware outermost first
+     * @param list<ClientMiddleware> $middleware outermost first
      * @param null|callable(non-empty-string, int<0, 65535>, ?ClientTls): Socket $connector opens a socket to the origin
      * @param positive-int $maxResponseHeadBytes combined limit for informational heads and the final head per exchange
      */
@@ -52,7 +52,7 @@ final readonly class Client
      */
     public function send(Request|string $request): Response
     {
-        return ($this->dispatch)(\is_string($request) ? new Request('GET', new Uri($request)) : $request);
+        return ($this->dispatch)(\is_string($request) ? Request::get($request) : $request);
     }
 
     /**
@@ -66,11 +66,12 @@ final readonly class Client
     public function withResponse(Request|string $request, callable $consume): mixed
     {
         $response = $this->send($request);
+        $body = $response->takeBody();
 
         try {
-            return $consume($response);
+            return $consume($response->withBody($body));
         } finally {
-            $response->body->close();
+            $body->close();
         }
     }
 }

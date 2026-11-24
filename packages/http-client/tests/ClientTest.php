@@ -63,7 +63,7 @@ final class ClientTest
             });
 
             $client = new Client(maxConnectionsPerOrigin: 1);
-            Assert::same($client->send("http://{$listener->address}/start")->body->buffer(limit: 4), 'done');
+            Assert::same($client->send("http://{$listener->address}/start")->takeBody()->readAll(), 'done');
         }));
     }
 
@@ -94,11 +94,14 @@ final class ClientTest
 
             $request = new Request('POST', new Uri("http://{$address}/upload?q=1"), body: 'data');
             $end = new Client()->withResponse($request, static function (Response $response) {
-                Assert::false(new \ReflectionObject($response->body)->isCloneable());
-                Assert::true($response->body->mayHaveTrailers);
-                Assert::same($response->body->read(2), 'ok');
+                $body = $response->takeBody();
+                Assert::false(new \ReflectionObject($body)->isCloneable());
+                Assert::true($body->mayHaveTrailers);
+                Assert::same($body->read(2), 'ok');
 
-                return $response->body->discard()->get('x-end');
+                Assert::null($body->read(1));
+
+                return $body->trailers()->get('x-end');
             });
             Assert::same($end, 'yes');
         });
@@ -135,28 +138,31 @@ final class ClientTest
             });
 
             $client = new Client();
-            $request = new Request('GET', new Uri("http://{$listener->address}/"));
-            $first = $client->send($request);
-            Assert::same($first->body->read(1), 'x');
-            $second = $client->send($request);
-            $first->body->close();
-            Assert::same($second->body->read(1), 'y');
-            Assert::same($second->body->discard()->get('x-end'), 'yes');
-            Assert::same($client->send($request)->status, 204);
-            Assert::same($second->body->discard()->get('x-end'), 'yes');
-            $head = $client->send(new Request('HEAD', $request->uri));
+            $uri = new Uri("http://{$listener->address}/");
+            $first = $client->send(Request::get($uri))->takeBody();
+            Assert::same($first->read(1), 'x');
+            $second = $client->send(Request::get($uri))->takeBody();
+            $first->close();
+            Assert::same($second->read(1), 'y');
+            Assert::null($second->read(1));
+            Assert::same($second->trailers()->get('x-end'), 'yes');
+            Assert::same($client->send(Request::get($uri))->status, 204);
+            Assert::same($second->trailers()->get('x-end'), 'yes');
+            $head = $client->send(new Request('HEAD', $uri));
             Assert::same($head->headers->get('content-length'), '7');
-            Assert::same($head->body->size, 0);
-            Assert::null($head->body->read(1));
-            $notModified = $client->send($request);
+            $headBody = $head->takeBody();
+            Assert::same($headBody->size, 0);
+            Assert::null($headBody->read(1));
+            $notModified = $client->send(Request::get($uri));
             Assert::same($notModified->status, 304);
             Assert::same($notModified->headers->get('content-length'), '0');
-            Assert::null($notModified->body->read(1));
-            Assert::same($client->send($request)->status, 200);
-            $last = $client->send($request);
-            Assert::false($last->body->mayHaveTrailers);
-            Assert::same($last->body->discard()->toArray(), []);
-            Assert::null($last->body->read(1));
+            Assert::null($notModified->takeBody()->read(1));
+            Assert::same($client->send(Request::get($uri))->status, 200);
+            $last = $client->send(Request::get($uri))->takeBody();
+            Assert::false($last->mayHaveTrailers);
+            Assert::same($last->readAll(), 'last');
+            Assert::same($last->trailers()->toArray(), []);
+            Assert::null($last->read(1));
         }));
     }
 
@@ -180,12 +186,12 @@ final class ClientTest
             });
 
             $client = new Client();
-            $request = new Request('GET', new Uri("http://{$listener->address}/"));
-            $first = $client->send($request);
-            Assert::same($first->body->read(1), 'a');
-            Assert::same($client->send($request)->status, 201);
-            Assert::same($client->send($request)->status, 202);
-            Assert::same($first->body->read(1), 'b');
+            $uri = new Uri("http://{$listener->address}/");
+            $first = $client->send(Request::get($uri))->takeBody();
+            Assert::same($first->read(1), 'a');
+            Assert::same($client->send(Request::get($uri))->status, 201);
+            Assert::same($client->send(Request::get($uri))->status, 202);
+            Assert::same($first->read(1), 'b');
         }));
     }
 
@@ -211,9 +217,9 @@ final class ClientTest
             });
 
             $client = new Client();
-            $request = new Request('GET', new Uri("http://{$listener->address}/"));
-            Assert::same($client->send($request)->status, 204);
-            $send = static fn() => $client->send($request)->body->read(1);
+            $uri = new Uri("http://{$listener->address}/");
+            Assert::same($client->send(Request::get($uri))->status, 204);
+            $send = static fn() => $client->send(Request::get($uri))->takeBody()->read(1);
             $first = $group->spawn($send);
             $second = $group->spawn($send);
             Assert::same($first->await(), 'x');
@@ -236,18 +242,18 @@ final class ClientTest
             });
 
             $client = new Client(maxConnectionsPerOrigin: 1);
-            $request = new Request('GET', new Uri("http://{$listener->address}/"));
-            $first = $client->send($request);
+            $uri = new Uri("http://{$listener->address}/");
+            $first = $client->send(Request::get($uri))->takeBody();
             /** @var Deferred<null> $started */
             $started = new Deferred();
-            $waiting = $group->spawn(static function () use ($client, $request, $started) {
+            $waiting = $group->spawn(static function () use ($client, $uri, $started) {
                 $started->complete();
 
-                return $client->send($request);
+                return $client->send(Request::get($uri));
             });
             $started->await();
             Assert::false($waiting->isDone);
-            Assert::same($first->body->read(1), 'x');
+            Assert::same($first->read(1), 'x');
             Assert::same($waiting->await()->status, 204);
         }));
     }
@@ -275,15 +281,15 @@ final class ClientTest
             });
 
             $client = new Client(maxConnectionsPerOrigin: 2);
-            $request = new Request('GET', new Uri("http://{$listener->address}/"));
-            $first = $client->send($request);
-            $second = $client->send($request);
-            Assert::same($first->body->read(1), 'a');
-            Assert::same($second->body->read(1), 'b');
-            $third = $client->send($request);
-            $fourth = $client->send($request);
-            Assert::same($third->body->read(1), 'x');
-            Assert::same($fourth->body->read(1), 'x');
+            $uri = new Uri("http://{$listener->address}/");
+            $first = $client->send(Request::get($uri))->takeBody();
+            $second = $client->send(Request::get($uri))->takeBody();
+            Assert::same($first->read(1), 'a');
+            Assert::same($second->read(1), 'b');
+            $third = $client->send(Request::get($uri))->takeBody();
+            $fourth = $client->send(Request::get($uri))->takeBody();
+            Assert::same($third->read(1), 'x');
+            Assert::same($fourth->read(1), 'x');
         }));
     }
 
@@ -331,7 +337,7 @@ final class ClientTest
             $server->await();
             \assert($saved instanceof Response);
             Expect::exception(StreamClosed::class);
-            $saved->body->read(1);
+            $saved->takeBody()->read(1);
         });
     }
 
@@ -361,7 +367,7 @@ final class ClientTest
 
             $client = new Client();
             $response = $client->send(new Request('GET', new Uri("http://{$address}/")));
-            $reader = $response->body;
+            $reader = $response->takeBody();
             $sendBody->complete();
             Assert::same($reader->read(1), 'x');
             if (!$explicitClose) {
@@ -371,8 +377,8 @@ final class ClientTest
                 return;
             }
 
-            $response->body->close();
-            $response->body->close();
+            $reader->close();
+            $reader->close();
             $server->await();
             Expect::exception(StreamClosed::class);
             $reader->read(1);

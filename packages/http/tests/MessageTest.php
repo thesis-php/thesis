@@ -13,134 +13,96 @@ use Uri\Rfc3986\Uri;
 #[Test]
 #[Covers(Request::class)]
 #[Covers(Response::class)]
-#[Covers(StringBody::class)]
 #[Covers(Query::class)]
+#[Covers(StringBody::class)]
 final class MessageTest
 {
-    public function requestHasNoHeadersAndEmptyBodyByDefault(): void
+    public function changingQueryAndHeadersLeavesTheOriginalRequestIntact(): void
     {
-        $request = new Request('GET', new Uri('https://example.com/'));
-
-        Assert::same(lines($request->headers), []);
-        Assert::same(readAll($request->body), '');
+        $original = Request::get('/search?tag=a&sort=C++&tag=b#top');
+        $copy = $original->withQueryParameter('tag', 'a & b')->withHeader('accept', 'text/plain');
+        Assert::same($original->query->all('tag'), ['a', 'b']);
+        Assert::same($original->query->get('sort'), 'C++');
+        Assert::true($original->headers->isEmpty);
+        Assert::same($copy->uri->toRawString(), '/search?tag=a%20%26%20b&sort=C%2B%2B#top');
+        Assert::same($copy->withUri(new Uri('/?page=2'))->query->get('page'), '2');
     }
 
-    public function stringBodyKeepsItsSizeAndSharesItsPositionWithTheMessageCopy(): void
+    public function requestCopiesShareOneHandoffAndCanOpenANewAttempt(): void
     {
-        $request = new Request('POST', new Uri('/'), body: "a\0b");
-        $copy = clone $request;
+        $trailers = new Headers(['x-end' => 'yes']);
+        $upload = new StringBody('payload', $trailers);
+        $original = new Request('PUT', new Uri('/first'), body: $upload);
+        $redirect = $original->withUri(new Uri('/next'))->withQueryParameter('page', '2');
+        Assert::same($redirect->takeBody(), $upload);
+        Assert::same($upload->readAll(), 'payload');
+        $retry = $redirect->withBody($upload->fresh());
+        Assert::same($retry->uri->getRawQuery(), 'page=2');
+        $body = $retry->takeBody();
+        Assert::same($body->readAll(), 'payload');
+        Assert::same($body->trailers(), $trailers);
 
-        Assert::true($request->body->isBuffered);
-        Assert::same($request->body->read(2), "a\0");
-        Assert::same($copy->body->read(2), 'b');
-        Assert::same($request->body->size, 3);
-        Assert::null($request->body->read(1));
+        Expect::exception(\LogicException::class);
+        $original->takeBody();
     }
 
-    public function bufferingUsesTheRemainingBodyAndChecksItsLimit(): void
-    {
-        $response = new Response(body: 'abcd');
-        Assert::same($response->body->read(1), 'a');
-        Assert::same($response->body->buffer(limit: 3), 'bcd');
-        Assert::same($response->body->buffer(limit: 0), '');
-
-        Expect::exception(\OverflowException::class);
-        new Response(body: 'abcd')->body->buffer(limit: 3);
-    }
-
-    public function everyRequestHasBodyOfItsOwn(): void
-    {
-        $uri = new Uri('https://example.com/');
-
-        Assert::notSame(new Request('GET', $uri)->body, new Request('GET', $uri)->body);
-    }
-
-    public function copiesRequestWithPropertiesChanged(): void
-    {
-        $request = new Request('POST', new Uri('https://example.com/a?b'), body: 'abc');
-
-        $copy = clone($request, [
-            'method' => 'PUT',
-            'uri' => $request->uri->withHost('backend'),
-            'headers' => new Headers(['x-forwarded-host' => 'example.com']),
-        ]);
-
-        Assert::same($copy->method, 'PUT');
-        Assert::same($copy->uri->toRawString(), 'https://backend/a?b');
-        Assert::same(lines($copy->headers), [['x-forwarded-host', 'example.com']]);
-        Assert::same($copy->body, $request->body);
-        Assert::same($request->method, 'POST');
-    }
-
-    public function replacingTheQueryUpdatesOnlyTheClonedUri(): void
-    {
-        $request = new Request('GET', new Uri('/search?tag=a&sort=C++&tag=b#top'));
-        $query = $request->query;
-        $next = clone($request, ['query' => $query->with('tag', 'a & b')]);
-        $other = clone($next, ['uri' => new Uri('/?page=2')]);
-
-        Assert::same($query->all('tag'), ['a', 'b']);
-        Assert::same($query->get('sort'), 'C++');
-        Assert::same($next->uri->toRawString(), '/search?tag=a%20%26%20b&sort=C%2B%2B#top');
-        Assert::same($other->query->toArray(), ['page' => ['2']]);
-        Assert::same($request->query, $query);
-    }
-
-    public function responseIsOkWithoutHeadersAndWithEmptyBodyByDefault(): void
-    {
-        $response = new Response();
-
-        Assert::same($response->status, 200);
-        Assert::same(lines($response->headers), []);
-        Assert::same(readAll($response->body), '');
-    }
-
-    public function closingAStringBodyLeavesItsBytesAvailable(): void
-    {
-        $response = new Response(body: 'payload');
-        $response->body->close();
-
-        Assert::same(readAll($response->body), 'payload');
-    }
-
-    public function everyResponseHasBodyOfItsOwn(): void
-    {
-        Assert::notSame(new Response()->body, new Response()->body);
-    }
-
-    public function copiesResponseWithPropertiesChanged(): void
-    {
-        $response = new Response(headers: new Headers(['content-type' => 'text/plain']));
-
-        $copy = clone($response, ['status' => 404, 'body' => new StringBody('Not found.')]);
-
-        Assert::same($copy->status, 404);
-        Assert::same($copy->headers, $response->headers);
-        Assert::same(readAll($copy->body), 'Not found.');
-        Assert::same($response->status, 200);
-    }
-
-    public function replacesTrailersOnACopyOfTheResponse(): void
-    {
-        $originalTrailers = new Headers(['x-original' => 'yes']);
-        $response = new Response(body: new StringBody('', $originalTrailers));
-        $trailers = new Headers(['x-count' => '1']);
-
-        $copy = clone($response, ['body' => new StringBody('', $trailers)]);
-
-        Assert::same($response->body->discard(), $originalTrailers);
-        Assert::same($copy->body->discard(), $trailers);
-    }
-
-    public function discardsTheRestOfAStringBodyAndReturnsItsTrailers(): void
+    public function outgoingCopiesShareTheBodyAndReplaceTrailersWithIt(): void
     {
         $trailers = new Headers(['x-count' => '1']);
-        $response = new Response(body: new StringBody('payload', $trailers));
-        $copy = clone $response;
+        $body = new StringBody('payload', $trailers);
+        $original = new Response(body: $body);
+        $copy = $original->withAddedHeader('set-cookie', 'a=1')->withAddedHeader('set-cookie', 'b=2');
+        $taken = $copy->takeBody();
+        Assert::same($taken, $body);
+        Assert::same($taken->trailers(), $trailers);
+        Assert::same($copy->headers->all('set-cookie'), ['a=1', 'b=2']);
+        $replacement = $copy->withBody('new')->takeBody();
+        Assert::same($replacement->readAll(), 'new');
+        Assert::same($replacement->trailers(), EMPTY_HEADERS);
 
-        Assert::same($response->body->read(3), 'pay');
-        Assert::same($response->body->discard(), $trailers);
-        Assert::null($copy->body->read(1));
-        Assert::same($response->body->size, 7);
+        Expect::exception(\LogicException::class);
+        $original->takeBody();
+    }
+
+    public function proxyForwardsTheRequestAndReturnsTheResponseWithTheirTrailers(): void
+    {
+        $fields = new Headers(['x-final' => 'yes']);
+        $incoming = new Request('POST', new Uri('/upload'), body: new StringBody('data', $fields));
+        $send = static function (Request $forwarded) use ($fields) {
+            Assert::same($forwarded->uri->getHost(), 'upstream.test');
+            $upload = $forwarded->takeBody();
+            Assert::same($upload->readAll(), 'data');
+            Assert::same($upload->trailers(), $fields);
+
+            return new Response(body: new StringBody('ok', $fields));
+        };
+
+        $reply = $send($incoming->withUri(new Uri('https://upstream.test/upload')));
+        $body = $reply->takeBody();
+        Assert::same($body->readAll(), 'ok');
+        Assert::same($body->trailers(), $fields);
+        Assert::null($incoming->uri->getHost());
+
+        Expect::exception(\LogicException::class);
+        $incoming->takeBody();
+    }
+
+    public function replayPreservesTrailersEvenForAnEmptyPayload(): void
+    {
+        $fields = new Headers(['x-final' => 'yes']);
+        $fresh = new StringBody('', $fields)->fresh();
+        Assert::true($fresh->mayHaveTrailers);
+        Assert::same($fresh->readAll(), '');
+        Assert::same($fresh->trailers(), $fields);
+        Assert::false(new StringBody('payload')->mayHaveTrailers);
+    }
+
+    public function wholeBodyReadsRejectAPartiallyConsumedUpload(): void
+    {
+        $body = new StringBody('12345');
+        Assert::same($body->read(2), '12');
+        Assert::same($body->fresh()->readAll(), '12345');
+        Expect::exception(\LogicException::class);
+        $body->readAll();
     }
 }

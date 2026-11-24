@@ -51,9 +51,10 @@ final class ConnectionBench
             $client = new Client();
             for ($i = 0; $i < $count; ++$i) {
                 $response = $client->send($uri);
+                $reader = $response->takeBody();
                 $body = '';
 
-                while (($bytes = $response->body->read(2)) !== null) {
+                while (($bytes = $reader->read(2)) !== null) {
                     $body .= $bytes;
                 }
                 if ($response->status !== 200 || $body !== 'ok') {

@@ -18,75 +18,41 @@
 
 <!-- head:end -->
 
-HTTP clients and servers share `Request`, `Response` and `Headers`. Each message holds HTTP data independent
-of the connection, including a streaming body that carries its trailer fields.
-
-```php
-use Thesis\Http\Headers;
-use Thesis\Http\Method;
-use Thesis\Http\Request;
-use Thesis\Http\Response;
-use Thesis\Http\Status;
-use Uri\Rfc3986\Uri;
-
-$request = new Request(
-    method: Method::POST,
-    uri: new Uri('https://example.com/users?notify=1'),
-    headers: new Headers(['content-type' => 'application/json']),
-    body: '{"name": "Alice"}',
-);
-
-$response = new Response(status: Status::CREATED, headers: new Headers(['location' => '/users/42']));
-```
-
-## Installation
-
-```shell
-composer require thesis/http
-```
-
-This package requires PHP 8.6+. The [HTTP/1 codec](https://github.com/thesis-php/http-protocol) uses these messages.
-
 ## Messages
 
-`Request` has a `$method` and a `$uri`, and `Response` has a `$status`. Both expose `$headers` and a `Body` through `$body`. To change a message, make a copy with `clone()`:
+Clients and servers use the same `Request` and `Response`. Use `with…` methods to derive a message
+with different metadata. The original and its copies share one right to take the body.
 
 ```php
-$forwarded = clone($request, ['uri' => $request->uri->withHost('backend.internal')]);
-$notFound = clone($response, ['status' => Status::NOT_FOUND, 'body' => new \Thesis\Http\StringBody('Not found.')]);
+use Thesis\Http\Request;
+use Thesis\Http\Response;
+
+$request = Request::get('https://example.org/search')
+    ->withQueryParameter('tag', ['php', 'http'])
+    ->withHeader('Accept', 'application/json');
+
+$response = (new Response(body: 'ok'))->withAddedHeader('Set-Cookie', 'theme=dark');
+$body = $response->takeBody();
+$bytes = $body->readAll();
+$trailers = $body->trailers();
 ```
 
-The copy shares the reader with the original unless it supplies a new one. Reading from a shared reader
-advances the position for both messages.
+Pass a string or an unread body to a message constructor. Give the message exclusive access until
+`takeBody()` transfers the reader to its caller. A second call through any metadata copy raises
+`LogicException`. A proxy can pass `$request->withUri($upstream)` to the client and return its response
+directly. Taking either body also transfers its trailers. Use `withBody()` to supply a replacement.
 
-A response status is an integer from 100 to 999.
+Read incrementally or call `readAll()` for the whole payload. After any bytes have been consumed,
+collecting the whole body raises `LogicException`. Close the reader to release its resources.
+Supply ready trailer fields with `new StringBody($bytes, $trailers)`. A streaming body can determine
+its fields while reading. Calling `trailers()` while fields are still pending raises `LogicException`.
 
-An eligible `HEAD` or `304` response can include `Content-Length` in its headers to advertise the size of
-the selected representation. The response body stays empty.
-
-`Status` defines constants for common status codes, including `Status::OK`, `Status::CREATED`
-and `Status::NOT_FOUND`.
-
-### The URI
-
-The target of a request is a [`Uri\Rfc3986\Uri`](https://www.php.net/manual/en/class.uri-rfc3986-uri.php),
-the class built into PHP. Its `getRawPath()` and `getRawQuery()` methods preserve path segments
-and percent escapes. A router, a proxy and a request signature need that.
-`Uri\WhatWg\Url` does not fit: it rewrites what it parses (removes dot segments, drops tabs) and cannot hold
-a target without a host.
-
-Read parameters through `$request->query`. Names are case-sensitive and a literal plus sign is preserved.
-`get()` returns the first value, `all()` returns every value for a name, and `toArray()` groups values by name.
-Iterating the query preserves the order of the pairs. Replacing the query on a copy updates its URI:
-
-```php
-$next = clone($request, ['query' => $request->query->with('page', '2')]);
-```
-
-A method is a string, sent exactly as written. Any token is a valid method: `GET`, `PURGE`, `PROPFIND`.
-`Method` defines constants for common methods, including `Method::GET`, `Method::POST` and `Method::HEAD`.
-`OPTIONS *` is an `OPTIONS` request whose URI has an empty path. The URI of a `CONNECT` request
-has only a host and a port (`//example.com:443`).
+A client middleware that may resend an upload takes the body before calling the next handler.
+It passes `$request->withBody($body)` on the first attempt. When policy permits another attempt
+and the body implements `ReplayableBody`, it passes `$request->withBody($body->fresh())`.
+This creates a new handoff with its own reader and trailers.
+`StringBody` supports replay. Headers, methods, status codes and ordered query parameters
+are shared by requests and responses.
 
 ## `Headers`
 
@@ -120,31 +86,3 @@ foreach ($headers as $name => $lines) {
 - `Headers` throws `\ValueError` if a name is invalid or a value contains a forbidden control character.
   So user input with `\r\n` in it cannot add a line to a message (response splitting). Spaces and tabs
   around a value are trimmed.
-
-## Body readers and trailers
-
-Give the sender exclusive access to the unread body until the send finishes.
-For fixed-length framing, the sender counts the bytes
-written and closes the connection if the reader ends before the advertised length.
-
-```php
-while (($bytes = $request->body->read(8192)) !== null) {
-    echo $bytes;
-}
-```
-
-`Request` and `Response` accept a string or a `Body`. Implement `Body` for a custom byte source and expose
-its length, buffering guarantee and trailer state.
-
-Use `new StringBody($bytes, $trailers)` for a string with trailers. `$body->mayHaveTrailers` tells the codec
-whether trailer fields are possible before it reads the body.
-
-Use `$body->close()` to release resources, or `$body->discard()` to advance to EOF and return the final trailers.
-Call `discard()` after a read returns `null` to get the trailers of a body you have already read.
-A string body moves its offset directly. A streaming body reads in bounded chunks and uses the same limits
-and timeouts as ordinary reads. Read errors propagate.
-
-Use `$response->body->buffer(limit: 1024 * 1024)` to collect the remaining bytes of a request or response body, with an 8 MiB default limit.
-Exceeding the limit closes the body and throws `OverflowException`. A successful read leaves trailers available.
-`StringBody::fresh()` returns an independent reader for the original bytes and trailers.
-Custom bodies can extend `AbstractBody` to inherit the bounded read loop.

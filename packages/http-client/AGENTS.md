@@ -2,13 +2,13 @@
 
 - Only return a persistent connection with an empty input buffer at a complete message boundary.
   Drop the body’s ownership before any later read, close or destruction can touch a reused socket.
-- A response copy shares its reader. The reader that owns the lease cannot be cloned: two owners could
+- Response copies share one body handoff. The reader that owns the lease cannot be cloned: two owners could
   release or close the same socket after another request has acquired it.
 - Reserve idle sockets per scheme, host and effective port. Probe before reuse. EOF, pending data and
   transport errors retire an idle socket. The transport leaves retry decisions to middleware.
 - A close-delimited response starts with any bytes the head reader already buffered.
-- `ResponseBody::discard()` drains through `read()` to finish the lease. The chunked decoder then supplies its
-  saved trailers. A close-delimited response returns empty headers without reading the released socket again.
+- Reading through EOF finishes the lease. Reading trailers delegates to the underlying body and never touches
+  a released socket. The transport takes the upload once and closes it on every exit.
 - A per-origin permit covers dialing, sending and the lifetime of the response body. Release it on every exit,
   including cancellation, early close and destruction. Reuse the most recently idle socket for an origin and
   evict the oldest idle socket across all origins at capacity.
@@ -16,7 +16,7 @@
   A handler inside redirects sees each destination. Credential middleware must check that destination.
 - Resolve Location against the current URI. Drop private and unrecognized fields across origins and refuse HTTPS
   downgrades. Return the last response when following would require replaying a one-shot body.
-- Retry only by explicit policy. Idempotence and an independent reader are both required. After returning the
+- Retry only by explicit policy. Idempotence and a `ReplayableBody` are both required. After returning the
   response head, a download failure belongs to the caller.
 - Decode only the encoding the middleware negotiated. Keep explicit negotiation, partial responses and
   bodyless representation metadata intact. Limit compressed input per inflate step and verify the stream end.

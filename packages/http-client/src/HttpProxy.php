@@ -48,7 +48,8 @@ final readonly class HttpProxy
         }
 
         $uri = new Uri('http://localhost')->withHost($host)->withPort($port);
-        $request = RequestHead::of(new Request(Method::CONNECT, $uri, $this->headers));
+        $connect = new Request(Method::CONNECT, $uri, $this->headers);
+        $request = RequestHead::of($connect, body: $connect->takeBody());
         $socket = connect($this->host, $this->port);
 
         try {

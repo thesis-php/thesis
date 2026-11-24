@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
+use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
@@ -117,12 +118,13 @@ final readonly class RequestHead
      * `of()` builds the HTTP/1.1 request head a client sends. It uses chunked framing if the body length
      * is unknown or the request has trailers.
      *
+     * @param Body $body the body taken from the message, used again to write the payload
      * @param bool $isPersistent false asks the server to close the connection after the response
      * @param list<non-empty-string> $upgrade the protocols to switch the connection to, for example `websocket`
      * @throws \ValueError if the method is not a token, the URI has no host, `CONNECT` has no port,
      *     or the headers contain a field that belongs to the connection
      */
-    public static function of(Request $request, bool $isPersistent = true, array $upgrade = []): self
+    public static function of(Request $request, Body $body, bool $isPersistent = true, array $upgrade = []): self
     {
         if (!isToken($request->method)) {
             throw new \ValueError(\sprintf('A method must be a token, got %s.', quote($request->method)));
@@ -157,9 +159,9 @@ final readonly class RequestHead
             throw new \ValueError('The header "host" is written by the codec from the URI of a request.');
         }
 
-        $length = $request->body->size;
+        $length = $body->size;
         $framing = match (true) {
-            $length === null || Fields::hasTrailers($request->headers, $request->body->mayHaveTrailers) => Framing::Chunked,
+            $length === null || Fields::hasTrailers($request->headers, $body->mayHaveTrailers) => Framing::Chunked,
             // POST, PUT and PATCH are expected to have content, so an empty body is sent as Content-Length: 0.
             $length > 0,
             \in_array($request->method, [Method::POST, Method::PUT, Method::PATCH], strict: true) => Framing::Length,

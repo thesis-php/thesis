@@ -7,7 +7,7 @@ namespace Thesis\Http;
 /**
  * @api
  */
-final class StringBody extends AbstractBody
+final class StringBody implements ReplayableBody
 {
     #[\Override]
     public int $size {
@@ -33,9 +33,11 @@ final class StringBody extends AbstractBody
 
     private function __clone() {}
 
-    /**
-     * Returns an independent reader at the beginning, including the original trailers.
-     */
+    public function trailers(): Headers
+    {
+        return $this->trailers;
+    }
+
     public function fresh(): self
     {
         return new self($this->bytes, $this->trailers);
@@ -53,11 +55,15 @@ final class StringBody extends AbstractBody
         return $bytes;
     }
 
-    public function discard(): Headers
+    public function readAll(): string
     {
+        if ($this->offset !== 0) {
+            throw new \LogicException('The body has already been read.');
+        }
+
         $this->offset = \strlen($this->bytes);
 
-        return $this->trailers;
+        return $this->bytes;
     }
 
     public function close(): void {}

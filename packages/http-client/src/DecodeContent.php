@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient;
 
+use Thesis\Http\ClientMiddleware;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -14,7 +15,7 @@ use Thesis\HttpClient\Internal\DecodedBody;
  *
  * @api
  */
-final readonly class DecodeContent implements Middleware
+final readonly class DecodeContent implements ClientMiddleware
 {
     public function handle(Request $request, callable $next): Response
     {
@@ -22,8 +23,7 @@ final readonly class DecodeContent implements Middleware
             return $next($request);
         }
 
-        $headers = $request->headers->with('accept-encoding', 'gzip, deflate');
-        $response = $next(clone($request, ['headers' => $headers]));
+        $response = $next($request->withHeader('accept-encoding', 'gzip, deflate'));
         if ($request->method === Method::HEAD || $response->status < 200
             || \in_array($response->status, [204, 205, 206, 304], strict: true)) {
             return $response;
@@ -39,9 +39,9 @@ final readonly class DecodeContent implements Middleware
             return $response;
         }
 
-        return clone($response, [
-            'headers' => $response->headers->without('content-length', 'content-encoding'),
-            'body' => new DecodedBody($response->body, $encoding),
-        ]);
+        return $response
+            ->withHeaders($response->headers->without('content-length', 'content-encoding'))
+            ->withBody(new DecodedBody($response->takeBody(), $encoding))
+        ;
     }
 }

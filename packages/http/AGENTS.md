@@ -1,31 +1,26 @@
 # thesis/http
 
-Clients and servers share HTTP messages, headers, bodies and request queries from this package.
-Read `README.md` for the message API and `ideas/http.md` for client and server design notes.
+Clients and servers share the same request and response types so proxies can forward unread bodies and trailers.
 
-## Invariants that must not be broken
+## Invariants
 
-- `Body` is the interface for message payloads. A string body owns its offset and has ready trailer fields.
-  Each read advances the offset by the bytes returned. The size remains the total length.
-- Messages accept a string or a `Body`. The constructor turns the string into a `StringBody` and uses a supplied
-  `Body` directly, including its stream position and metadata.
+- Client middleware passes an outgoing request on each call to the next handler. Server middleware can call
+  the next handler at most once, with the same incoming request bound to the call.
+
+- Trailer fields may be pending until the reader finishes.
+- All metadata copies of a message share one body handoff. A replacement body has its own handoff.
+- Changing metadata leaves the original intact. Replacing the payload replaces its trailers as well.
+- `readAll()` returns the whole body or fails once bytes have been consumed. Streaming implementations
+  can extend `StreamingBody` to enforce this across partial reads and keep exclusive access until a read finishes.
 - A message carries the meaning of HTTP. Protocol version, reason phrase and framing belong to the codec.
   A codec depends on the message package. Messages use no codec types.
 - An eligible HEAD or 304 response can carry `Content-Length` in its headers as representation metadata.
   The codec validates the field against the request method and response status.
-- The properties of `Request` and `Response` are `public(set)` for `clone()`, so their constructors check nothing:
-  a copy would bypass the check. The codec checks what must hold on the wire (a method is a token),
-  because every message passes through it.
 - `Headers` cannot hold a name that is not a token, or a value with a control character other than the tab.
   The class itself prevents response splitting, there is no "escape it later". Its state is private
   and changes only through its own methods.
 - PHP turns a numeric name of `Headers` (`1`) into an int key of the array. The keys are cast back to strings
   when iterating. The codec reads the underlying array and casts names when it writes them.
-- A message clone shares the reader and its position unless the clone supplies a new reader.
-  Pass an unread reader to the sender. A short body requires closing the connection before another head is written.
-- `Body::$mayHaveTrailers` tells the encoder whether to allow trailers before reading the body. True covers pending
-  or present trailers. `discard()` advances to EOF and returns the final fields, including after EOF has been read.
-  A string body moves its offset directly. Client and server decorators discard through their own `read()` to run their guards.
 
 ## Decisions
 
@@ -49,8 +44,6 @@ Read `README.md` for the message API and `ideas/http.md` for client and server d
 - `Headers` stores names in lowercase (HTTP/2 requires it). The HTTP/1.1 codec writes them as `Content-Type`
   (`ucwords()` by hyphens): lowercase names are valid, but some peers compare names case-sensitively.
   So `ETag` is written as `Etag`, as Go does.
-- The body owns the reader and its trailers so forwarding a body also forwards pending trailers.
-  The wire codec enforces body boundaries.
 - `StringBody::$size` reads the string length through a hook. In a PHP 8.6 microbenchmark, storing the length
   made construction with one size read 3% faster and with two reads 12% faster. Construction alone cost 13% more.
   Storing both size and trailer presence did not give a repeatable gain on the tracing-JIT Arena mix.
@@ -62,8 +55,7 @@ Read `README.md` for the message API and `ideas/http.md` for client and server d
   It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives
   `Host` from the URI, and `Headers` stores lowercase names. Interoperability belongs in adapters at the
   application boundary, where the adapter can define which streams and message fields it supports.
-- Buffer through the body’s own `read()` so limits, decompression and connection release also run for buffered reads.
-- A string body can open an independent reader with `fresh()` for another network attempt.
+- Each reader opened by `ReplayableBody::fresh()` can itself open an independent reader for another attempt.
   A general body is one-shot. Reading a streaming body never opens a replacement stream.
 - Rejected: using `Once` for incoming trailers. Reading before EOF must leave later reads able to see the final fields.
-  `Once` can cache a premature exception or an unavailable value. The body exposes the current trailer state.
+  `Once` can cache a premature exception or an unavailable value. The body owns its final fields and exposes them without advancing the reader.

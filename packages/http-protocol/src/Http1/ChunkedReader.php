@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\Http\Status;
 use Thesis\HttpProtocol\Internal\Http1\Fields;
 use Thesis\Io\Buffer;
-use Thesis\Io\ConcurrentRead;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
@@ -25,7 +24,7 @@ use const Thesis\HttpProtocol\Internal\Http1\TOKEN_CHARS;
  *
  * @api
  */
-final class ChunkedReader extends AbstractBody
+final class ChunkedReader extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -80,8 +79,6 @@ final class ChunkedReader extends AbstractBody
 
     private ?MalformedMessage $failure = null;
 
-    private bool $isReading = false;
-
     /**
      * @param positive-int $maxSizeLineLength bytes including chunk extensions and CRLF
      * @param positive-int $maxTrailersLength bytes including the final empty line
@@ -100,17 +97,11 @@ final class ChunkedReader extends AbstractBody
     /**
      * Invalid chunk framing or trailers cause MalformedMessage on this and every later read.
      */
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
-        if ($this->isReading) {
-            throw new ConcurrentRead('A read is already in progress on the body.');
-        }
-
         if ($this->failure !== null) {
             throw $this->failure;
         }
-
-        $this->isReading = true;
 
         try {
             return $this->readChunk($max);
@@ -118,20 +109,12 @@ final class ChunkedReader extends AbstractBody
             $this->failure = $error;
 
             throw $error;
-        } finally {
-            $this->isReading = false;
         }
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while (true) {
-            if ($this->trailers !== null) {
-                return $this->trailers;
-            }
-
-            $this->read(8192);
-        }
+        return $this->trailers ?? throw new \LogicException('The trailer fields are still pending.');
     }
 
     public function close(): void {}

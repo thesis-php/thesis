@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Stub;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 
-final class PrefixedBody extends AbstractBody
+final class PrefixedBody extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -31,7 +31,7 @@ final class PrefixedBody extends AbstractBody
         private readonly Body $body,
     ) {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
         if ($this->hasPrefix) {
             $this->hasPrefix = false;
@@ -42,11 +42,9 @@ final class PrefixedBody extends AbstractBody
         return $this->body->read($max);
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        $this->hasPrefix = false;
-
-        return $this->body->discard();
+        return $this->body->trailers();
     }
 
     public function close(): void

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
+use Thesis\Http\StreamingBody;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StreamClosed;
 
 /**
  * @internal
  */
-final class DecodedBody extends AbstractBody
+final class DecodedBody extends StreamingBody
 {
     #[\Override]
     public ?int $size {
@@ -54,7 +54,7 @@ final class DecodedBody extends AbstractBody
 
     private function __clone() {}
 
-    public function read(int $max): ?string
+    protected function readPayload(int $max): ?string
     {
         if ($this->closed) {
             throw new StreamClosed('The decoded response body is closed.');
@@ -120,11 +120,9 @@ final class DecodedBody extends AbstractBody
         return $bytes;
     }
 
-    public function discard(): Headers
+    public function trailers(): Headers
     {
-        while ($this->read(8192) !== null);
-
-        return $this->body->discard();
+        return $this->body->trailers();
     }
 
     public function close(): void

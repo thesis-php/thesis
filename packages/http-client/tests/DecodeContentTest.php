@@ -32,13 +32,14 @@ final class DecodeContentTest
             );
         });
         Assert::true($response->headers->isEmpty);
-        Assert::null($response->body->size);
-        Assert::true($response->body->mayHaveTrailers);
-        Assert::same($response->body->read(2), 'he');
-        Assert::same($response->body->read(16), 'llo');
-        Assert::same($response->body->read(16), ' world');
-        Assert::same($response->body->discard()->get('x-end'), 'ok');
-        Assert::null($response->body->read(1));
+        $body = $response->takeBody();
+        Assert::null($body->size);
+        Assert::true($body->mayHaveTrailers);
+        Assert::same($body->read(2), 'he');
+        Assert::same($body->read(16), 'llo');
+        Assert::same($body->read(16), ' world');
+        Assert::null($body->read(1));
+        Assert::same($body->trailers()->get('x-end'), 'ok');
     }
 
     public function decodesDeflateAndRejectsTruncation(): void
@@ -50,9 +51,10 @@ final class DecodeContentTest
             headers: new Headers(['content-encoding' => 'deflate']),
             body: substr($wire, 0, -1),
         ));
-        Assert::same($response->body->read(100), 'hello');
+        $body = $response->takeBody();
+        Assert::same($body->read(100), 'hello');
         Expect::exception(ReadFailed::class);
-        $response->body->discard();
+        $body->read(100);
     }
 
     public function leavesExplicitNegotiationAndPartialRepresentationsAlone(): void
@@ -60,11 +62,11 @@ final class DecodeContentTest
         $request = new Request('GET', new Uri('https://example.org'));
         $encoded = new Response(headers: new Headers(['content-encoding' => 'gzip']), body: 'wire bytes');
         foreach (['accept-encoding', 'range'] as $name) {
-            $explicit = clone($request, ['headers' => new Headers([$name => 'custom'])]);
+            $explicit = $request->withHeader($name, 'custom');
             Assert::same(new DecodeContent()->handle($explicit, static fn() => $encoded), $encoded);
         }
         foreach ([204, 205, 206, 304] as $status) {
-            $partial = clone($encoded, ['status' => $status]);
+            $partial = $encoded->withStatus($status);
             Assert::same(new DecodeContent()->handle($request, static fn() => $partial), $partial);
         }
         $head = new Request('HEAD', $request->uri);

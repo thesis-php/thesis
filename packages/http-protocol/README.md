@@ -63,14 +63,16 @@ $requestHead->length;       // 17
 $requestHead->isPersistent; // true: the connection stays open for the next request
 
 $response = new Response(status: Status::CREATED, body: 'created');
-$responseHead = ResponseHead::of($response, $requestHead);
+$body = $response->takeBody();
+$responseHead = ResponseHead::of($response, $requestHead, $body);
 
 $connection->write($responseHead->toString());
 // "HTTP/1.1 201 Created\r\nContent-Length: 7\r\n\r\n"
 ```
 
-A client does the same in the opposite direction: `RequestHead::of($request)->toString()`, then
-`ResponseHead::parse($bytes, $request->method)`. The parser needs the method to find the end of the response:
+The sender takes the body once and uses the same reader when writing the payload.
+A client formats the request with `RequestHead::of($request, $body)->toString()` and parses the response
+with `ResponseHead::parse($bytes, $request->method)`. The parser needs the method to find the end of the response:
 a response to `HEAD` has no body, whatever its fields say.
 
 Besides the parts of a message, a head holds what belongs to the connection:
@@ -120,7 +122,7 @@ bytes of the next message. A connection EOF before the declared size raises `The
 Pass the decoder directly as the message body to retain its declared length.
 Overlapping reads on the same `FixedLengthReader` or `ChunkedReader` throw `Thesis\Io\ConcurrentRead`.
 
-For `Framing::Chunked`, pass a `ChunkedReader` as the body. The message then exposes the decoder's trailer fields.
+For `Framing::Chunked`, pass a `ChunkedReader` as the body. The decoder exposes its trailer fields after the last chunk.
 
 ```php
 use Thesis\HttpProtocol\Http1\ChunkedReader;
@@ -137,10 +139,11 @@ $response = new Response(
 );
 
 // A proxy can forward the decoded payload and then the trailer section.
-while (($bytes = $response->body->read(8192)) !== null) {
+$body = $response->takeBody();
+while (($bytes = $body->read(8192)) !== null) {
     $downstream->write(encodeChunk($bytes));
 }
-$downstream->write(encodeLastChunk($response->body->discard()));
+$downstream->write(encodeLastChunk($body->trailers()));
 ```
 
 Outgoing HTTP/1.1 messages use chunked framing if trailers are present, announced by `Trailer`,

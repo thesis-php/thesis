@@ -10,6 +10,7 @@ use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\StringBody;
 use Thesis\HttpProtocol\Http1\MalformedMessage;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\WriteFailed;
@@ -70,7 +71,7 @@ final class RetryRequestsTest
         $attempts = 0;
         $retry = new RetryRequests(maxRetries: 3);
         $response = $retry->handle($request, static function (Request $request) use (&$attempts) {
-            Assert::same($request->body->read(16), 'payload');
+            Assert::same($request->takeBody()->read(16), 'payload');
 
             return match (++$attempts) {
                 1 => throw new ConnectFailed(),
@@ -102,13 +103,13 @@ final class RetryRequestsTest
 
     public function preservesNonReplayableOperationsAndPermanentFailures(): void
     {
-        $get = new Request('GET', new Uri('https://example.com'));
-        $stream = new Internal\DecodedBody($get->body, ZLIB_ENCODING_GZIP);
+        $uri = new Uri('https://example.com');
+        $stream = new Internal\DecodedBody(new StringBody(''), ZLIB_ENCODING_GZIP);
         foreach ([
-            [new Request('POST', $get->uri), new ConnectFailed()],
-            [new Request('GET', $get->uri, body: $stream), new ReadFailed()],
-            [$get, new TlsFailed()],
-            [$get, new MalformedMessage('Invalid status line.')],
+            [new Request('POST', $uri), new ConnectFailed()],
+            [new Request('GET', $uri, body: $stream), new ReadFailed()],
+            [Request::get($uri), new TlsFailed()],
+            [Request::get($uri), new MalformedMessage('Invalid status line.')],
         ] as [$request, $failure]) {
             $attempts = 0;
 

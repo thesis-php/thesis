@@ -6,6 +6,7 @@ namespace Thesis\HttpClient\Internal;
 
 use Thesis\Async\LocalKeyedSemaphore;
 use Thesis\Async\Lock;
+use Thesis\Http\Body;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -61,45 +62,52 @@ final readonly class Http1Transport
      */
     public function send(Request $request): Response
     {
-        $scheme = strtolower($request->uri->getScheme() ?? '');
-        if (!\in_array($scheme, ['http', 'https'], strict: true) || $request->method === Method::CONNECT) {
-            throw new \ValueError('The client requires an HTTP or HTTPS request without tunneling.');
-        }
-
-        if ($request->uri->getRawUserInfo() !== null) {
-            throw new \ValueError('Supply credentials in request headers, not in the URI.');
-        }
-
-        $head = RequestHead::of($request);
-        $host = $request->uri->getRawHost();
-        \assert($host !== null && $host !== '');
-        $port = $request->uri->getPort() ?? ($scheme === 'https' ? 443 : 80);
-        \assert($port >= 0 && $port <= 65535);
-        $origin = $scheme . '://' . strtolower($host) . ':' . $port;
-        $slot = $this->slots->acquire($origin);
+        $slot = null;
         $socket = null;
+        $body = $request->takeBody();
 
         try {
-            $tls = $scheme === 'https' ? $this->tls : null;
-            $socket = $this->pool->take($origin) ?? ($this->connect)($host, $port, $tls);
-            $socket->write($head->toString());
-            self::writeBody($socket, $request, $head);
+            try {
+                $scheme = strtolower($request->uri->getScheme() ?? '');
+                if (!\in_array($scheme, ['http', 'https'], strict: true) || $request->method === Method::CONNECT) {
+                    throw new \ValueError('The client requires an HTTP or HTTPS request without tunneling.');
+                }
+
+                if ($request->uri->getRawUserInfo() !== null) {
+                    throw new \ValueError('Supply credentials in request headers, not in the URI.');
+                }
+
+                $head = RequestHead::of($request, body: $body);
+                $host = $request->uri->getRawHost();
+                \assert($host !== null && $host !== '');
+                $port = $request->uri->getPort() ?? ($scheme === 'https' ? 443 : 80);
+                \assert($port >= 0 && $port <= 65535);
+                $origin = $scheme . '://' . strtolower($host) . ':' . $port;
+                $slot = $this->slots->acquire($origin);
+
+                $tls = $scheme === 'https' ? $this->tls : null;
+                $socket = $this->pool->take($origin) ?? ($this->connect)($host, $port, $tls);
+                $socket->write($head->toString());
+                self::writeBody($socket, $body, $head);
+            } finally {
+                $body->close();
+            }
 
             return $this->readResponse($socket, $head->method, $origin, $slot);
         } catch (\Throwable $error) {
             $socket?->close();
-            $slot->release();
+            $slot?->release();
 
             throw $error;
         }
     }
 
-    private static function writeBody(Socket $socket, Request $request, RequestHead $head): void
+    private static function writeBody(Socket $socket, Body $body, RequestHead $head): void
     {
         $remaining = $head->length;
 
         while ($head->framing !== Framing::None && ($remaining === null || $remaining > 0)) {
-            $bytes = $request->body->read(min(8192, $remaining ?? 8192));
+            $bytes = $body->read(min(8192, $remaining ?? 8192));
             if ($bytes === null) {
                 if ($remaining !== null) {
                     throw new ReadFailed('The request body ended before its declared length.');
@@ -115,7 +123,7 @@ final readonly class Http1Transport
         }
 
         if ($head->framing === Framing::Chunked) {
-            $socket->write(encodeLastChunk($request->body->discard()));
+            $socket->write(encodeLastChunk($body->trailers()));
         }
     }
 
