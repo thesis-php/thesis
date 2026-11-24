@@ -4,7 +4,7 @@ The shared messages live in [thesis/http](../packages/http/README.md), and the s
 [thesis/http-protocol](../packages/http-protocol/README.md). The [message notes](../packages/http/AGENTS.md) and
 [codec notes](../packages/http-protocol/AGENTS.md) record their decisions.
 The HTTP/1 server POC now lives in [thesis/http-server](../packages/http-server/README.md). Its entry point
-binds its configured endpoint when `run()` starts, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http-client/README.md) pools
+binds its configured endpoint when `start()` runs, and it closes a connection after an unread body. The [HTTP/1 client](../packages/http-client/README.md) pools
 persistent connections by origin once the response body is complete. The server extensions below remain proposals.
 
 ## One set of messages for both directions

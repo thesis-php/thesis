@@ -200,6 +200,15 @@ and the error is rethrown (unless an earlier failure takes precedence). If nothi
 it is a deadlock: the tasks are cancelled, and once they have unwound, `Deadlock` is rethrown with the place
 of every suspended fiber.
 
+### Background services with `Service`
+
+Build a `Thesis\Async\Service` along with its consumers, then call `start($group)` when the application starts.
+Once it returns, the service is ready to use. For example, a listening server already has a bound address.
+
+Call `stop()` while the group can still run the tasks needed for shutdown. Each service documents what
+has finished when the call returns. A logger drains its queue before returning. An HTTP server stops accepting
+connections and lets its group join active handlers, so a handler can call `stop()` itself.
+
 ### Failures that were not rethrown: `suppressed()`
 
 A group rethrows only its first failure. Others may follow while the group is cancelled: a sibling that failed

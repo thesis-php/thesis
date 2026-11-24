@@ -24,5 +24,5 @@ and [thesis/net](https://github.com/thesis-php/net): the API of 1.x is gone, see
 - Concurrent `transactional()` calls isolate their publications and acknowledgements. Cancelling a multiple
   acknowledgement before its write allows an individual acknowledgement to proceed.
 - `Consumer::cancel()` sends one cancellation for concurrent callers. Reusing a consumer tag leaves old handles inert.
-- `Client::channel()` stops waiting when startup fails or the owner group exits. `Client::close()` can resume
+- `Client::channel()` stops waiting when startup fails or the owner group exits. `Client::stop()` can resume
   an interrupted drain and finishes when an unsent confirmed publish is cancelled.

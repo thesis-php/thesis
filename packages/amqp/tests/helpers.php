@@ -25,7 +25,7 @@ function connect(Group $group, FakeServer $server, ?Config $config = null): arra
         return $peer;
     });
     $client = new Client($config ?? $server->config());
-    $client->run($group);
+    $client->start($group);
 
     return [$client, $peer->await()];
 }
@@ -64,10 +64,10 @@ function thrown(callable $fn): \Throwable
 /**
  * Closes $client gracefully, $peer agreeing.
  */
-function closeClient(Group $group, Client $client, FakePeer $peer): void
+function stopClient(Group $group, Client $client, FakePeer $peer): void
 {
     $group->spawn($peer->acceptClose(...));
-    $client->close();
+    $client->stop();
 }
 
 /**
@@ -82,12 +82,12 @@ function withRabbitMq(callable $test): void
     $client = new Client($config);
 
     group(static function (Group $group) use ($client, $test) {
-        $client->run($group);
+        $client->start($group);
 
         try {
             $test($client, $group);
         } finally {
-            shield(static fn() => timeout(sec(5), $client->close(...)));
+            shield(static fn() => timeout(sec(5), $client->stop(...)));
         }
     });
 }

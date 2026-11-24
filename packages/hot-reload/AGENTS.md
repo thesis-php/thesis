@@ -13,7 +13,8 @@
   Refreshing the snapshot for a launch clears pending edits already covered by that launch.
 - The CLI traps SIGHUP, SIGINT and SIGTERM until the supervisor group has joined. Restoring the default signal
   actions while the worker is stopping can kill the supervisor before it reaps the worker.
-  SIGINT or SIGTERM ends the group and closes the reload channel. A shielded group owns the worker until it exits.
+  Stopping the supervisor closes the reload channel and waits for its task. Its shielded group owns the worker
+  and file watcher until shutdown finishes. Group cancellation also closes the reload channel.
   Start a replacement only after the worker exits.
 
 ## Decisions

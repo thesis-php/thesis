@@ -13,6 +13,7 @@ use Thesis\Async\Channel;
 use Thesis\Async\Group;
 use Thesis\Async\ScopedValue;
 use Thesis\Async\SendResult;
+use Thesis\Async\Service;
 use Thesis\Async\Task;
 use Thesis\Async\TaskCancelled;
 use Thesis\Io\Writer;
@@ -31,7 +32,7 @@ use Thesis\Time\WallClock;
  * @see https://www.php-fig.org/psr/psr-20/
  * @see https://www.rfc-editor.org/rfc/rfc5424.html#section-6.2.1
  */
-final class Logger extends AbstractLogger
+final class Logger extends AbstractLogger implements Service
 {
     private const int MAX_LINE_BYTES = 16 * 1024;
     private const array PRIORITIES = [
@@ -51,7 +52,7 @@ final class Logger extends AbstractLogger
     public private(set) int $dropped = 0;
 
     /**
-     * The formatting or output error that stopped the writer, available before close().
+     * The formatting or output error that stopped the writer, available before stop().
      */
     public private(set) ?\Throwable $failure = null;
 
@@ -95,11 +96,11 @@ final class Logger extends AbstractLogger
     private function __clone() {}
 
     /**
-     * Starts the writer in the supplied group. Call {@see close()} while the group can still run the writer.
+     * Starts the writer in the supplied group. Call {@see stop()} while the group can still run the writer.
      *
      * @throws \LogicException if the logger has already started or closed, or the group has ended
      */
-    public function run(Group $group): void
+    public function start(Group $group): void
     {
         if ($this->task !== null || $this->queue->isClosed) {
             throw new \LogicException('The logger has already started or closed.');
@@ -111,7 +112,7 @@ final class Logger extends AbstractLogger
     /**
      * Records a message without waiting for the writer. The configured clock and a Stringable message's
      * conversion run in the calling fiber.
-     * Before {@see run()}, after close, from its own writer or when the queue is full, counts the record as dropped.
+     * Before {@see start()}, after close, from its own writer or when the queue is full, counts the record as dropped.
      * Unsupported context values are summarized without calling user code.
      *
      * @param array<array-key, mixed> $context
@@ -165,7 +166,7 @@ final class Logger extends AbstractLogger
      * @throws \Throwable if formatting or writing a record failed
      * @throws TaskCancelled if the writer task was cancelled
      */
-    public function close(): void
+    public function stop(): void
     {
         $this->queue->close();
 

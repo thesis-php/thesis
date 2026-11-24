@@ -327,7 +327,7 @@ final class Channel
     /**
      * Starts a consumer. Its deliveries are buffered until they are taken: with `noAck: false` the server
      * sends at most the prefetch of {@see qos()} ahead, with `noAck: true` nothing limits it.
-     * The consumer ends with {@see Consumer::cancel()}, {@see close()} or {@see Client::close()}.
+     * The consumer ends with {@see Consumer::cancel()}, {@see close()} or {@see Client::stop()}.
      *
      * @param string $consumerTag generated if empty
      * @param array<string, mixed> $arguments `x-priority`, `x-stream-offset`, ...

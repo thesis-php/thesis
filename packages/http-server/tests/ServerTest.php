@@ -44,7 +44,7 @@ final class ServerTest
                     $failure->complete($error);
                 },
             );
-            $server->run($group);
+            $server->start($group);
             $address = $server->address;
             \assert($address instanceof InetAddress);
             $client = connect('127.0.0.1', $address->port);
@@ -56,7 +56,7 @@ final class ServerTest
                 Assert::same('The response write did not complete in time.', $error->getMessage());
             } finally {
                 $client->close();
-                $server->close();
+                $server->stop();
             }
         }));
     }
@@ -77,7 +77,7 @@ final class ServerTest
                     return new Response(Status::NO_CONTENT);
                 },
             );
-            $server->run($group);
+            $server->start($group);
             $address = $server->address;
             \assert($address instanceof InetAddress);
 
@@ -90,7 +90,7 @@ final class ServerTest
                 Assert::same((string) $client->localAddress, (string) $context->remoteAddress);
                 Assert::null($context->tls);
 
-                $server->close();
+                $server->stop();
                 $release->complete();
 
                 $buffer = new Buffer();
@@ -101,7 +101,7 @@ final class ServerTest
                 );
                 Assert::null($client->read(1));
             } finally {
-                $server->close();
+                $server->stop();
                 $client->close();
                 $release->complete();
             }
@@ -122,7 +122,7 @@ final class ServerTest
                     return new Response(Status::NO_CONTENT);
                 },
             );
-            $server->run($group);
+            $server->start($group);
             $address = $server->address;
             \assert($address instanceof InetAddress);
             $client = connect('127.0.0.1', $address->port);
@@ -130,11 +130,11 @@ final class ServerTest
             try {
                 $client->write("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
                 $entered->await();
-                $server->close();
+                $server->stop();
 
                 Assert::null($client->read(1));
             } finally {
-                $server->close();
+                $server->stop();
                 $client->close();
             }
         }));
@@ -162,7 +162,7 @@ final class ServerTest
                     return new Response(Status::NO_CONTENT);
                 },
             );
-            $server->run($group);
+            $server->start($group);
             $address = $server->address;
             \assert($address instanceof InetAddress);
             $first = connect('127.0.0.1', $address->port);
@@ -178,7 +178,7 @@ final class ServerTest
                 $release->complete();
                 $next->await();
             } finally {
-                $server->close();
+                $server->stop();
                 $first->close();
                 $second->close();
                 $release->complete();
@@ -205,7 +205,7 @@ final class ServerTest
                     $failure->complete($error);
                 },
             );
-            $server->run($group);
+            $server->start($group);
             $address = $server->address;
             \assert($address instanceof InetAddress);
             $failed = connect('127.0.0.1', $address->port);
@@ -220,11 +220,11 @@ final class ServerTest
                 $buffer->fillUntil($client, "\r\n\r\n");
                 Assert::same('HTTP/1.1 204 No Content', $buffer->readUntil("\r\n\r\n"));
 
-                $server->close();
+                $server->stop();
                 Assert::null($client->read(1));
             } finally {
                 $failed->close();
-                $server->close();
+                $server->stop();
                 $client->close();
             }
         }));
@@ -234,17 +234,17 @@ final class ServerTest
     {
         group(static function (Group $group) {
             $server = new Server(new Config(new InetAddress('127.0.0.1', 0)), static fn() => new Response());
-            $server->run($group);
+            $server->start($group);
 
             Expect::exception(\LogicException::class);
-            $server->run($group);
+            $server->start($group);
         });
     }
 
     public function endingGroupImmediatelyClosesTheServer(): void
     {
         $server = new Server(new Config(new InetAddress('127.0.0.1', 0)), static fn() => new Response());
-        group($server->run(...));
+        group($server->start(...));
         Assert::null($server->address);
     }
 
@@ -255,7 +255,7 @@ final class ServerTest
         $result = timeoutOr(
             duration: ms(10),
             body: static fn() => group(static function (Group $group) use ($server) {
-                $server->run($group);
+                $server->start($group);
                 delay(sec(10));
             }),
             default: $expired,
@@ -275,7 +275,7 @@ final class ServerTest
             Assert::null($server->address);
 
             try {
-                $server->run($group);
+                $server->start($group);
                 Assert::fail('The port is already occupied.');
             } catch (ListenFailed) {
                 Assert::null($server->address);
@@ -283,7 +283,7 @@ final class ServerTest
                 $occupied->close();
             }
 
-            $server->run($group);
+            $server->start($group);
             Assert::equals($server->address, $address);
         });
     }
@@ -295,9 +295,9 @@ final class ServerTest
         Assert::false(file_exists($path));
 
         group(static function (Group $group) use ($server, $path) {
-            $server->run($group);
+            $server->start($group);
             Assert::true(file_exists($path));
-            $server->close();
+            $server->stop();
             Assert::false(file_exists($path));
         });
     }
@@ -328,7 +328,7 @@ final class ServerTest
                         $failure->complete($error);
                     },
                 );
-                $server->run($group);
+                $server->start($group);
                 $address = $server->address;
                 \assert($address instanceof InetAddress);
                 $client = connect(
@@ -361,7 +361,7 @@ final class ServerTest
                         $unsupported->close();
                     }
                 } finally {
-                    $server->close();
+                    $server->stop();
                     $client->close();
                 }
 

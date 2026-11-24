@@ -41,9 +41,9 @@ $server = new Server(
 );
 
 group(static function (Group $group) use ($server) {
-    $server->run($group);
+    $server->start($group);
     awaitSignal(SIGINT, SIGTERM);
-    $server->close();
+    $server->stop();
 });
 ```
 
@@ -72,8 +72,8 @@ To specify the address, pass a string such as `'0.0.0.0:8080'` or `'[::1]:8080'`
 For Unix, pass an absolute socket path such as `'/run/app.sock'`. Use `UnixEndpoint` for a relative path.
 Both endpoint types let you set `backlog`, which defaults to 511. `TcpEndpoint` also takes `reusePort` and `noDelay`.
 
-`$server->run($group)` binds the endpoint and returns once the server is ready. A bind failure throws
-`Thesis\Net\ListenFailed` from `run()`. With TCP port zero, `$server->address` gives the assigned port. Call `$server->close()` to stop accepting clients.
+`$server->start($group)` binds the endpoint and returns once the server is ready. A bind failure throws
+`Thesis\Net\ListenFailed` from `start()`. With TCP port zero, `$server->address` gives the assigned port. Call `$server->stop()` to stop accepting clients.
 The group waits for shutdown to finish. The server closes idle sockets and lets active handlers
 and response writers finish until the shutdown deadline. Cancelling the serving scope also stops the server.
 The example uses ext-pcntl and handles SIGINT and SIGTERM by closing the listener.

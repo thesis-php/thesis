@@ -9,7 +9,7 @@ namespace Thesis\Amqp;
  *
  * Closed by the server, {@see $replyCode} tells why (`ConnectionForced` when the broker stops,
  * `AccessRefused` for wrong credentials). Lost (a reset, missed heartbeats), it is null and the previous exception
- * is the cause. Closed by {@see Client::close()}, it is `ReplySuccess`.
+ * is the cause. Closed by {@see Client::stop()}, it is `ReplySuccess`.
  *
  * @api
  */

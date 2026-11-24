@@ -41,11 +41,11 @@ The call blocks the fiber directly. Use `async` to run the call concurrently.
 $pool = new Pool(limit: 8, bootstrap: __DIR__.'/bootstrap.php'); // no I/O
 
 group(static function (Group $group) use ($pool, $files) {
-    $pool->run($group);
+    $pool->start($group);
 
     $hashes = map($files, 8, static fn(string $file) => $pool->execute(hash_file(...), 'sha256', $file));
 
-    $pool->close();
+    $pool->stop();
 });
 ```
 
@@ -103,9 +103,9 @@ In amphp `Execution::await($cancellation)` stops waiting while the task goes on.
 
 ## The pool: a client of `agents/clients.md`
 
-- `new Pool(...)` does no I/O; `run($group)` starts the background work (the reader of every worker,
+- `new Pool(...)` does no I/O; `start($group)` starts the background work (the reader of every worker,
   watching the processes) as daemons of `$group`. Workers start lazily, their daemons go to the same group.
-- `close()` waits for the running calls and closes the sockets.
+- `stop()` waits for the running calls and closes the sockets.
 - Rejected: a global `workerPool()` per driver: its background work would have no owner.
 - Rejected: reading through `EventLoop::queue()` (`ContextWorker`): the same reason.
 

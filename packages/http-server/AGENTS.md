@@ -16,13 +16,13 @@
 
 ## Decisions
 
-- The constructor takes the configuration and handler. Bind the endpoint in `run()` so a DI container can build the server
+- The constructor takes the configuration and handler. Bind the endpoint in `start()` so a DI container can build the server
   without opening sockets and the application sees a bind failure at startup.
 - An integer endpoint in `Config` is a TCP port on `127.0.0.1`. Strings starting with `/` are absolute Unix paths.
   Other strings must be numeric TCP addresses with a port and brackets around IPv6. A relative path needs `UnixEndpoint`.
 - Both endpoint types own their backlog. TCP owns `reusePort` and `noDelay`. TLS, limits and timeouts live on `Config`.
-- Like the AMQP client, the server starts a daemon in the group passed to `run()`. It returns once the daemon
-  has registered shutdown. A handler may call `close()`: the group joins active exchanges after it returns.
+- Like the AMQP client, the server starts a daemon in the group passed to `start()`. It returns once the daemon
+  has registered shutdown. A handler may call `stop()`: the group joins active exchanges after it returns.
 - Rejected: opening a group for every request. Even with lazy task and daemon scopes from `499def1`,
   an unused group raised the median time per in-memory plaintext GET from 3.67 to 5.01 µs.
   A handler can open its own group for parallel work that finishes before it returns. A streaming body

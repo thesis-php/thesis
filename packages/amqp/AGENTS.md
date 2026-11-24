@@ -1,7 +1,7 @@
 # thesis/amqp
 
 AMQP 0.9.1 client for RabbitMQ. Uses `net` (the socket), `io` (`Buffer` codes every frame), `async` (every wait,
-the group of `Client::run()`, `agents/clients.md`) and `time`.
+the group of `Client::start()`, `agents/clients.md`) and `time`.
 The API and the guarantees are in `README.md` — read it first.
 
 ## Invariants that must not be broken
@@ -42,7 +42,7 @@ The API and the guarantees are in `README.md` — read it first.
   The silence is checked before a heartbeat is written, and none is written while another write waits:
   a write to a dead peer would block the check. A heartbeat under a second is rounded up, not to 0.
 - `Client`: `channel()` retries only on a connection that is closed; any other failure on a live one would spin.
-  `close()` during a handshake terminates the connection it produces (`run()` and `reconnect()` check `closing`
+  `stop()` during a handshake terminates the connection it produces (`start()` and `reconnect()` check `closing`
   after `connect()`). One `Backoff` serves all reconnects and is reset only by a connection that has lived 30 s.
   Hosts are validated by `Config`, not when a reconnect in a daemon tries them.
 - Fail the waiters for the next connection when startup fails or the supervisor ends: no daemon is left to wake

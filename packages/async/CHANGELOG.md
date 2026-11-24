@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Service` defines explicit startup in a group and shutdown for background services.
 - `group()` starts a task group with tasks and daemons. The task tree controls cancellation.
 - `group()` runs an event loop on PHP 8.6's `Io\Poll` from `{main}`. The loop throws `Deadlock` when
   nothing can wake a waiting task.

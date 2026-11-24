@@ -52,7 +52,7 @@ final class LoggerTest
         $logger->info('Before start');
 
         group(static function (Group $group) use ($logger, $output) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->debug('Below minimum');
             $logger->info('First');
             $logger->warning('Second');
@@ -62,8 +62,8 @@ final class LoggerTest
             Assert::same($logger->dropped, 2);
             Assert::null($logger->failure);
 
-            $logger->close();
-            $logger->close();
+            $logger->stop();
+            $logger->stop();
             $logger->info('After close');
 
             Assert::same($output->writes, ["First\n", "Second\n"]);
@@ -98,12 +98,12 @@ final class LoggerTest
         $logger = new Logger($output, formatter: $formatter);
 
         group(static function (Group $group) use ($logger, $other, $formatted) {
-            $logger->run($group);
-            $other->run($group);
+            $logger->start($group);
+            $other->start($group);
             $logger->info('From a producer');
             $formatted->await();
-            $logger->close();
-            $other->close();
+            $logger->stop();
+            $other->stop();
         });
 
         Assert::same($output->writes, ["From a producer\n"]);
@@ -143,10 +143,10 @@ final class LoggerTest
         ]);
 
         observe($observer, static fn() => group(static function (Group $group) use ($logger, $formatted) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('From a producer');
             $formatted->await();
-            $logger->close();
+            $logger->stop();
         }));
 
         Assert::same($output->writes, ["From a producer\n"]);
@@ -174,10 +174,10 @@ final class LoggerTest
         ]);
 
         observe($observer, static fn() => group(static function (Group $group) use ($logger, $waiting) {
-            $logger->run($group);
+            $logger->start($group);
             $waiting->await();
             $logger->info('From a producer');
-            $logger->close();
+            $logger->stop();
         }));
 
         Assert::same($output->writes, ["From a producer\n"]);
@@ -190,7 +190,7 @@ final class LoggerTest
         $logger = new Logger($output);
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('{exception} {} {two words} {http.status} {ok} {peer} {template} {undefined} {9} {done}', [
                 'exception' => new \RuntimeException('This is structured context'),
                 '' => 'Skipped',
@@ -202,7 +202,7 @@ final class LoggerTest
                 9 => 'Ninth',
                 'done' => true,
             ]);
-            $logger->close();
+            $logger->stop();
         });
 
         Assert::string($output->writes[0] ?? '')->endsWith("\n");
@@ -238,7 +238,7 @@ final class LoggerTest
 
         $error = new \RuntimeException('Connection lost');
         group(static function (Group $group) use ($logger, $contextValue, $error) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->debug($contextValue);
             $timezone = date_default_timezone_get();
             date_default_timezone_set('Asia/Tokyo');
@@ -257,7 +257,7 @@ final class LoggerTest
                 date_default_timezone_set($timezone);
             }
 
-            $logger->close();
+            $logger->stop();
         });
         $logger->error($contextValue);
 
@@ -357,9 +357,9 @@ final class LoggerTest
         $logger = new Logger($output);
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('Context', ["\u{FFFD}" => 'valid key', "\xff" => 'invalid key']);
-            $logger->close();
+            $logger->stop();
         });
 
         Assert::string($output->writes[0] ?? '')->endsWith("\"context\":{\"\u{FFFD}\":\"valid key\"}}\n");
@@ -382,9 +382,9 @@ final class LoggerTest
 
         $reference->warning($message, $context);
         group(static function (Group $group) use ($logger, $message, $context) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->warning($message, $context);
-            $logger->close();
+            $logger->stop();
         });
 
         $expected = $referenceOutput->getRecords()[0] ?? throw new \LogicException('Monolog did not write the record.');
@@ -413,7 +413,7 @@ final class LoggerTest
         $logger = new Logger($output, clock: $clock);
 
         group(static function (Group $group) use ($logger, $clock) {
-            $logger->run($group);
+            $logger->start($group);
             $message = new readonly class ($clock) implements \Stringable {
                 public function __construct(
                     private FrozenClock $clock,
@@ -429,7 +429,7 @@ final class LoggerTest
             };
             $logger->info($message);
             $logger->info('Second');
-            $logger->close();
+            $logger->stop();
         });
 
         Assert::string($output->writes[0] ?? '')->startsWith('{"time":"2026-11-23T22:12:00.012345+03:00",');
@@ -461,14 +461,14 @@ final class LoggerTest
 
         $error = new \ErrorException($long, filename: $long, line: 42);
         group(static function (Group $group) use ($logger, $long, $key, $error) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info(str_repeat('a', 1020) . '{field}', [
                 $key => 'Kept',
                 'field' => 'Value',
             ] + array_fill(1, 31, true));
             $logger->info('{message}{message}', ['message' => $long, 'exception' => $error]);
             $logger->info('Summarized', ['exception' => 'Reason', 'other' => new \RuntimeException('Text')]);
-            $logger->close();
+            $logger->stop();
         });
 
         Assert::count($captured, 3);
@@ -489,18 +489,18 @@ final class LoggerTest
         $logger = new Logger(new RecordingWriter());
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
 
-            Assert::instanceOf(thrown(static fn() => $logger->run($group)), \LogicException::class);
+            Assert::instanceOf(thrown(static fn() => $logger->start($group)), \LogicException::class);
 
-            $logger->close();
+            $logger->stop();
 
             Assert::same($logger->dropped, 0);
 
             $closed = new Logger(new RecordingWriter());
-            $closed->close();
+            $closed->stop();
 
-            Assert::instanceOf(thrown(static fn() => $closed->run($group)), \LogicException::class);
+            Assert::instanceOf(thrown(static fn() => $closed->start($group)), \LogicException::class);
         });
     }
 
@@ -516,12 +516,12 @@ final class LoggerTest
         $logger = new Logger($output, formatter: $formatter);
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('Oversized');
             $logger->info('LF');
             $logger->info('CR');
             $logger->info('At limit');
-            $logger->close();
+            $logger->stop();
         });
 
         Assert::same($logger->dropped, 3);
@@ -546,7 +546,7 @@ final class LoggerTest
         }]);
 
         observe($observer, static fn() => group(static function (Group $group) use ($logger, $failure, $failed) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('First');
             $logger->info('Second');
             $failed->await();
@@ -554,8 +554,8 @@ final class LoggerTest
             Assert::same($logger->failure, $failure);
 
             Assert::same($logger->dropped, 3);
-            Assert::same(thrown($logger->close(...)), $failure);
-            Assert::same(thrown($logger->close(...)), $failure);
+            Assert::same(thrown($logger->stop(...)), $failure);
+            Assert::same(thrown($logger->stop(...)), $failure);
         }));
 
         Assert::same($output->writes, []);
@@ -573,11 +573,11 @@ final class LoggerTest
         $logger = new Logger($output);
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('First');
 
             Expect::exception(WriteFailed::class)->withMessage('Output unavailable.');
-            $logger->close();
+            $logger->stop();
         });
     }
 
@@ -605,13 +605,13 @@ final class LoggerTest
         $logger = new Logger(new RecordingWriter());
 
         group(static function (Group $group) use ($logger, $message, $wasConverted) {
-            $logger->run($group);
+            $logger->start($group);
             $group->cancelTasks();
             $logger->info($message);
 
             Assert::true($wasConverted->isDone);
             Assert::same($logger->dropped, 1);
-            Assert::instanceOf(thrown($logger->close(...)), TaskCancelled::class);
+            Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
         });
     }
 
@@ -627,10 +627,10 @@ final class LoggerTest
         $logger = new Logger($output, formatter: $formatter);
 
         group(static function (Group $group) use ($logger, $resume, $output) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('Done');
             $closed = timeoutOr(ms(1), static function () use ($logger) {
-                $logger->close();
+                $logger->stop();
 
                 return true;
             });
@@ -639,7 +639,7 @@ final class LoggerTest
             Assert::same($output->writes, []);
 
             $resume->complete();
-            $logger->close();
+            $logger->stop();
 
             Assert::same($output->writes, ["Done\n"]);
             Assert::same($logger->dropped, 0);
@@ -652,7 +652,7 @@ final class LoggerTest
         $logger = new Logger($output);
 
         group(static function (Group $group) use ($logger) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('Pending');
             $group->cancelTasks();
         });
@@ -660,8 +660,8 @@ final class LoggerTest
         $logger->info('After cancellation');
 
         Assert::same($logger->dropped, 1);
-        Assert::instanceOf(thrown($logger->close(...)), TaskCancelled::class);
-        Assert::instanceOf(thrown($logger->close(...)), TaskCancelled::class);
+        Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
+        Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
         Assert::same($logger->dropped, 2);
         Assert::same($output->writes, []);
     }
@@ -680,13 +680,13 @@ final class LoggerTest
         $logger = new Logger($output, formatter: $formatter);
 
         group(static function (Group $group) use ($logger, $started) {
-            $logger->run($group);
+            $logger->start($group);
             $logger->info('Formatting');
             $started->await();
             $logger->info('Pending');
             $group->cancelTasks();
 
-            Assert::instanceOf(thrown($logger->close(...)), TaskCancelled::class);
+            Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
         });
 
         Assert::same($logger->dropped, 2);

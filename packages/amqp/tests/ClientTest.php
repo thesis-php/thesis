@@ -36,7 +36,7 @@ final class ClientTest
         group(static function (Group $group) use ($server) {
             $startOk = $group->spawn(static fn() => $server->accept()->handshake());
             $client = new Client($server->config());
-            $client->run($group);
+            $client->start($group);
 
             $startOk = $startOk->await();
             Assert::same($startOk->mechanism, 'PLAIN');
@@ -53,7 +53,7 @@ final class ClientTest
 
         group(static function (Group $group) use ($server) {
             [$client, $peer] = connect($group, $server);
-            closeClient($group, $client, $peer);
+            stopClient($group, $client, $peer);
 
             Expect::exception(ConnectionClosed::class)->withMessage('The client is closed.');
 
@@ -74,7 +74,7 @@ final class ClientTest
 
             Expect::exception(ConnectionFailed::class);
 
-            new Client($server->config())->run($group);
+            new Client($server->config())->start($group);
         });
     }
 
@@ -108,7 +108,7 @@ final class ClientTest
                 return $peer;
             });
             $client = new Client($server->config(heartbeat: sec(1)));
-            $client->run($group);
+            $client->start($group);
             $peer = $peer->await();
 
             // The client sends nothing but its heartbeats and, hearing nothing for 2 seconds, closes the socket.
@@ -136,7 +136,7 @@ final class ClientTest
                 return $peer;
             });
             $client = new Client($server->config(heartbeat: sec(1)));
-            $client->run($group);
+            $client->start($group);
             $peer = $peer->await();
 
             for ($i = 0; $i < 6; ++$i) {
@@ -146,7 +146,7 @@ final class ClientTest
 
             [$channel] = openChannel($group, $client, $peer);
             Assert::same($channel->id, 1);
-            closeClient($group, $client, $peer);
+            stopClient($group, $client, $peer);
         });
     }
 
@@ -163,7 +163,7 @@ final class ClientTest
             [$channel] = openChannel($group, $client, $peer);
 
             Assert::same($channel->id, 1);
-            closeClient($group, $client, $peer);
+            stopClient($group, $client, $peer);
         });
     }
 
@@ -178,7 +178,7 @@ final class ClientTest
 
                 return $peer->tune(heartbeat: 60);
             });
-            new Client($server->config(heartbeat: ms(300)))->run($group);
+            new Client($server->config(heartbeat: ms(300)))->start($group);
 
             Assert::same($tuneOk->await()->heartbeat, 1);
         });
@@ -196,7 +196,7 @@ final class ClientTest
                 return $peer;
             });
             $client = new Client($server->config(reconnect: true));
-            $client->run($group);
+            $client->start($group);
             openChannel($group, $client, $peer->await());
 
             Expect
@@ -208,7 +208,7 @@ final class ClientTest
         });
     }
 
-    public function closeDuringAReconnectLeavesNoConnection(): void
+    public function stopDuringAReconnectLeavesNoConnection(): void
     {
         $server = FakeServer::listen();
 
@@ -218,12 +218,12 @@ final class ClientTest
 
             $peer = $server->accept();
             $peer->start();
-            $closed = $group->spawn($client->close(...));
+            $closed = $group->spawn($client->stop(...));
             delay(ms(10));
             $peer->tune();
             $closed->await();
 
-            // The client closes the connection it has opened during close().
+            // The client closes the connection it has opened during stop().
             Assert::instanceOf(thrown($peer->frame(...)), IoException::class);
 
             Expect::exception(ConnectionClosed::class)->withMessage('The client is closed.');
@@ -232,7 +232,7 @@ final class ClientTest
         });
     }
 
-    public function closeWaitsForTheConfirmsOfThePublishesInFlight(): void
+    public function stopWaitsForTheConfirmsOfThePublishesInFlight(): void
     {
         $server = FakeServer::listen();
 
@@ -248,7 +248,7 @@ final class ClientTest
             $peer->expect(BasicPublish::class);
             $peer->expectMessage();
 
-            $close = $group->spawn($client->close(...));
+            $close = $group->spawn($client->stop(...));
             delay(ms(10));
             Assert::false($close->isDone);
 
@@ -274,13 +274,13 @@ final class ClientTest
             $peer->openChannel();
 
             Assert::same($channel->await()->id, 1);
-            closeClient($group, $client, $peer);
+            stopClient($group, $client, $peer);
         });
     }
 
-    public function throwsWhenUsedBeforeRun(): void
+    public function throwsWhenUsedBeforeStart(): void
     {
-        Expect::exception(\LogicException::class)->withMessage('The client is not running: call run() first.');
+        Expect::exception(\LogicException::class)->withMessage('The client is not running: call start() first.');
 
         new Client(new Config())->channel();
     }
@@ -298,7 +298,7 @@ final class ClientTest
 
             Expect::exception(ConnectionFailed::class);
 
-            new Client($server->config())->run($group);
+            new Client($server->config())->start($group);
         });
     }
 
@@ -307,12 +307,12 @@ final class ClientTest
         timeout(sec(3), static fn() => group(static function (Group $group) {
             $server = FakeServer::listen();
             $client = new Client($server->config());
-            $run = $group->spawn(static fn() => thrown(static fn() => $client->run($group)));
+            $startup = $group->spawn(static fn() => thrown(static fn() => $client->start($group)));
             $peer = $server->accept();
             $waiting = $group->spawn(static fn() => thrown(static fn() => timeout(ms(500), $client->channel(...))));
             checkpoint();
             $peer->socket->close();
-            Assert::instanceOf($run->await(), ConnectionFailed::class);
+            Assert::instanceOf($startup->await(), ConnectionFailed::class);
             Assert::instanceOf($waiting->await(), ConnectionFailed::class);
         }));
     }

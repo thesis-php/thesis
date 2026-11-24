@@ -36,7 +36,7 @@ with `Thesis\Async\group()`, and a wait outside it throws `LogicException`. The 
 
 ### Connecting
 
-`Client` is passive until `run()`, as every long-lived client of thesis: `run()` connects and performs the handshake
+`Client` is passive until `start()`, as every long-lived client of thesis: `start()` connects and performs the handshake
 in the calling fiber, then the reader, the heartbeats and the reconnects run as daemons of the group.
 
 ```php
@@ -51,13 +51,13 @@ use function Thesis\Time\sec;
 $client = new Client(Config::fromUri('amqp://guest:guest@localhost:5672/'));
 
 group(static function (Group $group) use ($client) {
-    $client->run($group);
+    $client->start($group);
 
     try {
         $channel = $client->channel();
         // ...
     } finally {
-        shield(static fn() => timeout(sec(5), $client->close(...)));
+        shield(static fn() => timeout(sec(5), $client->stop(...)));
     }
 });
 ```
@@ -67,7 +67,7 @@ group(static function (Group $group) use ($client) {
 `auth_mechanism`, the TLS files), and several hosts separated by commas: they are tried in order.
 `new Config(...)` takes the same with durations of thesis/time: `heartbeat: sec(30)`, `connectTimeout: sec(5)`.
 
-`close()` ends the consumers, waits for the confirms that are due and closes the connection. Nothing in the API
+`stop()` ends the consumers, waits for the confirms that are due and closes the connection. Nothing in the API
 has a timeout parameter: bound any call with `timeout()`, and a cancelled group stops the client.
 
 ### Publishing
@@ -128,7 +128,7 @@ foreach ($channel->consume('tasks') as $delivery) {
 }
 ```
 
-A consumer is an iterator of `Delivery`. It ends after `$consumer->cancel()`, `$channel->close()` or `$client->close()`,
+A consumer is an iterator of `Delivery`. It ends after `$consumer->cancel()`, `$channel->close()` or `$client->stop()`,
 and throws if the channel or the connection is lost, or `ConsumerCancelled` if the broker cancels it
 (the queue is deleted). Deliveries are buffered without a bound: the prefetch of `qos()` limits what the broker sends.
 

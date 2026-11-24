@@ -86,7 +86,7 @@ final readonly class Config
      *     server both propose positive intervals, they use the shorter interval. If either proposes zero, they
      *     use the other proposal. The client closes the connection after two intervals without a server frame.
      * @param ?Duration $connectTimeout for each attempt to connect to a host and to perform the handshake,
-     *     30 seconds if null. The first connection is bounded by the caller of {@see Client::run()} too
+     *     30 seconds if null. The first connection is bounded by the caller of {@see Client::start()} too
      * @param int<0, 65535> $channelMax 0 to take the limit of the server
      * @param int<0, 4294967295> $frameMax 0 to take the limit of the server
      * @param ?string $connectionName shown in the management UI of RabbitMQ

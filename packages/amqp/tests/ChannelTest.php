@@ -447,7 +447,7 @@ final class ChannelTest
                 return $peer;
             });
             $client = new Client($server->config());
-            $client->run($group);
+            $client->start($group);
             $peer = $peer->await();
             [$channel] = openChannel($group, $client, $peer);
 
@@ -615,7 +615,7 @@ final class ChannelTest
         });
     }
 
-    public function closeFinishesWhenAnUnsentConfirmedPublishIsCancelled(): void
+    public function stopFinishesWhenAnUnsentConfirmedPublishIsCancelled(): void
     {
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id, Client $client) {
             $select = $group->spawn($channel->confirmSelect(...));
@@ -629,7 +629,7 @@ final class ChannelTest
             $peer->expect(BasicPublish::class);
             $unsent = $group->spawn(static fn() => $channel->publish(new Message('unsent')));
             checkpoint();
-            $close = $group->spawn($client->close(...));
+            $close = $group->spawn($client->stop(...));
             checkpoint();
             $unsent->cancel();
             $peer->expectMessage();
@@ -662,7 +662,7 @@ final class ChannelTest
         });
     }
 
-    public function closeCanResumeAnInterruptedDrain(): void
+    public function stopCanResumeAnInterruptedDrain(): void
     {
         self::withChannel(static function (Group $group, Channel $channel, FakePeer $peer, int $id, Client $client) {
             $select = $group->spawn($channel->confirmSelect(...));
@@ -672,12 +672,12 @@ final class ChannelTest
             $publish = $group->spawn(static fn() => $channel->publish(new Message('m')));
             $peer->expect(BasicPublish::class);
             $peer->expectMessage();
-            $first = thrown(static fn() => timeout(ms(100), $client->close(...)));
+            $first = thrown(static fn() => timeout(ms(100), $client->stop(...)));
             Assert::instanceOf($first, TimedOut::class);
             $peer->send($id, new BasicAck(1, false));
             $publish->await();
             $group->daemon($peer->acceptClose(...));
-            $client->close();
+            $client->stop();
             Assert::true($channel->isClosed);
         });
     }

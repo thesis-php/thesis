@@ -297,7 +297,7 @@ or the process loop. `virtualTime()` runs a separate loop.
   A waiter cancelled in its own scope leaves the attempt alone. Work owned by a group (such as a shared DNS query)
   belongs in a task of that group. Rejected: starting the callback in a background task from the constructor.
 - `Backoff` computes the delays and does not wait: the wait of each user ends differently (`StreamWatcher::delay()`
-  that `close()` ends in thesis/net, a `timeoutOr()` that `Client::close()` ends in thesis/amqp).
+  that `close()` ends in thesis/net, a `timeoutOr()` that `Client::stop()` ends in thesis/amqp).
   Rejected: a `retry(callable, Backoff)`, it would fix the wait and which failures are retried.
   The jitter takes between half and all of a delay ("equal jitter"), not from zero ("full jitter"):
   a reconnect right after a loss is a storm, and a floor keeps the attempts paced.

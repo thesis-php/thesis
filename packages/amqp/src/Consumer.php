@@ -15,7 +15,7 @@ use function Thesis\Async\timeoutOr;
  *     each($consumer, concurrency: 10, static function (Delivery $delivery) { ...; $delivery->ack(); });
  *
  * The iteration ends once the consumer is cancelled ({@see cancel()}, {@see Channel::close()},
- * {@see Client::close()}) and the deliveries that arrived before are taken. It throws {@see ConsumerCancelled}
+ * {@see Client::stop()}) and the deliveries that arrived before are taken. It throws {@see ConsumerCancelled}
  * if the server has cancelled the consumer, {@see ChannelClosed} or {@see ConnectionClosed} if the channel is gone.
  *
  * @api

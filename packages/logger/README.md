@@ -39,12 +39,12 @@ use function Thesis\Io\stderr;
 
 group(static function (Group $group) {
     $logger = new Logger(stderr());
-    $logger->run($group);
+    $logger->start($group);
 
     try {
         $logger->info('Worker {worker} is ready', ['worker' => 3]);
     } finally {
-        $logger->close();
+        $logger->stop();
     }
 });
 ```
@@ -94,15 +94,15 @@ non-scalar message, the exception summary uses its type. Unset file and line fie
 
 The default minimum level is `info` and the default queue holds 1024 lines. Pass `minLevel` or `capacity`
 to change these. A full queue drops the incoming record. `$dropped` counts records refused or lost, including
-before `run()` or after `close()`. Logging to the same logger from its writer task or a task started by the
+before `start()` or after `stop()`. Logging to the same logger from its writer task or a task started by the
 writer also counts as a drop. This prevents a formatter, output or trace listener from feeding records back
 into the queue. Records filtered by level do not count.
 
 Read `$logger->failure` to check whether formatting or writing stopped the background task. It holds the
-original throwable as soon as the writer catches it, and `close()` rethrows it. Queue overflow, normal
+original throwable as soon as the writer catches it, and `stop()` rethrows it. Queue overflow, normal
 shutdown and task cancellation leave this property null.
 
-Stop producers first and then call `close()` while the group is still running. `close()` stops accepting
+Stop producers first and then call `stop()` while the group is still running. `stop()` stops accepting
 records and drains the queue. It leaves the destination open and throws if formatting or writing failed. In a cancelled
 scope use `shield()` with a `timeout()` to give the writer time to drain. A cancelled wait leaves the writer
-free to continue until the group ends, and a later `close()` can wait for it again.
+free to continue until the group ends, and a later `stop()` can wait for it again.

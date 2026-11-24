@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\HttpServer;
 
 use Thesis\Async\Group;
+use Thesis\Async\Service;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\HttpServer\Internal\Listener;
@@ -22,7 +23,7 @@ use function Thesis\Net\listenUnix;
  *
  * @api
  */
-final class Server
+final class Server implements Service
 {
     private ?SocketListener $listener = null;
 
@@ -62,7 +63,7 @@ final class Server
      *
      * @throws ListenFailed if the endpoint cannot be bound
      */
-    public function run(Group $group): void
+    public function start(Group $group): void
     {
         if ($this->listener !== null) {
             throw new \LogicException('The server has already started.');
@@ -89,18 +90,18 @@ final class Server
                 onError: $this->onError,
             );
             $task = $group->daemon(function () use ($driver, &$ready) {
-                $unsubscribe = onCancel($this->close(...));
+                $unsubscribe = onCancel($this->stop(...));
 
                 try {
                     $ready = true;
                     shield($driver->run(...));
                 } finally {
                     $unsubscribe();
-                    $this->close();
+                    $this->stop();
                 }
             });
 
-            // A group may finish as soon as run() returns. A daemon cancelled before it starts never runs its finally.
+            // A group may finish as soon as start() returns. A daemon cancelled before it starts never runs its finally.
             while (!$ready && !$task->isDone) {
                 checkpoint();
             }
@@ -109,7 +110,8 @@ final class Server
                 $task->await();
             }
         } catch (\Throwable $error) {
-            $this->close();
+            $this->stop();
+            $this->listener = null;
 
             throw $error;
         }
@@ -118,7 +120,7 @@ final class Server
     /**
      * Stops accepting requests. Safe to call from a handler or more than once.
      */
-    public function close(): void
+    public function stop(): void
     {
         $this->listener?->close();
     }

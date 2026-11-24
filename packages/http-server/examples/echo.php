@@ -18,7 +18,7 @@ $server = new Server(
 );
 
 group(static function (Group $group) use ($server) {
-    $server->run($group);
+    $server->start($group);
     awaitSignal(SIGINT, SIGTERM);
-    $server->close();
+    $server->stop();
 });

@@ -38,7 +38,7 @@ the decision to keep them. The list comes from a review of every package's `src/
   `PublishBatchFailed::$nacked`), never only in the message.
 - A mistake of the caller is an exception of PHP, not ours: a wrong value is `\ValueError`, a wrong state
   or order is `\LogicException` with the fix in the message (`call confirmSelect() first.`,
-  `call run() first.`).
+  `call start() first.`).
 - A message is a sentence ending with a period, except one that copies PHP (the polyfill). A failure is "Failed to <verb> …", a closed resource "The <noun> is closed." /
   "… was closed while reading.", a second reader "Another fiber is reading from the <noun>."
 

@@ -11,6 +11,7 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\LocalMutex;
+use Thesis\Async\Service;
 use Thesis\Async\TimedOut;
 use Thesis\Io\IoException;
 use function Thesis\Amqp\Internal\address;
@@ -22,18 +23,18 @@ use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 /**
- * A connection to RabbitMQ that reconnects. A passive object until {@see run()} (agents/clients.md):
+ * A connection to RabbitMQ that reconnects. A passive object until {@see start()} (agents/clients.md):
  *
  *     $client = new Client(Config::fromUri('amqp://guest:guest@localhost:5672/'));
  *
  *     group(static function (Group $group) use ($client) {
- *         $client->run($group);
+ *         $client->start($group);
  *
  *         try {
  *             $channel = $client->channel();
  *             // ...
  *         } finally {
- *             shield(static fn() => timeout(sec(5), $client->close(...)));
+ *             shield(static fn() => timeout(sec(5), $client->stop(...)));
  *         }
  *     });
  *
@@ -44,9 +45,9 @@ use function Thesis\Time\sec;
  *
  * @api
  */
-final class Client
+final class Client implements Service
 {
-    private bool $running = false;
+    private bool $started = false;
 
     private bool $closing = false;
 
@@ -62,7 +63,7 @@ final class Client
     private Deferred $next;
 
     /**
-     * Completed by {@see close()}: ends the wait between reconnects.
+     * Completed by {@see stop()}: ends the wait between reconnects.
      *
      * @var Deferred<null>
      */
@@ -82,24 +83,45 @@ final class Client
     /**
      * Connects to the first host of the config that accepts, performs the handshake in the calling fiber
      * and returns: the client is ready. The reader, the heartbeats and the reconnects run as daemons of $group,
-     * so the client works until {@see close()} or the end of the group.
+     * so the client works until {@see stop()} or the end of the group.
      *
      * @throws ConnectionFailed
-     * @throws \LogicException if the client is running already
      */
-    public function run(Group $group): void
+    public function start(Group $group): void
     {
-        if ($this->running) {
-            throw new \LogicException('The client is running already.');
+        if ($this->started) {
+            throw new \LogicException('The client has already started.');
         }
 
-        // Before the first wait: a concurrent run() must not open a second connection.
-        $this->running = true;
+        $this->started = true;
 
         try {
             $connection = $this->connect();
+
+            if ($this->closing) {
+                $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
+
+                return;
+            }
+
+            $task = $group->daemon(function () use ($connection) {
+                try {
+                    $this->supervise($connection);
+                } finally {
+                    $this->next->fail(new ConnectionClosed('The client is stopped.'));
+                }
+            });
+            if ($task->isDone) {
+                $task->await();
+            }
+
+            $this->up($connection);
         } catch (\Throwable $exception) {
-            $this->running = false;
+            if (isset($connection)) {
+                $connection->terminate(new ConnectionClosed('The client failed to start.'));
+            }
+
+            $this->started = false;
             $waiting = $this->next;
             $this->next = new Deferred();
             $waiting->fail($exception instanceof Cancelled
@@ -108,21 +130,6 @@ final class Client
 
             throw $exception;
         }
-
-        if ($this->closing) {
-            $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
-
-            return;
-        }
-
-        $this->up($connection);
-        $group->daemon(function () use ($connection) {
-            try {
-                $this->supervise($connection);
-            } finally {
-                $this->next->fail(new ConnectionClosed('The client is stopped.'));
-            }
-        });
     }
 
     /**
@@ -130,7 +137,7 @@ final class Client
      *
      * @throws ConnectionClosed if the client is closed, or the connection is lost and reconnects are off
      * @throws AmqpException
-     * @throws \LogicException if {@see run()} has not been called
+     * @throws \LogicException if {@see start()} has not been called
      */
     public function channel(): Channel
     {
@@ -154,9 +161,9 @@ final class Client
      * in flight, closes the connection with the server. Bound it with `timeout()` and `shield()`.
      * The daemons end by themselves afterwards. Later calls do nothing.
      */
-    public function close(): void
+    public function stop(): void
     {
-        if (!$this->running) {
+        if (!$this->started) {
             return;
         }
 
@@ -176,8 +183,8 @@ final class Client
      */
     private function connection(): Connection
     {
-        if (!$this->running) {
-            throw new \LogicException('The client is not running: call run() first.');
+        if (!$this->started) {
+            throw new \LogicException('The client is not running: call start() first.');
         }
 
         if ($this->closing) {
@@ -253,8 +260,8 @@ final class Client
                 continue;
             }
 
-            // close() has come during the handshake: it could not see this connection.
-            if ($this->closing) { // @phpstan-ignore if.alwaysFalse (close() runs while connect() waits)
+            // stop() has come during the handshake: it could not see this connection.
+            if ($this->closing) { // @phpstan-ignore if.alwaysFalse (stop() runs while connect() waits)
                 $connection->terminate(new ConnectionClosed('The client is closed.', ReplyCode::ReplySuccess));
 
                 return null;

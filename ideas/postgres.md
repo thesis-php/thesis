@@ -135,7 +135,7 @@ Here: one driver, no `sql` until the second driver (the roadmap), no `@template`
 one interface, the rest `final` classes. About 15 types:
 
 - `Executor`, the only interface: what user code takes, so a repository works in a transaction and outside it.
-- `Client` (the pool, `run($group)`/`close()` of `agents/clients.md`), `Config`, `Connection`, `Transaction`,
+- `Client` (the pool, `start($group)`/`stop()` of `agents/clients.md`), `Config`, `Connection`, `Transaction`,
   `Result`, `Listener`, `Notification`. `Connection` and `Transaction` have `@internal` constructors.
 - `PostgresException`, `ConnectionFailed`, `ConnectionClosed`, `QueryFailed`, `SqlState`, `IsolationLevel`.
 
@@ -154,7 +154,7 @@ interface Executor
 }
 
 $client = new Client(Config::fromUri('postgres://app@db/app'));
-$client->run($group);
+$client->start($group);
 
 $user = $client->query('SELECT * FROM users WHERE id = $1', [$id])->first();
 
@@ -291,7 +291,7 @@ are written down. A chain of sessions, one stage each (1–2k lines with tests),
    the answers to the queue of queries, the states of a connection. Without them parallel sessions diverge.
 1. The skeleton, sequential, it sets the conventions: the package and its manifest, the postgres service,
    the fake server, `Config::fromUri()`, startup, trust/md5/SCRAM, ErrorResponse, `SqlState` generated,
-   simple query, `Client::run()`/`close()`.
+   simple query, `Client::start()`/`stop()`.
 2. The hot core, a session of its own, not split and not finished after a compression: extended query,
    the pipelining queue, Sync, recovery, the statement cache, the table of types, the decoder generator.
    Ends with the benchmark again (0.62 µs per row).

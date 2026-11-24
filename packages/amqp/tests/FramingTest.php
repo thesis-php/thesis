@@ -138,7 +138,7 @@ final class FramingTest
                 return $peer;
             });
             $client = new Client($server->config());
-            $client->run($group);
+            $client->start($group);
             $peer = $peer->await();
             [$channel, $id] = openChannel($group, $client, $peer);
 
