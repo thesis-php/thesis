@@ -29,9 +29,9 @@ final class LocalSemaphore implements Semaphore
     private int $permits;
 
     /**
-     * @var WaitQueue<Continuation<null>>
+     * @var ?WaitQueue<Continuation<null>>
      */
-    private readonly WaitQueue $waiters;
+    private ?WaitQueue $waiters = null;
 
     /**
      * @param positive-int $permits
@@ -39,7 +39,6 @@ final class LocalSemaphore implements Semaphore
     public function __construct(int $permits)
     {
         $this->permits = $permits;
-        $this->waiters = new WaitQueue();
     }
 
     public function acquire(): Lock
@@ -50,10 +49,11 @@ final class LocalSemaphore implements Semaphore
         } else {
             suspend(function (Continuation $continuation) {
                 /** @var Continuation<null> $continuation */
-                $key = $this->waiters->push($continuation);
+                $waiters = $this->waiters ??= new WaitQueue();
+                $key = $waiters->push($continuation);
 
-                return function () use ($key) {
-                    $this->waiters->remove($key);
+                return static function () use ($waiters, $key) {
+                    $waiters->remove($key);
                 };
             });
             // Resumed by release(): the permit has been handed over.
@@ -64,10 +64,14 @@ final class LocalSemaphore implements Semaphore
 
     private function release(): void
     {
-        while ($this->waiters->items !== [] && ($waiter = $this->waiters->shift()) !== null) {
-            if ($waiter->resume()) {
-                return;
+        if ($this->waiters !== null) {
+            while (($waiter = $this->waiters->shift()) !== null) {
+                if ($waiter->resume()) {
+                    return;
+                }
             }
+
+            $this->waiters = null;
         }
 
         ++$this->permits;

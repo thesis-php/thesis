@@ -73,11 +73,13 @@ The model, the API and the guarantees are described in `README.md` — read it f
 - `Channel` hands values over like `LocalSemaphore` hands permits: a value goes to a waiting receiver, or is taken
   from a waiting sender, only if that waiter's `resume()` returns `true`; otherwise it goes to the next one or to the
   buffer. So a `send()` that throws `Cancelled` has not delivered, and a `receive()` that throws `Cancelled` has not
-  taken anything. Waiting receivers imply an empty buffer; waiting senders imply a full one (or a rendezvous).
+  taken anything. A rendezvous channel has no buffer to allocate. A local semaphore creates its wait queue
+  when a caller first has to wait for a permit and drops it when a permit returns to the pool.
+  Waiting receivers imply an empty buffer; waiting senders imply a full one (or a rendezvous).
 - `each()` and `map()` run on `Internal\Workers`: at most `concurrency` tasks, each takes the next item under
   `synchronized()` (a generator may suspend, and another worker must not resume it meanwhile); an array cannot suspend,
-  so it is taken without the lock. An item is pulled when it is taken, never ahead: `next()` before `valid()`, not after
-  `current()`. Taking checks cancellation first (after getting the lock), so nothing is pulled after a failure.
+  so it is taken without the lock. A single worker needs no lock for any iterable.
+  An item is pulled when it is taken, never ahead: `next()` before `valid()`, not after `current()`. Taking checks cancellation first (after getting the lock), so nothing is pulled after a failure.
   A new worker is started only when the item just taken leaves no worker free.
   The callable gets the value only (`$fn($value)`, so an internal function fits); only `map()` uses the key, for its
   result. A repeated key in a generator takes the last input's result. Each invocation writes its own cell, so

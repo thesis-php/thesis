@@ -50,7 +50,7 @@ final class Workers
         new self(
             group: $group,
             items: (static fn() => yield from $items)(),
-            mutex: \is_array($items) ? null : new LocalMutex(),
+            mutex: $concurrency === 1 || \is_array($items) ? null : new LocalMutex(),
             concurrency: $concurrency,
             fn: $fn,
             traced: $traced,
@@ -59,7 +59,7 @@ final class Workers
 
     /**
      * @param \Generator<K, T> $items
-     * @param ?LocalMutex $mutex guards advancing the iterator, or null for an array that cannot suspend
+     * @param ?LocalMutex $mutex guards advancing the iterator, or null for one worker or an array
      * @param positive-int $concurrency
      * @param \Closure(T, K): mixed $fn
      * @param callable(T): mixed $traced

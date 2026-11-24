@@ -41,9 +41,9 @@ use Thesis\Async\Internal\WaitQueue;
 final class Channel implements \IteratorAggregate, \Countable
 {
     /**
-     * @var \SplQueue<T>
+     * @var ?\SplQueue<T>
      */
-    private readonly \SplQueue $buffer;
+    private readonly ?\SplQueue $buffer;
 
     /**
      * @var WaitQueue<Continuation<?array{T}>> resumed with null once the channel is closed
@@ -66,7 +66,9 @@ final class Channel implements \IteratorAggregate, \Countable
     public function __construct(
         public readonly int $capacity,
     ) {
-        $this->buffer = new \SplQueue();
+        /** @var ?\SplQueue<T> $buffer */
+        $buffer = $capacity === 0 ? null : new \SplQueue();
+        $this->buffer = $buffer;
         $this->receivers = new WaitQueue();
         $this->senders = new WaitQueue();
     }
@@ -131,8 +133,10 @@ final class Channel implements \IteratorAggregate, \Countable
             }
         }
 
-        if ($this->buffer->count() < $this->capacity) {
-            $this->buffer->enqueue($value);
+        $buffer = $this->buffer;
+
+        if ($buffer !== null && \count($buffer) < $this->capacity) {
+            $buffer->enqueue($value);
 
             return true;
         }
@@ -217,7 +221,7 @@ final class Channel implements \IteratorAggregate, \Countable
 
     public function count(): int
     {
-        return $this->buffer->count();
+        return $this->buffer?->count() ?? 0;
     }
 
     /**
@@ -242,15 +246,17 @@ final class Channel implements \IteratorAggregate, \Countable
      */
     private function take(): ?array
     {
-        if (!$this->buffer->isEmpty()) {
-            $value = $this->buffer->dequeue();
+        $buffer = $this->buffer;
+
+        if ($buffer !== null && \count($buffer) > 0) {
+            $value = $buffer->dequeue();
 
             // There is room now: the first waiting sender moves its value to the buffer and goes on.
             while ($this->senders->items !== [] && ($waiting = $this->senders->shift()) !== null) {
                 [$sender, $sent] = $waiting;
 
                 if ($sender->resume()) {
-                    $this->buffer->enqueue($sent);
+                    $buffer->enqueue($sent);
 
                     break;
                 }
