@@ -52,6 +52,12 @@ component_management:
         - packages/formatter/src/**
       flag_regexes:
         - '^formatter$'
+    - component_id: hot-reload
+      name: thesis/hot-reload
+      paths:
+        - packages/hot-reload/src/**
+      flag_regexes:
+        - '^hot-reload$'
     - component_id: http
       name: thesis/http
       paths:
@@ -94,6 +100,12 @@ component_management:
         - packages/net/src/**
       flag_regexes:
         - '^net$'
+    - component_id: process
+      name: thesis/process
+      paths:
+        - packages/process/src/**
+      flag_regexes:
+        - '^process$'
     - component_id: source-location
       name: thesis/source-location
       paths:

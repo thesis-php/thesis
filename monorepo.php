@@ -8,7 +8,7 @@ use Thesis\Monorepo\Config;
 return new Config(
     php: '^8.6',
     description: 'Asynchronous PHP on an event loop of its own: structured concurrency for fibers, '
-        . 'non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, and a runnable demo. '
+        . 'non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, Unix processes, hot reload and a runnable demo. '
         . 'Monorepo of the thesis/* packages.',
     copyrightHolder: 'The Thesis Authors',
     licenseSince: 2026,
@@ -29,6 +29,8 @@ return new Config(
         'http-server',
         'logging',
         'demo',
+        'process',
+        'hot-reload',
     ],
     authors: [
         ['name' => 'Vadim Zanfir', 'email' => 'vadimzanfir@gmail.com'],

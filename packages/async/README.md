@@ -465,6 +465,10 @@ Both are waits like any other: cancellable, and they keep the event loop running
 right before the event loop waits for the kernel is handled at the latest 100 ms later, the longest wait
 while a handler is installed.
 
+Use `onSignal($signal, $handler)` to notify a library between fibers. The callback must finish without
+suspending. Subscribing the same closure several times in one loop calls it once per delivery.
+Each call returns a closure to unsubscribe in the same loop. The last unsubscribe restores the previous handler.
+
 ### CPU-bound loops: `checkpoint()`
 
 A loop that never waits starves the event loop: timers, including `timeout()` deadlines, cannot fire,
@@ -1225,6 +1229,7 @@ all([user, orders])              orders fails after 50 ms
 | `Lock`: `release(): bool`, `$isReleased` | a held permit, one-shot |
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(Duration)` | cancellable sleep; zero or less waits as zero |
+| `onSignal(int $signal, Closure $handler): Closure` | subscribe a shared loop callback and return its unsubscribe function |
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |

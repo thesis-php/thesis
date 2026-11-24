@@ -27,8 +27,8 @@ The background reading of a worker is `EventLoop::queue()`: nothing owns it.
 ## The transport: a socket pair, no hub
 
 The hub, the key, the two connections and the connect timeout exist for Windows, where a child cannot inherit
-an extra descriptor. We are Unix only (`agents/platform.md`): `socketPair()` of `net`, one end passed
-to the child as `3 => $socket` in the descriptor spec of `proc_open()`, the child opens `php://fd/3`.
+an extra descriptor. We are Unix only (`agents/platform.md`): a Unix stream socket pair, one end passed
+to the child as `descriptors: [3 => $child]` of `Process::start()`. The child opens `php://fd/3`.
 One socket per worker, nothing listens (no foreign connections to reject), no connect phase.
 
 Messages and the result share the socket: a frame `[u32 length][u8 type][u64 job][payload]` on `Buffer`.
@@ -150,7 +150,8 @@ is piped through daemons of the pool.
 
 ## Dependencies and order
 
-`thesis/parallel` requires `async`, `io`, `net` (`socketPair()`), `time` and `process`, which comes first.
+`thesis/parallel` requires `async`, `io`, `time` and `process`. The parent wraps its end of the socket pair
+in an `Io\Stream`.
 What `process` needs for it: passing arbitrary descriptors to the child, not only 0, 1 and 2, and inheriting stdio
 without pipes.
 

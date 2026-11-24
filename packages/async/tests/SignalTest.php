@@ -16,6 +16,67 @@ use function Thesis\Time\sec;
 #[Test]
 final class SignalTest
 {
+    public function sharedSignalHandlerRunsOnceUntilItsLastSubscriptionEnds(): void
+    {
+        $calls = [];
+        $handler = static function (int $signal) use (&$calls) {
+            $calls[] = $signal;
+        };
+        $previous = pcntl_signal_get_handler(SIGUSR1);
+        $first = onSignal(SIGUSR1, $handler);
+        $second = onSignal(SIGUSR1, $handler);
+
+        try {
+            posix_kill(posix_getpid(), SIGUSR1);
+            delay(sec(1));
+            Assert::same($calls, [SIGUSR1]);
+
+            $first();
+            $first();
+            posix_kill(posix_getpid(), SIGUSR1);
+            delay(sec(1));
+            Assert::same($calls, [SIGUSR1, SIGUSR1]);
+        } finally {
+            $first();
+            $second();
+        }
+
+        Assert::same(pcntl_signal_get_handler(SIGUSR1), $previous);
+        assertNoCallbacksLeft();
+    }
+
+    public function innerLoopReleasesItsOwnSubscriptionToTheSameHandler(): void
+    {
+        $calls = 0;
+        $handler = static function () use (&$calls) {
+            ++$calls;
+        };
+        $outer = onSignal(SIGUSR1, $handler);
+
+        try {
+            virtualTime(static function () use ($handler, $outer) {
+                $inner = onSignal(SIGUSR1, $handler);
+
+                try {
+                    Assert::instanceOf(thrown($outer), \LogicException::class);
+                    posix_kill(posix_getpid(), SIGUSR1);
+                    delay(sec(1));
+                } finally {
+                    $inner();
+                }
+            });
+
+            Assert::same($calls, 1);
+            posix_kill(posix_getpid(), SIGUSR1);
+            delay(sec(1));
+            Assert::same($calls, 2);
+        } finally {
+            $outer();
+        }
+
+        assertNoCallbacksLeft();
+    }
+
     public function awaitSignalReturnsSignalReceived(): void
     {
         $signal = group(static function (Group $group) {

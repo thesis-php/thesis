@@ -1,0 +1,66 @@
+{
+    "name": "thesis/hot-reload",
+    "description": "Restart a development server on file changes or SIGHUP, including after a failed launch.",
+    "keywords": [
+        "php",
+        "hot-reload",
+        "file-watcher",
+        "process",
+        "development",
+        "unix"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vadim Zanfir",
+            "email": "vadimzanfir@gmail.com"
+        },
+        {
+            "name": "Valentin Udaltsov",
+            "email": "udaltsov.valentin@gmail.com"
+        },
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/thesis-php/thesis/graphs/contributors"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/thesis-php/thesis/issues",
+        "source": "https://github.com/thesis-php/thesis/tree/main/packages/hot-reload",
+        "security": "https://github.com/thesis-php/thesis/security/policy"
+    },
+    "require": {
+        "php": "^8.6",
+        "ext-pcntl": "*",
+        "composer-runtime-api": "^2.2",
+        "thesis/async": "^0.1",
+        "thesis/exceptionally": "^0.4",
+        "thesis/io": "^0.1",
+        "thesis/process": "^0.1",
+        "thesis/time": "^0.4"
+    },
+    "require-dev": {
+        "testo/assert": "^0.1.17",
+        "testo/test": "^0.1.8",
+        "testo/testo": "^0.10.29"
+    },
+    "bin": [
+        "bin/hot-reload"
+    ],
+    "autoload": {
+        "psr-4": {
+            "Thesis\\HotReload\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Thesis\\HotReload\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.5.x-dev"
+        }
+    }
+}

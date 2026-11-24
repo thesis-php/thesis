@@ -585,6 +585,39 @@ function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $f
 }
 
 /**
+ * Registers a callback in the current loop. It runs between fibers and must not suspend.
+ * Multiple subscriptions to the same closure and signal call it once per delivery.
+ * Call the returned closure in the subscribing loop to remove this subscription. Repeated calls are harmless.
+ *
+ * @api
+ * @param positive-int $signal
+ * @param \Closure(int): void $handler
+ * @return \Closure(): void
+ * @throws \LogicException without ext-pcntl
+ */
+function onSignal(int $signal, \Closure $handler): \Closure
+{
+    if (!\function_exists('pcntl_signal')) {
+        throw new \LogicException('Signals need ext-pcntl.');
+    }
+
+    $loop = Loop::get();
+    $loop->onSignal($signal, $handler);
+
+    return static function () use (&$loop, $signal, $handler) {
+        if ($loop === null) {
+            return;
+        }
+        if ($loop !== Loop::get()) {
+            throw new \LogicException('Unsubscribe from the signal in the loop that subscribed to it.');
+        }
+
+        $loop->offSignal($signal, $handler);
+        $loop = null;
+    };
+}
+
+/**
  * Returns the first requested signal it receives. Use SIGINT or SIGTERM for graceful shutdown.
  * The wait is cancellable and requires ext-pcntl.
  *

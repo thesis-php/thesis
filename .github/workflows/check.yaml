@@ -95,6 +95,7 @@ jobs:
           - dispatcher
           - exceptionally
           - formatter
+          - hot-reload
           - http
           - http-client
           - http-protocol
@@ -102,6 +103,7 @@ jobs:
           - io
           - logger
           - net
+          - process
           - source-location
           - testo-plugin
           - time

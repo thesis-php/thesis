@@ -1,6 +1,6 @@
 {
     "name": "thesis/async",
-    "description": "Structured concurrency for PHP fibers with its own event loop, task-tree cancellation and lazy initialization.",
+    "description": "Structured concurrency for PHP fibers with its own event loop, signals, task-tree cancellation and lazy initialization.",
     "keywords": [
         "php",
         "async",
@@ -8,7 +8,8 @@
         "structured-concurrency",
         "cancellation",
         "event-loop",
-        "lazy-initialization"
+        "lazy-initialization",
+        "signals"
     ],
     "license": "MIT",
     "type": "library",

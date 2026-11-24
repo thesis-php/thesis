@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `synchronized()`, rate limiters and `Backoff`.
 - `StreamWatcher` and `Pacer` support non-blocking streams. `Pacer::tryPace()` checks the budget without yielding.
 - `awaitSignal()` and `trapSignals()` handle signals.
+- `onSignal()` shares a signal callback across subscriptions in the same loop.
 - `Instant` reads monotonic time. `virtualTime()` and `burnCpu()` control time in tests, and a seed shuffles
   the fibers ready in each tick.
 - `Trace\observe()` dispatches scope events. The events record cancellation causes, spawn and wait sites,

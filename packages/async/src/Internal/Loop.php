@@ -177,7 +177,7 @@ final class Loop
     private int $streamWaits = 0;
 
     /**
-     * @var array<int, array<int, \Closure(int): void>> by signal, then by spl_object_id()
+     * @var array<int, array<int, array{handler: \Closure(int): void, subscriptions: int}>> by signal and handler id
      */
     private array $signalHandlers = [];
 
@@ -547,7 +547,9 @@ final class Loop
             pcntl_signal($signal, $this->catchSignal(...));
         }
 
-        $this->signalHandlers[$signal][spl_object_id($handler)] = $handler;
+        $id = spl_object_id($handler);
+        $this->signalHandlers[$signal][$id] ??= ['handler' => $handler, 'subscriptions' => 0];
+        ++$this->signalHandlers[$signal][$id]['subscriptions'];
     }
 
     /**
@@ -558,7 +560,12 @@ final class Loop
      */
     public function offSignal(int $signal, \Closure $handler): void
     {
-        unset($this->signalHandlers[$signal][spl_object_id($handler)]);
+        $id = spl_object_id($handler);
+        if (!isset($this->signalHandlers[$signal][$id]) || --$this->signalHandlers[$signal][$id]['subscriptions'] > 0) {
+            return;
+        }
+
+        unset($this->signalHandlers[$signal][$id]);
 
         if (($this->signalHandlers[$signal] ?? null) !== []) {
             return;
@@ -1176,7 +1183,13 @@ final class Loop
         $this->caughtSignals = [];
 
         foreach ($caught as $signal) {
-            foreach ($this->signalHandlers[$signal] ?? [] as $handler) {
+            foreach ($this->signalHandlers[$signal] ?? [] as $id => $subscription) {
+                if (!isset($this->signalHandlers[$signal][$id])) {
+                    continue;
+                }
+
+                $handler = $subscription['handler'];
+
                 try {
                     $handler($signal);
                 } catch (\Throwable $error) {

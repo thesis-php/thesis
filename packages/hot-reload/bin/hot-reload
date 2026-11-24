@@ -1,0 +1,88 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Thesis\Async\Channel;
+use Thesis\Async\Group;
+use Thesis\Async\SignalTrap;
+use Thesis\HotReload\Internal\FileWatcher;
+use Thesis\HotReload\Internal\NullWatcher;
+use Thesis\HotReload\Internal\Supervisor;
+use Time\TimeException;
+use function Thesis\Async\group;
+use function Thesis\Async\trapSignals;
+use function Thesis\Time\ms;
+use function Thesis\Time\parseDuration;
+
+$command = array_slice($argv ?? [], 1);
+$paths = [];
+$debounceText = null;
+while (($option = $command[0] ?? null) !== null) {
+    if ($option === '--') {
+        array_shift($command);
+        break;
+    }
+
+    $parts = explode('=', $option, 2);
+    $name = $parts[0];
+    if ($name !== '--watch' && $name !== '--debounce') {
+        break;
+    }
+
+    array_shift($command);
+    $value = $parts[1] ?? array_shift($command);
+    if ($value === null || $value === '--') {
+        fwrite(STDERR, "Expected a value for {$name}.\n");
+
+        exit(2);
+    }
+
+    if ($name === '--debounce') {
+        $debounceText = $value;
+        continue;
+    }
+
+    if (!is_file($value) && !is_dir($value)) {
+        fwrite(STDERR, "Expected an existing file or directory for --watch.\n");
+
+        exit(2);
+    }
+
+    $paths[] = $value;
+}
+
+if ($command === []) {
+    fwrite(STDERR, "Usage: hot-reload [--watch <path>]... [--debounce <duration>] -- <command> [arguments...]\n");
+
+    exit(2);
+}
+
+require $_composer_autoload_path ?? dirname(__DIR__, 3) . '/vendor/autoload.php';
+
+try {
+    $debounce = $debounceText === null ? ms(200) : parseDuration($debounceText);
+} catch (TimeException $error) {
+    fwrite(STDERR, "Invalid --debounce value. {$error->getMessage()}\n");
+
+    exit(2);
+}
+
+if ($debounce->negative) {
+    fwrite(STDERR, "The --debounce duration must be non-negative.\n");
+
+    exit(2);
+}
+
+/** @var Channel<true> $reload */
+$reload = new Channel(capacity: 1);
+$watcher = $paths === [] ? new NullWatcher() : new FileWatcher($paths, $debounce, $reload);
+$supervisor = new Supervisor($command, $reload, $watcher);
+trapSignals([SIGHUP, SIGINT, SIGTERM], static function (SignalTrap $signals) use ($supervisor) {
+    group(static function (Group $group) use ($supervisor, $signals) {
+        $supervisor->run($group);
+        while ($signals->receive() === SIGHUP) {
+            $supervisor->reload();
+        }
+    });
+});

@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, and a runnable demo. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, Unix processes, hot reload and a runnable demo. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -19,7 +19,9 @@
         "dns",
         "http-server",
         "logging",
-        "demo"
+        "demo",
+        "process",
+        "hot-reload"
     ],
     "authors": [
         {
@@ -42,7 +44,7 @@
         "ext-openssl": "*",
         "ext-pcntl": "*",
         "ext-uri": "*",
-        "composer-runtime-api": "^2.1",
+        "composer-runtime-api": "^2.2",
         "internal/container": "^1.1",
         "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
@@ -60,6 +62,7 @@
         "ext-zlib": "*",
         "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",
+        "amphp/process": "^2.1",
         "composer/semver": "^3.4",
         "ergebnis/composer-normalize": "^2.57",
         "friendsofphp/php-cs-fixer": "^3.95.30",
@@ -71,6 +74,7 @@
         "rector/rector": "^2.8.5",
         "shipmonk/composer-dependency-analyser": "^1.8.4",
         "symfony/console": "^8.0",
+        "symfony/process": "^8.1",
         "symfony/var-dumper": "^8.0",
         "testo/assert": "^0.1.17",
         "testo/bridge-infection": "^0.1.9",
@@ -88,6 +92,7 @@
         "thesis/dispatcher": "0.4.x-dev",
         "thesis/exceptionally": "0.4.x-dev",
         "thesis/formatter": "0.2.x-dev",
+        "thesis/hot-reload": "0.5.x-dev",
         "thesis/http": "0.1.x-dev",
         "thesis/http-client": "0.1.x-dev",
         "thesis/http-protocol": "0.1.x-dev",
@@ -96,6 +101,7 @@
         "thesis/logger": "0.1.x-dev",
         "thesis/net": "0.1.x-dev",
         "thesis/phpstan-extension": "0.1.x-dev",
+        "thesis/process": "0.1.x-dev",
         "thesis/source-location": "0.1.x-dev",
         "thesis/testo-plugin": "0.1.x-dev",
         "thesis/time": "0.4.x-dev"
@@ -113,6 +119,7 @@
             "Thesis\\Cache\\": "packages/cache/src/",
             "Thesis\\Demo\\": "packages/demo/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
+            "Thesis\\HotReload\\": "packages/hot-reload/src/",
             "Thesis\\HttpClient\\": "packages/http-client/src/",
             "Thesis\\HttpProtocol\\": "packages/http-protocol/src/",
             "Thesis\\HttpServer\\": "packages/http-server/src/",
@@ -120,6 +127,7 @@
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
             "Thesis\\PhpstanExtension\\": "packages/phpstan-extension/src/",
+            "Thesis\\Process\\": "packages/process/src/",
             "Thesis\\SourceLocation\\": "packages/source-location/src/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/src/",
             "Thesis\\Time\\": "packages/time/src/"
@@ -160,6 +168,7 @@
             "Thesis\\Async\\Benchmarks\\": "packages/async/benchmarks/",
             "Thesis\\Cache\\": "packages/cache/tests/",
             "Thesis\\Formatter\\": "packages/formatter/tests/",
+            "Thesis\\HotReload\\": "packages/hot-reload/tests/",
             "Thesis\\HttpClient\\": "packages/http-client/tests/",
             "Thesis\\HttpProtocol\\": "packages/http-protocol/tests/",
             "Thesis\\HttpServer\\": "packages/http-server/tests/",
@@ -171,6 +180,7 @@
             "Thesis\\Net\\": "packages/net/tests/",
             "Thesis\\PhpCsFixer\\": "tools/php-cs-fixer/src/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
+            "Thesis\\Process\\": "packages/process/tests/",
             "Thesis\\SourceLocation\\": "packages/source-location/tests/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",
             "Thesis\\Time\\": "packages/time/tests/",
@@ -189,6 +199,7 @@
             "packages/io/tests/helpers.php",
             "packages/logger/tests/Logger/helpers.php",
             "packages/net/tests/helpers.php",
+            "packages/process/tests/helpers.php",
             "packages/time/tests/helpers.php"
         ]
     },

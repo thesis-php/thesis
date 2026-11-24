@@ -48,6 +48,8 @@ final readonly class Manifest
      * @param list<non-empty-string> $dist top-level entries of the package that src/ needs at runtime (a polyfill,
      *     resources). The split repository has only them, src/, composer.json, LICENSE, README.md,
      *     CHANGELOG.md, CONTRIBUTING.md, SECURITY.md and skills/
+     * @param list<non-empty-string> $bin Composer binaries relative to the package. Their top-level entries
+     *     are also included in the split repository.
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
      *     installs by its type
      * @param bool $devMain pins the runtime Thesis dependencies of a Composer project to dev-main,
@@ -76,6 +78,7 @@ final readonly class Manifest
         public array $skip = [],
         public array $testoPlugins = [],
         public array $dist = [],
+        public array $bin = [],
         public string $type = 'library',
         public bool $devMain = false,
         public array $extra = [],

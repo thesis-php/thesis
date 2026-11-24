@@ -9,6 +9,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   (`agents/repositories.md`). An allowlist: a new file of the monorepo stays out of the split, and so out
   of every install, without anyone remembering to exclude it. `sync` throws on a `dist` path that does not exist
   or is not a top-level entry: the split keeps whole entries, a path inside one would name nothing.
+  Declare Composer executables in `Manifest::$bin`. `sync` checks that each path names a file in the package
+  and includes its top-level entry in the split.
   Rejected: a list of excluded files (a forgotten one leaks into every install); `.gitattributes`
   with `export-ignore` over an exact copy of the package (only the archive was trimmed: the repository,
   an install from source and `dev-main` of Packagist had the tests and the files of the monorepo,
@@ -23,6 +25,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   composer-normalize) are `requireDev` of `monorepo.php`, their versions are in the lock, their configs are
   in the root under the names the tools look for, so `make` passes no `--config`. Rejected: the tools
   of the Docker image: a rebuilt image changed their versions under a commit that changed nothing.
+- Register an optional dependency exception only while the root has it as a dev dependency. Once another package
+  requires it at runtime, the dependency analyser reports the exception as unused.
 - Exceptions of a package to the quality tools are typed fields of `Manifest`, with paths relative to the package, so a
   renamed package or file does not leave a stale entry in a config: `optional` (a dev dependency used in `src/` behind a
   check) for composer-dependency-analyser, `FixerSkip` and `RectorSkip` with a required reason. The configs in the root

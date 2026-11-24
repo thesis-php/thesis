@@ -183,6 +183,7 @@ final class Generator
             'require-dev' => self::sortRequire($this->versioned($package, $manifest->requireDev)),
             'conflict' => self::sortRequire($manifest->conflict),
             'suggest' => self::sortRequire($manifest->suggest),
+            'bin' => $manifest->bin,
             'autoload' => array_filter([
                 'psr-4' => [$package->namespace => 'src/'],
                 'files' => $package->files,
@@ -335,6 +336,25 @@ final class Generator
     private function splitList(Package $package): string
     {
         $errors = [];
+        $binaryEntries = [];
+
+        foreach ($package->manifest->bin as $binary) {
+            $parts = explode('/', $binary);
+            if (array_intersect($parts, ['', '.', '..']) !== []
+                || !is_file($this->monorepo->root . '/' . $package->path . '/' . $binary)
+            ) {
+                $errors[] = \sprintf(
+                    '%s/%s: the binary %s must name a file within the package.',
+                    $package->path,
+                    Monorepo::MANIFEST,
+                    $binary,
+                );
+
+                continue;
+            }
+
+            $binaryEntries[] = $parts[0];
+        }
 
         foreach ($package->manifest->dist as $path) {
             $directory = strstr($path, '/', before_needle: true);
@@ -369,6 +389,7 @@ final class Generator
             'CONTRIBUTING.md',
             'SECURITY.md',
             ...$package->manifest->dist,
+            ...$binaryEntries,
         ];
 
         if ($package->hasSkills) {
