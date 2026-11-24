@@ -169,3 +169,16 @@
 - Rejected: four PHP processes sharing one server vCPU with `SO_REUSEPORT` for the 4096-client mix.
   The worker CPU masks all contained only CPU 0. Two pairs lost 27.7% and 52.7% throughput and one tied
   within 5 replies/s. Candidate throughput varied from 22.7k to 57.2k replies/s on the shared machine.
+- At `7eaf938`, a fixed GET through the ordinary server returned the same 66 bytes as a loop that recognized
+  only the benchmark request and wrote a prebuilt reply. Both used the same listener, connection fibers,
+  socket deadlines and write pacing. With 4096 connections on one server vCPU, the simpler loop was faster
+  in six of six pairs: median 66.7k to 90.7k replies/s, p99 94.4 to 77.2 ms. This comparison removes
+  request processing, handler dispatch, message construction and response formatting together.
+- Rejected: detaching a fully buffered fixed-length request body of up to 8 KiB into a string and bypassing
+  the streaming response loop for a small, unread string response. Both paths use one socket write.
+  The first three mixed pairs gained 13.8%, 4.6% and 3.6% RPS.
+  The repeat changed RPS by −19.3%, −10.7% and +3.2%. Across six pairs the base and candidate medians were
+  both 59.0–59.1k replies/s, with p99 of 97.7 and 97.3 ms. See the fixed GET comparison above for the cost
+  of the entire HTTP path.
+  A response body wrapping the input body can forward its `isBuffered` property. Marking the input buffered
+  made that response close the connection after the first of two pipelined POSTs. The base served both.
