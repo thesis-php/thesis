@@ -225,3 +225,11 @@
 - In a second tracing-JIT comparison of the unchanged stock handler, the three paired percentages of
   true-async throughput were 87.9%, 94.5% and 81.3%. Median RPS was 57,080 vs 67,325 and median p99
   was 145.5 vs 141.1 ms. Both processes ran on the same server vCPU in alternating runs.
+- Against `19bdc1d`, chunked POST lost throughput in all six alternating tracing-JIT Arena pairs
+  (4096 connections, pipeline depth one). Pairs 1–3 used `6093d1e`; pairs 4–6 used `08254a2`
+  after comment formatting and a Composer lock update. In the final three pairs, the median paired
+  changes in RPS and p99 were −7.38% and +14.92% for chunked POST, −5.58% and −1.42% for the mix,
+  and −6.23% and +8.65% for Content-Length POST. Across all six, the corresponding changes were
+  −7.61% and +8.94%, −4.54% and +2.96%, and −4.08% and +4.16%. All 45,188,984 timed replies were 2xx.
+  In six one-vCPU in-memory controls, chunked POST took 6.26 vs 6.93 µs of process CPU per request
+  at the base and final medians (+10.04% at the paired median). The extra CPU cost persists without sockets.
