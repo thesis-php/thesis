@@ -36,8 +36,8 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 - `packages/<name>/AGENTS.md` is for those who *change* the package and is loaded only when you read its files.
   How to *use* a package is in its `README.md` or its `skills/`: read them before using a package
   you have not used yet in this session.
-- Write `AGENTS.md` only, never `CLAUDE.md`: with the default settings, a `CLAUDE.md` in a directory makes
-  Claude Code skip `AGENTS.md` there.
+- Keep agent instructions in `AGENTS.md`. Tool-specific instruction files can cause an agent to skip
+  `AGENTS.md` in the same directory.
 - What a tool enforces (`make fixer`, `make rector`) is not described: the tool fixes the code anyway.
   Why a custom rule is the way it is goes to the `AGENTS.md` next to the rule.
 
@@ -82,7 +82,7 @@ the whole monorepo is for the final check.
   to that branch with `git merge --ff-only <branch>` in the worktree where `main` is checked out.
 - The user handles all pushes and pushes only `main`.
 - Undo a pushed commit with `git revert`, never by rewriting history.
-- No `Claude-Session` or other trailers in commit messages and PR descriptions.
+- No trailers in commit messages or PR descriptions.
 - An empty directory is kept by an empty `.gitignore`, never by `.gitkeep`. Delete it once the directory has files.
 
 ## Packages

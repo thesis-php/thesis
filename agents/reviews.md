@@ -19,8 +19,9 @@ Read before reviewing a change or acting on the findings of a review.
 
 1. Before the review, `make test`, `make phpstan`, `make fixer` and `make rector` of the package pass:
    a reviewer does not spend itself on what a tool catches.
-2. The reviewer is a new agent on Fable with effort `high`. It gets the diff, the task with its "done" criterion
-   and the rules, never the reasoning of the author: an agent that sees it agrees with it instead of checking
+2. Start a fresh agent with the best available model for code review. Use high reasoning effort if the model
+   supports it. The reviewer gets the diff, the task with its "done" criterion and the rules, never the
+   reasoning of the author: an agent that sees it agrees with it instead of checking
    the code. It reports only findings with a failure scenario.
 3. The author confirms a finding with a failing test, then fixes it and answers why it was missed. The answer
    goes where it prevents the whole class: a PHPStan, fixer or rector rule if a tool can catch it, otherwise
