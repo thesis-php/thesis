@@ -295,6 +295,10 @@ or the process loop. `virtualTime()` runs a separate loop.
   Rejected: a `retry(callable, Backoff)`, it would fix the wait and which failures are retried.
   The jitter takes between half and all of a delay ("equal jitter"), not from zero ("full jitter"):
   a reconnect right after a loss is a storm, and a floor keeps the attempts paced.
+- Rejected for HTTP throughput: appending checkpoints to a packed deferred queue and waking them directly.
+  Against `7eaf938` with 4096 connections on one server vCPU, GET gained throughput in two of three pairs,
+  but the HTTP Arena H1 mix lost 5.4%, gained 8.2% and lost 5.6%. Median mixed p99 fell from 183.5 to 151.8 ms.
+
 ## Conventions
 
 - Every test runs on virtual time (`VirtualTimePlugin` of thesis/testo-plugin in `testoPlugins` of the manifest; no

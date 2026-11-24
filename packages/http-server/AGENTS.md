@@ -160,3 +160,12 @@
   at `ab4b259` to 46.4k, and median p99 fell from 272.8 to 159.4 ms. Five of six pairs gained
   throughput. Both arms had about 22% relative standard deviation on the working Mac. All replies
   were 2xx with no reconnects or errors, and both arms passed the Arena validators.
+- At `7eaf938`, Thesis served 72.9%, 80.7% and 75.2% of true-async throughput in three mixed pairs
+  with one server vCPU. Median p99 was 110.9 ms for Thesis and 92.7 ms for true-async.
+- Rejected: checking for an exact whole-head match before the cached prefix match to skip writing an empty suffix.
+  Against `7eaf938`, all three mixed pairs lost throughput (1.0%, 12.5%, 9.5%) and p99 rose in all three.
+- Rejected: trying a keep-alive read before the idle deadline and checkpoint when another socket is waiting,
+  then using the usual checkpoint on a miss. Mixed throughput fell in all three pairs (4.9%, 4.5%, 1.7%).
+- Rejected: four PHP processes sharing one server vCPU with `SO_REUSEPORT` for the 4096-client mix.
+  The worker CPU masks all contained only CPU 0. Two pairs lost 27.7% and 52.7% throughput and one tied
+  within 5 replies/s. Candidate throughput varied from 22.7k to 57.2k replies/s on the shared machine.
