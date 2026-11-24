@@ -76,9 +76,11 @@ the whole monorepo is for the final check.
 
 ## Git
 
-- Work and commit directly on `main`, do not create branches: the monorepo is in early development,
-  branches only get in the way. This rule will change once others contribute.
-- Commit only when asked, with a short imperative subject like the existing history. The user pushes.
+- Work on the branch checked out in the current worktree. Commit there only when asked,
+  with a short imperative subject like the existing history.
+- Sync only when asked. Rebase the worktree branch onto local `main`, then fast-forward `main`
+  to that branch with `git merge --ff-only <branch>` in the worktree where `main` is checked out.
+- The user handles all pushes and pushes only `main`.
 - Undo a pushed commit with `git revert`, never by rewriting history.
 - No `Claude-Session` or other trailers in commit messages and PR descriptions.
 - An empty directory is kept by an empty `.gitignore`, never by `.gitkeep`. Delete it once the directory has files.
