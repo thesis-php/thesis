@@ -29,10 +29,4 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Stream HTTP/1 requests and responses with fixed-length and chunked bodies, trailers and keep-alive.
   Set `maxRequestsPerConnection` to limit keep-alive reuse.
 - Bound request sizes and connection I/O waits. Stop accepting connections and give active exchanges time to finish.
-- `FixedLengthReader` reads exactly the declared size and reports a premature EOF. Its read-only
-  remaining byte count reaches zero on delivery of the last byte.
-- The HTTP/1 body decoders can be passed directly to a message with their length and trailers.
-- `RequestHead` and `ResponseHead` handle HTTP/1.1 heads and record framing and persistence.
-  `parse()` rejects ambiguous input, `of()` builds a head from a message, and `toString()` writes the head.
-- `ChunkedReader`, `encodeChunk()` and `encodeLastChunk()` handle chunked bodies with trailers.
-- `ResponseHead` preserves `Content-Length` as representation metadata for eligible `HEAD` and `304` responses.
+- Preserve `Content-Length` as representation metadata for eligible `HEAD` and `304` responses.

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 /**
- * @api
+ * @internal
  */
 enum Version: string
 {

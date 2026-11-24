@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;

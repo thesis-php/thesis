@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Status;
 use Thesis\Http\StreamingBody;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
-use function Thesis\Http\Internal\Http1\quote;
+use function Thesis\Http\Internal\quote;
 use const Thesis\Http\EMPTY_HEADERS;
-use const Thesis\Http\Internal\Http1\TOKEN_CHARS;
+use const Thesis\Http\Internal\TOKEN_CHARS;
 
 /**
  * Reads a chunked body through the last chunk and its trailers.
@@ -22,7 +21,7 @@ use const Thesis\Http\Internal\Http1\TOKEN_CHARS;
  *
  * If the connection ends earlier, the read fails with {@see ReadFailed}: a truncated body must not look complete.
  *
- * @api
+ * @internal
  */
 final class ChunkedReader extends StreamingBody
 {

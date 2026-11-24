@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Http\Internal\Client;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
+use Thesis\Http\Internal\Http1\ChunkedReader;
+use Thesis\Http\Internal\Http1\FixedLengthReader;
 use Thesis\Http\StreamingBody;
 use Thesis\Io\IoException;
 use Thesis\Io\StreamClosed;

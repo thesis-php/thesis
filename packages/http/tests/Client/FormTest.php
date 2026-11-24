@@ -8,7 +8,7 @@ use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Http\Http1\ChunkedReader;
+use Thesis\Http\Internal\Http1\ChunkedReader;
 use Thesis\Io\Buffer;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;

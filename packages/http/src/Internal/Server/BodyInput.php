@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal\Server;
 
-use Thesis\Http\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\MalformedMessage;
 use Thesis\Http\Status;
 use Thesis\Io\Reader;
 use Time\Duration;

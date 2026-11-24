@@ -7,22 +7,21 @@ namespace Thesis\Http\Internal\Client;
 use Thesis\Async\LocalKeyedSemaphore;
 use Thesis\Async\Lock;
 use Thesis\Http\Body;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
+use Thesis\Http\Internal\Http1\ChunkedReader;
+use Thesis\Http\Internal\Http1\FixedLengthReader;
+use Thesis\Http\Internal\Http1\Framing;
+use Thesis\Http\Internal\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\RequestHead;
+use Thesis\Http\Internal\Http1\ResponseHead;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Io\Buffer;
 use Thesis\Io\ReadFailed;
-use Thesis\Io\UnexpectedEof;
 use Thesis\Net\ClientTls;
 use Thesis\Net\Socket;
-use function Thesis\Http\Http1\encodeChunk;
-use function Thesis\Http\Http1\encodeLastChunk;
+use function Thesis\Http\Internal\Http1\encodeChunk;
+use function Thesis\Http\Internal\Http1\encodeLastChunk;
 use function Thesis\Net\connect;
 
 /**
@@ -133,33 +132,10 @@ final readonly class Http1Transport
     private function readResponse(Socket $socket, string $method, string $origin, Lock $slot): Response
     {
         $buffer = new Buffer();
-        $head = null;
-        $remaining = $this->maxResponseHeadBytes;
-        do {
-            if ($remaining <= 0) {
-                throw new MalformedMessage("The response heads exceed {$this->maxResponseHeadBytes} bytes.");
-            }
-
-            try {
-                $buffer->fillUntil($socket, "\r\n\r\n", $remaining);
-            } catch (UnexpectedEof) {
-                if ($head === null && $buffer->count() === 0) {
-                    throw new ReadFailed('The peer closed the connection before sending a response.');
-                }
-
-                throw new MalformedMessage('The connection ended in a response head.');
-            } catch (\OverflowException) {
-                throw new MalformedMessage("The response heads exceed {$this->maxResponseHeadBytes} bytes.");
-            }
-
-            $bytes = $buffer->readUntil("\r\n\r\n");
-            \assert($bytes !== null);
-            $remaining -= \strlen($bytes) + 4;
-            $head = ResponseHead::parse($bytes, $method);
-            if ($head->status === 101) {
-                throw new MalformedMessage('The server switched protocols without an upgrade request.');
-            }
-        } while ($head->status < 200);
+        $head = ResponseHead::read($buffer, $socket, $method, $this->maxResponseHeadBytes);
+        if ($head->status === 101) {
+            throw new MalformedMessage('The server switched protocols without an upgrade request.');
+        }
 
         $pool = \WeakReference::create($this->pool);
         $release = static function (Socket $socket, bool $complete) use ($pool, $origin, $buffer, $head, $slot) {

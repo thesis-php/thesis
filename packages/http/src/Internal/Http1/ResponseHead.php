@@ -2,16 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
-use function Thesis\Http\Internal\Http1\isFieldValue;
-use function Thesis\Http\Internal\Http1\quote;
+use Thesis\Io\Buffer;
+use Thesis\Io\Reader;
+use Thesis\Io\ReadFailed;
+use Thesis\Io\UnexpectedEof;
+use function Thesis\Http\Internal\isFieldValue;
+use function Thesis\Http\Internal\quote;
 use const Thesis\Http\EMPTY_HEADERS;
 
 /**
@@ -19,10 +22,46 @@ use const Thesis\Http\EMPTY_HEADERS;
  * connection, and a client parses it. The head carries the response details, HTTP version, body framing
  * and whether the connection stays open.
  *
- * @api
+ * @internal
  */
 final readonly class ResponseHead
 {
+    /**
+     * Reads informational responses and the final head under one shared byte limit.
+     *
+     * @param non-empty-string $method
+     * @param positive-int $limit
+     */
+    public static function read(Buffer $buffer, Reader $reader, string $method, int $limit): self
+    {
+        $head = null;
+        $remaining = $limit;
+        do {
+            if ($remaining <= 0) {
+                throw new MalformedMessage("The response heads exceed {$limit} bytes.");
+            }
+
+            try {
+                $buffer->fillUntil($reader, "\r\n\r\n", $remaining);
+            } catch (UnexpectedEof) {
+                if ($head === null && $buffer->count() === 0) {
+                    throw new ReadFailed('The peer closed the connection before sending a response.');
+                }
+
+                throw new MalformedMessage('The connection ended in a response head.');
+            } catch (\OverflowException) {
+                throw new MalformedMessage("The response heads exceed {$limit} bytes.");
+            }
+
+            $bytes = $buffer->readUntil("\r\n\r\n");
+            \assert($bytes !== null);
+            $remaining -= \strlen($bytes) + 4;
+            $head = self::parse($bytes, $method);
+        } while ($head->status < 200 && $head->status !== 101);
+
+        return $head;
+    }
+
     /**
      * `parse()` parses the head of a response read from a connection, as strictly as {@see RequestHead::parse()}.
      *

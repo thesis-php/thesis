@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use function Thesis\Http\Internal\isFieldValue;
+use function Thesis\Http\Internal\isToken;
+use function Thesis\Http\Internal\quote;
+
 /**
  * A `Headers` object holds immutable message headers or trailers. It treats names as case-insensitive
  * and stores them in lowercase, as HTTP/2 requires. A name may have several lines. Iteration yields
@@ -17,15 +21,6 @@ namespace Thesis\Http;
  */
 final class Headers implements \IteratorAggregate
 {
-    private const int QUOTE_LENGTH = 64;
-    private const string TOKEN_CHARS = '!#$%&\'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-
-    /**
-     * DEL and every control character except the tab.
-     */
-    private const string FIELD_VALUE_FORBIDDEN_CHARS = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0A\x0B\x0C\x0D\x0E\x0F"
-        . "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F";
-
     public bool $isEmpty {
         get => $this->lines === [];
     }
@@ -183,8 +178,8 @@ final class Headers implements \IteratorAggregate
      */
     private static function name(string $name): string
     {
-        if ($name === '' || strspn($name, self::TOKEN_CHARS) !== \strlen($name)) {
-            throw new \ValueError(\sprintf('A header name must be a token, got %s.', self::quote($name)));
+        if (!isToken($name)) {
+            throw new \ValueError(\sprintf('A header name must be a token, got %s.', quote($name)));
         }
 
         return strtolower($name);
@@ -234,23 +229,14 @@ final class Headers implements \IteratorAggregate
 
     private static function value(string $name, string $value): string
     {
-        if (strcspn($value, self::FIELD_VALUE_FORBIDDEN_CHARS) !== \strlen($value)) {
+        if (!isFieldValue($value)) {
             throw new \ValueError(\sprintf(
                 'A value of the header "%s" must have no control characters, got %s.',
                 $name,
-                self::quote($value),
+                quote($value),
             ));
         }
 
         return trim($value, " \t");
-    }
-
-    private static function quote(string $bytes): string
-    {
-        if (\strlen($bytes) > self::QUOTE_LENGTH) {
-            $bytes = substr($bytes, 0, self::QUOTE_LENGTH) . '...';
-        }
-
-        return '"' . addcslashes($bytes, "\0..\37\"\\\177..\377") . '"';
     }
 }

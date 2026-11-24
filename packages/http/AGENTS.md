@@ -3,7 +3,7 @@
 Clients and servers share the same request and response types so proxies can forward unread bodies and trailers.
 
 The public client and server entry points live beside the message types. Their options and middleware live in
-`Client` and `Server`. The public codec lives in `Http1`. Implementation details live under `Internal`.
+`Client` and `Server`. Implementation details live under `Internal`.
 
 ## Invariants
 
@@ -338,8 +338,8 @@ The public client and server entry points live beside the message types. Their o
 ## HTTP/1 codec
 
 Clients and servers share the HTTP/1 codec for heads and bodies. The codec uses the message types in `thesis/http`.
-It needs 64-bit PHP for Content-Length and chunk sizes. Read `README.md` for the codec API.
-The HTTP/1 API lives in `Http1`. Its implementation details live in `Internal\Http1`.
+It needs 64-bit PHP for Content-Length and chunk sizes. The codec lives in `Internal\Http1`. The client and CONNECT proxy share
+the response-head reader so informational heads count toward the same byte limit as the final head.
 
 ### Invariants that must not be broken
 
@@ -455,7 +455,7 @@ Revisit them if a profile shows a different workload or a PHP upgrade changes th
 
 ### Tests
 
-- A rejection is asserted with its status and its whole message (`rejection()` in `tests/Http1/helpers.php`),
+- A rejection is asserted with its status and its whole message (`rejection()` in `tests/Internal/Http1/helpers.php`),
   so a test fails when an input is rejected for a reason other than the one the test names.
 - Keep regression cases for ambiguous heads in `RequestHeadParseTest` and malformed chunks in `ChunkedTest`.
 - `ScriptedReader` returns its bytes in pieces and fails on demand: a codec is tested with every piece size

@@ -6,13 +6,13 @@ namespace Thesis\Http\Internal\Server;
 
 use Thesis\Async\Cancelled;
 use Thesis\Http\Body;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
-use Thesis\Http\Http1\Version;
+use Thesis\Http\Internal\Http1\ChunkedReader;
+use Thesis\Http\Internal\Http1\FixedLengthReader;
+use Thesis\Http\Internal\Http1\Framing;
+use Thesis\Http\Internal\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\RequestHead;
+use Thesis\Http\Internal\Http1\ResponseHead;
+use Thesis\Http\Internal\Http1\Version;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -27,8 +27,8 @@ use Thesis\Io\UnexpectedEof;
 use Thesis\Io\Writer;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\isCancelled;
-use function Thesis\Http\Http1\encodeChunk;
-use function Thesis\Http\Http1\encodeLastChunk;
+use function Thesis\Http\Internal\Http1\encodeChunk;
+use function Thesis\Http\Internal\Http1\encodeLastChunk;
 use const Thesis\Http\EMPTY_BODY;
 
 /**

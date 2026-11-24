@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
@@ -10,8 +10,7 @@ use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\Stub\StubUnknownLengthBody;
-use Thesis\Http\Internal\Http1\Fields;
+use Thesis\Http\Internal\Http1\Stub\StubUnknownLengthBody;
 use Thesis\Http\Response;
 use Thesis\Http\StringBody;
 

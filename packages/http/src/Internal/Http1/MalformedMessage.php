@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Status;
 use Thesis\Io\IoException;
@@ -12,7 +12,7 @@ use Thesis\Io\IoException;
  * the meaning of a message that two recipients could understand differently. After this exception
  * the connection cannot be read any further: the end of the message is unknown.
  *
- * @api
+ * @internal
  */
 final class MalformedMessage extends IoException
 {

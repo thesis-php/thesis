@@ -4,56 +4,37 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal\Http1;
 
-/**
- * The characters allowed in a token (RFC 9110). A method and a field name are tokens.
- *
- * @internal
- */
-const TOKEN_CHARS = '!#$%&\'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+use Thesis\Http\Headers;
+use const Thesis\Http\EMPTY_HEADERS;
 
 /**
- * The bytes forbidden in a field value: DEL and every control character except the tab.
+ * Encodes a chunk of a body sent with `Transfer-Encoding: chunked`.
  *
  * @internal
+ * @param non-empty-string $bytes an empty chunk would mean the last chunk and end the body
  */
-const FIELD_VALUE_FORBIDDEN_CHARS = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0A\x0B\x0C\x0D\x0E\x0F"
-    . "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F";
-
-/**
- * @internal
- * @phpstan-assert-if-true =non-empty-string $value
- */
-function isToken(string $value): bool
+function encodeChunk(string $bytes): string
 {
-    return $value !== '' && strspn($value, TOKEN_CHARS) === \strlen($value);
+    return dechex(\strlen($bytes)) . "\r\n{$bytes}\r\n";
 }
 
 /**
- * @internal
- */
-function isFieldValue(string $value): bool
-{
-    return strcspn($value, FIELD_VALUE_FORBIDDEN_CHARS) === \strlen($value);
-}
-
-/**
- * A peer may send a line that is kilobytes long: an error message shows only the start of the line.
+ * Encodes the last chunk of a body, followed by the trailers.
  *
  * @internal
+ * @throws \ValueError if the trailers contain a field that frames or routes a message
  */
-const QUOTE_LENGTH = 64;
-
-/**
- * Prepares bytes from a peer or a caller for an error message: control characters are escaped,
- * so they never get into a log unescaped.
- *
- * @internal
- */
-function quote(string $bytes): string
+function encodeLastChunk(Headers $trailers = EMPTY_HEADERS): string
 {
-    if (\strlen($bytes) > QUOTE_LENGTH) {
-        $bytes = substr($bytes, 0, QUOTE_LENGTH) . '...';
+    if ($trailers->isEmpty) {
+        return "0\r\n\r\n";
     }
 
-    return '"' . addcslashes($bytes, "\0..\37\"\\\177..\377") . '"';
+    foreach (Fields::NOT_IN_TRAILERS as $name) {
+        if ($trailers->has($name)) {
+            throw new \ValueError(\sprintf('The field "%s" must not be in trailers.', $name));
+        }
+    }
+
+    return "0\r\n" . Fields::formatLines($trailers) . "\r\n";
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal\Server;
 
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\RequestHead;
+use Thesis\Http\Internal\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\RequestHead;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;

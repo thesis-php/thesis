@@ -12,7 +12,7 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\TimedOut;
 use Thesis\Http\Client;
-use Thesis\Http\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\MalformedMessage;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Io\Buffer;

@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Test;
-use Thesis\Http\Internal\Http1\Fields;
 
 #[Test]
 #[Covers(RequestHead::class)]

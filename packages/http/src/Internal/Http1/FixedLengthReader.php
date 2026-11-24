@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Headers;
 use Thesis\Http\StreamingBody;
@@ -16,7 +16,7 @@ use const Thesis\Http\EMPTY_HEADERS;
  * Reads a body of exactly the given size from a connection. The connection owner keeps the buffer
  * and any bytes left in it for the next message. Closing the body leaves the connection open.
  *
- * @api
+ * @internal
  */
 final class FixedLengthReader extends StreamingBody
 {

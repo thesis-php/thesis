@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1\Stub;
+namespace Thesis\Http\Internal\Http1\Stub;
 
 use Thesis\Http\Body;
 use Thesis\Http\Headers;

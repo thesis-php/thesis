@@ -75,7 +75,7 @@ The body is where the two directions differ:
 | Lifetime | free | tied to the connection: it is not back in the pool until the owner reaches the message boundary or discards the connection |
 
 Messages expose `Io\Reader` directly.
-`Http1\FixedLengthReader` enforces a declared length, and `Http1\ChunkedReader` consumes the terminating
+`Internal\Http1\FixedLengthReader` enforces a declared length, and `Internal\Http1\ChunkedReader` consumes the terminating
 chunk and its trailers. The connection owner manages the lifetime of readers that borrow it.
 
 Amp has four body APIs. An outgoing client request uses `HttpContent`, whose `getContent()` returns a fresh
@@ -178,7 +178,7 @@ flowchart TD
     drain -->|Failure or limit reached| close
 ```
 
-The `Thesis\Http\Http1` codec lives in `thesis/http`. The client formats request heads and
+The `Thesis\Http\Internal\Http1` codec lives in `thesis/http`. The client formats request heads and
 parses response heads. The server does the reverse. Both need the same framing rules. For example, a response
 to HEAD ends after the fields even when Content-Length describes the size of the representation.
 

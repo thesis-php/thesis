@@ -2,24 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Http\Http1;
+namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Http1\Fields;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Status;
 use Uri\Rfc3986\Uri;
-use function Thesis\Http\Internal\Http1\isToken;
-use function Thesis\Http\Internal\Http1\quote;
+use function Thesis\Http\Internal\isToken;
+use function Thesis\Http\Internal\quote;
 
 /**
  * An HTTP/1.1 request head contains the request line and header lines. A client writes the head to a
  * connection, and a server parses it. The head carries the request details, HTTP version, body framing
  * and whether the connection stays open.
  *
- * @api
+ * @internal
  */
 final readonly class RequestHead
 {

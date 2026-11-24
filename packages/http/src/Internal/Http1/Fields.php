@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Thesis\Http\Internal\Http1;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\Framing;
-use Thesis\Http\Http1\MalformedMessage;
-use Thesis\Http\Http1\Version;
 use Thesis\Http\Status;
+use function Thesis\Http\Internal\isFieldValue;
+use function Thesis\Http\Internal\isToken;
+use function Thesis\Http\Internal\quote;
 use const Thesis\Http\EMPTY_HEADERS;
 
 /**
@@ -21,7 +21,7 @@ final readonly class Fields
     /**
      * The fields that belong to an HTTP/1.1 connection, not to a message.
      */
-    public const array OF_CONNECTION = ['content-length', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade'];
+    private const array OF_CONNECTION = ['content-length', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade'];
 
     /**
      * Trailers must not frame or route a message: a recipient that merges trailers into the headers

@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Thesis\Http\Client;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\RequestHead;
-use Thesis\Http\Http1\ResponseHead;
+use Thesis\Http\Internal\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\RequestHead;
+use Thesis\Http\Internal\Http1\ResponseHead;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Io\Buffer;
-use Thesis\Io\UnexpectedEof;
+use Thesis\Io\ReadFailed;
 use Thesis\Net\ClientTls;
 use Thesis\Net\ConnectFailed;
 use Thesis\Net\Socket;
@@ -39,7 +40,7 @@ final readonly class HttpProxy
     /**
      * @param non-empty-string $host the origin host name or IP address
      * @param int<0, 65535> $port the origin port
-     * @throws ConnectFailed if the proxy refuses the tunnel or returns an incomplete response
+     * @throws ConnectFailed if the proxy refuses the tunnel or returns an invalid or incomplete response
      */
     public function __invoke(string $host, int $port, ?ClientTls $tls): Socket
     {
@@ -55,18 +56,12 @@ final readonly class HttpProxy
         try {
             $socket->write($request->toString());
             $buffer = new Buffer();
-            $remaining = 64 * 1024;
-            do {
-                if ($remaining <= 0) {
-                    throw new ConnectFailed('The proxy response heads exceed 65536 bytes.');
-                }
 
-                $buffer->fillUntil($socket, "\r\n\r\n", $remaining);
-                $bytes = $buffer->readUntil("\r\n\r\n");
-                \assert($bytes !== null);
-                $remaining -= \strlen($bytes) + 4;
-                $head = ResponseHead::parse($bytes, Method::CONNECT);
-            } while ($head->status < 200 && $head->status !== 101);
+            try {
+                $head = ResponseHead::read($buffer, $socket, Method::CONNECT, 64 * 1024);
+            } catch (MalformedMessage|ReadFailed $error) {
+                throw new ConnectFailed('The proxy response could not be read: ' . $error->getMessage(), previous: $error);
+            }
 
             if ($head->status < 200 || $head->status >= 300) {
                 throw new ConnectFailed("The proxy refused CONNECT with HTTP status {$head->status}.");
@@ -83,10 +78,6 @@ final readonly class HttpProxy
             }
 
             return $socket;
-        } catch (\OverflowException|UnexpectedEof $error) {
-            $socket->close();
-
-            throw new ConnectFailed('The proxy response head is incomplete or exceeds 65536 bytes.', previous: $error);
         } catch (\Throwable $error) {
             $socket->close();
 

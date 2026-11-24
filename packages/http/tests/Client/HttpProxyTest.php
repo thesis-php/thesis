@@ -6,6 +6,7 @@ namespace Thesis\Http\Client;
 
 use Testo\Assert;
 use Testo\Codecov\Covers;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Group;
@@ -107,23 +108,28 @@ final class HttpProxyTest
         }
     }
 
-    public function closesARejectedTunnel(): void
+    /**
+     * @param non-empty-string $message
+     */
+    #[DataSet(['HTTP/1.1 407 Proxy Authentication Required', 'The proxy refused CONNECT with HTTP status 407.'], 'refused')]
+    #[DataSet(['invalid', 'The proxy response could not be read'], 'malformed')]
+    public function closesARejectedTunnel(string $statusLine, string $message): void
     {
-        group(static function (Group $group) {
+        group(static function (Group $group) use ($statusLine, $message) {
             $listener = listen('127.0.0.1', 0);
             $address = $listener->address;
             \assert($address instanceof InetAddress);
-            $server = $group->spawn(static function () use ($listener) {
+            $server = $group->spawn(static function () use ($listener, $statusLine) {
                 $peer = $listener->accept() ?? throw new \LogicException();
                 new Buffer()->fillUntil($peer, "\r\n\r\n");
-                $peer->write("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
+                $peer->write("{$statusLine}\r\n\r\n");
                 Assert::null($peer->read(1));
                 $peer->close();
                 $listener->close();
             });
 
             $proxy = new HttpProxy($address->ip, $address->port);
-            Expect::exception(ConnectFailed::class)->withMessage('The proxy refused CONNECT with HTTP status 407.');
+            Expect::exception(ConnectFailed::class)->withMessageContaining($message);
 
             try {
                 $proxy('origin.test', 443, null);

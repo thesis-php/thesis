@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Thesis\Http\Internal\Server;
 
 use Thesis\Http\Headers;
-use Thesis\Http\Http1\ChunkedReader;
-use Thesis\Http\Http1\FixedLengthReader;
-use Thesis\Http\Http1\MalformedMessage;
+use Thesis\Http\Internal\Http1\ChunkedReader;
+use Thesis\Http\Internal\Http1\FixedLengthReader;
+use Thesis\Http\Internal\Http1\MalformedMessage;
 use Thesis\Http\Status;
 use Thesis\Http\StreamingBody;
 use Thesis\Io\IoException;
