@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
-/**
- * @api
- */
+/** @api */
 const EMPTY_HEADERS = new Headers();
 
-/**
- * @api
- */
+/** @api */
 const EMPTY_BODY = new StringBody('');
