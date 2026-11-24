@@ -213,3 +213,13 @@
   callback at shutdown. Keeping each connection's task and resuming batches of subscribed continuations gained
   only 0.47% in total mixed replies over six pairs, while GET p99 rose from 94.5 to 159.3 ms at the medians.
   The stock server and both candidates installed no further read watchers after the first 10k hot GET exchanges.
+- Rejected: parsing and writing in a shared worker while running the handler and its response body in a
+  dedicated nested fiber. It preserved connection-scoped cancellation and passed the streaming-body tests.
+  Across nine JIT-enabled mixed pairs it handled 1.69% more replies in total. The last pair lost 12.85% RPS
+  and raised p99 from 109.4 to 179.7 ms. With 4096 warmed connections sitting idle, RSS was 183 vs 413 MiB.
+- Rejected for throughput: storing deadline timestamps and sockets in separate arrays keyed by operation.
+  With 4096 outstanding entries it saved 749,728 bytes of PHP heap in a queue control. Mixed Arena throughput
+  fell 0.5%, 4.8% and 1.2% across three pairs and median p99 rose from 124.8 to 159.0 ms.
+- In a second tracing-JIT comparison of the unchanged stock handler, the three paired percentages of
+  true-async throughput were 87.9%, 94.5% and 81.3%. Median RPS was 57,080 vs 67,325 and median p99
+  was 145.5 vs 141.1 ms. Both processes ran on the same server vCPU in alternating runs.

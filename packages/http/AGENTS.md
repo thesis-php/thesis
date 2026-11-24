@@ -53,6 +53,8 @@ Read `README.md` for the message API and `ideas/http.md` for client and server d
   The wire codec enforces body boundaries.
 - `StringBody::$size` reads the string length through a hook. In a PHP 8.6 microbenchmark, storing the length
   made construction with one size read 3% faster and with two reads 12% faster. Construction alone cost 13% more.
+  Storing both size and trailer presence did not give a repeatable gain on the tracing-JIT Arena mix.
+  In five alternating pairs before the time limit, the candidate lost three; the median paired change was −9.5%.
 - A request parses its query on first access. A clone with a new URI parses its own query.
   Replacing the query on a clone updates the URI that the codec writes.
 - Rejected: PSR-7 as the shared message contract. `StreamInterface` permits sequential reads, but an arbitrary
