@@ -991,6 +991,6 @@ final class ChannelTest
      */
     private function isBuffered(Channel $channel): bool
     {
-        return !(fn() => $this->buffer)->call($channel)->isEmpty();
+        return (fn() => $this->buffer?->isEmpty() === false)->call($channel);
     }
 }

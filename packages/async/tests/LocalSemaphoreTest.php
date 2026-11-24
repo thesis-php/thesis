@@ -157,7 +157,7 @@ final class LocalSemaphoreTest
         $exception = thrown(static fn() => timeout(sec(1), $semaphore->acquire(...)));
 
         Assert::instanceOf($exception, TimedOut::class);
-        Assert::same((fn() => $this->waiters->items)->call($semaphore), []);
+        Assert::same((fn() => $this->waiters->items ?? [])->call($semaphore), []);
         assertNoCallbacksLeft();
 
         $lock->release();
