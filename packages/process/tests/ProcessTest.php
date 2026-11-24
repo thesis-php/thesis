@@ -37,7 +37,7 @@ final class ProcessTest
                 exit(1);
             }
             fwrite($ipc, "!");
-            exit(getcwd() === $argv[1] && getenv('WORKER_LABEL') === $argv[2] ? 0 : 2);
+            exit(getcwd() === $argv[1] && getenv('WORKER_LABEL') === $argv[2] && getenv('EMPTY') === '' ? 0 : 2);
             PHP_WORKER;
 
         group(static function (Group $group) use ($ipc, $child, $script) {
@@ -46,7 +46,7 @@ final class ProcessTest
                 command: [PHP_BINARY, '-r', $script, '--', __DIR__, 'a b;$HOME'],
                 descriptors: [3 => $child],
                 cwd: __DIR__,
-                env: ['WORKER_LABEL' => 'a b;$HOME'],
+                env: ['WORKER_LABEL' => 'a b;$HOME', 'EMPTY' => ''],
             );
             fclose($child);
             $ipc->write("ping\n");
@@ -169,6 +169,19 @@ final class ProcessTest
                 Assert::null($status->signal);
                 Assert::same($worker->wait(), $status);
             }
+        });
+    }
+
+    public function reportsAStatusTakenByAnotherWaitWhileAPeerIsRunning(): void
+    {
+        group(static function (Group $group) {
+            Process::start($group, [PHP_BINARY, '-r', 'sleep(30);']);
+            $worker = Process::start($group, [PHP_BINARY, '-r', 'sleep(30);']);
+            $worker->signal(SIGTERM);
+            Assert::same(pcntl_waitpid($worker->pid, $status), $worker->pid);
+
+            $error = thrown(static fn() => timeoutOr(sec(2), $worker->wait(...)));
+            Assert::instanceOf($error, ProcessException::class);
         });
     }
 

@@ -87,6 +87,14 @@ final class Process
      */
     private static function open(array $command, array $descriptors, ?string $cwd, ?array $env): self
     {
+        $environment = null;
+        if ($env !== null) {
+            $environment = [];
+            foreach ($env as $name => $value) {
+                $environment[] = "{$name}={$value}";
+            }
+        }
+
         try {
             $spec = Descriptors::prepare($descriptors);
             $handle = exceptionally(static fn() => proc_open(
@@ -94,7 +102,8 @@ final class Process
                 descriptor_spec: $spec,
                 pipes: $pipes,
                 cwd: $cwd,
-                env_vars: $env,
+                // @phpstan-ignore argument.type (Unix proc_open accepts a list of name=value entries.)
+                env_vars: $environment,
             ));
         } catch (\ErrorException $error) {
             throw new ProcessException($error->getMessage(), previous: $error);
