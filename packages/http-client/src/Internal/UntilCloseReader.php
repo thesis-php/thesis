@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
@@ -13,7 +13,7 @@ use const Thesis\Http\EMPTY_HEADERS;
 /**
  * @internal
  */
-final class UntilCloseReader implements Body
+final class UntilCloseReader extends AbstractBody
 {
     #[\Override]
     public ?int $size {

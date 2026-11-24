@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Internal;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\Http\Status;
 use Thesis\HttpProtocol\Http1\ChunkedReader;
@@ -16,7 +16,7 @@ use Thesis\Io\IoException;
 /**
  * @internal
  */
-final class BodyReader implements Body
+final class BodyReader extends AbstractBody
 {
     #[\Override]
     public ?int $size {

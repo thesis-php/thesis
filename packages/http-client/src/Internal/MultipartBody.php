@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\HttpClient\FormPart;
@@ -18,12 +19,15 @@ use const Thesis\Http\EMPTY_HEADERS;
 /**
  * @internal
  */
-final class MultipartBody implements Body
+final class MultipartBody extends AbstractBody
 {
+    #[\Override]
     public readonly ?int $size;
 
+    #[\Override]
     public readonly bool $isBuffered;
 
+    #[\Override]
     public bool $mayHaveTrailers {
         get => false;
     }

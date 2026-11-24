@@ -7,16 +7,19 @@ namespace Thesis\Http;
 /**
  * @api
  */
-final class StringBody implements Body
+final class StringBody extends AbstractBody
 {
+    #[\Override]
     public int $size {
         get => \strlen($this->bytes);
     }
 
+    #[\Override]
     public bool $isBuffered {
         get => true;
     }
 
+    #[\Override]
     public bool $mayHaveTrailers {
         get => !$this->trailers->isEmpty;
     }

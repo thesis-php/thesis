@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1\Stub;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\Http\StringBody;
 
-final class StubUnknownLengthBody implements Body
+final class StubUnknownLengthBody extends AbstractBody
 {
     #[\Override]
     public ?int $size {

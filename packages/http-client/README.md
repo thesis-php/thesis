@@ -27,7 +27,7 @@ use function Thesis\Async\timeout;
 use function Thesis\Time\sec;
 
 $client = new Client();
-$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->buffer(limit: 1024 * 1024));
+$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->body->buffer(limit: 1024 * 1024));
 ```
 
 Send an HTTP/1.1 request inside a Thesis async scope. The final response head is available as soon as

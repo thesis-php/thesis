@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Thesis\HttpServer\Stub;
 
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
 
-final class PrefixedBody implements Body
+final class PrefixedBody extends AbstractBody
 {
     #[\Override]
     public ?int $size {

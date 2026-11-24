@@ -144,6 +144,7 @@ Call `discard()` after a read returns `null` to get the trailers of a body you h
 A string body moves its offset directly. A streaming body reads in bounded chunks and uses the same limits
 and timeouts as ordinary reads. Read errors propagate.
 
-Use `$response->buffer(limit: 1024 * 1024)` to collect the remaining bytes, with an 8 MiB default limit.
+Use `$response->body->buffer(limit: 1024 * 1024)` to collect the remaining bytes of a request or response body, with an 8 MiB default limit.
 Exceeding the limit closes the body and throws `OverflowException`. A successful read leaves trailers available.
 `StringBody::fresh()` returns an independent reader for the original bytes and trailers.
+Custom bodies can extend `AbstractBody` to inherit the bounded read loop.

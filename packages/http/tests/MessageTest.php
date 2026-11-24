@@ -41,11 +41,11 @@ final class MessageTest
     {
         $response = new Response(body: 'abcd');
         Assert::same($response->body->read(1), 'a');
-        Assert::same($response->buffer(limit: 3), 'bcd');
-        Assert::same($response->buffer(limit: 0), '');
+        Assert::same($response->body->buffer(limit: 3), 'bcd');
+        Assert::same($response->body->buffer(limit: 0), '');
 
         Expect::exception(\OverflowException::class);
-        new Response(body: 'abcd')->buffer(limit: 3);
+        new Response(body: 'abcd')->body->buffer(limit: 3);
     }
 
     public function everyRequestHasBodyOfItsOwn(): void

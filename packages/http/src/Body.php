@@ -32,6 +32,14 @@ interface Body extends Reader, Closer
     public bool $mayHaveTrailers { get; }
 
     /**
+     * Reads the remaining body. A read failure or a size limit violation closes the body.
+     *
+     * @param non-negative-int $limit maximum bytes to keep in memory
+     * @throws \OverflowException if the remaining body exceeds the limit
+     */
+    public function buffer(int $limit = 8 * 1024 * 1024): string;
+
+    /**
      * Advances the read position to EOF and returns the final trailer fields, including after EOF was read.
      */
     public function discard(): Headers;

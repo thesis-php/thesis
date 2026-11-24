@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\Io\Buffer;
 use Thesis\Io\ConcurrentRead;
@@ -19,7 +19,7 @@ use const Thesis\Http\EMPTY_HEADERS;
  *
  * @api
  */
-final class FixedLengthReader implements Body
+final class FixedLengthReader extends AbstractBody
 {
     #[\Override]
     public bool $isBuffered {

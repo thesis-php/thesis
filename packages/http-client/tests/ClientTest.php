@@ -63,7 +63,7 @@ final class ClientTest
             });
 
             $client = new Client(maxConnectionsPerOrigin: 1);
-            Assert::same($client->send("http://{$listener->address}/start")->buffer(limit: 4), 'done');
+            Assert::same($client->send("http://{$listener->address}/start")->body->buffer(limit: 4), 'done');
         }));
     }
 

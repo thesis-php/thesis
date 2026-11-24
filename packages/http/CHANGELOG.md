@@ -19,5 +19,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass a string or a `Body` to a message constructor. `StringBody` accepts a string with optional trailer fields.
 - `Body::$mayHaveTrailers` signals possible trailers before reading. `Body::discard()` returns the final fields at EOF.
 - `Body::close()` releases body resources.
-- Collect the remaining response body with a byte limit through `Response::buffer()`.
+- Collect the remaining request or response body with a byte limit through `Body::buffer()`.
 - Open an independent reader for string uploads through `StringBody::fresh()`.

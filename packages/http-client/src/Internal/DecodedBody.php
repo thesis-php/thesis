@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Io\ReadFailed;
@@ -12,16 +13,19 @@ use Thesis\Io\StreamClosed;
 /**
  * @internal
  */
-final class DecodedBody implements Body
+final class DecodedBody extends AbstractBody
 {
+    #[\Override]
     public ?int $size {
         get => null;
     }
 
+    #[\Override]
     public bool $isBuffered {
         get => $this->body->isBuffered;
     }
 
+    #[\Override]
     public bool $mayHaveTrailers {
         get => $this->body->mayHaveTrailers;
     }

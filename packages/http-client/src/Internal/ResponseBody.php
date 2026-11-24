@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpClient\Internal;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\HttpProtocol\Http1\ChunkedReader;
 use Thesis\HttpProtocol\Http1\FixedLengthReader;
@@ -16,7 +16,7 @@ use const Thesis\Http\EMPTY_HEADERS;
 /**
  * @internal
  */
-final class ResponseBody implements Body
+final class ResponseBody extends AbstractBody
 {
     #[\Override]
     public ?int $size {

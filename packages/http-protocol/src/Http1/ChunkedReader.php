@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\HttpProtocol\Http1;
 
-use Thesis\Http\Body;
+use Thesis\Http\AbstractBody;
 use Thesis\Http\Headers;
 use Thesis\Http\Status;
 use Thesis\HttpProtocol\Internal\Http1\Fields;
@@ -25,7 +25,7 @@ use const Thesis\HttpProtocol\Internal\Http1\TOKEN_CHARS;
  *
  * @api
  */
-final class ChunkedReader implements Body
+final class ChunkedReader extends AbstractBody
 {
     #[\Override]
     public ?int $size {
