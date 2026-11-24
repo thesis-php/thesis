@@ -31,6 +31,21 @@ final class FollowRedirectsTest
         $peer->close();
     }
 
+    public function droppingTheLastRequestCopyClosesItsUnclaimedUpload(): void
+    {
+        [$upload, $peer] = socketPair();
+        $request = Form::multipart('http://example.test', [new FormPart('file', $upload)]);
+        $copy = clone $request;
+        $replacement = $copy->withBody('new');
+
+        unset($request);
+        Assert::false($upload->isClosed);
+        unset($copy);
+        Assert::true($upload->isClosed);
+        Assert::same($replacement->takeBody()->readAll(), 'new');
+        $peer->close();
+    }
+
     public function resolvesRelativeTargetsAndRewritesPost(): void
     {
         $request = new Request(

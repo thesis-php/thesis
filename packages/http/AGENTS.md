@@ -28,6 +28,12 @@ Clients and servers share the same request and response types so proxies can for
 
 ## Decisions
 
+- Keep one `PendingBody` per message and share it with metadata copies. Rejected: binding two body
+  properties by reference and creating the owner on the first clone. This split cleanup between two
+  destructors and made ownership depend on PHP preserving the reference across a clone.
+  Bypassing both owners in a chunked POST probe saved 6.42% CPU at the paired median, but the probe
+  omitted shared ownership. The version that preserved it has no measured gain.
+
 - **`Uri\Rfc3986\Uri`, not `Uri\WhatWg\Url`.** HTTP is defined in terms of RFC 3986. `Uri\Rfc3986\Uri` keeps
   the path and the query as they were sent (`getRawPath()`, `getRawQuery()`), which a router, a proxy
   and a request signature need. It also holds a reference without a host: an HTTP/1.0 request without `Host`,
