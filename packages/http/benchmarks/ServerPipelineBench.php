@@ -7,9 +7,11 @@ namespace Thesis\Http\Benchmarks;
 use Tally\Attribute\Before;
 use Tally\Attribute\DataProvider;
 use Tally\Attribute\Warmup;
+use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Context;
+use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\Pipeline;
 use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Net\InetAddress;
@@ -30,7 +32,7 @@ final class ServerPipelineBench
     public function __construct()
     {
         $address = new InetAddress('127.0.0.1', 80);
-        $this->context = new Context($address, $address, null);
+        $this->context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
         $this->request = Request::get('/');
     }
 

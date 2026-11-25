@@ -20,6 +20,38 @@
 - For codec experiments see the [HTTP/1 codec decisions](#http1-codec-performance).
   For timer tradeoffs see the [async package decisions](../async/AGENTS.md).
 
+### Server events
+
+Resolving subscriptions with `Dispatcher::for()` when the listener is created leaves nullable dispatchers
+on the connection. With no request listeners, Tally counted 28,790,817 instructions for 512 in-memory GETs,
+2.1% above the pre-event baseline and 1.5% below the per-request lookup below. This benchmark starts at
+Connection and excludes listener setup, TCP acceptance and connection closure events.
+
+Checking `listens()` in Exchange before creating each request event and timing only requests with a
+RequestEnded listener raised median time from 5.63 to 5.92 µs per GET with an empty dispatcher
+(+5.1% time, 4.8% fewer requests/s) against `f055ebf`. Both versions ran again under the same
+ServerConnectionBench protocol described below. Tally counted 28,207,913 vs 29,239,804 instructions
+for 512 requests (+3.7%).
+
+Against the server before events (`f055ebf`), always dispatching RequestStarted and RequestEnded to an empty
+dispatcher raised the median time per GET from 5.71 to 6.86 µs (+20.2%, or 16.8% fewer requests/s).
+ServerConnectionBench processed 512 keep-alive plaintext requests in memory with no router or TCP.
+Each revision ran 12 times in six ABBA blocks on PHP 8.6 with CLI OPcache on and JIT and Xdebug off.
+Each timed run checked 51,200 responses after warm-up. Tally counted 28,207,913 vs 33,891,932 instructions
+for 512 requests (+20.2%). The measurement includes constructing both events and measuring request duration.
+
+Tally on PHP 8.6 aarch64 counted 26,700,443 instructions for 512 plaintext requests on one in-memory connection
+without a server context, up from 26,341,755 (+1.36%). Peak memory was 93,320 bytes in both runs.
+For 2048 parameterized route matches, instructions rose from 37,275,569 to 38,689,154 (+3.79%) and peak memory rose
+from 3528 to 3984 bytes. These counts compare the event implementation with the previous callback implementation.
+Passing response status and
+completion flags by reference through every exchange instead cost 1.21% more instructions than the callback version.
+
+For 512 in-memory keep-alive GETs to a parameterized route, dispatching RouteMatched unconditionally took
+3.42% more instructions with an empty dispatcher (32.55M vs 31.47M) and 0.87% fewer with one listener counting
+matches (32.91M vs 33.19M). In 12 alternating timing blocks with CLI OPcache on, the median paired time change
+was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's listens() check for the empty case.
+
 ### Comparing with earlier measurements
 
 - Use `make bench P=http` for instruction counts. For TCP, use PHP 8.6 with CLI OPcache

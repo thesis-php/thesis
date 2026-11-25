@@ -7,10 +7,12 @@ namespace Thesis\Http\Benchmarks;
 use Tally\Attribute\DataProvider;
 use Tally\Attribute\Linear;
 use Tally\Attribute\Warmup;
+use Thesis\Dispatcher;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Context;
+use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
 use Thesis\Net\UnixAddress;
@@ -43,7 +45,8 @@ final class RouterBench
         ]);
         $request = new Request(Method::GET, new Uri('/users/42'));
 
-        $context = new Context(new UnixAddress(''), new UnixAddress(''), null);
+        $address = new UnixAddress('');
+        $context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
 
         for ($i = 0; $i < $count; ++$i) {
             if ($router($request, $context)->takeBody()->readAll() !== '42') {

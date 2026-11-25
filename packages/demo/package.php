@@ -12,6 +12,7 @@ return new Manifest(
     require: [
         'ext-pcntl' => '*',
         'thesis/async' => '*',
+        'thesis/dispatcher' => '*',
         'thesis/http' => '*',
         'thesis/io' => '*',
         'thesis/logger' => '*',

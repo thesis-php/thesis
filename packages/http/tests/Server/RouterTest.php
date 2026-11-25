@@ -8,6 +8,7 @@ use Testo\Assert;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Dispatcher;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -24,7 +25,8 @@ final readonly class RouterTest
 
     public function __construct()
     {
-        $this->context = new Context(new UnixAddress(''), new UnixAddress(''), null);
+        $address = new UnixAddress('');
+        $this->context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
     }
 
     public function choosesTheMostSpecificCompletePathBeforeTheMethod(): void
@@ -56,7 +58,7 @@ final readonly class RouterTest
     {
         $router = new Router([new Route(Method::POST, '/', static fn() => new Response())]);
         $address = new UnixAddress('');
-        $context = new Context($address, $address, null, new TextErrorHandler());
+        $context = new Context($address, $address, null, new TextErrorHandler(), new Dispatcher());
 
         $response = $router(Request::get('/'), $context);
         Assert::same($response->takeBody()->readAll(), 'GET 405');

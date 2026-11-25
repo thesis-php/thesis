@@ -91,10 +91,6 @@ final class ResponseWriter implements Writer, Closer
         try {
             try {
                 $response = $this->errorHandler->handleError(Status::INTERNAL_SERVER_ERROR, $request);
-                if ($response->status !== Status::INTERNAL_SERVER_ERROR) {
-                    throw new \ValueError('The error handler must preserve the status.');
-                }
-
                 $body = $response->takeBody();
                 [$reply, $bytes] = $this->encodeHead($response, $body, $head, isPersistent: false);
             } catch (Cancelled $error) {

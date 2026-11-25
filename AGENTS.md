@@ -98,12 +98,12 @@ the whole monorepo is for the final check.
 - `async`: Structured concurrency for PHP fibers with an event loop and task-tree cancellation. Requires: dispatcher, source-location, time.
 - `async-trace`: Trace thesis/async tasks to diagnose cancellation, blocking code and long waits. Requires: async, dispatcher, formatter, source-location, time.
 - `cache`: Cache interface with Time\Duration TTLs, a local LRU cache and stampede protection by a keyed mutex. Requires: async, time.
-- `demo`: A small HTTP server with console logging that shows how concurrent requests overlap. Requires: async, http, io, logger, time.
+- `demo`: A small HTTP server with console logging that shows how concurrent requests overlap. Requires: async, dispatcher, http, io, logger, time.
 - `dispatcher`: Synchronous event dispatcher that matches events to listeners by parameter type. Requires: formatter.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
 - `hot-reload`: Restart a development server on file changes or SIGHUP, including after a failed launch. Requires: async, exceptionally, io, process, time.
-- `http`: Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies. Requires: async, net, time, io.
+- `http`: Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies. Requires: async, dispatcher, net, time, io.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
 - `logger`: PSR-3 logger with bounded buffering and asynchronous JSON and colored console output. Requires: async, io, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.

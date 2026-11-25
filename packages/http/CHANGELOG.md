@@ -11,9 +11,15 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Log server events and optional per-request access records to a PSR-3 logger with `ServerLogger`.
+- Observe server, connection, request and routing events through a dispatcher in place of the server error callback.
+  RequestStarted, RouteMatched and RequestEnded carry the request object. The server emits RequestEnded with duration, status and response write outcome.
+  Handlers and middleware can publish application events through `Context::$dispatcher`.
+
 - Server middleware receives the connection context as the second argument of `handle()`, before `$next`.
 - Serve a default HTML page for routing errors and server-generated 500 responses.
 - Customize routing errors and server-generated 500 responses with `Server\ErrorHandler`.
+  Access it through `Context::$errorHandler`. Creating a context requires both the error handler and the dispatcher.
 - Read the active route in handlers and middleware with `Server\routeMatch($request)`.
 - Route requests by method and path with named parameters, HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.

@@ -9,6 +9,7 @@ use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
+use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
@@ -34,6 +35,72 @@ use function Thesis\Time\sec;
 #[Test]
 final class ServerTest
 {
+    public function observesTheServerConnectionRouteAndExchange(): void
+    {
+        timeout(sec(2), static fn() => group(static function (Group $group) {
+            $events = [];
+            $handled = null;
+            $observe = static function (object $event) use (&$events) {
+                $events[] = $event;
+            };
+            $server = new Server(
+                config: new Config(0),
+                handler: new Router([new Route('GET', '/:id', static function (Request $request) use (&$handled) {
+                    $handled = $request;
+
+                    return new Response(Status::NO_CONTENT);
+                })]),
+                dispatcher: new Dispatcher([$observe]),
+            );
+            $server->start($group);
+            $address = $server->address;
+            \assert($address instanceof InetAddress);
+            $client = connect('127.0.0.1', $address->port);
+
+            try {
+                $client->write(
+                    "HEAD /42 HTTP/1.1\r\nHost: local\r\n\r\n"
+                    . "GET /no/match HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n",
+                );
+
+                while ($client->read(8192) !== null);
+            } finally {
+                $client->close();
+                $server->stop();
+            }
+
+            Assert::same(array_map(get_class(...), $events), [
+                Event\ServerStarted::class,
+                Event\ConnectionAccepted::class,
+                Event\RequestStarted::class,
+                Event\RouteMatched::class,
+                Event\RequestEnded::class,
+                Event\RequestStarted::class,
+                Event\RequestEnded::class,
+                Event\ConnectionClosed::class,
+                Event\ServerStopping::class,
+                Event\ServerStopped::class,
+            ]);
+            $route = $events[3] ?? null;
+            \assert($route instanceof Event\RouteMatched);
+            Assert::same($route->request->method, 'HEAD');
+            Assert::same($route->match->pattern, '/:id');
+            $started = $events[2] ?? null;
+            \assert($started instanceof Event\RequestStarted);
+            $ended = $events[4] ?? null;
+            \assert($ended instanceof Event\RequestEnded);
+            Assert::same($handled, $started->request);
+            Assert::same($route->request, $started->request);
+            Assert::same($ended->request, $started->request);
+
+            Assert::same($ended->status, Status::NO_CONTENT);
+            Assert::true($ended->responseWritten);
+            $missing = $events[6] ?? null;
+            \assert($missing instanceof Event\RequestEnded);
+            Assert::same($missing->status, Status::NOT_FOUND);
+        }));
+    }
+
     public function routerUsesTheServersErrorHandler(): void
     {
         timeout(sec(2), static fn() => group(static function (Group $group) {
@@ -67,12 +134,18 @@ final class ServerTest
         timeout(sec(2), static fn() => group(static function (Group $group) {
             /** @var Deferred<\Throwable> $failure */
             $failure = new Deferred();
+            /** @var Deferred<Event\RequestEnded> $exchange */
+            $exchange = new Deferred();
+            $onFinish = static function (Event\RequestEnded $event) use ($exchange) {
+                $exchange->complete($event);
+            };
+            $observe = static function (Event\ConnectionHandlingFailed $event) use ($failure) {
+                $failure->complete($event->error);
+            };
             $server = new Server(
                 config: new Config(0, idleTimeout: sec(5), writeTimeout: ms(20)),
                 handler: static fn() => new Response(body: str_repeat('x', 16 * 1024 * 1024)),
-                onError: static function (\Throwable $error) use ($failure) {
-                    $failure->complete($error);
-                },
+                dispatcher: new Dispatcher([$observe, $onFinish]),
             );
             $server->start($group);
             $address = $server->address;
@@ -83,6 +156,9 @@ final class ServerTest
                 $client->write("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
                 $error = $failure->await();
                 Assert::instanceOf($error, WriteFailed::class);
+                $finished = $exchange->await();
+                Assert::same($finished->status, Status::OK);
+                Assert::false($finished->responseWritten);
                 Assert::same('The response write did not complete in time.', $error->getMessage());
             } finally {
                 $client->close();
@@ -153,6 +229,11 @@ final class ServerTest
         timeout(sec(2), static fn() => group(static function (Group $group) {
             /** @var Deferred<null> $entered */
             $entered = new Deferred();
+            /** @var Deferred<int> $forced */
+            $forced = new Deferred();
+            $onStop = static function (Event\ServerStopped $event) use ($forced) {
+                $forced->complete($event->forcedConnections);
+            };
             $server = new Server(
                 config: new Config(0, shutdownTimeout: ms(10)),
                 handler: static function () use ($entered) {
@@ -161,6 +242,7 @@ final class ServerTest
 
                     return new Response(Status::NO_CONTENT);
                 },
+                dispatcher: new Dispatcher([$onStop]),
             );
             $server->start($group);
             $address = $server->address;
@@ -172,6 +254,7 @@ final class ServerTest
                 $entered->await();
                 $server->stop();
 
+                Assert::same($forced->await(), 1);
                 Assert::null($client->read(1));
             } finally {
                 $server->stop();
@@ -232,6 +315,14 @@ final class ServerTest
             /** @var Deferred<\Throwable> $failure */
             $failure = new Deferred();
             $error = new \RuntimeException('Handler failed.');
+            /** @var Deferred<Event\RequestEnded> $exchange */
+            $exchange = new Deferred();
+            $onFinish = static function (Event\RequestEnded $event) use ($exchange) {
+                $exchange->complete($event);
+            };
+            $observe = static function (Event\ConnectionHandlingFailed $event) use ($failure) {
+                $failure->complete($event->error);
+            };
             $server = new Server(
                 config: new Config(new InetAddress('127.0.0.1', 0)),
                 handler: static function (Request $request) use ($error) {
@@ -241,9 +332,7 @@ final class ServerTest
 
                     return new Response(Status::NO_CONTENT);
                 },
-                onError: static function (\Throwable $error) use ($failure) {
-                    $failure->complete($error);
-                },
+                dispatcher: new Dispatcher([$observe, $onFinish]),
             );
             $server->start($group);
             $address = $server->address;
@@ -254,6 +343,9 @@ final class ServerTest
             try {
                 $failed->write("GET /fail HTTP/1.1\r\nHost: local\r\n\r\n");
                 Assert::same($error, $failure->await());
+                $finished = $exchange->await();
+                Assert::same($finished->status, Status::INTERNAL_SERVER_ERROR);
+                Assert::true($finished->responseWritten);
                 $client->write("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
 
                 $buffer = new Buffer();
@@ -357,6 +449,9 @@ final class ServerTest
                 /** @var Deferred<\Throwable> $failure */
                 $failure = new Deferred();
                 $tls = new ServerTls(certificate: $certificate, alpnProtocols: ['http/1.1', 'h2']);
+                $observe = static function (Event\TlsHandshakeFailed $event) use ($failure) {
+                    $failure->complete($event->error);
+                };
                 $server = new Server(
                     config: new Config(new InetAddress('127.0.0.1', 0), tls: $tls),
                     handler: static function (Request $request, Context $context) use ($received) {
@@ -364,9 +459,7 @@ final class ServerTest
 
                         return new Response(Status::NO_CONTENT);
                     },
-                    onError: static function (\Throwable $error) use ($failure) {
-                        $failure->complete($error);
-                    },
+                    dispatcher: new Dispatcher([$observe]),
                 );
                 $server->start($group);
                 $address = $server->address;

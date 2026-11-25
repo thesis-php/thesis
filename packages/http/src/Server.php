@@ -7,6 +7,7 @@ namespace Thesis\Http;
 use Thesis\Async\Group;
 use Thesis\Async\Service;
 use Thesis\Async\Task;
+use Thesis\Dispatcher;
 use Thesis\Http\Internal\Server\Listener;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
@@ -49,22 +50,15 @@ final class Server implements Service
     private readonly \Closure $handler;
 
     /**
-     * @var (\Closure(\Throwable): void)|null
-     */
-    private readonly ?\Closure $onError;
-
-    /**
      * @param Handler $handler
-     * @param ?callable(\Throwable): void $onError observes connection failures. An exception it throws fails the group.
      */
     public function __construct(
         public readonly Config $config,
         callable $handler,
-        ?callable $onError = null,
+        private readonly Dispatcher $dispatcher = new Dispatcher(),
         private readonly ErrorHandler $errorHandler = new DefaultErrorHandler(),
     ) {
         $this->handler = $handler(...);
-        $this->onError = $onError === null ? null : $onError(...);
     }
 
     /**
@@ -92,24 +86,22 @@ final class Server implements Service
         };
 
         try {
-            $httpListener = new Listener(
+            $this->listener = new Listener(
                 socketListener: $socketListener,
                 handler: $this->handler,
                 config: $this->config,
-                onError: $this->onError,
+                dispatcher: $this->dispatcher,
                 errorHandler: $this->errorHandler,
             );
-            $this->listener = $httpListener;
-            $task = $group->daemon($httpListener->run(...));
-            $this->task = $task;
+            $this->task = $group->daemon($this->listener->run(...));
 
             // A group may finish as soon as start() returns. A daemon cancelled before it starts never runs its finally.
-            while (!$httpListener->isReady && !$task->isDone) {
+            while (!$this->listener->isReady && !$this->task->isDone) {
                 checkpoint();
             }
 
-            if (!$httpListener->isReady) {
-                $task->await();
+            if (!$this->listener->isReady) {
+                $this->task->await();
             }
         } catch (\Throwable $error) {
             $socketListener->close();

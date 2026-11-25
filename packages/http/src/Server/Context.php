@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Request;
-use Thesis\Http\Response;
+use Thesis\Dispatcher;
 use Thesis\Net\Address;
 use Thesis\Net\TlsInfo;
 
@@ -23,20 +22,7 @@ final readonly class Context
         public Address $localAddress,
         public Address $remoteAddress,
         public ?TlsInfo $tls,
-        private ErrorHandler $errorHandler = new DefaultErrorHandler(),
+        public ErrorHandler $errorHandler,
+        public Dispatcher $dispatcher,
     ) {}
-
-    /**
-     * @param int<400, 599> $status
-     * @throws \ValueError if the error handler returns a different status
-     */
-    public function handleError(int $status, Request $request): Response
-    {
-        $response = $this->errorHandler->handleError($status, $request);
-        if ($response->status !== $status) {
-            throw new \ValueError('The error handler must preserve the status.');
-        }
-
-        return $response;
-    }
 }

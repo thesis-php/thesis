@@ -9,6 +9,7 @@ use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Async\Instant;
+use Thesis\Dispatcher;
 use Thesis\Http\Internal\Server\Connection;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -23,6 +24,35 @@ use function Thesis\Time\sec;
 #[Covers(Connection::class)]
 final class ConnectionLimitsTest
 {
+    public function eventsShareTheRejectedRequestWithoutReadingItsBody(): void
+    {
+        foreach ([413 => '100-continue', 417 => 'unsupported'] as $status => $expect) {
+            $started = $ended = null;
+            $onStart = static function (Event\RequestStarted $event) use (&$started) {
+                $started = $event->request;
+            };
+            $onEnd = static function (Event\RequestEnded $event) use (&$ended) {
+                $ended = $event;
+            };
+            $output = new RecordingWriter();
+            $connection = new Connection(
+                input: new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 2\r\nExpect: {$expect}\r\n\r\n"),
+                output: $output,
+                config: new Config('/test.sock', maxBodyBytes: $status === 413 ? 1 : 2),
+                requestStarted: new Dispatcher([$onStart]),
+                requestEnded: new Dispatcher([$onEnd]),
+            );
+            $connection->run(static fn() => throw new \LogicException('Rejected request reached the handler.'));
+
+            \assert($ended instanceof Event\RequestEnded);
+            Assert::same($ended->request, $started);
+            Assert::same($ended->request->headers->get('expect'), $expect);
+            Assert::same($ended->status, $status);
+            Assert::true($ended->responseWritten);
+            Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
+        }
+    }
+
     #[VirtualTime]
     public function headDeadlineCoversMultipleReads(): void
     {
@@ -33,9 +63,22 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
         $start = Instant::now();
 
-        $connection = new Connection($input, $output, new Config('/test.sock', headTimeout: sec(3)));
+        $status = null;
+        $observe = static function (Event\RequestHeadRejected $event) use ($output, &$status) {
+            $status = $event->status;
+            Assert::same($output->writes, 0);
+        };
+        $dispatcher = new Dispatcher([$observe]);
+
+        $connection = new Connection(
+            input: $input,
+            output: $output,
+            config: new Config('/test.sock', headTimeout: sec(3)),
+            dispatcher: $dispatcher,
+        );
         $connection->run(static fn() => throw new \LogicException('An incomplete head must not reach the handler.'));
 
+        Assert::same($status, 408);
         Assert::equals(Instant::now()->since($start), sec(3));
         Assert::string($output->bytes)->startsWith('HTTP/1.1 408 ');
     }

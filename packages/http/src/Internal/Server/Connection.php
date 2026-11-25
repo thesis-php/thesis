@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal\Server;
 
+use Thesis\Dispatcher;
 use Thesis\Http\Internal\Http1\MalformedMessage;
 use Thesis\Http\Internal\Http1\RequestHead;
 use Thesis\Http\Request;
@@ -11,6 +12,7 @@ use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\ErrorHandler;
+use Thesis\Http\Server\Event;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
 use Thesis\Io\Writer;
@@ -43,6 +45,9 @@ final class Connection
         ErrorHandler $errorHandler = new DefaultErrorHandler(),
         private readonly ?SocketDeadlines $idle = null,
         ?SocketDeadlines $writes = null,
+        private readonly ?Dispatcher $requestStarted = null,
+        private readonly ?Dispatcher $requestEnded = null,
+        private readonly Dispatcher $dispatcher = new Dispatcher(),
     ) {
         $this->buffer = new Buffer();
         $this->requestsRemaining = $config->maxRequestsPerConnection;
@@ -80,7 +85,8 @@ final class Connection
             $this->isHandlingRequest = true;
 
             try {
-                $canReuse = new Exchange($head, $this->bodyInput, $this->output, $canAcceptNextRequest)->run($handler);
+                $exchange = new Exchange($head, $this->bodyInput, $this->output, $canAcceptNextRequest);
+                $canReuse = $exchange->run($handler, $this->requestStarted, $this->requestEnded);
             } finally {
                 $this->isHandlingRequest = false;
             }
@@ -118,6 +124,7 @@ final class Connection
         try {
             return $headReader->read($isKeepAlive);
         } catch (MalformedMessage $error) {
+            $this->dispatcher->dispatch(new Event\RequestHeadRejected($error->status, $error->getMessage()));
             $this->output->writeError($error->status);
 
             return null;

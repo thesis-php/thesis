@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Thesis\Http\Internal\Server;
 
 use Thesis\Async\Cancelled;
+use Thesis\Async\Instant;
+use Thesis\Dispatcher;
 use Thesis\Http\Body;
 use Thesis\Http\Internal\Http1\ChunkedReader;
 use Thesis\Http\Internal\Http1\FixedLengthReader;
@@ -14,6 +16,7 @@ use Thesis\Http\Internal\Http1\Version;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Event;
 use Thesis\Http\Status;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
@@ -32,7 +35,9 @@ final class Exchange
 
     private ?ContinueResponse $continue = null;
 
-    private bool $committed = false;
+    private ?int $status = null;
+
+    private bool $responseWritten = false;
 
     private bool $isBodyComplete {
         get => match (true) {
@@ -55,22 +60,48 @@ final class Exchange
     /**
      * @param callable(Request): Response $handler
      */
-    public function run(callable $handler): bool
+    public function run(callable $handler, ?Dispatcher $requestStarted, ?Dispatcher $requestEnded): bool
     {
-        if ($this->head->length !== null && $this->head->length > $this->input->maxBodyBytes) {
-            $this->output->writeError(Status::CONTENT_TOO_LARGE, $this->head);
-
-            return false;
-        }
-
         $expect = $this->head->headers->get('expect');
-        if ($expect !== null && strcasecmp($expect, '100-continue') !== 0) {
-            $this->output->writeError(Status::EXPECTATION_FAILED, $this->head);
-
-            return false;
+        $rejection = match (true) {
+            $this->head->length !== null && $this->head->length > $this->input->maxBodyBytes => Status::CONTENT_TOO_LARGE,
+            $expect !== null && strcasecmp($expect, '100-continue') !== 0 => Status::EXPECTATION_FAILED,
+            default => null,
+        };
+        $request = $rejection === null
+            ? $this->createRequest($expect)
+            : new Request($this->head->method, $this->head->uri, $this->head->headers);
+        if ($requestEnded !== null) {
+            $startedAt = Instant::now();
         }
 
-        $request = $this->createRequest($expect);
+        try {
+            $requestStarted?->dispatch(new Event\RequestStarted($request));
+
+            if ($rejection !== null) {
+                $this->writeError($rejection);
+
+                return false;
+            }
+
+            return $this->handle($handler, $request);
+        } finally {
+            if ($requestEnded !== null) {
+                $requestEnded->dispatch(new Event\RequestEnded(
+                    request: $request,
+                    status: $this->status,
+                    responseWritten: $this->responseWritten,
+                    duration: Instant::now()->since($startedAt),
+                ));
+            }
+        }
+    }
+
+    /**
+     * @param callable(Request): Response $handler
+     */
+    private function handle(callable $handler, Request $request): bool
+    {
         $body = null;
 
         try {
@@ -155,7 +186,7 @@ final class Exchange
         }
 
         $this->continue?->commit();
-        $this->committed = true;
+        $this->status = $response->status;
         $this->output->writeResponse(
             body: $body,
             head: $reply,
@@ -165,12 +196,14 @@ final class Exchange
                 && $this->decoder->isFullyBuffered,
         );
 
+        $this->responseWritten = true;
+
         return $reply->isPersistent && $this->isBodyComplete;
     }
 
     private function handleFailure(\Throwable $error, Request $request): void
     {
-        if ($this->committed) {
+        if ($this->status !== null) {
             throw $error;
         }
 
@@ -180,13 +213,13 @@ final class Exchange
 
         $failure = $this->bodyReader?->failure;
         if ($failure instanceof MalformedMessage) {
-            $this->output->writeError($failure->status, $this->head);
+            $this->writeError($failure->status);
 
             return;
         }
 
         if ($failure instanceof ReadFailed && $failure->getPrevious() instanceof UnexpectedEof) {
-            $this->output->writeError(Status::BAD_REQUEST, $this->head);
+            $this->writeError(Status::BAD_REQUEST);
 
             return;
         }
@@ -198,7 +231,9 @@ final class Exchange
         $this->continue?->commit();
 
         try {
+            $this->status = Status::INTERNAL_SERVER_ERROR;
             $this->output->writeServerError($this->head, $request);
+            $this->responseWritten = true;
         } catch (Cancelled $cancelled) {
             throw $cancelled;
         } catch (\Throwable) {
@@ -206,5 +241,15 @@ final class Exchange
         }
 
         throw $error;
+    }
+
+    /**
+     * @param int<400, 599> $status
+     */
+    private function writeError(int $status): void
+    {
+        $this->status = $status;
+        $this->output->writeError($status, $this->head);
+        $this->responseWritten = true;
     }
 }

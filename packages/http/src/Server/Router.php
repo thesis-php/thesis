@@ -52,7 +52,7 @@ final class Router
     {
         $path = self::decodePath($request);
         if ($path === null) {
-            return $context->handleError(Status::BAD_REQUEST, $request);
+            return $context->errorHandler->handleError(Status::BAD_REQUEST, $request);
         }
 
         if (isset($this->exact[$path])) {
@@ -61,7 +61,7 @@ final class Router
 
         return $this->matchTrailing($path, $request, $context)
             ?? $this->matchPattern($path, $request, $context)
-            ?? $context->handleError(Status::NOT_FOUND, $request);
+            ?? $context->errorHandler->handleError(Status::NOT_FOUND, $request);
     }
 
     private static function decodePath(Request $request): ?string
@@ -210,6 +210,13 @@ final class Router
         $matches[$request] = $match;
 
         try {
+            if ($context->dispatcher->listens(Event\RouteMatched::class)) {
+                $context->dispatcher->dispatch(new Event\RouteMatched(
+                    request: $request,
+                    match: $match,
+                ));
+            }
+
             return ($route->handler)($request, $context);
         } finally {
             if ($previous === null) {
@@ -252,7 +259,7 @@ final class Router
             $methods[] = Method::HEAD;
         }
 
-        $response = $context->handleError(Status::METHOD_NOT_ALLOWED, $request);
+        $response = $context->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, $request);
 
         return $response->withHeader('Allow', implode(', ', $methods));
     }

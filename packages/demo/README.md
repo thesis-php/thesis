@@ -45,6 +45,6 @@ time curl -fsS --parallel --parallel-immediate 'http://127.0.0.1:8080/[1-8]'
 ```
 
 On an idle machine, expect about two seconds for the first command and about 250 ms for the second.
-Press Ctrl+C to stop the server.
+The console shows the path and duration of each finished request. Press Ctrl+C to stop the server and drain its logs.
 
 The server and logger are wired in [run.php](run.php).

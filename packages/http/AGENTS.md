@@ -137,9 +137,13 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   The local type in routeMatch() is needed because PHPStan 2.3.7 ignores dynamicConstantNames for object values.
   Each match keeps its own parameters when nested routers handle the same request.
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so join method keys as text in the Allow header.
-- Configure the error handler on the server. Middleware and the router receive the same Context, which calls the configured ErrorHandler.
+- Resolve RequestStarted, RequestEnded, ConnectionAccepted and ConnectionClosed once per listener with Dispatcher::for().
+  Dispatch error events directly when the error occurs.
+  The router checks for listeners before creating RouteMatched.
+  RequestStarted, RouteMatched and RequestEnded carry the same Request as the handler. Correlate these events by request identity. A cached request head and URI can serve several keep-alive requests.
+- Configure the error handler on the server. Middleware and the router receive the same Context, which exposes the configured ErrorHandler as $errorHandler.
   The default error page contains only the status and its standard reason phrase. The router owns Allow. Error handlers format responses before the final head. If formatting a 500 fails,
-  preserve the original failure for onError and attempt an empty 500 only before writing starts.
+  preserve the original failure for ConnectionHandlingFailed and attempt an empty 500 only before writing starts.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.

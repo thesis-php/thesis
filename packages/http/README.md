@@ -331,7 +331,7 @@ $server = new Server($config, $pipeline);
 
 The first middleware receives the request first and the response last.
 Each layer receives `handle(Request $request, Context $context, callable $next)`. It can use
-`$context->handleError(403, $request)` to format an error with the server’s configured error handler.
+`$context->errorHandler->handleError(403, $request)` to format an error with the server’s configured error handler.
 Server middleware can return a response directly or call `$next()`. After that call returns or throws,
 the middleware can call `$next()` again while its own `handle()` is running. Overlapping calls to the
 same `$next` and calls after its `handle()` has returned or thrown raise a `LogicException`.
@@ -359,7 +359,7 @@ The server closes idle sockets and lets active handlers
 and response writers finish until the shutdown deadline. Cancelling the serving scope also stops the server.
 The example uses ext-pcntl and handles SIGINT and SIGTERM by closing the listener.
 
-The constructor accepts an optional `onError` callback for connection and application failures. If the handler throws
+If the handler throws
 before the final response starts, the client receives a 500. Once a final response has started,
 a failure closes the connection. Each connection runs independently of the others.
 
@@ -367,6 +367,46 @@ When the handler leaves the request body unread, the server finishes writing its
 connection. An echo or another streaming response may still read the request body after the handler returns.
 A fixed-length request is complete when its final payload byte is read. A chunked request is complete when
 the decoder has consumed the terminating chunk and all its trailers.
+
+### Server events
+
+The server uses an empty dispatcher by default. Pass a `Thesis\Dispatcher` as the named `dispatcher` argument to observe events.
+Subscribe by the event class in `Thesis\Http\Server\Event`. Listeners run synchronously in the emitting task. Handlers and middleware can publish their own events to the same dispatcher with `$context->dispatcher->dispatch($event)`.
+
+| Event | When the server dispatches it |
+| --- | --- |
+| `ServerStarted` | The listener is ready, with its bound address and whether TLS is enabled. |
+| `ServerStopping` | The listener has closed and graceful shutdown starts, with the number of open connections and the shutdown timeout. |
+| `ServerStopped` | The serving group and its connection tasks have finished. Includes the number of open connections forced closed at the shutdown deadline. |
+| `ConnectionAccepted`, `ConnectionClosed` | A connection task starts or releases its socket. Both carry the local and remote addresses. |
+| `RequestHeadRejected` | The parser rejected the head, before the server attempts the error response. Carries the status and parser diagnostic. |
+| `RequestStarted` | The server accepted a parsed request head. Carries the request, including when the server will reject its size or expectation. |
+| `RouteMatched` | The router is about to invoke a matched handler. Carries the request and the match, including the selected route method. |
+| `RequestEnded` | Processing of a parsed request ended, including cancellation and failed writes. Carries the intended final status if available, whether the whole response was written, and elapsed time since the parsed head. |
+| `TlsHandshakeFailed`, `ConnectionHandlingFailed` | An exception escaped TLS negotiation or HTTP processing. A listener can accept both with the union type `TlsHandshakeFailed\|ConnectionHandlingFailed`. Each carries the original exception and the connection addresses. |
+
+A malformed request head never starts an exchange. A handler exception followed by a successful 500 write produces
+both a finished request and a server error. A handler that returns a 500 produces only the normal request events.
+The server dispatches `RequestEnded` directly when processing leaves the exchange, including on cancellation.
+The three request events expose the request as `$event->request`. Use its object identity to correlate events,
+including concurrent requests to the same URI. The handler receives this same object. Calling `takeBody()` in a listener
+claims the body for that listener. For an early 413 or 417 the server exposes the parsed headers and an empty body.
+
+### Server logging
+
+Pass a PSR-3 logger to `ServerLogger`. It logs startup and shutdown at info, HTTP failures at error,
+and TLS failures and rejected request heads at debug. The TCP startup message includes a URL with the bound port.
+Wildcard listeners use a loopback URL and keep the bound address in the log context. Enable the optional access log to record each
+finished request at info, including its method, path, status, write outcome and duration
+in milliseconds. The path excludes the query string.
+
+```php
+use Thesis\Dispatcher;
+use Thesis\Http\Server;
+use Thesis\Http\Server\ServerLogger;
+
+$server = new Server($config, $handler, dispatcher: new Dispatcher([new ServerLogger($logger, accessLog: true)]));
+```
 
 ### Limits
 

@@ -8,14 +8,23 @@ use Testo\Assert;
 use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
+use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Net\InetAddress;
 
 #[Test]
-final class PipelineTest
+final readonly class PipelineTest
 {
+    private Context $context;
+
+    public function __construct()
+    {
+        $address = new InetAddress('127.0.0.1', 80);
+        $this->context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
+    }
+
     public function emptyMiddlewareReturnsTheOriginalHandler(): void
     {
         $handler = static fn() => new Response();
@@ -26,8 +35,7 @@ final class PipelineTest
 
     public function wrapsInOrderAndBindsEachRequest(): void
     {
-        $address = new InetAddress('127.0.0.1', 80);
-        $context = new Context($address, $address, null);
+        $context = $this->context;
         $request = Request::get('/');
         $calls = [];
         $outer = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
@@ -38,7 +46,7 @@ final class PipelineTest
         $inner = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
             $calls[] = $connection;
 
-            return $incoming->uri->getRawPath() === '/' ? $next() : $connection->handleError(403, $incoming);
+            return $incoming->uri->getRawPath() === '/' ? $next() : $connection->errorHandler->handleError(403, $incoming);
         });
         $endpoint = static function (Request $incoming, Context $connection) use (&$calls) {
             $calls[] = [$incoming, $connection];
@@ -51,15 +59,14 @@ final class PipelineTest
         };
         $handler = Pipeline::wrap($endpoint, $middleware());
 
-        Assert::same(201, $handler($request, $context)->status);
+        Assert::same(201, $handler($request, $this->context)->status);
         $denied = Request::get('/private');
-        Assert::same(403, $handler($denied, $context)->status);
+        Assert::same(403, $handler($denied, $this->context)->status);
         Assert::same([[$request, $context], $context, [$request, $context], [$denied, $context], $context], $calls);
     }
 
     public function rejectsReentryWhileTheInnerLayerIsRunning(): void
     {
-        $address = new InetAddress('127.0.0.1', 80);
         $endpoint = static fn() => new Response();
         $saved = $endpoint;
         $outer = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) use (&$saved) {
@@ -73,14 +80,13 @@ final class PipelineTest
         $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class);
-        $handler(Request::get('/'), new Context($address, $address, null));
+        $handler(Request::get('/'), $this->context);
     }
 
     #[DataSet([false], 'middleware returns')]
     #[DataSet([true], 'middleware throws')]
     public function expiresTheInnerContinuationWhileTheOuterMiddlewareStillRuns(bool $throws): void
     {
-        $address = new InetAddress('127.0.0.1', 80);
         $endpoint = static fn() => new Response();
         $saved = $endpoint;
         $outer = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) use (&$saved) {
@@ -100,12 +106,11 @@ final class PipelineTest
         $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class)->withMessage('The middleware invocation has ended.');
-        $handler(Request::get('/'), new Context($address, $address, null));
+        $handler(Request::get('/'), $this->context);
     }
 
     public function repeatsTheSameInnerLayerAfterItReturns(): void
     {
-        $address = new InetAddress('127.0.0.1', 80);
         $twice = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) {
             $next();
 
@@ -114,14 +119,12 @@ final class PipelineTest
         $deny = new CallbackMiddleware(static fn() => new Response(403));
         $handler = Pipeline::wrap(static fn() => new Response(), [$twice, $deny]);
 
-        $response = $handler(Request::get('/'), new Context($address, $address, null));
+        $response = $handler(Request::get('/'), $this->context);
         Assert::same(403, $response->status);
     }
 
     public function retriesAfterTheHandlerThrows(): void
     {
-        $address = new InetAddress('127.0.0.1', 80);
-        $context = new Context($address, $address, null);
         $request = Request::get('/');
         $attempts = [];
         $retry = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) {
@@ -141,7 +144,7 @@ final class PipelineTest
         };
         $handler = Pipeline::wrap($endpoint, [$retry]);
 
-        Assert::same(201, $handler($request, $context)->status);
-        Assert::same([[$request, $context], [$request, $context]], $attempts);
+        Assert::same(201, $handler($request, $this->context)->status);
+        Assert::same([[$request, $this->context], [$request, $this->context]], $attempts);
     }
 }

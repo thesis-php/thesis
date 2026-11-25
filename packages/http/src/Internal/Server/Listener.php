@@ -9,12 +9,15 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Async\Lock;
+use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
 use Thesis\Http\Server\ErrorHandler;
+use Thesis\Http\Server\Event;
 use Thesis\Net\Address;
 use Thesis\Net\Server;
+use Thesis\Net\ServerTls;
 use Thesis\Net\Socket;
 use Thesis\Net\SocketClosed;
 use Thesis\Net\TlsFailed;
@@ -39,7 +42,7 @@ final class Listener
     public private(set) bool $isReady = false;
 
     /**
-     * @var \SplObjectStorage<Connection, null>
+     * @var \SplObjectStorage<Connection, Socket>
      */
     private readonly \SplObjectStorage $connections;
 
@@ -48,21 +51,34 @@ final class Listener
      */
     private ?Deferred $drained = null;
 
+    private int $forcedConnections = 0;
+
     private readonly LocalSemaphore $capacity;
+
+    private readonly ?Dispatcher $connectionAccepted;
+
+    private readonly ?Dispatcher $connectionClosed;
+
+    private readonly ?Dispatcher $requestStarted;
+
+    private readonly ?Dispatcher $requestEnded;
 
     /**
      * @param HandlerClosure $handler
-     * @param (\Closure(\Throwable): void)|null $onError
      */
     public function __construct(
         private readonly Server $socketListener,
         private readonly \Closure $handler,
         private readonly Config $config,
-        private readonly ?\Closure $onError,
+        private readonly Dispatcher $dispatcher,
         private readonly ErrorHandler $errorHandler,
     ) {
         $this->connections = new \SplObjectStorage();
         $this->capacity = new LocalSemaphore($config->maxConnections);
+        $this->connectionAccepted = $dispatcher->for(Event\ConnectionAccepted::class);
+        $this->connectionClosed = $dispatcher->for(Event\ConnectionClosed::class);
+        $this->requestStarted = $dispatcher->for(Event\RequestStarted::class);
+        $this->requestEnded = $dispatcher->for(Event\RequestEnded::class);
     }
 
     public function run(): void
@@ -76,6 +92,10 @@ final class Listener
         } finally {
             $unsubscribe();
             $this->socketListener->close();
+            $this->dispatcher->dispatch(new Event\ServerStopped(
+                address: $this->socketListener->address,
+                forcedConnections: $this->forcedConnections,
+            ));
         }
     }
 
@@ -97,12 +117,26 @@ final class Listener
         $acceptor = $group->spawn(fn() => $this->accept($group, $idle, $writes));
 
         try {
+            $this->dispatcher->dispatch(new Event\ServerStarted(
+                address: $this->socketListener->address,
+                tls: $this->config->tls !== null,
+            ));
             $this->socketListener->awaitClose();
+            $this->dispatcher->dispatch(new Event\ServerStopping(
+                address: $this->socketListener->address,
+                connections: $this->connections->count(),
+                timeout: $this->config->shutdownTimeout,
+            ));
             $acceptor->cancel();
 
             if ($this->connections->count() > 0) {
                 $this->drained = new Deferred();
                 timeoutOr($this->config->shutdownTimeout, $this->drained->await(...));
+                foreach ($this->connections as $connection) {
+                    if (!$this->connections[$connection]->isClosed) {
+                        ++$this->forcedConnections;
+                    }
+                }
             }
         } finally {
             $this->socketListener->close();
@@ -137,8 +171,11 @@ final class Listener
                 errorHandler: $this->errorHandler,
                 idle: $idle,
                 writes: $writes,
+                requestStarted: $this->requestStarted,
+                requestEnded: $this->requestEnded,
+                dispatcher: $this->dispatcher,
             );
-            $this->connections[$connection] = null;
+            $this->connections[$connection] = $socket;
             $group->spawn(fn() => $this->serveConnection($socket, $connection, $permit));
         }
     }
@@ -146,25 +183,75 @@ final class Listener
     private function serveConnection(Socket $socket, Connection $connection, Lock $permit): void
     {
         try {
+            $this->connectionAccepted?->dispatch(new Event\ConnectionAccepted(
+                localAddress: $socket->localAddress,
+                remoteAddress: $socket->remoteAddress,
+            ));
+
             if ($socket->isClosed) {
                 return;
             }
 
             $tls = $this->config->tls;
-            if ($tls !== null) {
-                timeout($this->config->tlsHandshakeTimeout, static fn() => $socket->enableTls($tls));
-
-                $protocol = $socket->tls?->alpnProtocol;
-                if ($protocol !== null && $protocol !== 'http/1.1') {
-                    throw new TlsFailed('The negotiated TLS application protocol is not HTTP/1.1.');
-                }
+            if ($tls !== null && !$this->negotiateTls($socket, $tls)) {
+                return;
             }
 
+            $this->handleRequests($socket, $connection);
+        } finally {
+            $connection->close();
+            unset($this->connections[$connection]);
+            $permit->release();
+
+            if ($this->connections->count() === 0) {
+                $this->drained?->complete();
+            }
+            $this->connectionClosed?->dispatch(new Event\ConnectionClosed(
+                localAddress: $socket->localAddress,
+                remoteAddress: $socket->remoteAddress,
+            ));
+        }
+    }
+
+    private function negotiateTls(Socket $socket, ServerTls $tls): bool
+    {
+        try {
+            timeout($this->config->tlsHandshakeTimeout, static fn() => $socket->enableTls($tls));
+
+            $protocol = $socket->tls?->alpnProtocol;
+            if ($protocol !== null && $protocol !== 'http/1.1') {
+                throw new TlsFailed('The negotiated TLS application protocol is not HTTP/1.1.');
+            }
+        } catch (\Throwable $error) {
+            if ($error instanceof Cancelled) {
+                throw $error;
+            }
+
+            if ($error instanceof SocketClosed && $this->socketListener->isClosed) {
+                return false;
+            }
+
+            $this->dispatcher->dispatch(new Event\TlsHandshakeFailed(
+                localAddress: $socket->localAddress,
+                remoteAddress: $socket->remoteAddress,
+                error: $error,
+            ));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function handleRequests(Socket $socket, Connection $connection): void
+    {
+        try {
             $context = new Context(
                 localAddress: $socket->localAddress,
                 remoteAddress: $socket->remoteAddress,
                 tls: $socket->tls,
                 errorHandler: $this->errorHandler,
+                dispatcher: $this->dispatcher,
             );
             $connection->run(
                 handler: fn(Request $request) => ($this->handler)($request, $context),
@@ -173,16 +260,12 @@ final class Listener
         } catch (Cancelled $cancelled) {
             throw $cancelled;
         } catch (\Throwable $error) {
-            if ($this->onError !== null && !($error instanceof SocketClosed && $this->socketListener->isClosed)) {
-                ($this->onError)($error);
-            }
-        } finally {
-            $connection->close();
-            unset($this->connections[$connection]);
-            $permit->release();
-
-            if ($this->connections->count() === 0) {
-                $this->drained?->complete();
+            if (!($error instanceof SocketClosed && $this->socketListener->isClosed)) {
+                $this->dispatcher->dispatch(new Event\ConnectionHandlingFailed(
+                    localAddress: $socket->localAddress,
+                    remoteAddress: $socket->remoteAddress,
+                    error: $error,
+                ));
             }
         }
     }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Thesis\Async\Group;
+use Thesis\Dispatcher;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -10,6 +11,7 @@ use Thesis\Http\Server;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
+use Thesis\Http\Server\ServerLogger;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
 use function Thesis\Async\awaitSignal;
@@ -25,35 +27,39 @@ use function Thesis\Time\sec;
 $autoload = __DIR__ . '/vendor/autoload.php';
 require is_file($autoload) ? $autoload : dirname(__DIR__, 2) . '/vendor/autoload.php';
 
-$endpoint = $argv[1] ?? '127.0.0.1:8080';
-if ($endpoint === '') {
-    throw new InvalidArgumentException('The listening address must not be empty.');
-}
+group(static function (Group $group) {
+    /** @var list<string> $arguments */
+    $arguments = $_SERVER['argv'] ?? [];
+    $endpoint = $arguments[1] ?? '127.0.0.1:8080';
+    if ($endpoint === '') {
+        throw new InvalidArgumentException('The listening address must not be empty.');
+    }
 
-$logger = new Logger(stderr(), formatter: new Console());
-$server = new Server(
-    config: new Config($endpoint),
-    handler: new Router([
-        new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
-        new Route(Method::GET, '/:id', static function (Request $request) {
-            delay(ms(250));
+    $logger = new Logger(stderr(), formatter: new Console());
+    $server = new Server(
+        config: new Config($endpoint),
+        handler: new Router([
+            new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
+            new Route(Method::GET, '/:id', static function (Request $request) {
+                delay(ms(250));
 
-            $id = routeMatch($request)
-                ?->param('id')
-                ?? throw new LogicException('Expected the /:id route to supply id.')
-            ;
+                $id = routeMatch($request)
+                    ?->param('id')
+                    ?? throw new LogicException('Expected the /:id route to supply id.')
+                ;
 
-            return new Response(body: $id);
-        }),
-    ]),
-);
+                return new Response(body: $id);
+            }),
+        ]),
+        dispatcher: new Dispatcher([
+            new ServerLogger($logger, accessLog: true),
+        ]),
+    );
 
-group(static function (Group $group) use ($logger, $server) {
     $logger->start($group);
 
     try {
         $server->start($group);
-        $logger->info('Listening on {address}', ['address' => (string) $server->address]);
         awaitSignal(SIGINT, SIGTERM);
     } finally {
         try {

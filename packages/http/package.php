@@ -29,7 +29,9 @@ return new Manifest(
         // Content-Length and chunk sizes can exceed 2^31.
         'php-64bit' => '*',
         'ext-zlib' => '*',
+        'psr/log' => '^3.0',
         'thesis/async' => '*',
+        'thesis/dispatcher' => '*',
         'thesis/net' => '*',
         'thesis/time' => '*',
         'thesis/io' => '*',
