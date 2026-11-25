@@ -22,7 +22,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
   Access it through `Context::$errorHandler`. Creating a context requires both the error handler and the dispatcher.
 - Read the active route in handlers and middleware with `Server\routeMatch($request)` or a single parameter with `Server\routeParam($request, $name)`.
 - Register one or more methods per route with `Route::$methods`. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
-  Inspect matches with `Router::lookup()` or ignore trailing slashes. Dispatch supports HEAD fallback and 405 with Allow.
+  Inspect matches with `Router::lookup()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.

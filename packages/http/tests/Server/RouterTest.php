@@ -266,9 +266,30 @@ final readonly class RouterTest
         $report = $router->lookup(Request::get('/reports/2026-11.csv'));
         Assert::same($report?->params, ['year' => '2026', 'month' => '11']);
         Assert::null($router->lookup(Request::get('/reports/current-11.csv')));
+    }
 
-        $lenient = new Router([new Route('GET', '/docs/', $handler)], ignoreTrailingSlash: true);
-        Assert::same($lenient->lookup(Request::get('/docs'))?->pattern, '/docs/');
+    public function matchesOneOptionalTrailingSlash(): void
+    {
+        $handler = static fn() => new Response();
+        $router = new Router([
+            new Route('GET', '/docs[/]', $handler),
+            new Route('GET', '/archive/{year?}[/]', $handler),
+        ]);
+        Assert::same($router->lookup(Request::get('/docs'))?->pattern, '/docs[/]');
+        Assert::same($router->lookup(Request::get('/docs/'))?->pattern, '/docs[/]');
+        Assert::null($router->lookup(Request::get('/docs//')));
+        Assert::same($router->lookup(Request::get('/archive/'))?->params, []);
+        Assert::same($router->lookup(Request::get('/archive/2026/'))?->params, ['year' => '2026']);
+    }
+
+    public function rejectsAnExplicitRouteCoveredByAnOptionalSlash(): void
+    {
+        $handler = static fn() => new Response();
+        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate route GET /docs/{name}/.');
+        new Router([
+            new Route('GET', '/docs/{id}[/]', $handler),
+            new Route('GET', '/docs/{name}/', $handler),
+        ]);
     }
 
     public function prefersTheShortestCompleteSplitBetweenAdjacentParameters(): void

@@ -263,7 +263,8 @@ or emitting an event. Dispatch checks the method after selecting the complete pa
 An explicit HEAD wins over the GET fallback. A mismatch yields 405 with Allow, an unknown path 404.
 
 Matching uses the raw URI path. Dot segments, plus signs and trailing slashes keep their meaning.
-Pass `ignoreTrailingSlash: true` to the router to trim trailing slashes from both definitions and requests.
+End a pattern with `[/]` to accept one optional slash. For example, `/docs[/]` matches both `/docs` and `/docs/`.
+A remainder must end its pattern and captures trailing slashes itself.
 An absolute URI with an empty path matches `/`. The special targets `OPTIONS *` and authority-form `CONNECT` have no route path.
 Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
 For example, `/users/a%252Fb` passes `a%2Fb` to the handler.

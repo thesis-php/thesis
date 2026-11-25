@@ -152,6 +152,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   On PHP 8.6 aarch64, lookup of a 2048-digit serial followed by two letters took 8.15 µs instead
   of 1.57 ms (eight alternating pairs). Mixed lookup at 2048 iterations used 102.79M instructions
   against 111.27M with independent requirements throughout, and 4,800 more bytes of peak memory.
+- Register `[/]` with the route. Trimming request paths would change the value captured by a remainder.
 - At the root, an omitted suffix can follow an empty literal segment: `//{id?}` also matches `/`.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.

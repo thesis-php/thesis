@@ -34,10 +34,8 @@ final class Router
      * @param iterable<Route> $routes
      * @throws \InvalidArgumentException for duplicate routes, invalid patterns or methods
      */
-    public function __construct(
-        iterable $routes,
-        private readonly bool $ignoreTrailingSlash = false,
-    ) {
+    public function __construct(iterable $routes)
+    {
         $this->root = new RouteNode();
         foreach ($routes as $route) {
             $this->register($route);
@@ -123,9 +121,6 @@ final class Router
         if (str_contains($path, "\0")) {
             return Status::BAD_REQUEST;
         }
-        if ($this->ignoreTrailingSlash) {
-            $path = self::trimSlashes($path);
-        }
         if (isset($this->exact[$path])) {
             $routes = $this->exact[$path];
 
@@ -165,13 +160,16 @@ final class Router
             }
         }
 
-        $path = $this->ignoreTrailingSlash ? self::trimSlashes($pattern) : $pattern;
+        $optionalSlash = str_ends_with($pattern, '[/]');
+        $path = $optionalSlash ? substr($pattern, 0, -3) : $pattern;
         if (strpbrk($path, '{}') === false && $route->requirements === [] && $route->defaults === []) {
-            foreach ($route->methods as $method) {
-                if (isset($this->exact[$path][$method])) {
-                    throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
+            foreach ($optionalSlash ? [$path, $path . '/'] : [$path] as $literal) {
+                foreach ($route->methods as $method) {
+                    if (isset($this->exact[$literal][$method])) {
+                        throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
+                    }
+                    $this->exact[$literal][$method] = [$route, new RouteMatch($method, $pattern)];
                 }
-                $this->exact[$path][$method] = [$route, new RouteMatch($method, $pattern)];
             }
 
             return;
@@ -209,6 +207,10 @@ final class Router
             }
             if ($modifier === '?') {
                 $optional = true;
+                if ($optionalSlash) {
+                    $slash = $node->literals[''] ??= new RouteNode();
+                    ($slash->optional ??= new RouteNode())->register($route, $before);
+                }
                 ($node->optional ??= new RouteNode())->register($route, $before);
             }
             if ($tokens !== []) {
@@ -217,7 +219,7 @@ final class Router
             if ($tokens === []) {
                 $node = $node->literals[$segment] ??= new RouteNode();
             } elseif ($modifier === '+' || $modifier === '*') {
-                if ($index !== array_key_last($segments)) {
+                if ($optionalSlash || $index !== array_key_last($segments)) {
                     throw new \InvalidArgumentException("Invalid remainder in '{$pattern}'.");
                 }
                 if (isset($requirements[0])) {
@@ -244,13 +246,9 @@ final class Router
             throw new \InvalidArgumentException("Unknown parameter in '{$pattern}'.");
         }
         $node->register($route, $names);
-    }
-
-    private static function trimSlashes(string $path): string
-    {
-        $path = rtrim($path, '/');
-
-        return $path === '' ? '/' : $path;
+        if ($optionalSlash) {
+            ($node->literals[''] ??= new RouteNode())->register($route, $names);
+        }
     }
 
     private static function literal(string $literal, string $segment, string $pattern): string
