@@ -11,16 +11,14 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
 - `make test-alone` installs thesis/formatter and thesis/source-location from Packagist, not from the monorepo:
   a change that needs an unreleased one fails there until it is released. Raise its lower bound in the manifest then.
 - The hot path is `dispatch()`: one lookup of `$listenersByClass[$event::class]` and the calls. Everything else
-  is done once: the types are parsed and checked when registered (`Internal\Listener::of()`), the listeners
+  is done once: the types are parsed and checked in the constructor (`Internal\Listener::of()`), the listeners
   of a class are found on its first event or `listens()`. Never reflect or match types per event.
 - The table is filled lazily, not in the constructor: the classes of the events are not known in advance,
   a listener of an interface gets the events of classes that are loaded later (anonymous ones too).
 - A type is kept in the disjunctive normal form (`(A&B)|C` is `[[A, B], [C]]`, `null` for every event), so a class,
   a union, an intersection and a DNF go through one match, and a listener is added once per class whatever
   number of its types matches.
-- `with()` reuses the parsed listeners and appends the new ones in iteration order. Its class table starts empty:
-  even a cached miss may now match a listener.
-- The order is the order of registration. A dispatcher is immutable, so the table is never invalidated
+- The order is the order of the constructor. A dispatcher is immutable, so the table is never invalidated
   and a listener added during `dispatch()` is not a case. For the same reason a listener may dispatch:
   it is a plain nested call, its listeners run before the next listener of the outer event.
 - Every listener is called with the event and the dispatcher, `$listener($event, $this)`: nothing about
@@ -105,6 +103,8 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
   and a tool that reports always stands next to a listener of its reports), a constructor that takes any `object`
   and looks for the marks (`callable|object` takes a closure and an invokable object of any signature, PHPStan
   stops checking them), an empty marker interface next to the marks (two declarations that can disagree).
+- Rejected: `Dispatcher::with()` for components that register their own subscribers. Each component gets a separate
+  dispatcher, so a subscriber added by one component misses events dispatched through another component's copy.
 - Rejected: `withListener()` and `withSubscriber()` instead of the list: the types are precise, but where
   a dispatcher is built one has to know again which of the two a class is. Rejected: an invokable object
   with a `match` over the events (it hides what it listens to), a list of `$object->onX(...)` where the dispatcher

@@ -60,44 +60,6 @@ final class SubscriberTest
         Assert::same($subscriber->calls, ['before', 'unrelated', 'unrelated again', 'after', 'other']);
     }
 
-    public function extendsADispatcherAfterAMiss(): void
-    {
-        $subscriber = new class implements Subscriber {
-            public ?Dispatcher $dispatcher = null;
-
-            #[\Override]
-            public function listeners(): iterable
-            {
-                yield $this->onOther(...);
-            }
-
-            private function onOther(Other $event, Dispatcher $dispatcher): void
-            {
-                $this->dispatcher = $dispatcher;
-                $dispatcher->dispatch(new Unrelated());
-            }
-        };
-        $calls = [];
-        $first = static function (Unrelated $event) use (&$calls) {
-            $calls[] = 'first';
-        };
-        $last = static function (Unrelated $event) use (&$calls) {
-            $calls[] = 'last';
-        };
-        $base = new Dispatcher([$first]);
-        Assert::false($base->listens(Other::class));
-
-        $extended = $base->with([$subscriber, $last]);
-        Assert::true($extended->listens(Other::class));
-        $extended->dispatch(new Other());
-
-        Assert::same($subscriber->dispatcher, $extended);
-        Assert::false($base->listens(Other::class));
-        $base->dispatch(new Other());
-        $base->dispatch(new Unrelated());
-        Assert::same($calls, ['first', 'last', 'first']);
-    }
-
     public function isNotCalledItself(): void
     {
         $subscriber = new class implements Subscriber {

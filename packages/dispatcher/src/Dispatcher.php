@@ -20,7 +20,7 @@ final class Dispatcher
     /**
      * @var list<Listener>
      */
-    private array $listeners;
+    private readonly array $listeners;
 
     /**
      * Filled on the first event of each class: the classes of the events are not known in advance,
@@ -42,29 +42,15 @@ final class Dispatcher
     }
 
     /**
-     * Returns a new dispatcher that calls the additional listeners after the existing ones.
-     *
-     * @param iterable<(callable(never, self): void)|Dispatcher\Subscriber> $listeners in iteration order, keys ignored
-     * @throws \InvalidArgumentException if a listener cannot take an event or is a generator
-     */
-    public function with(iterable $listeners): self
-    {
-        $dispatcher = new self($listeners);
-        $dispatcher->listeners = [...$this->listeners, ...$dispatcher->listeners];
-
-        return $dispatcher;
-    }
-
-    /**
      * If a listener suspends the fiber, this call suspends with it. This call propagates the listener's exception,
      * the listeners after it are not called. An event dispatched by a listener goes to its listeners at once,
      * before the next listener of $event is called.
      */
     public function dispatch(object $event): void
     {
-        // Resolving a cached class again gives the same listeners.
-        // @infection-ignore AssignCoalesce
-        foreach ($this->listenersByClass[$event::class] ??= $this->resolve($event::class) as $listener) {
+        // without the table every event resolves its listeners again and gets the same ones: only slower
+        // @infection-ignore Coalesce
+        foreach ($this->listenersByClass[$event::class] ?? $this->resolve($event::class) as $listener) {
             $listener($event, $this);
         }
     }
@@ -76,9 +62,7 @@ final class Dispatcher
      */
     public function listens(string $class): bool
     {
-        // Resolving a cached class again gives the same listeners.
-        // @infection-ignore AssignCoalesce
-        return ($this->listenersByClass[$class] ??= $this->resolve($class)) !== [];
+        return ($this->listenersByClass[$class] ?? $this->resolve($class)) !== [];
     }
 
     /**
@@ -95,6 +79,6 @@ final class Dispatcher
             }
         }
 
-        return $listeners;
+        return $this->listenersByClass[$class] = $listeners;
     }
 }

@@ -15,7 +15,7 @@ use Thesis\Dispatcher;
 interface Subscriber
 {
     /**
-     * Called once each time this subscriber is given to the constructor or with().
+     * Called once, by the constructor of the dispatcher, which checks each of them as any listener.
      *
      * @return iterable<callable(never, Dispatcher): void> in the order they are called, the keys are ignored
      */

@@ -104,17 +104,15 @@ final class Mailer implements Subscriber
 $dispatcher = new Dispatcher([new Mailer(), $otherListener]);
 ```
 
-Its listeners take the place of the object, in the order it gives them, and each goes through the usual listener checks.
-`listeners()` is called once each time the subscriber is given to the constructor or `with()`
-and may return any iterable.
+Its listeners take the place of the object, in the order it gives them, and the constructor checks each
+as any listener. `listeners()` is called once, by the constructor, and may return any iterable.
 A subscriber is never called itself, an invokable one too. Its listeners may be private methods:
 PHPStan reports one that `listeners()` does not give as unused.
 
 ## Dispatching
 
-`dispatch()` calls the listeners of the event one by one, in registration order.
-The constructor and `with()` take any iterable of listeners and subscribers (an array, a generator,
-or a tagged collection from a container). Both ignore the keys.
+`dispatch()` calls the listeners of the event one by one, in the order they are given to the constructor.
+It takes any iterable of them (an array, a generator, a tagged collection of a container), the keys are ignored.
 There are no priorities and no stopping. What a listener throws is thrown from `dispatch()`, and the listeners
 after it are not called. A listener may suspend the fiber, and then `dispatch()` waits for it: the next listener
 is called after it returns.
@@ -124,8 +122,7 @@ is called. So a listener that stands after the one that dispatches gets the new 
 that has caused it: put a listener that dispatches after those that take both events.
 
 The listeners of a class are found on its first event and kept, so every next event costs one lookup by its class.
-`$extended = $dispatcher->with($more)` returns a new dispatcher that calls the original listeners first,
-then the additional ones. The original dispatcher keeps its own set of listeners.
+A dispatcher is immutable: to add listeners, create another one, `new Dispatcher([...$listeners, ...$more])`.
 
 `listens()` tells whether any listener gets the events of a class, to skip building an event that nobody gets:
 
