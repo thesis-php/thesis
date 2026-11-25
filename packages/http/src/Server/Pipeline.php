@@ -33,6 +33,6 @@ final readonly class Pipeline
 
     public function __invoke(Request $request, Context $context): Response
     {
-        return new Next($this->middleware, $this->handler, $request, $context)();
+        return Next::dispatch($this->middleware, $this->handler, $request, $context, index: 0);
     }
 }

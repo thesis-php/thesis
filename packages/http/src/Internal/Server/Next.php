@@ -14,24 +14,46 @@ use Thesis\Http\Server\Middleware;
  */
 final class Next
 {
+    /**
+     * @param list<Middleware> $middleware
+     * @param \Closure(Request, Context): Response $handler
+     */
+    public static function dispatch(
+        array $middleware,
+        \Closure $handler,
+        Request $request,
+        Context $context,
+        int $index,
+    ): Response {
+        $layer = $middleware[$index] ?? null;
+        if ($layer === null) {
+            return $handler($request, $context);
+        }
+
+        $next = new self($middleware, $handler, $request, $context, $index + 1);
+
+        try {
+            return $layer->handle($request, $next);
+        } finally {
+            $next->expired = true;
+        }
+    }
+
     private bool $expired = false;
 
     private bool $running = false;
-
-    private readonly int $index;
 
     /**
      * @param list<Middleware> $middleware
      * @param \Closure(Request, Context): Response $handler
      */
-    public function __construct(
+    private function __construct(
         private readonly array $middleware,
         private readonly \Closure $handler,
         private readonly Request $request,
         private readonly Context $context,
-    ) {
-        $this->index = 0;
-    }
+        private readonly int $index,
+    ) {}
 
     private function __clone() {}
 
@@ -51,18 +73,7 @@ final class Next
         $this->running = true;
 
         try {
-            $layer = $this->middleware[$this->index] ?? null;
-            if ($layer === null) {
-                return ($this->handler)($this->request, $this->context);
-            }
-
-            $next = clone($this, ['index' => $this->index + 1, 'running' => false]);
-
-            try {
-                return $layer->handle($this->request, $next);
-            } finally {
-                $next->expired = true;
-            }
+            return self::dispatch($this->middleware, $this->handler, $this->request, $this->context, $this->index);
         } finally {
             $this->running = false;
         }
