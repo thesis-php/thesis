@@ -57,6 +57,25 @@ final class RouterBench
 
     #[DataProvider('sizes')]
     #[Linear('count')]
+    public function benchAdjacentParameters(int $count): void
+    {
+        $router = new Router([new Route(
+            'GET',
+            '/parts/{serial}{code}',
+            static fn() => new Response(),
+            requirements: ['serial' => '[0-9]+', 'code' => '[a-z]+'],
+        )]);
+        $serial = str_repeat('1', $count);
+        $request = Request::get("/parts/{$serial}ab");
+        for ($i = 0; $i < 64; ++$i) {
+            if ($router->lookup($request)?->params !== ['serial' => $serial, 'code' => 'ab']) {
+                throw new \LogicException('Wrong parameter boundary.');
+            }
+        }
+    }
+
+    #[DataProvider('sizes')]
+    #[Linear('count')]
     public function benchMixedLookup(int $count): void
     {
         $routes = [];

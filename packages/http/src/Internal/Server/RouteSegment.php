@@ -10,28 +10,92 @@ namespace Thesis\Http\Internal\Server;
 final readonly class RouteSegment
 {
     /**
+     * @var non-empty-list<?string>
+     */
+    private array $requirements;
+
+    private ?string $compound;
+
+    /**
      * @param non-empty-list<string> $literals
      * @param non-empty-list<?string> $requirements
      */
     public function __construct(
         private array $literals,
-        private array $requirements,
-    ) {}
+        array $requirements,
+        string $pattern,
+    ) {
+        $compiled = [];
+        foreach ($requirements as $fragment) {
+            $compiled[] = $fragment === null ? null : self::requirement($fragment, $pattern);
+        }
+        $this->requirements = $compiled;
+        $this->compound = \count($requirements) > 1 ? $this->compoundExpression($requirements) : null;
+    }
+
+    public static function requirement(string $regex, string $pattern): string
+    {
+        $regex = "\x01\\A(?:{$regex})\\z\x01sD";
+        if (@preg_match($regex, '') === false) {
+            throw new \InvalidArgumentException("Invalid requirement in '{$pattern}'.");
+        }
+
+        return $regex;
+    }
+
+    /**
+     * @param non-empty-list<?string> $requirements
+     */
+    private function compoundExpression(array $requirements): ?string
+    {
+        $regex = '\A';
+        foreach ($requirements as $index => $fragment) {
+            $regex .= preg_quote($this->literals[$index] ?? '', '~');
+            if ($fragment === null) {
+                $regex .= '(.+?)';
+
+                continue;
+            }
+            // Lazy positive repetitions preserve the shortest valid capture at each boundary.
+            $simple = '~\A(?:\[[a-zA-Z0-9_-]+\]|\\\[dws])([+]|\{[1-9][0-9]*(?:,[0-9]*)?\})?\z~';
+            if (preg_match($simple, $fragment, $parts) !== 1) {
+                return null;
+            }
+            $regex .= '(' . $fragment . (isset($parts[1]) ? '?' : '') . ')';
+        }
+        $suffix = $this->literals[\count($requirements)] ?? '';
+        $regex = '~' . $regex . preg_quote($suffix, '~') . '\z~sD';
+
+        return @preg_match($regex, '') === false ? null : $regex;
+    }
 
     /**
      * @return list<string>|null
      */
     public function match(string $segment): ?array
     {
+        if ($this->compound !== null) {
+            $matched = preg_match($this->compound, $segment, $captures);
+            if ($matched === 1) {
+                // The generated expression contains only numbered captures.
+                /** @var non-empty-list<string> $captures */
+                return \array_slice($captures, 1);
+            }
+            if ($matched === 0) {
+                return null;
+            }
+            // If PCRE reaches a limit, try the requirements individually.
+        }
+
         [$prefix] = $this->literals;
-        if (!str_starts_with($segment, $prefix)) {
+        $suffix = array_last($this->literals);
+        if (!str_starts_with($segment, $prefix) || !str_ends_with($segment, $suffix)) {
             return null;
         }
 
         if (\count($this->requirements) === 1) {
-            $suffix = $this->literals[1] ?? '';
             $length = \strlen($segment) - \strlen($prefix) - \strlen($suffix);
-            if ($length <= 0 || !str_ends_with($segment, $suffix)) {
+            if ($length <= 0) {
                 return null;
             }
             $value = $prefix === '' && $suffix === '' ? $segment : substr($segment, \strlen($prefix), $length);
@@ -61,7 +125,7 @@ final readonly class RouteSegment
         while ($end <= \strlen($segment)) {
             if ($last) {
                 $end = \strlen($segment) - \strlen($literal);
-                if ($end <= $start || !str_ends_with($segment, $literal)) {
+                if ($end <= $start) {
                     break;
                 }
             } elseif ($literal !== '') {

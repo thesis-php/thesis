@@ -200,9 +200,7 @@ final class Router
                 $names[] = $name;
                 $literal = substr($segment, $end, $start - $end);
                 $literals[] = self::literal($literal, $segment, $pattern);
-                $requirements[] = isset($route->requirements[$name])
-                    ? self::expression($route->requirements[$name], $pattern)
-                    : null;
+                $requirements[] = $route->requirements[$name] ?? null;
                 $end = $start + \strlen($token);
             }
             $literals[] = self::literal(substr($segment, $end), $segment, $pattern);
@@ -223,7 +221,7 @@ final class Router
                     throw new \InvalidArgumentException("Invalid remainder in '{$pattern}'.");
                 }
                 if (isset($requirements[0])) {
-                    $regex = $requirements[0];
+                    $regex = RouteSegment::requirement($requirements[0], $pattern);
                     $node = $node->remainderExpressions[$regex] ??= new RouteNode();
                 } else {
                     $node = $node->remainder ??= new RouteNode();
@@ -238,7 +236,7 @@ final class Router
                 $node = $node->parameter ??= new RouteNode();
             } else {
                 $key = serialize([$literals, $requirements]);
-                $node->expressions[$key] ??= [new RouteSegment($literals, $requirements), new RouteNode()];
+                $node->expressions[$key] ??= [new RouteSegment($literals, $requirements, $pattern), new RouteNode()];
                 $node = $node->expressions[$key][1];
             }
         }
@@ -253,16 +251,6 @@ final class Router
         $path = rtrim($path, '/');
 
         return $path === '' ? '/' : $path;
-    }
-
-    private static function expression(string $regex, string $pattern): string
-    {
-        $regex = "\x01\\A(?:{$regex})\\z\x01sD";
-        if (@preg_match($regex, '') === false) {
-            throw new \InvalidArgumentException("Invalid requirement in '{$pattern}'.");
-        }
-
-        return $regex;
     }
 
     private static function literal(string $literal, string $segment, string $pattern): string

@@ -271,6 +271,19 @@ final readonly class RouterTest
         Assert::same($lenient->lookup(Request::get('/docs'))?->pattern, '/docs/');
     }
 
+    public function prefersTheShortestCompleteSplitBetweenAdjacentParameters(): void
+    {
+        $router = new Router([new Route(
+            'GET',
+            '/{first}{second}{third}.txt',
+            static fn() => new Response(),
+            requirements: ['first' => '[0-9]+', 'second' => '\d{2,3}'],
+        )]);
+        $match = $router->lookup(Request::get('/123456.txt'));
+        Assert::same($match?->params, ['first' => '1', 'second' => '23', 'third' => '456']);
+        Assert::null($router->lookup(Request::get('/123.txt')));
+    }
+
     public function keepsCaptureGroupsLocalToEachRequirement(): void
     {
         $handler = static fn() => new Response();
