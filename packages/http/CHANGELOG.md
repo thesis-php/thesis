@@ -11,6 +11,8 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Create JSON and HTML responses with optional headers using `Response::json()` and `Response::html()`.
+
 - Use `Router::$list` to read the original routes in registration order.
 - Cancel the active server exchange when the peer disconnects after sending the request body.
 

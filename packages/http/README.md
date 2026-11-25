@@ -53,6 +53,10 @@ collecting the whole body raises `LogicException`. Close the reader to release i
 Supply ready trailer fields with `new StringBody($bytes, $trailers)`. A streaming body can determine
 its fields while reading. Calling `trailers()` while fields are still pending raises `LogicException`.
 
+Use `Response::json($value, status: Status::CREATED)` to encode a PHP value as `application/json`.
+Use `Response::html($body)` for a UTF-8 HTML string or stream. Both constructors default to status 200.
+Pass a `Headers` object with `headers:` to either constructor. A supplied `Content-Type` takes precedence.
+
 A client middleware that may resend an upload takes the body before calling the next handler.
 It passes `$request->withBody($body)` on the first attempt. When policy permits another attempt
 and the body implements `ReplayableBody`, it passes `$request->withBody($body->fresh())`.

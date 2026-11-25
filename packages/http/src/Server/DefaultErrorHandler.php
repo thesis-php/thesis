@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Headers;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
@@ -19,9 +18,7 @@ final readonly class DefaultErrorHandler implements ErrorHandler
         $reason = Status::reasonPhrase($status);
         $title = $reason === null ? (string) $status : "{$status} {$reason}";
 
-        return new Response(
-            status: $status,
-            headers: new Headers(['Content-Type' => 'text/html; charset=utf-8']),
+        return Response::html(
             body: <<<HTML
                 <!doctype html>
                 <html lang="en">
@@ -34,6 +31,7 @@ final readonly class DefaultErrorHandler implements ErrorHandler
                 </body>
                 </html>
                 HTML,
+            status: $status,
         );
     }
 }

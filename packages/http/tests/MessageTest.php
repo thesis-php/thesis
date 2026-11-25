@@ -17,6 +17,39 @@ use Uri\Rfc3986\Uri;
 #[Covers(StringBody::class)]
 final class MessageTest
 {
+    public function jsonResponseEncodesValuesAndSetsTheMediaType(): void
+    {
+        $response = Response::json(['id' => 42], status: Status::CREATED);
+        Assert::same($response->status, Status::CREATED);
+        Assert::same($response->headers->get('content-type'), 'application/json');
+        Assert::same($response->takeBody()->readAll(), '{"id":42}');
+        Expect::exception(\JsonException::class);
+        Response::json(NAN);
+    }
+
+    public function htmlResponseKeepsTheSuppliedBody(): void
+    {
+        $body = new StringBody('<p>Hello</p>');
+        $response = Response::html($body);
+        Assert::same($response->status, Status::OK);
+        Assert::same($response->headers->get('content-type'), 'text/html; charset=utf-8');
+        Assert::same($response->takeBody(), $body);
+    }
+
+    public function responseFactoriesKeepSuppliedHeaders(): void
+    {
+        $headers = new Headers(['Set-Cookie' => ['a=1', 'b=2']]);
+        foreach ([Response::html('', headers: $headers), Response::json(null, headers: $headers)] as $response) {
+            Assert::same($response->headers->all('set-cookie'), ['a=1', 'b=2']);
+            Assert::true($response->headers->has('content-type'));
+        }
+
+        $json = $headers->with('Content-Type', 'application/problem+json');
+        $html = $headers->with('Content-Type', 'text/html');
+        Assert::same(Response::json(null, headers: $json)->headers->all('content-type'), ['application/problem+json']);
+        Assert::same(Response::html('', headers: $html)->headers->all('content-type'), ['text/html']);
+    }
+
     public function changingQueryAndHeadersLeavesTheOriginalRequestIntact(): void
     {
         $original = Request::get('/search?tag=a&sort=C++&tag=b#top');

@@ -13,6 +13,41 @@ use Thesis\Http\Internal\PendingBody;
  */
 final readonly class Response
 {
+    /**
+     * @param int<100, 999> $status
+     */
+    public static function html(
+        string|Body $body,
+        int $status = Status::OK,
+        Headers $headers = EMPTY_HEADERS,
+    ): self {
+        return new self(
+            status: $status,
+            headers: $headers->has('content-type')
+                ? $headers
+                : $headers->with('content-type', 'text/html; charset=utf-8'),
+            body: $body,
+        );
+    }
+
+    /**
+     * @param int<100, 999> $status
+     * @throws \JsonException if the value cannot be encoded
+     */
+    public static function json(
+        mixed $value,
+        int $status = Status::OK,
+        Headers $headers = EMPTY_HEADERS,
+    ): self {
+        return new self(
+            status: $status,
+            headers: $headers->has('content-type')
+                ? $headers
+                : $headers->with('content-type', 'application/json'),
+            body: json_encode($value, JSON_THROW_ON_ERROR),
+        );
+    }
+
     private PendingBody $pendingBody;
 
     /**
