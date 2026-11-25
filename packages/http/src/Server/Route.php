@@ -13,13 +13,13 @@ use Thesis\Http\Response;
 final readonly class Route
 {
     /**
-     * @var \Closure(Request, Context, RouteMatch): Response
+     * @var \Closure(Request, Context): Response
      */
     public \Closure $handler;
 
     /**
      * @param non-empty-string $method
-     * @param callable(Request, Context, RouteMatch): Response $handler
+     * @param callable(Request, Context): Response $handler
      */
     public function __construct(
         public string $method,

@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal;
 
+use Thesis\Http\Request;
+use Thesis\Http\Server\RouteMatch;
+
+/**
+ * @internal
+ * @var \WeakMap<Request, RouteMatch>
+ */
+const ROUTE_MATCHES = new \WeakMap();
+
 /**
  * The characters allowed in a token (RFC 9110). A method and a field name are tokens.
  *

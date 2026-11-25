@@ -222,8 +222,9 @@ and a `Thesis\Http\Server\Context` with connection information. It returns a `Th
 
 ### Routing
 
-Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Each route handler receives the request,
-the connection context and a `Thesis\Http\Server\RouteMatch`. Its `method` and `pattern` identify the selected route.
+Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Each route handler receives the request
+and the connection context. Inside the route handler and its middleware, `Thesis\Http\Server\routeMatch($request)` returns the active match.
+Outside dispatch it returns null. The match’s `method` and `pattern` identify the selected route.
 `param($name)` returns a decoded parameter or null, and `$match->params` contains all parameters.
 
 ```php
@@ -233,10 +234,11 @@ use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
 use Thesis\Http\Server;
+use function Thesis\Http\Server\routeMatch;
 
 $router = new Router([
     new Route(Method::GET, '/users/me', static fn() => new Response(body: 'Current user')),
-    new Route(Method::GET, '/users/:id', static fn($request, $context, $match) => new Response(body: $match->param('id') ?? '')),
+    new Route(Method::GET, '/users/:id', static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? '')),
 ]);
 
 $server = new Server(new Config(8080), $router);

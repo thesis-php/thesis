@@ -17,8 +17,8 @@
 <!-- head:end -->
 
 `GET /` returns a usage hint immediately. The router sends single-segment paths such as `GET /1` to a handler
-that reads `id` with `$match->param('id')`, waits for 250 ms and returns `OK /1`.
-The router decodes the parameter, so `GET /a%20b` returns `OK /a b`.
+that waits for 250 ms, reads `id` with `routeMatch($request)?->param('id')` and returns `1`.
+The router decodes the parameter, so `GET /a%20b` returns `a b`.
 
 ## Run
 

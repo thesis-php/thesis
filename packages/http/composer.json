@@ -64,6 +64,7 @@
         "files": [
             "src/Internal/Http1/internal.php",
             "src/Internal/internal.php",
+            "src/Server/api.php",
             "src/api.php"
         ]
     },

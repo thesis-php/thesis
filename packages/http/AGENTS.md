@@ -133,7 +133,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   Registration writes directly to the router’s tables. All requests share them.
 - Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
   Both constructors accept a callable and store its closure.
-- Route handlers receive the request, the connection context and a RouteMatch with the registered method, pattern and decoded parameters.
+- Route handlers receive the request and the connection context. routeMatch($request) reads the active match from a WeakMap keyed by request identity.
+  The local type in routeMatch() is needed because PHPStan 2.3.7 ignores dynamicConstantNames for object values.
   Each match keeps its own parameters when nested routers handle the same request.
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so join method keys as text in the Allow header.
 - Configure the error handler on the server. Middleware and the router receive the same Context, which calls the configured ErrorHandler.

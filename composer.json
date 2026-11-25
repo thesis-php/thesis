@@ -137,6 +137,7 @@
             "packages/formatter/src/api.php",
             "packages/http/src/Internal/Http1/internal.php",
             "packages/http/src/Internal/internal.php",
+            "packages/http/src/Server/api.php",
             "packages/http/src/api.php",
             "packages/io/src/Internal/internal.php",
             "packages/io/src/api.php",

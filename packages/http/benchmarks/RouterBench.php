@@ -15,6 +15,7 @@ use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
 use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\Server\routeMatch;
 
 #[Warmup(1)]
 final class RouterBench
@@ -37,7 +38,7 @@ final class RouterBench
             new Route(
                 method: Method::GET,
                 route: '/users/:id',
-                handler: static fn($request, $context, $match) => new Response(body: $match->param('id') ?? ''),
+                handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
         ]);
         $request = new Request(Method::GET, new Uri('/users/42'));

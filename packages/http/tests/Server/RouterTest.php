@@ -11,6 +11,7 @@ use Testo\Test;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Net\UnixAddress;
@@ -34,7 +35,7 @@ final readonly class RouterTest
             new Route(
                 method: Method::GET,
                 route: '/:group/me/:id',
-                handler: static fn($request, $context, $match) => new Response(body: implode('/', $match->params)),
+                handler: static fn($request) => new Response(body: implode('/', routeMatch($request)->params ?? [])),
             ),
             new Route(Method::GET, '/users/:id/info', static fn() => new Response(body: 'info')),
         ]);
@@ -99,7 +100,7 @@ final readonly class RouterTest
             new Route(
                 method: Method::GET,
                 route: '/:value',
-                handler: static fn($request, $context, $match) => new Response(body: $match->param('value') ?? ''),
+                handler: static fn($request) => new Response(body: routeMatch($request)?->param('value') ?? ''),
             ),
         ]);
 
@@ -121,16 +122,18 @@ final readonly class RouterTest
     {
         $get = new Request(Method::HEAD, new Uri('/a/items/42'));
         $inner = new Router([
-            new Route(Method::GET, '/:group/items/:name', function ($request, $context, $match) use ($get) {
+            new Route(Method::GET, '/:group/items/:name', function ($request, $context) use ($get) {
                 Assert::same($request, $get);
                 Assert::same($context, $this->context);
-                Assert::same($match->params, ['group' => 'a', 'name' => '42']);
+                Assert::same(routeMatch($request)?->params, ['group' => 'a', 'name' => '42']);
 
                 return new Response();
             }),
         ]);
-        $outer = static function (Request $request, Context $context, RouteMatch $match) use ($inner) {
+        $outer = static function (Request $request, Context $context) use ($inner) {
             $response = $inner($request, $context);
+            $match = routeMatch($request);
+            Assert::instanceOf($match, RouteMatch::class);
             Assert::same($match->method, Method::GET);
             Assert::same($match->pattern, '/:team/items/:item');
             Assert::null($match->param('missing'));
@@ -138,11 +141,19 @@ final readonly class RouterTest
 
             return $response;
         };
+        $outer = Pipeline::wrap($outer, [
+            new CallbackMiddleware(static function ($request, $context, $next) {
+                Assert::same(routeMatch($request)?->param('team'), 'a');
+
+                return $next();
+            }),
+        ]);
         $router = new Router((static function () use ($outer) {
             yield new Route(Method::GET, '/:team/items/:item', $outer);
             yield new Route(Method::PUT, '/:group/items/:name', static fn() => new Response());
         })());
         Assert::same($router($get, $this->context)->status, Status::OK);
+        Assert::null(routeMatch($get));
         $response = $router($get->withMethod('get'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'GET, PUT, HEAD');
@@ -230,7 +241,7 @@ final readonly class RouterTest
             new Route(
                 method: Method::GET,
                 route: '/:id',
-                handler: static fn($request, $context, $match) => new Response(body: $match->param('id') ?? ''),
+                handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
             new Route(Method::HEAD, '/:id', static fn() => new Response(Status::NO_CONTENT)),
         ]);
@@ -246,8 +257,8 @@ final readonly class RouterTest
         Assert::same($response->headers->get('allow'), 'GET, HEAD');
     }
 
-    private static function user(Request $request, Context $context, RouteMatch $match): Response
+    private static function user(Request $request): Response
     {
-        return new Response(body: $request->method . ' ' . ($match->param('id') ?? ''));
+        return new Response(body: $request->method . ' ' . (routeMatch($request)?->param('id') ?? ''));
     }
 }

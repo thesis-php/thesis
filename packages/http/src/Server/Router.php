@@ -9,6 +9,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
 use function Thesis\Http\Internal\isToken;
+use const Thesis\Http\Internal\ROUTE_MATCHES;
 
 /**
  * @api
@@ -204,7 +205,19 @@ final class Router
             $match = new RouteMatch($route->method, $route->route, $params);
         }
 
-        return ($route->handler)($request, $context, $match);
+        $matches = ROUTE_MATCHES;
+        $previous = $matches[$request] ?? null;
+        $matches[$request] = $match;
+
+        try {
+            return ($route->handler)($request, $context);
+        } finally {
+            if ($previous === null) {
+                unset($matches[$request]);
+            } else {
+                $matches[$request] = $previous;
+            }
+        }
     }
 
     /**

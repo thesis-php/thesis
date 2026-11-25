@@ -8,9 +8,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
 use Thesis\Http\Server\Config;
-use Thesis\Http\Server\Context;
 use Thesis\Http\Server\Route;
-use Thesis\Http\Server\RouteMatch;
 use Thesis\Http\Server\Router;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
@@ -19,6 +17,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeout;
+use function Thesis\Http\Server\routeMatch;
 use function Thesis\Io\stderr;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
@@ -32,15 +31,22 @@ if ($endpoint === '') {
 }
 
 $logger = new Logger(stderr(), formatter: new Console());
-$router = new Router([
-    new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
-    new Route(Method::GET, '/:id', static function (Request $request, Context $context, RouteMatch $match) {
-        delay(ms(250));
+$server = new Server(
+    config: new Config($endpoint),
+    handler: new Router([
+        new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
+        new Route(Method::GET, '/:id', static function (Request $request) {
+            delay(ms(250));
 
-        return new Response(body: "OK /{$match->param('id')}\n");
-    }),
-]);
-$server = new Server(config: new Config($endpoint), handler: $router);
+            $id = routeMatch($request)
+                ?->param('id')
+                ?? throw new LogicException('Expected the /:id route to supply id.')
+            ;
+
+            return new Response(body: $id);
+        }),
+    ]),
+);
 
 group(static function (Group $group) use ($logger, $server) {
     $logger->start($group);
