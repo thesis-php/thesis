@@ -12,6 +12,7 @@ use Thesis\Async\Group;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
+use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Io\Buffer;
 use Thesis\Io\WriteFailed;
@@ -33,6 +34,34 @@ use function Thesis\Time\sec;
 #[Test]
 final class ServerTest
 {
+    public function routerUsesTheServersErrorHandler(): void
+    {
+        timeout(sec(2), static fn() => group(static function (Group $group) {
+            $server = new Server(new Config(0), new Router([]), errorHandler: new TextErrorHandler());
+            $server->start($group);
+            $address = $server->address;
+            \assert($address instanceof InetAddress);
+            $client = connect('127.0.0.1', $address->port);
+
+            try {
+                $client->write("GET /missing HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n");
+                $bytes = '';
+
+                while (($chunk = $client->read(8192)) !== null) {
+                    $bytes .= $chunk;
+                }
+
+                Assert::same(
+                    actual: $bytes,
+                    expected: "HTTP/1.1 404 Not Found\r\nContent-Length: 7\r\nConnection: close\r\n\r\nGET 404",
+                );
+            } finally {
+                $client->close();
+                $server->stop();
+            }
+        }));
+    }
+
     public function aClientThatStopsReadingExpiresAtTheWriteDeadline(): void
     {
         timeout(sec(2), static fn() => group(static function (Group $group) {

@@ -36,7 +36,7 @@ final class Next
     public function handle(Middleware $middleware): Response
     {
         try {
-            return $middleware->handle($this->request, $this);
+            return $middleware->handle($this->request, $this->context, $this);
         } finally {
             $this->expired = true;
         }

@@ -14,6 +14,7 @@ use Thesis\Http\Response;
 use Thesis\Http\Server\Stub\ContinueReader;
 use Thesis\Http\Server\Stub\PrefixedBody;
 use Thesis\Http\Server\Stub\RecordingWriter;
+use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
@@ -192,12 +193,34 @@ final class ExchangeTest
             Assert::same(
                 actual: $output->bytes,
                 expected: "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
-                    . "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    . self::defaultErrorResponse(),
             );
         }
     }
 
-    public function sendsAnEmpty500AndPropagatesTheHandlerError(): void
+    public function formatsThe500AndPropagatesTheHandlerError(): void
+    {
+        $output = new RecordingWriter();
+        $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
+        Expect::exception(\RuntimeException::class)->withMessage('Private details');
+
+        try {
+            Connection::serve(
+                input: $input,
+                output: $output,
+                handler: static fn() => throw new \RuntimeException('Private details'),
+                config: new Config('/test.sock'),
+                errorHandler: new TextErrorHandler(),
+            );
+        } finally {
+            Assert::same(
+                actual: $output->bytes,
+                expected: "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 7\r\nConnection: close\r\n\r\nGET 500",
+            );
+        }
+    }
+
+    public function sendsAnHtml500AndPropagatesTheHandlerError(): void
     {
         $output = new RecordingWriter();
         $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
@@ -213,8 +236,27 @@ final class ExchangeTest
         } finally {
             Assert::same(
                 actual: $output->bytes,
-                expected: "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                expected: self::defaultErrorResponse(),
             );
         }
+    }
+
+    private static function defaultErrorResponse(): string
+    {
+        $body = <<<'HTML'
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <title>500 Internal Server Error</title>
+            </head>
+            <body>
+                <h1>500 Internal Server Error</h1>
+            </body>
+            </html>
+            HTML;
+
+        return "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html; charset=utf-8\r\n"
+            . 'Content-Length: ' . \strlen($body) . "\r\nConnection: close\r\n\r\n" . $body;
     }
 }

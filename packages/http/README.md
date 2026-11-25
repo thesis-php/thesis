@@ -254,6 +254,23 @@ An absolute URI with an empty path matches `/`. The special targets `OPTIONS *` 
 Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
 For example, `/users/a%252Fb` passes `a%2Fb` to the handler.
 
+By default, routing errors and server-generated 500 responses carry a small HTML page with the status code
+and its standard reason phrase when known. Pass an optional `Server\ErrorHandler` to the server to customize routing errors and 500 responses:
+
+```php
+$errorHandler = new class implements \Thesis\Http\Server\ErrorHandler {
+    public function handle(int $status, \Thesis\Http\Request $request): \Thesis\Http\Response
+    {
+        return new \Thesis\Http\Response($status, body: "Request failed ($status)");
+    }
+};
+
+$server = new Server(new Config(8080), new Router($routes), errorHandler: $errorHandler);
+```
+
+Return the supplied status. The router sets `Allow` on a 405. Protocol rejections still have an empty body.
+An explicit error response from an application handler passes through as returned.
+
 ### Streaming echo
 
 ```php
@@ -311,6 +328,8 @@ $server = new Server($config, $pipeline);
 ```
 
 The first middleware receives the request first and the response last.
+Each layer receives `handle(Request $request, Context $context, callable $next)`. It can use
+`$context->handle(403, $request)` to format an error with the server’s configured error handler.
 Server middleware can return a response directly or call `$next()`. After that call returns or throws,
 the middleware can call `$next()` again while its own `handle()` is running. Overlapping calls to the
 same `$next` and calls after its `handle()` has returned or thrown raise a `LogicException`.
@@ -339,7 +358,7 @@ and response writers finish until the shutdown deadline. Cancelling the serving 
 The example uses ext-pcntl and handles SIGINT and SIGTERM by closing the listener.
 
 The constructor accepts an optional `onError` callback for connection and application failures. If the handler throws
-before the final response starts, the client receives an empty 500. Once a final response has started,
+before the final response starts, the client receives a 500. Once a final response has started,
 a failure closes the connection. Each connection runs independently of the others.
 
 When the handler leaves the request body unread, the server finishes writing its response and closes the

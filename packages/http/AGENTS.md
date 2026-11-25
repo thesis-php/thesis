@@ -136,6 +136,9 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   The route table returns the handler alongside the match. Each match keeps its own parameters when nested routers handle the same request.
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so convert keys back to strings
   when building the Allow header.
+- Configure the error handler on the server. Middleware and the router receive the same Context, which implements ErrorHandler.
+  The default error page contains only the status and its standard reason phrase. The router owns Allow. Error handlers format responses before the final head. If formatting a 500 fails,
+  preserve the original failure for onError and attempt an empty 500 only before writing starts.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.

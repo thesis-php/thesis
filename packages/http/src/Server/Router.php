@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Headers;
 use Thesis\Http\Internal\Server\RouteTable;
 use Thesis\Http\Internal\Server\RoutingError;
 use Thesis\Http\Method;
@@ -42,10 +41,9 @@ final readonly class Router
         $result = $this->routes->lookup($request->method, $path);
 
         if ($result instanceof RoutingError) {
-            return new Response(
-                status: $result->status,
-                headers: new Headers($result->allow === [] ? [] : ['Allow' => implode(', ', $result->allow)]),
-            );
+            $response = $context->handle($result->status, $request);
+
+            return $result->allow === [] ? $response : $response->withHeader('Allow', implode(', ', $result->allow));
         }
 
         return $result[0]($request, $context, $result[1]);

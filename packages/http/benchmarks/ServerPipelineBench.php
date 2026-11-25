@@ -54,7 +54,7 @@ final class ServerPipelineBench
     {
         $response = new Response();
         $handler = static fn() => $response;
-        $forward = new CallbackMiddleware(static fn(Request $_, callable $next) => $next());
+        $forward = new CallbackMiddleware(static fn(Request $_, Context $context, callable $next) => $next());
         $middleware = array_fill(0, $count, $forward);
         if ($shortCircuit) {
             array_unshift($middleware, new CallbackMiddleware($handler));

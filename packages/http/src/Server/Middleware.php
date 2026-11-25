@@ -19,5 +19,5 @@ interface Middleware
      *
      * @param callable(): Response $next
      */
-    public function handle(Request $request, callable $next): Response;
+    public function handle(Request $request, Context $context, callable $next): Response;
 }

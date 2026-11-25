@@ -11,6 +11,7 @@ use Thesis\Async\LocalSemaphore;
 use Thesis\Http\Request;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
+use Thesis\Http\Server\ErrorHandler;
 use Thesis\Net\Server;
 use Thesis\Net\SocketClosed;
 use Thesis\Net\TlsFailed;
@@ -47,6 +48,7 @@ final class Listener
         private readonly \Closure $handler,
         private readonly Config $config,
         private readonly ?\Closure $onError,
+        private readonly ErrorHandler $errorHandler,
     ) {
         $this->drained = new Deferred();
         $this->capacity = new LocalSemaphore($config->maxConnections);
@@ -141,6 +143,7 @@ final class Listener
                 localAddress: $socket->localAddress,
                 remoteAddress: $socket->remoteAddress,
                 tls: $socket->tls,
+                errorHandler: $this->errorHandler,
             );
             Connection::serve(
                 input: $socket,
@@ -148,6 +151,7 @@ final class Listener
                 handler: fn(Request $request) => ($this->handler)($request, $context),
                 config: $this->config,
                 state: $connection,
+                errorHandler: $this->errorHandler,
             );
         } catch (Cancelled $cancelled) {
             throw $cancelled;

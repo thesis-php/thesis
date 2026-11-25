@@ -11,6 +11,7 @@ use Testo\Test;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
 
@@ -47,6 +48,18 @@ final readonly class RouterTest
         $response = $router(Request::get('/users/me'), $this->context);
         Assert::same($response->status, 405);
         Assert::same($response->headers->get('Allow'), Method::POST);
+    }
+
+    public function formatsRoutingErrorsAndPreservesAllow(): void
+    {
+        $router = new Router([new Route(Method::POST, '/', static fn() => new Response())]);
+        $address = new UnixAddress('');
+        $context = new Context($address, $address, null, new TextErrorHandler());
+
+        $response = $router(Request::get('/'), $context);
+        Assert::same($response->takeBody()->readAll(), 'GET 405');
+        Assert::same($response->headers->get('Allow'), Method::POST);
+        Assert::same($router(Request::get('/missing'), $context)->takeBody()->readAll(), 'GET 404');
     }
 
     public function ordersOverlappingParameterizedShapesLeftToRight(): void

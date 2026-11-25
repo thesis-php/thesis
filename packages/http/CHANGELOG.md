@@ -11,6 +11,9 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Server middleware receives the connection context as the second argument of `handle()`, before `$next`.
+- Serve a default HTML page for routing errors and server-generated 500 responses.
+- Customize routing errors and server-generated 500 responses with `Server\ErrorHandler`.
 - Route requests by method and path with named parameters, HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.

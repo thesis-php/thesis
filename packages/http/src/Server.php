@@ -10,6 +10,8 @@ use Thesis\Async\Task;
 use Thesis\Http\Internal\Server\Listener;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
+use Thesis\Http\Server\DefaultErrorHandler;
+use Thesis\Http\Server\ErrorHandler;
 use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Server\UnixEndpoint;
 use Thesis\Net\Address;
@@ -62,6 +64,7 @@ final class Server implements Service
         public readonly Config $config,
         callable $handler,
         ?callable $onError = null,
+        private readonly ErrorHandler $errorHandler = new DefaultErrorHandler(),
     ) {
         $this->handler = $handler(...);
         $this->onError = $onError === null ? null : $onError(...);
@@ -99,6 +102,7 @@ final class Server implements Service
                 handler: $this->handler,
                 config: $this->config,
                 onError: $this->onError,
+                errorHandler: $this->errorHandler,
             );
             $task = $group->daemon(static function () use ($listener, $driver, &$ready) {
                 $unsubscribe = onCancel($listener->close(...));

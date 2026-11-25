@@ -30,15 +30,15 @@ final class PipelineTest
         $context = new Context($address, $address, null);
         $request = Request::get('/');
         $calls = [];
-        $outer = new CallbackMiddleware(static function (Request $incoming, callable $next) use (&$calls) {
-            $calls[] = $incoming;
+        $outer = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
+            $calls[] = [$incoming, $connection];
 
             return $next();
         });
-        $inner = new CallbackMiddleware(static function (Request $incoming, callable $next) use (&$calls) {
-            $calls[] = 'inner';
+        $inner = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
+            $calls[] = $connection;
 
-            return $incoming->uri->getRawPath() === '/' ? $next() : new Response(403);
+            return $incoming->uri->getRawPath() === '/' ? $next() : $connection->handle(403, $incoming);
         });
         $endpoint = static function (Request $incoming, Context $connection) use (&$calls) {
             $calls[] = [$incoming, $connection];
@@ -54,7 +54,7 @@ final class PipelineTest
         Assert::same(201, $handler($request, $context)->status);
         $denied = Request::get('/private');
         Assert::same(403, $handler($denied, $context)->status);
-        Assert::same([$request, 'inner', [$request, $context], $denied, 'inner'], $calls);
+        Assert::same([[$request, $context], $context, [$request, $context], [$denied, $context], $context], $calls);
     }
 
     public function rejectsReentryWhileTheInnerLayerIsRunning(): void
@@ -62,7 +62,7 @@ final class PipelineTest
         $address = new InetAddress('127.0.0.1', 80);
         $endpoint = static fn() => new Response();
         $saved = $endpoint;
-        $outer = new CallbackMiddleware(static function (Request $_, callable $next) use (&$saved) {
+        $outer = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) use (&$saved) {
             $saved = $next;
 
             return $next();
@@ -83,7 +83,7 @@ final class PipelineTest
         $address = new InetAddress('127.0.0.1', 80);
         $endpoint = static fn() => new Response();
         $saved = $endpoint;
-        $outer = new CallbackMiddleware(static function (Request $_, callable $next) use (&$saved) {
+        $outer = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) use (&$saved) {
             try {
                 $next();
             } finally {
@@ -92,7 +92,7 @@ final class PipelineTest
 
             return new Response();
         });
-        $inner = new CallbackMiddleware(static function (Request $_, callable $next) use (&$saved, $throws) {
+        $inner = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) use (&$saved, $throws) {
             $saved = $next;
 
             return $throws ? throw new \RuntimeException('Middleware failed.') : new Response();
@@ -106,7 +106,7 @@ final class PipelineTest
     public function repeatsTheSameInnerLayerAfterItReturns(): void
     {
         $address = new InetAddress('127.0.0.1', 80);
-        $twice = new CallbackMiddleware(static function (Request $_, callable $next) {
+        $twice = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) {
             $next();
 
             return $next();
@@ -124,7 +124,7 @@ final class PipelineTest
         $context = new Context($address, $address, null);
         $request = Request::get('/');
         $attempts = [];
-        $retry = new CallbackMiddleware(static function (Request $_, callable $next) {
+        $retry = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) {
             try {
                 return $next();
             } catch (\RuntimeException) {

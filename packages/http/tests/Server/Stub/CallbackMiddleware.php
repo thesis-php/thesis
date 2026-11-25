@@ -6,19 +6,20 @@ namespace Thesis\Http\Server\Stub;
 
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Context;
 use Thesis\Http\Server\Middleware;
 
 final readonly class CallbackMiddleware implements Middleware
 {
     /**
-     * @param \Closure(Request, callable(): Response): Response $callback
+     * @param \Closure(Request, Context, callable(): Response): Response $callback
      */
     public function __construct(
         private \Closure $callback,
     ) {}
 
-    public function handle(Request $request, callable $next): Response
+    public function handle(Request $request, Context $context, callable $next): Response
     {
-        return ($this->callback)($request, $next);
+        return ($this->callback)($request, $context, $next);
     }
 }

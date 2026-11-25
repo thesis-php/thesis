@@ -17,10 +17,11 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
+use Thesis\Http\Server\DefaultErrorHandler;
+use Thesis\Http\Server\ErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Http\StringBody;
 use Thesis\Io\Buffer;
-use Thesis\Io\IoException;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\UnexpectedEof;
@@ -38,7 +39,7 @@ final class Connection
 {
     /**
      * Serve HTTP/1 requests on one connection. The caller closes the transport in a finally block.
-     * A handler failure before the final head gets an empty 500 response and still propagates to the caller.
+     * A handler failure before the final head gets a 500 response and still propagates to the caller.
      *
      * @param callable(Request): Response $handler
      * @param ?ConnectionState $state used by the listener to stop after the current exchange
@@ -49,6 +50,7 @@ final class Connection
         callable $handler,
         Config $config,
         ?ConnectionState $state = null,
+        ErrorHandler $errorHandler = new DefaultErrorHandler(),
     ): void {
         $headReader = new HeadReader($state->scheme ?? 'http', $state?->idle);
         $buffer = new Buffer();
@@ -97,6 +99,7 @@ final class Connection
                     maxBodyBytes: $config->maxBodyBytes,
                     keepAlive: $requestsRemaining !== 0,
                     state: $state,
+                    errorHandler: $errorHandler,
                 );
             } finally {
                 $state?->endRequest();
@@ -123,6 +126,7 @@ final class Connection
         int $maxBodyBytes,
         bool $keepAlive,
         ?ConnectionState $state,
+        ErrorHandler $errorHandler,
     ): bool {
         if ($head->length !== null && $head->length > $maxBodyBytes) {
             self::writeError($output, Status::CONTENT_TOO_LARGE, $head);
@@ -250,9 +254,13 @@ final class Connection
                 throw $failure;
             }
 
+            $continue?->commit();
+
             try {
-                self::writeError($output, Status::INTERNAL_SERVER_ERROR, $head);
-            } catch (IoException) {
+                self::writeServerError($output, $head, $request, $errorHandler);
+            } catch (Cancelled $cancelled) {
+                throw $cancelled;
+            } catch (\Throwable) {
                 // Keep the handler failure available to the caller even if the peer cannot receive the error.
             }
 
@@ -311,6 +319,37 @@ final class Connection
         }
 
         $output->write($reply->toString());
+    }
+
+    private static function writeServerError(
+        Writer $output,
+        RequestHead $head,
+        Request $request,
+        ErrorHandler $errorHandler,
+    ): void {
+        $body = null;
+
+        try {
+            try {
+                $response = $errorHandler->handle(Status::INTERNAL_SERVER_ERROR, $request);
+                if ($response->status !== Status::INTERNAL_SERVER_ERROR) {
+                    throw new \ValueError('The error handler must preserve the status.');
+                }
+
+                $body = $response->takeBody();
+                [$reply, $bytes] = self::encodeHead($response, $body, $head, isPersistent: false);
+            } catch (Cancelled $error) {
+                throw $error;
+            } catch (\Throwable) {
+                self::writeError($output, Status::INTERNAL_SERVER_ERROR, $head);
+
+                return;
+            }
+
+            self::writeResponse($body, $reply, $bytes, $output, first: null, bufferedEcho: false);
+        } finally {
+            $body?->close();
+        }
     }
 
     private static function writeResponse(
