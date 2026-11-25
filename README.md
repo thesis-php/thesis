@@ -45,7 +45,7 @@ Run the development commands in Docker through Make. `make help` lists the targe
 ```shell
 make i                 # install dependencies
 make test P=async      # test one package
-make check             # everything CI runs
+make check             # run style, Rector, PHPStan, dependency and test checks
 ```
 
 `AGENTS.md` describes the layout, the manifests and the rules of the monorepo.

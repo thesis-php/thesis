@@ -1,7 +1,6 @@
 # thesis/source-location
 
 `Location` identifies a place in source code, and `caller()` finds the call site outside a library.
-Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

@@ -31,7 +31,7 @@ Use Git, Docker and Make. Containers use the monorepo's PHP version.
    Leave version headings to the maintainers.
 6. If you changed `packages/logger/package.php` (dependencies, description, keywords),
    run `make sync` and commit the generated files: CI fails on any difference.
-7. Run `make check`, which runs everything CI runs, and open a pull request to `main`
+7. Run `make check` for style, Rector, PHPStan, dependencies and tests. Open a pull request to `main`
    in the monorepo.
 
 The rules of the code and of the monorepo are in

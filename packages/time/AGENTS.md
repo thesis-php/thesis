@@ -1,7 +1,7 @@
 # thesis/time
 
 This package provides PHP 8.6's `Time\Duration` on PHP 8.2 to 8.5. It also provides duration helpers
-and PSR-20 clocks on both 64-bit and 32-bit PHP. Read `README.md` for the API and the
+and PSR-20 clocks on both 64-bit and 32-bit PHP. Read the
 [`Time\Duration` RFC](https://wiki.php.net/rfc/duration_class) for the class.
 
 ## Invariants

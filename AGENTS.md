@@ -26,16 +26,19 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 - A rule is in the plain English of `php.md`. A rewrite for style keeps every fact, reason and `Rejected:`.
 - An important finding (an invariant, a decision, a trap, a rejected approach) is written in the same change,
   without being asked, to the narrowest file that covers it: `AGENTS.md` of the package or tool if it is about one,
-  a topic if it spans several, a new topic with a line in "Topics" if none fits. A topic over about 8 KB is split
-  where its parts are needed apart.
+  a shared topic if it spans several. List new shared topics under "Topics". Split a topic over about 8 KB
+  where its parts are needed apart. Link package-specific topics from the package's `AGENTS.md` and say when to read them.
 - This file changes only when the user asks or a topic is added: parallel sessions would collide in it.
 - A shared file (this file, a topic, the `Makefile`, a workflow) does not list the packages that share
   a manifest property (the PHP version, `php-64bit`). Such a list repeats the manifests and gets stale.
   Every session that adds a package to the list collides with the other sessions. The shared file states the rule.
   The manifest and the package `AGENTS.md` state the fact. A shared file names a package only as an example of a rule.
-- `packages/<name>/AGENTS.md` is for those who *change* the package and is loaded only when you read its files.
-  How to *use* a package is in its `README.md` or its `skills/`: read them before using a package
-  you have not used yet in this session.
+- Before editing or reviewing a package or tool, read its `AGENTS.md` if it has one. Do this for each
+  package or tool the change touches.
+- Before changing or documenting public behaviour, check the guarantees in the package README.
+  Before using a package for the first time in a session, consult its README or the package skill for the API you need.
+  When consulting a README, first locate the relevant section by searching its headings or the symbol name.
+  Then read only that section, up to the next heading of the same or higher level.
 - Keep agent instructions in `AGENTS.md`. Tool-specific instruction files can cause an agent to skip
   `AGENTS.md` in the same directory.
 - What a tool enforces (`make fixer`, `make rector`) is not described: the tool fixes the code anyway.
@@ -43,8 +46,10 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 
 ## Topics
 
-`php.md` is imported below and always loaded. Read any other topic in `agents/` before the work it names:
+Before writing, editing or reviewing PHP in a package or tool, read [agents/php.md](agents/php.md) in full.
+Read each applicable topic in `agents/` before starting the work it covers:
 
+- `php-api.md`: declaring or changing a symbol in `src/`, a signature, namespace, PHPDoc contract or duration.
 - `tests.md`: writing or changing a test, mutation testing (`make infect`).
 - `errors.md`: calling a PHP function that fails with a warning (files, streams, sockets, processes).
 - `fibers.md`: keeping state per fiber, a test that depends on the order of callbacks.
@@ -53,16 +58,15 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 - `services.md`: a background service, its startup and shutdown, and clients with reader loops or reconnects.
 - `repositories.md`: the split, the repositories of the packages and their settings on GitHub.
 - `versions.md`: the version of a package (`version:` of a manifest), a constraint on a monorepo package.
-- `changelogs.md`: writing or editing a `CHANGELOG.md` of a package.
+- `changelogs.md`: a change to public API or user-visible behaviour (check `[Unreleased]`), or any changelog edit.
 - `releases.md`: the release, the tags and the GitHub Releases of the split repositories.
 - `platform.md`: code that depends on the operating system or on the size of `int`.
 - `reviews.md`: reviewing a change, acting on the findings of a review.
-- `benchmarks.md`: a benchmark, a change justified by one (`make bench`).
-
-@agents/php.md
+- `benchmarks.md`: a Tally benchmark or a change justified by one (`make bench`).
 
 ## Commands
 
+Use the runtime, tools and commands chosen by the project. Use installed skills for details of those tools.
 Everything runs in Docker through `make`. `P=<name>` narrows a command to one package. Use it while you work,
 the whole monorepo is for the final check.
 
@@ -70,9 +74,10 @@ the whole monorepo is for the final check.
 - `make sync` after changing a manifest or `monorepo.php`
 - `make test` starts the services of `compose.yaml` (RabbitMQ) first (`make up`), `make down` stops them.
   An integration test fails without its service, it is never skipped: a skip hides a broken environment
-- `make check` runs the checks of CI. CI also runs `make sync` and fails on any change in git,
-  so commit the generated files. Everything runs on PHP 8.6. A package whose manifest allows an older PHP
-  is also tested alone on every minor below 8.6 (`PHP_VERSION=8.2 make test-alone P=time`)
+- `make check` runs the style, Rector, PHPStan, dependency and test checks. CI also checks generated files,
+  compatibility, coverage and benchmarks. When asked to commit, include generated changes with their sources.
+  The monorepo runs on PHP 8.6. A package that supports older PHP is also tested alone on each supported minor below 8.6
+  (`PHP_VERSION=8.2 make test-alone P=time`).
 
 ## Git
 

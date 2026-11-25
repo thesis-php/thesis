@@ -1,7 +1,6 @@
 # thesis/testo-plugin
 
 These Testo plugins support tests for Thesis packages and applications that use them.
-Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

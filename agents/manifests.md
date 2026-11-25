@@ -51,7 +51,7 @@ or changing the public API of a package that others use. How the generator works
   (`benchmarks.md`). Without `tests/` (`phpstan-extension`, checked by `make phpstan`) the package gets
   no Testo suite and no `autoload-dev`.
 - `rootEntry: true` of the manifest puts the entry point named after the package in the root namespace
-  (`php.md`): the psr-4 prefix of `src/` and `tests/` becomes `Thesis\`, so the class is `src/Dispatcher.php`,
+  (`agents/php-api.md`): the psr-4 prefix of `src/` and `tests/` becomes `Thesis\`, so the class is `src/Dispatcher.php`,
   a function is in `src/api.php`, its test is `tests/DispatcherTest.php`, and the rest moves to `src/<Name>/`
   and `tests/<Name>/` (`src/Dispatcher/Internal/`, `tests/Exceptionally/helpers.php`). The root `composer.json`
   lists every such `src/` and `tests/` under `Thesis\`.

@@ -23,7 +23,7 @@ A synchronous event dispatcher that routes by the type of a listener's parameter
   it is a plain nested call, its listeners run before the next listener of the outer event.
 - Every listener is called with the event and the dispatcher, `$listener($event, $this)`: nothing about
   the second parameter is reflected or decided per listener. The parameters after the event are a contract
-  of types (`callable(never, self): void` of the constructor and of `Subscriber::listeners()`, `php.md`),
+  of types (`callable(never, self): void` of the constructor and of `Subscriber::listeners()`, `agents/php-api.md`),
   not of the constructor's checks.
 - `dispatch()` does not care whether a listener suspends the fiber: `resolve()` does not suspend, so concurrent
   dispatches from other fibers see a consistent table. A ban on suspending belongs to the user of the dispatcher

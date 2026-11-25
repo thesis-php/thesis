@@ -2,7 +2,7 @@
 
 AMQP 0.9.1 client for RabbitMQ. Uses `net` (the socket), `io` (`Buffer` codes every frame), `async` (every wait,
 the group of `Client::start()`, `agents/services.md`) and `time`.
-The API and the guarantees are in `README.md` — read it first.
+The API and the guarantees are in `README.md`.
 
 ## Invariants that must not be broken
 

@@ -3,7 +3,6 @@
 This package provides non-blocking TCP and Unix sockets, TLS and asynchronous DNS. Every wait goes through
 thesis/async, so the task tree controls cancellation. `Socket` implements the thesis/io `Reader`, `Writer`
 and `Closer` interfaces. DNS messages use `Buffer` for encoding and decoding.
-Read `README.md` for the API and its guarantees.
 
 ## Invariants that must not be broken
 

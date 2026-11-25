@@ -1,6 +1,6 @@
 # Changelogs
 
-Read before writing or editing a `CHANGELOG.md` of a package. How a heading becomes a release is in `releases.md`.
+Check `[Unreleased]` when a change affects public API or user-visible behaviour. Read this before editing a changelog. How a heading becomes a release is in `releases.md`.
 
 ## Rules
 

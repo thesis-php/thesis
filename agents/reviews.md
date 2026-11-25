@@ -6,13 +6,10 @@ Read before reviewing a change or acting on the findings of a review.
 
 - A task states when it is done (a test that passes, a behaviour, `make check P=<name>`). Without that
   the author decides when to stop and the reviewer decides what counts as a defect.
-- A finding is a defect only with a failure scenario: a concrete input or state that leads to a wrong result,
-  a crash or a broken invariant. Without one it is a matter of taste: the author decides once,
-  it does not go another round.
-- The yardstick is the rules of the project (`php.md`, the topics, `AGENTS.md` of the package), not general taste.
-  A preference that no rule covers is either written down as a rule or dropped.
-- A review is done when it has no confirmed correctness findings. Style and simplification findings
-  do not keep it open.
+- For a behaviour defect, give an input or state that produces a wrong result, crash or broken invariant.
+- For a violation of a written project rule, cite the rule and the changed line that violates it.
+- The author decides preferences that no rule covers. They do not start another round.
+- Close the review once the confirmed behaviour defects and violations of written rules have been resolved.
 - Findings of one kind that keep coming back mean a gap in the rules or the tests, not a need for more rounds.
 
 ## Procedure
@@ -22,8 +19,9 @@ Read before reviewing a change or acting on the findings of a review.
 2. Start a fresh agent with the best available model for code review. Use high reasoning effort if the model
    supports it. The reviewer gets the diff, the task with its "done" criterion and the rules, never the
    reasoning of the author: an agent that sees it agrees with it instead of checking
-   the code. It reports only findings with a failure scenario.
-3. The author confirms a finding with a failing test, then fixes it and answers why it was missed. The answer
+   the code. Report each finding with the evidence required above.
+3. The author reproduces a behaviour defect with a failing test where applicable, or verifies a rule violation
+   against the cited line. Fix the confirmed finding and explain why it was missed. The answer
    goes where it prevents the whole class: a PHPStan, fixer or rector rule if a tool can catch it, otherwise
    an invariant or a trap in the narrowest `AGENTS.md` or topic. A rejected finding goes to "Decisions"
    of the narrowest file with its reason, so the next review does not raise it again.

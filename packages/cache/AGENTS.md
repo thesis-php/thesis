@@ -1,7 +1,6 @@
 # thesis/cache
 
 This package defines the cache interface, provides an in-process cache and protects against cache stampedes.
-Read `README.md` for the API.
 
 ## Invariants that must not be broken
 

@@ -4,7 +4,7 @@
 `Writer` and `Closer` interfaces. `StringReader` reads a string in memory. `Stream` wraps a
 non-blocking PHP resource, while `stdin()`, `stdout()` and `stderr()` expose the standard streams.
 Streams wait through thesis/async.
-Read `README.md` for the API and design decisions.
+The README documents the stream and buffer APIs and their design decisions.
 
 ## Invariants that must not be broken
 
