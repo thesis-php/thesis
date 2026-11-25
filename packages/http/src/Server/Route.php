@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Thesis\Http\Server;
 
 use Thesis\Http\Method;
-use Thesis\Http\Request;
-use Thesis\Http\Response;
 
 /**
  * @api
+ * @phpstan-import-type Handler from \Thesis\Http\Server
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
  */
 final readonly class Route
 {
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -24,7 +24,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -38,7 +38,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -52,7 +52,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -62,7 +62,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -76,7 +76,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -90,7 +90,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -104,7 +104,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -118,7 +118,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -132,7 +132,7 @@ final readonly class Route
     }
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */
@@ -147,13 +147,13 @@ final readonly class Route
     public ?array $methods;
 
     /**
-     * @var \Closure(Request, Context): Response
+     * @var HandlerClosure
      */
     public \Closure $handler;
 
     /**
      * @param non-empty-string|non-empty-list<non-empty-string>|null $methods
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param array<non-empty-string, string> $requirements
      * @param array<non-empty-string, string> $defaults
      */

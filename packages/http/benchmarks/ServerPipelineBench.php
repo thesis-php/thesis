@@ -16,6 +16,9 @@ use Thesis\Http\Server\Pipeline;
 use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Net\InetAddress;
 
+/**
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
+ */
 #[Warmup(1)]
 final class ServerPipelineBench
 {
@@ -24,7 +27,7 @@ final class ServerPipelineBench
     private readonly Context $context;
 
     /**
-     * @var \Closure(Request, Context): Response
+     * @var HandlerClosure
      */
     // @phpstan-ignore property.uninitialized (Tally calls prepare() before each case.)
     private \Closure $pipeline;

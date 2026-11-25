@@ -11,6 +11,7 @@ use Thesis\Http\Server\Middleware;
 
 /**
  * @internal
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
  */
 final class Next
 {
@@ -22,7 +23,7 @@ final class Next
 
     /**
      * @param non-empty-list<Middleware> $middleware
-     * @param \Closure(Request, Context): Response $handler
+     * @param HandlerClosure $handler
      */
     public function __construct(
         private readonly array $middleware,

@@ -12,13 +12,15 @@ use Thesis\Http\Response;
  * Wraps a request handler with ordered server middleware.
  *
  * @api
+ * @phpstan-import-type Handler from \Thesis\Http\Server
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
  */
 final readonly class Pipeline
 {
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param iterable<Middleware> $middleware outermost first
-     * @return callable(Request, Context): Response the original handler when the iterable is empty
+     * @return Handler the original handler when the iterable is empty
      */
     public static function wrap(callable $handler, iterable $middleware): callable
     {
@@ -28,7 +30,7 @@ final readonly class Pipeline
     }
 
     /**
-     * @param \Closure(Request, Context): Response $handler
+     * @param HandlerClosure $handler
      * @param non-empty-list<Middleware> $middleware
      */
     private function __construct(
