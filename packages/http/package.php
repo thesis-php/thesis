@@ -6,8 +6,7 @@ use Thesis\Monorepo\Manifest;
 use Thesis\TestoPlugin\EventLoopPlugin;
 
 return new Manifest(
-    description: 'Asynchronous HTTP/1 client and server with strict parsing, pooled connections, TLS, '
-        . 'request routing, middleware and streamed bodies with trailers.',
+    description: 'Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies.',
     licenseSince: 2026,
     version: '0.1',
     title: 'Thesis HTTP',

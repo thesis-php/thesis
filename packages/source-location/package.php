@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.',
+    description: 'Find source locations and callers outside a library, including in code run by eval().',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'source-location', 'backtrace', 'debugging'],

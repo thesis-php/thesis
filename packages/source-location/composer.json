@@ -1,6 +1,6 @@
 {
     "name": "thesis/source-location",
-    "description": "Where in the source code: a file and a line, the caller outside a library, the code of eval() resolved.",
+    "description": "Find source locations and callers outside a library, including in code run by eval().",
     "keywords": [
         "php",
         "source-location",

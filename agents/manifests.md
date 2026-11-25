@@ -30,12 +30,10 @@ or changing the public API of a package that others use. How the generator works
   the plugins of every suite are in `testo.php` (`PhpErrorsPlugin`: a PHP error fails the test).
 - `keywords` of a manifest and of `monorepo.php` go to `composer.json` and are the topics of the repository
   on GitHub (`repositories.md`), so `make sync` checks them by the rules of a topic.
-- **`description` and `keywords` follow the features.** A change that adds, removes or renames what a package does
-  (a protocol, a transport, a kind of API) updates the `description` and `keywords` of its manifest
-  in the same change. When a change alters what the ecosystem as a whole offers (a new package), it also updates
-  the `description` and `keywords` of `monorepo.php`.
-  Packagist and GitHub use this metadata to help users find packages. Stale metadata can hide new features
-  or promise features that no longer exist.
+- In both a package manifest and `monorepo.php`, write `description` as one sentence of at most 100 characters,
+  including spaces and punctuation. State the main purpose. Put the feature list in the README.
+- When features change, review the package keywords and, for changes across the ecosystem, the root keywords.
+  Update the description when the main purpose changes. Packagist and GitHub use both fields for discovery.
 - **No list of packages is written by hand**, in a config, a workflow or a Makefile: what is done per package
   is derived from the manifests and the layout of a package (`tests/`), by the configs through `Tools`
   or by `make sync` into a generated file or a marked part of one. A package takes part or not by a field

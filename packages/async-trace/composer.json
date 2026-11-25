@@ -1,6 +1,6 @@
 {
     "name": "thesis/async-trace",
-    "description": "Tools around the trace of thesis/async: its events written as NDJSON and as lines of text for tests, who has cancelled a scope and why, code that blocks the others, waits that last too long.",
+    "description": "Trace thesis/async tasks to diagnose cancellation, blocking code and long waits.",
     "keywords": [
         "php",
         "async",

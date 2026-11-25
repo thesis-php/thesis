@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Thesis\Monorepo\Manifest;
 
 return new Manifest(
-    description: 'Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures.',
+    description: 'Testo plugins for testing thesis/async code with real or virtual time and PHP errors as failures.',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'async', 'testing', 'testo', 'event-loop', 'virtual-time', 'error-handling'],

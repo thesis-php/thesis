@@ -1,6 +1,6 @@
 {
     "name": "thesis/testo-plugin",
-    "description": "Testo plugins for thesis packages: tests in the event loop of thesis/async, real or virtual time, PHP errors as failures.",
+    "description": "Testo plugins for testing thesis/async code with real or virtual time and PHP errors as failures.",
     "keywords": [
         "php",
         "async",

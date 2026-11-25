@@ -170,7 +170,7 @@ final class Generator
 
         $composer = [
             'name' => $package->name,
-            'description' => $manifest->description,
+            'description' => self::description($manifest->description, $package->path . '/' . Monorepo::MANIFEST),
             'keywords' => self::keywords($manifest->keywords, $package->path . '/' . Monorepo::MANIFEST),
             'license' => 'MIT',
             'type' => $manifest->type,
@@ -295,7 +295,7 @@ final class Generator
 
         $composer = [
             'name' => Monorepo::VENDOR . '/monorepo',
-            'description' => $config->description,
+            'description' => self::description($config->description, Monorepo::CONFIG),
             'keywords' => self::keywords($config->keywords, Monorepo::CONFIG),
             'license' => 'MIT',
             'type' => 'project',
@@ -885,6 +885,19 @@ final class Generator
         }
 
         return Json::encode($skills);
+    }
+
+    /**
+     * @param non-empty-string $description
+     * @return non-empty-string
+     */
+    private static function description(string $description, string $file): string
+    {
+        if (preg_match('/\A[^\r\n]{1,100}\z/u', $description) !== 1) {
+            throw new MonorepoException($file . ': the description must fit on one line of at most 100 characters.');
+        }
+
+        return $description;
     }
 
     /**

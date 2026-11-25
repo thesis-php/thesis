@@ -1,6 +1,6 @@
 {
     "name": "thesis/logger",
-    "description": "PSR-3 logger with a configurable clock, bounded buffering, and asynchronous JSON and colored console output.",
+    "description": "PSR-3 logger with bounded buffering and asynchronous JSON and colored console output.",
     "keywords": [
         "php",
         "async",

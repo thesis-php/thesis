@@ -8,7 +8,7 @@ use Thesis\Monorepo\RectorSkip;
 use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
-    description: 'Structured concurrency for PHP fibers with its own event loop, signals, task-tree cancellation and lazy initialization.',
+    description: 'Structured concurrency for PHP fibers with an event loop and task-tree cancellation.',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'async', 'fibers', 'structured-concurrency', 'cancellation', 'event-loop', 'lazy-initialization', 'signals'],
