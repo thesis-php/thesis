@@ -10,6 +10,7 @@ use Thesis\Async\Group;
 use Thesis\Io\Buffer;
 use Thesis\Io\Stream;
 use Thesis\Process\Process;
+use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
@@ -42,6 +43,67 @@ final class HotReloadTest
                 Assert::same(timeout(sec(5), $readLine), 'ready');
             },
         );
+    }
+
+    public function terminalInterruptLetsTheWorkerFinishCleanup(): void
+    {
+        $launcher = <<<'PHP_LAUNCHER'
+            if (posix_setsid() < 0 || !fopen(posix_ttyname(STDIN), 'r+')) {
+                exit(1);
+            }
+            pcntl_exec(PHP_BINARY, array_slice($argv, 1));
+            PHP_LAUNCHER;
+        $worker = <<<'PHP_WORKER'
+            $terminal = fopen('/dev/tty', 'r+');
+            pcntl_async_signals(true);
+            pcntl_signal(SIGINT, static function () use ($terminal) {
+                pcntl_signal(SIGINT, SIG_DFL);
+                fwrite($terminal, "stopping\n");
+                if (trim(fgets($terminal)) === 'finish') {
+                    fwrite($terminal, "finished\n");
+                    exit(0);
+                }
+                exit(1);
+            });
+            fwrite($terminal, "ready\n");
+            sleep(15);
+            PHP_WORKER;
+
+        $binary = \dirname(__DIR__) . '/bin/hot-reload';
+        $process = proc_open(
+            command: [PHP_BINARY, '-r', $launcher, '--', $binary, '--', PHP_BINARY, '-r', $worker],
+            descriptor_spec: [0 => ['pty'], 1 => ['null'], 2 => ['null']],
+            pipes: $pipes,
+        );
+        \assert(\is_resource($process) && isset($pipes[0]));
+        $terminal = new Stream($pipes[0]);
+        $buffer = new Buffer();
+        $readLine = static function () use ($terminal, $buffer) {
+            $buffer->fillUntil($terminal, "\n");
+
+            return trim($buffer->readUntil("\n") ?? '');
+        };
+
+        try {
+            group(static function () use ($terminal, $readLine, $process) {
+                Assert::same(timeout(sec(5), $readLine), 'ready');
+                $terminal->write("\x03");
+                Assert::string(timeout(sec(5), $readLine))->contains('stopping');
+                $terminal->write("finish\n");
+                timeout(sec(5), static function () use ($readLine) {
+                    while ($readLine() !== 'finished');
+                });
+                timeout(sec(5), static function () use ($process) {
+                    while (proc_get_status($process)['running']) {
+                        delay(ms(10));
+                    }
+                });
+            });
+        } finally {
+            proc_terminate($process);
+            $terminal->close();
+            proc_close($process);
+        }
     }
 
     public function keepsHandlingSignalsUntilTheWorkerExits(): void

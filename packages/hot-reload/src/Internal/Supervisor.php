@@ -27,6 +27,8 @@ final class Supervisor implements Service
      */
     private ?Task $task = null;
 
+    private ?int $stopSignal = SIGTERM;
+
     /**
      * @param non-empty-list<string> $command
      * @param Channel<true> $reload
@@ -57,9 +59,10 @@ final class Supervisor implements Service
         $this->reload();
     }
 
-    public function stop(): void
+    public function stop(?int $signal = SIGTERM): void
     {
         if ($this->task !== null) {
+            $this->stopSignal = $signal;
             $this->reload->close();
             $this->task->await();
         }
@@ -75,7 +78,7 @@ final class Supervisor implements Service
         try {
             foreach ($this->reload as $_) {
                 if ($worker !== null) {
-                    self::stopWorker($worker);
+                    self::stopWorker($worker, $this->stopSignal);
                     $worker = null;
                 }
                 if ($this->reload->isClosed) {
@@ -103,14 +106,16 @@ final class Supervisor implements Service
             }
         } finally {
             if ($worker !== null) {
-                shield(static fn() => self::stopWorker($worker));
+                shield(fn() => self::stopWorker($worker, $this->stopSignal));
             }
         }
     }
 
-    private static function stopWorker(Process $worker): void
+    private static function stopWorker(Process $worker, ?int $signal): void
     {
-        $worker->signal(SIGTERM);
+        if ($signal !== null) {
+            $worker->signal($signal);
+        }
         if (timeoutOr(sec(3), $worker->wait(...)) === null) {
             $worker->signal(SIGKILL);
             $worker->wait();

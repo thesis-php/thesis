@@ -13,3 +13,4 @@ The package was rewritten on Thesis Async and Process in the monorepo.
 
 - `hot-reload` restarts a development server on `SIGHUP` or changes to paths passed with `--watch`,
   including after a crash or failed startup.
+- Let the server finish its Ctrl+C handler while sharing the terminal with the supervisor.

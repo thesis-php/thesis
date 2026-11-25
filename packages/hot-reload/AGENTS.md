@@ -11,11 +11,14 @@
 - The watcher waits for the configured duration after the most recent detected edit on the async monotonic clock.
   Scan again at the deadline so an edit before the next regular poll resets the wait. SIGHUP requests a reload immediately.
   Refreshing the snapshot for a launch clears pending edits already covered by that launch.
-- The CLI traps SIGHUP, SIGINT and SIGTERM until the supervisor group has joined. Restoring the default signal
+- The CLI traps SIGHUP, SIGINT, SIGQUIT and SIGTERM until the supervisor group has joined. Restoring the default signal
   actions while the worker is stopping can kill the supervisor before it reaps the worker.
   Stopping the supervisor closes the reload channel and waits for its task. Its shielded group owns the worker
   and file watcher until shutdown finishes. Group cancellation also closes the reload channel.
   Start a replacement only after the worker exits.
+- Keep the worker in the inherited process group. A terminal interrupt already reaches both processes.
+  A second signal can kill the worker during cleanup. Check for a controlling terminal through /dev/tty
+  even when stdio is redirected. Scripts stop the supervisor with SIGTERM.
 
 ## Decisions
 

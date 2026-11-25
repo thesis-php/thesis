@@ -78,12 +78,17 @@ if ($debounce->negative) {
 $reload = new Channel(capacity: 1);
 $watcher = $paths === [] ? new NullWatcher() : new FileWatcher($paths, $debounce, $reload);
 $supervisor = new Supervisor($command, $reload, $watcher);
-trapSignals([SIGHUP, SIGINT, SIGTERM], static function (SignalTrap $signals) use ($supervisor) {
+trapSignals([SIGHUP, SIGINT, SIGTERM, SIGQUIT], static function (SignalTrap $signals) use ($supervisor) {
     group(static function (Group $group) use ($supervisor, $signals) {
         $supervisor->start($group);
-        while ($signals->receive() === SIGHUP) {
+        while (($signal = $signals->receive()) === SIGHUP) {
             $supervisor->reload();
         }
-        $supervisor->stop();
+        // A terminal sends interrupt and quit to the whole foreground group, even with redirected stdio.
+        if ($signal !== SIGTERM && ($terminal = @fopen('/dev/tty', 'r')) !== false) {
+            fclose($terminal);
+            $signal = null;
+        }
+        $supervisor->stop($signal);
     });
 });

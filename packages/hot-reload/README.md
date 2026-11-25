@@ -38,6 +38,11 @@ For an immediate restart request, send `kill -HUP <pid>` to the supervisor PID p
 `--watch` to use manual restarts only. The server inherits stdio, so startup errors and application logs appear
 in the same terminal. If the server exits, the supervisor reports its exit status and waits for a file change or `SIGHUP`.
 
-`SIGINT` and `SIGTERM` stop the session. On restart or shutdown, the supervisor sends the server `SIGTERM`,
-gives it three seconds to exit, and sends `SIGKILL` if it is still running.
+The server shares the supervisor's terminal and process group, so interactive commands can open `/dev/tty`.
+Ctrl+C sends `SIGINT` to both processes. The supervisor waits for the server to finish. Ctrl+\ works
+the same way with `SIGQUIT`. Use `kill -TERM <pid>` to stop the supervisor from a script: it forwards
+`SIGTERM` to the server. With a controlling terminal, sending `SIGINT` only to the supervisor starts the wait
+without signalling the server. Without a controlling terminal, the supervisor forwards `SIGINT` and `SIGQUIT`.
+
+A restart sends `SIGTERM`. On restart or shutdown, a server still running after three seconds receives `SIGKILL`.
 The replacement starts after the old server exits. Saves during shutdown go into that same replacement.
