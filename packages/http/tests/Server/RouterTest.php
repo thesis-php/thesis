@@ -129,6 +129,9 @@ final readonly class RouterTest
                 Assert::same($context, $this->context);
                 Assert::same(routeMatch($request)?->params, ['group' => 'a', 'name' => '42']);
 
+                Assert::same(routeParam($request, 'name'), '42');
+                Assert::null(routeParam($request, 'team'));
+
                 return new Response();
             }),
         ]);
@@ -145,7 +148,7 @@ final readonly class RouterTest
         };
         $outer = Pipeline::wrap($outer, [
             new CallbackMiddleware(static function ($request, $context, $next) {
-                Assert::same(routeMatch($request)?->param('team'), 'a');
+                Assert::same(routeParam($request, 'team'), 'a');
 
                 return $next();
             }),
@@ -156,6 +159,7 @@ final readonly class RouterTest
         })());
         Assert::same($router($get, $this->context)->status, Status::OK);
         Assert::null(routeMatch($get));
+        Assert::null(routeParam($get, 'team'));
         $response = $router($get->withMethod('get'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'POST, GET, PUT, HEAD');
