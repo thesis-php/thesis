@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Dispatcher::with()` returns a new dispatcher with additional listeners and subscribers.
+
 - A listener gets the dispatcher as its second argument, to dispatch events of its own:
   `static function (OrderPlaced $event, Dispatcher $dispatcher)`.
 - `Dispatcher\Subscriber`: an object with several listeners, given to the constructor among them:
