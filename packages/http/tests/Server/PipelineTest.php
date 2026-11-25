@@ -16,6 +16,14 @@ use Thesis\Net\InetAddress;
 #[Test]
 final class PipelineTest
 {
+    public function emptyMiddlewareReturnsTheOriginalHandler(): void
+    {
+        $handler = static fn() => new Response();
+
+        Assert::same($handler, Pipeline::wrap($handler, []));
+        Assert::same($handler, Pipeline::wrap($handler, new \EmptyIterator()));
+    }
+
     public function wrapsInOrderAndBindsEachRequest(): void
     {
         $address = new InetAddress('127.0.0.1', 80);
@@ -37,7 +45,11 @@ final class PipelineTest
 
             return new Response(201);
         };
-        $handler = new Pipeline($endpoint, [$outer, $inner]);
+        $middleware = static function () use ($outer, $inner) {
+            yield 'layer' => $outer;
+            yield 'layer' => $inner;
+        };
+        $handler = Pipeline::wrap($endpoint, $middleware());
 
         Assert::same(201, $handler($request, $context)->status);
         $denied = Request::get('/private');
@@ -58,7 +70,7 @@ final class PipelineTest
         $inner = new CallbackMiddleware(static function () use (&$saved) {
             return $saved();
         });
-        $handler = new Pipeline($endpoint, [$outer, $inner]);
+        $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class);
         $handler(Request::get('/'), new Context($address, $address, null));
@@ -85,7 +97,7 @@ final class PipelineTest
 
             return $throws ? throw new \RuntimeException('Middleware failed.') : new Response();
         });
-        $handler = new Pipeline($endpoint, [$outer, $inner]);
+        $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class)->withMessage('The middleware invocation has ended.');
         $handler(Request::get('/'), new Context($address, $address, null));
@@ -100,7 +112,7 @@ final class PipelineTest
             return $next();
         });
         $deny = new CallbackMiddleware(static fn() => new Response(403));
-        $handler = new Pipeline(static fn() => new Response(), [$twice, $deny]);
+        $handler = Pipeline::wrap(static fn() => new Response(), [$twice, $deny]);
 
         $response = $handler(Request::get('/'), new Context($address, $address, null));
         Assert::same(403, $response->status);
@@ -127,7 +139,7 @@ final class PipelineTest
 
             return new Response(201);
         };
-        $handler = new Pipeline($endpoint, [$retry]);
+        $handler = Pipeline::wrap($endpoint, [$retry]);
 
         Assert::same(201, $handler($request, $context)->status);
         Assert::same([[$request, $context], [$request, $context]], $attempts);

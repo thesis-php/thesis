@@ -17,7 +17,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.
 - Read streaming bodies incrementally or collect a whole unread payload. Replayable bodies can open independent readers.
 - Intercept client and server exchanges with `Client\Middleware` and `Server\Middleware`.
-  Wrap a handler in `Server\Pipeline` to run ordered middleware and retry after the next handler returns or throws.
+  Pass an iterable to `Server\Pipeline::wrap()` to run ordered middleware and retry after the next handler returns or throws.
 - Send an HTTP or HTTPS GET by URL, or send a request with streaming bodies and trailers through `Client::send()`.
 - `Client::withResponse()` closes the body when the response callback returns or throws.
 - Limit concurrent connections per origin and pool persistent connections across exchanges.

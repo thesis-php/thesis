@@ -21,8 +21,11 @@ final class ServerPipelineBench
 
     private readonly Context $context;
 
+    /**
+     * @var \Closure(Request, Context): Response
+     */
     // @phpstan-ignore property.uninitialized (Tally calls prepare() before each case.)
-    private Pipeline $pipeline;
+    private \Closure $pipeline;
 
     public function __construct()
     {
@@ -57,7 +60,7 @@ final class ServerPipelineBench
             array_unshift($middleware, new CallbackMiddleware($handler));
         }
 
-        $this->pipeline = new Pipeline($handler, $middleware);
+        $this->pipeline = Pipeline::wrap($handler, $middleware)(...);
     }
 
     /**

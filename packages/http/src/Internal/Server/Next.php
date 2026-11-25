@@ -14,48 +14,33 @@ use Thesis\Http\Server\Middleware;
  */
 final class Next
 {
-    /**
-     * @param list<Middleware> $middleware
-     * @param \Closure(Request, Context): Response $handler
-     */
-    public static function dispatch(
-        array $middleware,
-        \Closure $handler,
-        Request $request,
-        Context $context,
-        int $index,
-    ): Response {
-        $layer = $middleware[$index] ?? null;
-        if ($layer === null) {
-            return $handler($request, $context);
-        }
-
-        $next = new self($middleware, $handler, $request, $context, $index + 1);
-
-        try {
-            return $layer->handle($request, $next);
-        } finally {
-            $next->expired = true;
-        }
-    }
-
     private bool $expired = false;
 
     private bool $running = false;
 
+    private readonly int $index;
+
     /**
-     * @param list<Middleware> $middleware
+     * @param non-empty-list<Middleware> $middleware
      * @param \Closure(Request, Context): Response $handler
      */
-    private function __construct(
+    public function __construct(
         private readonly array $middleware,
         private readonly \Closure $handler,
         private readonly Request $request,
         private readonly Context $context,
-        private readonly int $index,
-    ) {}
+    ) {
+        $this->index = 1;
+    }
 
-    private function __clone() {}
+    public function handle(Middleware $middleware): Response
+    {
+        try {
+            return $middleware->handle($this->request, $this);
+        } finally {
+            $this->expired = true;
+        }
+    }
 
     /**
      * @throws \LogicException if the middleware invocation has ended or a previous call is still running
@@ -73,9 +58,19 @@ final class Next
         $this->running = true;
 
         try {
-            return self::dispatch($this->middleware, $this->handler, $this->request, $this->context, $this->index);
+            $middleware = $this->middleware[$this->index] ?? null;
+
+            if ($middleware === null) {
+                return ($this->handler)($this->request, $this->context);
+            }
+
+            $next = clone($this, ['index' => $this->index + 1, 'running' => false]);
+
+            return $next->handle($middleware);
         } finally {
             $this->running = false;
         }
     }
+
+    private function __clone() {}
 }

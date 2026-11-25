@@ -16,23 +16,30 @@ use Thesis\Http\Response;
 final readonly class Pipeline
 {
     /**
-     * @var \Closure(Request, Context): Response
+     * @param callable(Request, Context): Response $handler
+     * @param iterable<Middleware> $middleware outermost first
+     * @return callable(Request, Context): Response the original handler when the iterable is empty
      */
-    private \Closure $handler;
+    public static function wrap(callable $handler, iterable $middleware): callable
+    {
+        $layers = iterator_to_array($middleware, preserve_keys: false);
+
+        return $layers === [] ? $handler : new self($handler(...), $layers);
+    }
 
     /**
-     * @param callable(Request, Context): Response $handler
-     * @param list<Middleware> $middleware outermost first
+     * @param \Closure(Request, Context): Response $handler
+     * @param non-empty-list<Middleware> $middleware
      */
-    public function __construct(
-        callable $handler,
+    private function __construct(
+        private \Closure $handler,
         private array $middleware,
-    ) {
-        $this->handler = $handler(...);
-    }
+    ) {}
 
     public function __invoke(Request $request, Context $context): Response
     {
-        return Next::dispatch($this->middleware, $this->handler, $request, $context, index: 0);
+        $next = new Next($this->middleware, $this->handler, $request, $context);
+
+        return $next->handle($this->middleware[0]);
     }
 }

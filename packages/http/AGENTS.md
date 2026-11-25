@@ -14,8 +14,10 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   calls to the same continuation and expire it when its own `handle()` exits. A public `Server\Pipeline`
   wraps any handler and keeps delegation state local to each middleware invocation. Rejected: passing one mutable
   cursor to every layer. If an inner layer returns early, a second call from the outer layer could skip it.
-- Allocate one continuation per middleware invocation. With an empty pipeline, dispatch calls the endpoint directly.
-  Compared with creating an initial `Next` in `d30cffb`, Tally on PHP 8.6 aarch64 measured 0 B of extra peak
+- `Server\Pipeline::wrap()` returns the original callable for an empty iterable. Collect middleware once in
+  iteration order, including values with repeated keys.
+- Allocate one continuation per middleware invocation.
+  Comparing `9ffb998` with the initial `Next` in `d30cffb`, Tally on PHP 8.6 aarch64 measured 0 B of extra peak
   memory instead of 160 B for the empty pipeline. In ten alternating pairs with CLI OPcache off, its median
   dispatch time fell from 390 ns to 186 ns. Four layers over an in-memory HTTP/1 connection showed no clear time gain.
 - Server retries preserve the request's body handoff. Keep incoming bodies streaming. Once a layer takes the body,

@@ -297,13 +297,15 @@ curl --http1.1 -sS -H 'Transfer-Encoding: chunked' --data-binary 'one' http://12
 
 ### Server middleware
 
-Wrap a handler in a `Pipeline` and pass it to the server. The same pipeline can handle concurrent requests.
+Use `Pipeline::wrap()` to wrap a handler and pass it to the server. It collects the middleware from an iterable
+in iteration order, ignoring keys. An empty iterable returns the original handler. The same handler can serve
+concurrent requests.
 
 ```php
 use Thesis\Http\Server;
 use Thesis\Http\Server\Pipeline;
 
-$pipeline = new Pipeline($handler, [$accessLog, $authorization]);
+$pipeline = Pipeline::wrap($handler, [$accessLog, $authorization]);
 $server = new Server($config, $pipeline);
 ```
 
