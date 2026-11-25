@@ -10,4 +10,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Log requests and server shutdown through the HTTP event subscriber.
-- Run a local HTTP server with a usage hint at `GET /` and compare sequential and concurrent requests to `GET /{id}`, which echoes the decoded parameter, with curl.
+- Explore the linked routes at `GET /`, compare sequential and concurrent requests to `GET /wait/250ms`, and trigger a handler exception at `GET /error`.
+- Run `app.php` with `hot-reload` to restart the server after edits.

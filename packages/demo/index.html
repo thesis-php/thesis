@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thesis HTTP demo</title>
+<style>
+  :root { color-scheme: light dark; font: 1rem/1.6 system-ui, sans-serif; }
+  body { max-width: 66ch; margin: 3rem auto; padding: 0 1rem; }
+  a { text-underline-offset: 0.2em; }
+  pre { overflow-x: auto; padding: 1rem; border-radius: 0.5rem; background: #202938; color: #fff; }
+</style>
+<h1>Thesis HTTP demo</h1>
+<p>This PHP server can handle other requests while a handler waits.
+Open <a target="_blank" rel="noopener" href="/wait/5s">a five-second wait</a>, then try
+<a target="_blank" rel="noopener" href="/wait/250ms">a 250 ms wait</a>.
+The shorter request can finish first.</p>
+<p>Run this in a terminal to send eight requests in parallel to the default address.
+Each waits for 250–257 ms. The command waits for all eight and prints their total elapsed time,
+usually about a quarter of a second on an idle machine.</p>
+<pre><code>time curl -fsS --parallel --parallel-immediate \
+  'http://127.0.0.1:8080/wait/25[0-7]ms'</code></pre>
+<p>Visit <a target="_blank" rel="noopener" href="/error">the error route</a> to trigger an exception.
+Check the server console for the request logs.</p>
+</html>

@@ -35,6 +35,7 @@
         "ext-pcntl": "*",
         "thesis/async": "dev-main",
         "thesis/dispatcher": "dev-main",
+        "thesis/exceptionally": "dev-main",
         "thesis/formatter": "dev-main",
         "thesis/http": "dev-main",
         "thesis/io": "dev-main",
@@ -42,6 +43,10 @@
         "thesis/net": "dev-main",
         "thesis/source-location": "dev-main",
         "thesis/time": "dev-main"
+    },
+    "require-dev": {
+        "thesis/hot-reload": "dev-main",
+        "thesis/process": "dev-main"
     },
     "extra": {
         "branch-alias": {

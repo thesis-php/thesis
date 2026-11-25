@@ -5,5 +5,6 @@ CONTRIBUTING.md
 LICENSE
 README.md
 SECURITY.md
+app.php
 composer.json
-run.php
+index.html
