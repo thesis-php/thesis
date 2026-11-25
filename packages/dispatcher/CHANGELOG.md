@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Dispatcher::for()` returns the dispatcher if any listener accepts one of the given event classes.
 - A listener gets the dispatcher as its second argument, to dispatch events of its own:
   `static function (OrderPlaced $event, Dispatcher $dispatcher)`.
 - `Dispatcher\Subscriber`: an object with several listeners, given to the constructor among them:

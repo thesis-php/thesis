@@ -131,3 +131,14 @@ if ($dispatcher->listens(QueryExecuted::class)) {
     $dispatcher->dispatch(new QueryExecuted($sql, $elapsed, backtrace()));
 }
 ```
+
+Use `for()` to check once and keep the result. It returns the same dispatcher if any of the given classes
+has a listener, or `null` if none do. With no classes it returns `null`.
+
+```php
+// When the component is created
+$this->queries = $dispatcher->for(QueryExecuted::class);
+
+// After each query, PHP skips both backtrace() and the event construction when $this->queries is null.
+$this->queries?->dispatch(new QueryExecuted($sql, $elapsed, backtrace()));
+```

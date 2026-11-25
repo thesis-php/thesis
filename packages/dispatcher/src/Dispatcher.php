@@ -66,6 +66,17 @@ final class Dispatcher
     }
 
     /**
+     * Returns this dispatcher if any listener accepts any of the given event classes, or null otherwise.
+     *
+     * @no-named-arguments
+     * @param class-string ...$classes
+     */
+    public function for(string ...$classes): ?static
+    {
+        return array_any($classes, $this->listens(...)) ? $this : null;
+    }
+
+    /**
      * @param class-string $class
      * @return list<\Closure(object, self): void>
      */

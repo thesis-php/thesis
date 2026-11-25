@@ -53,6 +53,15 @@ final class DispatcherTest
         Assert::same(array_values(array_filter(self::ALL, $dispatcher->listens(...))), $classes);
     }
 
+    public function returnsItselfWhenAnyEventClassHasAListener(): void
+    {
+        $dispatcher = new Dispatcher([static function (Base $event) {}]);
+
+        Assert::same($dispatcher->for(Other::class, Child::class), $dispatcher);
+        Assert::null($dispatcher->for(Other::class, Unrelated::class));
+        Assert::null($dispatcher->for());
+    }
+
     public function callsTheListenersInTheOrderTheyAreGiven(): void
     {
         $calls = [];
