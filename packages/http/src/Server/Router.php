@@ -7,6 +7,7 @@ namespace Thesis\Http\Server;
 use Thesis\Http\Headers;
 use Thesis\Http\Internal\Server\RouteTable;
 use Thesis\Http\Internal\Server\RoutingError;
+use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 
@@ -28,7 +29,17 @@ final readonly class Router
 
     public function __invoke(Request $request, Context $context): Response
     {
-        $result = $this->routes->lookup($request->method, $request->uri->getRawPath());
+        $path = $request->uri->getRawPath();
+        if (
+            $path === ''
+            && $request->uri->getScheme() !== null
+            && $request->method !== Method::CONNECT
+            && ($request->method !== Method::OPTIONS || $request->uri->getRawQuery() !== null)
+        ) {
+            $path = '/';
+        }
+
+        $result = $this->routes->lookup($request->method, $path);
 
         if ($result instanceof RoutingError) {
             return new Response(

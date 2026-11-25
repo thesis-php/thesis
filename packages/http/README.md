@@ -250,6 +250,7 @@ over the GET fallback. A method mismatch yields 405 with all allowed methods, in
 An unknown path yields 404. Duplicate method and path shapes fail during construction.
 
 Matching uses the raw path component of the request URI. Slashes, trailing slashes, dot segments and plus signs keep their meaning.
+An absolute URI with an empty path matches `/`. The special targets `OPTIONS *` and authority-form `CONNECT` have no route path.
 Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
 For example, `/users/a%252Fb` passes `a%2Fb` to the handler.
 

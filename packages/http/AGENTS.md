@@ -137,6 +137,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so convert keys back to strings
   when building the Allow header.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
+- Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.
   Preserve empty segments, plus signs and dot segments.
 
