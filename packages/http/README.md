@@ -281,7 +281,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server;
-use function Thesis\Async\awaitSignal;
+use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\group;
 
 $server = new Server(
@@ -293,7 +293,7 @@ $server = new Server(
 
 group(static function (Group $group) use ($server) {
     $server->start($group);
-    awaitSignal(SIGINT, SIGTERM);
+    awaitShutdownSignal();
     $server->stop();
 });
 ```

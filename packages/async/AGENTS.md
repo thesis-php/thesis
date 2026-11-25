@@ -33,6 +33,7 @@ Read the topics for the behaviour your change affects, including changes to its 
 - Signal subscriptions are counted per loop, signal and closure object. Several groups can share one handler
   and release their subscriptions independently. The loop calls the shared handler once per delivery.
 - A signal never cancels a scope by itself: a shutdown is a group whose body returns after `awaitSignal()`.
+  `awaitShutdownSignal()` checks for ext-pcntl before reading SIGINT and SIGTERM because the extension defines them.
   `trapSignals()` holds handlers of the loop (`Loop::onSignal()`, installed at once) while its callable runs, and needs
   ext-pcntl (`LogicException` without it, which is why the package only suggests it); `awaitSignal()` is
   a trap around one `receive()`, so a signal outside the wait gets the default action (a second Ctrl+C kills the

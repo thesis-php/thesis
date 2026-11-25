@@ -439,14 +439,14 @@ try {
 ### Shutdown and reload: `awaitSignal()` and `trapSignals()`
 
 A signal does not cancel anything by itself. `awaitSignal()` waits for any of the requested signals
-and returns the signal it receives.
+and returns the signal it receives. `awaitShutdownSignal()` is shorthand for `awaitSignal(SIGINT, SIGTERM)`.
 For a graceful shutdown, return from the group body when the signal arrives. The group cancels and joins its daemons.
 `trapSignals()` catches signals for as long as its callable runs, for those that come again and again.
 
 ```php
 use Thesis\Async\Group;
 use Thesis\Async\SignalTrap;
-use function Thesis\Async\awaitSignal;
+use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\group;
 use function Thesis\Async\trapSignals;
 
@@ -459,7 +459,7 @@ group(static function (Group $group) use ($server, $config) {
         }
     }));
 
-    awaitSignal(SIGINT, SIGTERM);
+    awaitShutdownSignal();
 });
 ```
 
@@ -1239,6 +1239,7 @@ all([user, orders])              orders fails after 50 ms
 | `ScopedValue<T>(T $default = null)`: `get(): T`, `isBound(): bool`, `with(T, callable(): R): R` | a value bound while a callable runs, inherited by the tasks spawned inside |
 | `delay(Duration)` | cancellable sleep; zero or less waits as zero |
 | `onSignal(int $signal, Closure $handler): Closure` | subscribe a shared loop callback and return its unsubscribe function |
+| `awaitShutdownSignal(): int` | wait for SIGINT or SIGTERM and return the signal received |
 | `awaitSignal(int $signal, int ...$signals): int` | wait for a signal, returns the one received |
 | `trapSignals(list<int> $signals, callable(SignalTrap): T): T`; `SignalTrap`: `receive(): int`, `foreach` | catch signals while a callable runs, one pending per signal |
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |

@@ -14,7 +14,7 @@ use Thesis\Http\Server\Router;
 use Thesis\Http\Server\ServerLogger;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
-use function Thesis\Async\awaitSignal;
+use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
@@ -60,7 +60,7 @@ group(static function (Group $group) {
 
     try {
         $server->start($group);
-        awaitSignal(SIGINT, SIGTERM);
+        awaitShutdownSignal();
     } finally {
         try {
             shield($server->stop(...));

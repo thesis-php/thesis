@@ -12,7 +12,7 @@ use Thesis\Http\Server\Config;
 use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Status;
 use Thesis\Net\InetAddress;
-use function Thesis\Async\awaitSignal;
+use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\group;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -56,6 +56,6 @@ $server = new Server(
 
 group(static function (Group $group) use ($server) {
     $server->start($group);
-    awaitSignal(SIGINT, SIGTERM);
+    awaitShutdownSignal();
     $server->stop();
 });

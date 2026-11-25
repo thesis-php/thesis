@@ -77,6 +77,20 @@ final class SignalTest
         assertNoCallbacksLeft();
     }
 
+    public function awaitShutdownSignalReturnsInterruptOrTerminate(): void
+    {
+        foreach ([SIGINT, SIGTERM] as $expected) {
+            $signal = group(static function (Group $group) use ($expected) {
+                $group->spawn(static fn() => self::kill($expected));
+
+                return timeout(sec(10), awaitShutdownSignal(...));
+            });
+
+            Assert::same($signal, $expected);
+            assertNoCallbacksLeft();
+        }
+    }
+
     public function awaitSignalReturnsSignalReceived(): void
     {
         $signal = group(static function (Group $group) {

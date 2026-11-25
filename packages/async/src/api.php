@@ -616,7 +616,7 @@ function onSignal(int $signal, \Closure $handler): \Closure
 }
 
 /**
- * Returns the first requested signal it receives. Use SIGINT or SIGTERM for graceful shutdown.
+ * Returns the first requested signal it receives. See {@see awaitShutdownSignal()} for graceful shutdown.
  * The wait is cancellable and requires ext-pcntl.
  *
  * The handlers exist only while it waits: a signal that comes before or after gets the default action,
@@ -632,6 +632,21 @@ function onSignal(int $signal, \Closure $handler): \Closure
 function awaitSignal(int $signal, int ...$signals): int
 {
     return trapSignals(signals: [$signal, ...$signals], fn: static fn(SignalTrap $trap) => $trap->receive());
+}
+
+/**
+ * Waits for SIGINT or SIGTERM and returns the signal received.
+ *
+ * @api
+ * @throws \LogicException without ext-pcntl
+ */
+function awaitShutdownSignal(): int
+{
+    if (!\function_exists('pcntl_signal')) {
+        throw new \LogicException('Signals need ext-pcntl.');
+    }
+
+    return awaitSignal(SIGINT, SIGTERM);
 }
 
 /**
