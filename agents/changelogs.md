@@ -1,6 +1,7 @@
 # Changelogs
 
-Check `[Unreleased]` when a change affects public API or user-visible behaviour. Read this before editing a changelog. How a heading becomes a release is in `releases.md`.
+Before finishing a change that users can observe, compare the new behaviour with `[Unreleased]` and update the entry
+if needed. Read this topic before editing a changelog. How a heading becomes a release is in `releases.md`.
 
 ## Rules
 

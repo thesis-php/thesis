@@ -49,6 +49,7 @@ implementations and have no dependencies on those packages. Thesis runs on Unix.
 Before writing, editing or reviewing PHP in a package or tool, read [agents/php.md](agents/php.md) in full.
 Read each applicable topic in `agents/` before starting the work it covers:
 
+- `php-objects.md`: class design, properties, method visibility or placement, object construction and shared state.
 - `php-api.md`: declaring or changing a symbol in `src/`, a signature, namespace, PHPDoc contract or duration.
 - `tests.md`: writing or changing a test, mutation testing (`make infect`).
 - `errors.md`: calling a PHP function that fails with a warning (files, streams, sockets, processes).
@@ -61,7 +62,7 @@ Read each applicable topic in `agents/` before starting the work it covers:
 - `changelogs.md`: a change to public API or user-visible behaviour (check `[Unreleased]`), or any changelog edit.
 - `releases.md`: the release, the tags and the GitHub Releases of the split repositories.
 - `platform.md`: code that depends on the operating system or on the size of `int`.
-- `reviews.md`: reviewing a change, acting on the findings of a review.
+- `reviews.md`: reviewing a change, acting on findings, or checking how agents follow project instructions.
 - `benchmarks.md`: a Tally benchmark or a change justified by one (`make bench`).
 
 ## Commands
