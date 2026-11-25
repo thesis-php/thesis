@@ -39,7 +39,7 @@ final class Exchange
 
     private bool $responseWritten = false;
 
-    private bool $isBodyComplete {
+    public bool $isBodyComplete {
         get => match (true) {
             $this->decoder === null => true,
             $this->decoder instanceof ChunkedReader => $this->decoder->isComplete,
@@ -121,6 +121,16 @@ final class Exchange
             return false;
         } finally {
             $body?->close();
+        }
+    }
+
+    /**
+     * @param \Closure(): void $notify
+     */
+    public function onBodyComplete(\Closure $notify): void
+    {
+        if ($this->decoder !== null) {
+            $this->decoder->onComplete = $notify;
         }
     }
 

@@ -383,6 +383,11 @@ If the handler throws
 before the final response starts, the client receives a 500. Once a final response has started,
 a failure closes the connection. Each connection runs independently of the others.
 
+The event loop watches each connection for peer shutdown. After the request body is complete,
+EOF or a transport read failure cancels the connection task. This interrupts cancellable waits such as `delay()`. A client that shuts down its
+write side can therefore lose its response. If bytes of a pipelined request arrive, the server saves them
+for the next exchange and stops watching for the rest of this one.
+
 When the handler leaves the request body unread, the server finishes writing its response and closes the
 connection. An echo or another streaming response may still read the request body after the handler returns.
 A fixed-length request is complete when its final payload byte is read. A chunked request is complete when

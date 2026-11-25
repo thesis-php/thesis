@@ -35,6 +35,97 @@ use function Thesis\Time\sec;
 #[Test]
 final class ServerTest
 {
+    public function disconnectCancelsAWaitingHandlerAfterItsRequestBody(): void
+    {
+        foreach ([
+            "GET / HTTP/1.1\r\nHost: local\r\n\r\n",
+            "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 1\r\n\r\nx",
+            "POST / HTTP/1.1\r\nHost: local\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nx\r\n0\r\n\r\n",
+        ] as $wire) {
+            timeout(sec(2), static fn() => group(static function (Group $group) use ($wire) {
+                /** @var Deferred<null> $entered */
+                $entered = new Deferred();
+                /** @var Deferred<Event\RequestEnded> $ended */
+                $ended = new Deferred();
+                $payload = null;
+                $server = new Server(
+                    config: new Config(0),
+                    handler: static function (Request $request) use ($entered, &$payload) {
+                        $entered->complete();
+                        if ($request->method === 'POST') {
+                            // Leave the final byte for the body reader while the watcher receives the half-close.
+                            delay(ms(20));
+                            $payload = $request->takeBody()->readAll();
+                        }
+
+                        delay(sec(3600));
+
+                        return new Response();
+                    },
+                    dispatcher: new Dispatcher([static function (Event\RequestEnded $event) use ($ended) {
+                        $ended->complete($event);
+                    }]),
+                );
+                $server->start($group);
+                $address = $server->address;
+                \assert($address instanceof InetAddress);
+                $client = connect('127.0.0.1', $address->port);
+                $client->write($wire);
+                $entered->await();
+                $client->closeWrite();
+                $event = $ended->await();
+                $client->close();
+                Assert::same($payload, str_starts_with($wire, 'POST') ? 'x' : null);
+                Assert::null($event->status);
+                Assert::false($event->responseWritten);
+                $server->stop();
+            }));
+        }
+    }
+
+    public function keepsAPipelinedRequestSentWhileTheHandlerWaits(): void
+    {
+        timeout(sec(2), static fn() => group(static function (Group $group) {
+            /** @var Deferred<null> $entered */
+            $entered = new Deferred();
+            $server = new Server(
+                config: new Config(0),
+                handler: static function (Request $request) use ($entered) {
+                    $path = $request->uri->getRawPath();
+                    if ($path === '/first') {
+                        $entered->complete();
+                        delay(ms(250));
+                    }
+
+                    return new Response(body: $path);
+                },
+            );
+            $server->start($group);
+            $address = $server->address;
+            \assert($address instanceof InetAddress);
+            $client = connect('127.0.0.1', $address->port);
+
+            try {
+                $client->write("GET /first HTTP/1.1\r\nHost: local\r\n\r\n");
+                $entered->await();
+                $client->write("GET /second HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n");
+                $client->closeWrite();
+                $bytes = '';
+
+                while (($chunk = $client->read(8192)) !== null) {
+                    $bytes .= $chunk;
+                }
+
+                Assert::same(substr_count($bytes, 'HTTP/1.1 200 OK'), 2);
+                Assert::true(str_contains($bytes, '/firstHTTP/1.1'));
+                Assert::true(str_ends_with($bytes, '/second'));
+            } finally {
+                $client->close();
+                $server->stop();
+            }
+        }));
+    }
+
     public function observesTheServerConnectionRouteAndExchange(): void
     {
         timeout(sec(2), static fn() => group(static function (Group $group) {

@@ -1000,6 +1000,14 @@ When the last observation of a dispatcher ends, that dispatcher receives `Trace\
 
 ### Streams: `StreamWatcher`
 
+Use `readHangUp()` to await a possible peer write shutdown in the current fiber.
+Use `observeReadable($probe)` to observe the stream without a waiting fiber. The callback receives
+a `ReadObserver` and runs between fibers. Return true to await another event or false to pause.
+Call `$observer->recheck()` when a paused probe can read again. Pass `hangUpOnly: true` to wait for
+peer write shutdown on epoll. On other backends, or for ordinary read readiness, the first callback
+also checks for input already buffered by PHP. Replacing the observer or closing the watcher
+removes both kernel and deferred notifications. Registering an observer on a closed watcher throws.
+
 A `StreamWatcher` owns the waits on one stream: `readable()` and `writable()` suspend until a read or a write
 would not block, and are cancelled by the task tree as any wait. The owner of the stream calls `close()` before closing it:
 the kernel forgets a closed stream, and a fiber waiting for it would never wake up.
@@ -1245,7 +1253,7 @@ all([user, orders])              orders fails after 50 ms
 | `checkpoint()` | yield to the event loop and check for cancellation, for code that never waits |
 | `Backoff(Duration $initial, Duration $max, bool $jitter = true, ?Randomizer)`: `next(): Duration`, `reset()` | delays between attempts, doubled up to `$max` |
 | `Pacer(int $perTick)`: `pace()`, `tryPace()` | yield once an operation has completed without a wait `$perTick` times in one tick |
-| `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `delay(Duration): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
+| `StreamWatcher(resource $stream)`: `readable(): bool`, `writable(): bool`, `readHangUp(): bool`, `observeReadable(Closure, bool): ReadObserver`, `delay(Duration): bool`, `close()`, `$isClosed` | the waits on one stream, `false` once `close()` has ended them |
 | `isCancelled(): bool` | whether the current scope is cancelled, without waiting |
 | `onCancel(callable(): void): \Closure(): void` | call back once the current scope is cancelled, returns unsubscribe |
 | `suspend(callable(Continuation<T>): ?\Closure(): void): T` | the suspension point |

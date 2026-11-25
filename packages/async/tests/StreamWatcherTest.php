@@ -35,6 +35,62 @@ final class StreamWatcherTest
         assertNoCallbacksLeft();
     }
 
+    public function aPausedObserverRechecksOnceAndCanBeReplaced(): void
+    {
+        [$reader, $writer] = self::pair();
+        $watcher = new StreamWatcher($reader);
+        $calls = 0;
+        $observations = [];
+        $observer = $watcher->observeReadable(static function () use (&$calls) {
+            ++$calls;
+
+            return false;
+        });
+        delay(sec(1));
+        $observations[] = $calls;
+        fwrite($writer, 'x');
+        delay(sec(1));
+        $observations[] = $calls;
+
+        $observer->recheck();
+        $observer->recheck();
+        delay(sec(1));
+        $observations[] = $calls;
+
+        $observer->recheck();
+        $replacement = $watcher->observeReadable(static function () use ($reader) {
+            Assert::same(fread($reader, 1), 'x');
+
+            return true;
+        });
+        delay(sec(1));
+        $observations[] = $calls;
+        $watcher->close();
+        $replacement->recheck();
+        Assert::same($observations, [1, 1, 2, 2]);
+        assertNoCallbacksLeft();
+    }
+
+    public function observerCanCloseDuringItsOwnCallback(): void
+    {
+        [$reader, $writer] = self::pair();
+        $watcher = new StreamWatcher($reader);
+        $calls = 0;
+        $watcher->observeReadable(static function (ReadObserver $observer) use (&$calls) {
+            if (++$calls === 2) {
+                $observer->close();
+            }
+
+            return true;
+        });
+        delay(sec(1));
+        Assert::same($calls, 1);
+        fwrite($writer, 'x');
+        delay(sec(1));
+        Assert::same($calls, 2);
+        assertNoCallbacksLeft();
+    }
+
     public function writableReturnsOnceBufferHasRoom(): void
     {
         [, $writer] = self::pair();
@@ -67,6 +123,7 @@ final class StreamWatcherTest
             $handles = [
                 $group->spawn($watcher->readable(...)),
                 $group->spawn($watcher->writable(...)),
+                $group->spawn($watcher->readHangUp(...)),
                 $group->spawn(static fn() => $watcher->delay(sec(100))),
             ];
 
@@ -79,7 +136,7 @@ final class StreamWatcherTest
             return array_map(static fn(Task $handle) => $handle->await(), $handles);
         });
 
-        Assert::same($results, [false, false, false]);
+        Assert::same($results, [false, false, false, false]);
         Assert::true($watcher->isClosed);
         assertNoCallbacksLeft();
     }
@@ -112,6 +169,7 @@ final class StreamWatcherTest
         $elapsed = elapsed(static function () use ($watcher) {
             Assert::false($watcher->readable());
             Assert::false($watcher->writable());
+            Assert::false($watcher->readHangUp());
             Assert::false($watcher->delay(sec(10)));
         });
 

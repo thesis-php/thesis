@@ -15,6 +15,10 @@ Read the topics for the behaviour your change affects, including changes to its 
 
 ## Invariants that must not be broken
 
+- A stream's read, write and read-hangup waits share one kernel watcher. Request ReadHangUp explicitly
+  on epoll. Other backends use read readiness and the socket owner checks for EOF.
+
+
 - Every wait goes through `suspend()` or parks an `Internal\ContinuationImpl` registered in the loop
   (`delay()`, `checkpoint()`, `StreamWatcher`). Nothing else calls `\Fiber::suspend()`. Those of the loop take
   the steps of `suspend()` in its order (the check of cancellation, the registration, the subscription, the park

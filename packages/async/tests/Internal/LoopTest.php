@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
+use Io\Poll\Event;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Async\Deadlock;
@@ -747,7 +748,7 @@ final class LoopTest
 
         $loop->run(static function () use ($loop, $reader, $writer) {
             $continuation = new ContinuationImpl();
-            $loop->watch($reader, $continuation, write: false);
+            $loop->watch($reader, $continuation, Event::Read);
             $loop->start(static function () use ($loop, $writer) {
                 self::yield($loop);
                 fwrite($writer, 'ping');
@@ -768,9 +769,9 @@ final class LoopTest
         $log = [];
 
         $loop->run(static function () use ($loop, $reader, $writer, &$log) {
-            foreach (['reader 1' => false, 'reader 2' => false, 'writer' => true] as $name => $write) {
+            foreach (['reader 1' => Event::Read, 'reader 2' => Event::Read, 'writer' => Event::Write] as $name => $event) {
                 $continuation = new ContinuationImpl();
-                $loop->watch($reader, $continuation, write: $write);
+                $loop->watch($reader, $continuation, $event);
                 $loop->start(static function () use ($continuation, $name, &$log) {
                     $continuation->park();
                     $log[] = $name;
@@ -794,11 +795,11 @@ final class LoopTest
         $unwatched = new ContinuationImpl();
 
         $loop->run(static function () use ($loop, $reader, $writer, $unwatched) {
-            $loop->watch($reader, $unwatched, write: false);
-            $loop->unwatch($reader, $unwatched, write: false);
-            $loop->unwatch($reader, $unwatched, write: false);
+            $loop->watch($reader, $unwatched, Event::Read);
+            $loop->unwatch($reader, $unwatched, Event::Read);
+            $loop->unwatch($reader, $unwatched, Event::Read);
             $continuation = new ContinuationImpl();
-            $loop->watch($reader, $continuation, write: false);
+            $loop->watch($reader, $continuation, Event::Read);
             fwrite($writer, 'ping');
             $continuation->park();
         });
@@ -813,9 +814,9 @@ final class LoopTest
 
         $loop->run(static function () use ($loop, $reader) {
             $continuation = new ContinuationImpl();
-            $loop->watch($reader, $continuation, write: false);
+            $loop->watch($reader, $continuation, Event::Read);
             self::yield($loop);
-            $loop->unwatch($reader, $continuation, write: false);
+            $loop->unwatch($reader, $continuation, Event::Read);
             fclose($reader);
             self::yield($loop);
         });
@@ -849,7 +850,7 @@ final class LoopTest
 
         $loop->run(static function () use ($loop, $stream) {
             $continuation = new ContinuationImpl();
-            $loop->watch($stream, $continuation, write: false);
+            $loop->watch($stream, $continuation, Event::Read);
             $continuation->park();
             self::yield($loop); // the loop drops the watcher of nobody before this wait
         });
@@ -869,7 +870,7 @@ final class LoopTest
 
             $ready = $loop->run(static function () use ($loop, $stream) {
                 $continuation = new ContinuationImpl();
-                $loop->watch($stream, $continuation, write: false);
+                $loop->watch($stream, $continuation, Event::Read);
 
                 return $continuation->park();
             });
@@ -886,11 +887,11 @@ final class LoopTest
         $ready = $loop->run(static function () use ($loop, $reader, $writer) {
             fwrite($writer, 'ping');
             $first = new ContinuationImpl();
-            $loop->watch($reader, $first, write: false);
+            $loop->watch($reader, $first, Event::Read);
             $first->park();
             fclose($reader);
             $second = new ContinuationImpl();
-            $loop->watch($reader, $second, write: false);
+            $loop->watch($reader, $second, Event::Read);
             // Keeps the loop alive: without the fix, the second wait would hang until it.
             $guard = $loop->delay(toNs(sec(5)), $second);
 
@@ -911,14 +912,14 @@ final class LoopTest
 
         $loop->run(static function () use ($loop, $reader) {
             $first = new ContinuationImpl();
-            $loop->watch($reader, $first, write: false);
+            $loop->watch($reader, $first, Event::Read);
             self::yield($loop);
             fclose($reader);
             $second = new ContinuationImpl();
-            $loop->watch($reader, $second, write: true);
+            $loop->watch($reader, $second, Event::Write);
             self::yield($loop);
-            $loop->unwatch($reader, $first, write: false);
-            $loop->unwatch($reader, $second, write: true);
+            $loop->unwatch($reader, $first, Event::Read);
+            $loop->unwatch($reader, $second, Event::Write);
             self::yield($loop);
         });
 
@@ -933,7 +934,7 @@ final class LoopTest
 
         $ready = $loop->run(static function () use ($loop, $reader) {
             $continuation = new ContinuationImpl();
-            $loop->watch($reader, $continuation, write: false);
+            $loop->watch($reader, $continuation, Event::Read);
 
             return $continuation->park();
         });
@@ -949,7 +950,7 @@ final class LoopTest
 
         $ready = $loop->run(static function () use ($loop, $stream) {
             $continuation = new ContinuationImpl();
-            $loop->watch($stream, $continuation, write: true);
+            $loop->watch($stream, $continuation, Event::Write);
 
             return $continuation->park();
         });
@@ -1019,7 +1020,7 @@ final class LoopTest
                     [$reader] = self::pair();
 
                     if ($watchStream) {
-                        $loop->watch($reader, new ContinuationImpl(), write: false);
+                        $loop->watch($reader, new ContinuationImpl(), Event::Read);
                     }
 
                     $process = proc_open(
@@ -1209,7 +1210,7 @@ final class LoopTest
                 }
             };
             $loop->start($task->body(...));
-            $loop->watch($reader, new ContinuationImpl(), write: false);
+            $loop->watch($reader, new ContinuationImpl(), Event::Read);
             self::yield($loop);
         });
         $loop->release();

@@ -6,6 +6,7 @@ namespace Thesis\Net;
 
 use Thesis\Async\Channel;
 use Thesis\Async\Pacer;
+use Thesis\Async\ReadObserver;
 use Thesis\Async\SendResult;
 use Thesis\Async\StreamWatcher;
 use Thesis\Io\Closer;
@@ -144,6 +145,31 @@ final class Socket implements Reader, Writer, Closer
         } finally {
             $this->reading = false;
         }
+    }
+
+    /**
+     * Waits for a possible peer shutdown without consuming bytes. A local close returns false.
+     * TLS and backends without a distinct shutdown event wake on readability. Confirm with tryRead().
+     */
+    public function awaitReadHangUp(): bool
+    {
+        return $this->tls === null ? $this->watcher->readHangUp() : $this->watcher->readable();
+    }
+
+    /**
+     * Observe possible peer shutdown without consuming any bytes. TLS and portable backends wake on readability.
+     * Return true to await another event, or false to pause. Closing the socket removes the observer.
+     *
+     * @param \Closure(ReadObserver): bool $probe a callback that must not suspend
+     * @throws SocketClosed if the socket is closed
+     */
+    public function observeReadHangUp(\Closure $probe): ReadObserver
+    {
+        if ($this->isClosed) {
+            throw new SocketClosed('Cannot observe a closed socket.');
+        }
+
+        return $this->watcher->observeReadable($probe, hangUpOnly: $this->tls === null);
     }
 
     /**

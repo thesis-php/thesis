@@ -180,11 +180,15 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Both endpoint types own their backlog. TCP owns `reusePort` and `noDelay`. TLS, limits and timeouts live on `Config`.
 - Like the AMQP client, the server starts a daemon in the group passed to `start()`. It returns once the daemon
   has registered shutdown. The owner calls `stop()` from outside request handlers because it waits for every active exchange.
-- Rejected: opening a group for every request. Even with lazy task and daemon scopes from `499def1`,
-  an unused group raised the median time per in-memory plaintext GET from 3.67 to 5.01 µs.
-  A handler can open its own group for parallel work that finishes before it returns. A streaming body
-  can produce bytes as the server reads it. Few tasks need to keep running independently after the handler
-  returns. Revisit this if middleware needs the server to own such a task until the response has been sent.
+- One callback on the existing loop watches each socket for a kernel shutdown event on epoll, or readability on other backends
+  and TLS. After the body decoder finishes, probe the socket and keep any pipelined byte for the next head.
+  Pause the callback while the decoder owns the stream or the next head has buffered bytes. Recheck once
+  after the decoder completes or the next exchange starts. Cancel the connection task on EOF or a read failure. Rejected: a group and reader daemon per exchange. They roughly halved
+  short GET throughput even for synchronous handlers (see performance.md). With the lazy scopes in
+  `499def1`, an unused group raised the median in-memory plaintext GET from 3.67 to 5.01 µs.
+  A handler can open a group for parallel work that finishes before it returns. A streaming body can
+  produce bytes as the server reads it. Revisit per-exchange groups if middleware needs an owned task
+  to keep running after the handler returns until the server finishes writing the response.
 
 - The listener registers each connection before spawning its task so shutdown sees it even before TLS negotiation.
   It drains active exchanges on shutdown.

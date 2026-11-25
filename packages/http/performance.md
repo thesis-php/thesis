@@ -20,6 +20,108 @@
 - For codec experiments see the [HTTP/1 codec decisions](#http1-codec-performance).
   For timer tradeoffs see the [async package decisions](../async/AGENTS.md).
 
+### Peer disconnect cancellation
+
+The connection registers a callback on the event loop after the handshake. On Linux epoll,
+a plaintext socket waits for read hangup. Idle handlers share the loop and need no second fiber
+or periodic disconnect checks.
+
+With 1000 one-hour handlers, median RSS growth from an empty server was 32,896 KiB compared
+with 30,828 KiB before disconnect monitoring (`d89b464`). The additional 2068 KiB is about
+2.02 MiB total or 2.07 KiB per waiting connection. Each median covers three fresh PHP processes.
+The current server with the callback disabled grew by 30,824 KiB. PHP heap growth was 27,523 KiB
+with callbacks and 25,727 KiB with callbacks disabled.
+
+Across five cycles of opening and closing 1000 clients, the handler count returned to zero each
+time and the PHP heap after cleanup stayed at 4,410,272 bytes. With 1000 idle handlers over
+30 seconds, the original and callback servers used 0.04 and 0.05 CPU seconds respectively.
+
+Each server ran the baseline11 GET on the same Linux CPU with PHP 8.6, CLI OPcache on,
+Xdebug and access logging off. The load generator used another CPU, validated each response
+and checked the waiting handler count after every sample. The rates below are medians of six
+interleaved four-second samples per version after warm-up.
+
+| Waiting handlers | Short GET workload | Original (responses/s) | Callback (responses/s) | Change |
+| ---: | --- | ---: | ---: | ---: |
+| 0 | 64 keep-alive clients | 86,152 | 87,780 | +1.89% |
+| 0 | One client, batches of 16 | 74,689 | 73,980 | −0.95% |
+| 1000 | 64 keep-alive clients | 83,399 | 81,754 | −1.97% |
+| 1000 | One client, batches of 16 | 78,781 | 73,745 | −6.39% |
+
+The pipeline run with 1000 waiting handlers crossed the 5% budget in four-second samples.
+Repeating that workload in three ABBA blocks of 12 seconds per sample gave median rates of
+76,754 original and 80,638 callback responses/s (+5.06%).
+
+With 1000 waiting handlers, 30 more clients disconnected one at a time. From socket close to
+confirmation through a separate HTTP request took 0.13 ms at the median and 5.18 ms at the
+maximum on Docker loopback.
+
+#### Earlier monitor with a companion fiber
+
+The earlier implementation watched each socket from a second fiber. On Linux epoll it registered read hangup
+once per plaintext connection. With 1000 handlers in a one-hour delay, short GET throughput
+was within the 5% budget compared with `d89b464` before disconnect monitoring.
+
+| Waiting handlers | Short GET workload | Original (responses/s) | Event-driven (responses/s) | Change |
+| ---: | --- | ---: | ---: | ---: |
+| 0 | 64 keep-alive clients | 107,725 | 108,386 | +0.61% |
+| 0 | One client, batches of 16 | 95,214 | 96,369 | +1.21% |
+| 1000 | 64 keep-alive clients | 109,108 | 108,671 | −0.40% |
+| 1000 | One client, batches of 16 | 95,703 | 99,084 | +3.53% |
+
+Each server ran the baseline11 GET on the same Linux CPU with PHP 8.6, CLI OPcache on, Xdebug and
+access logging off, and 4096 connection slots. Restore the original async, net and HTTP classes
+for the baseline. After warm-up, take six interleaved four-second samples per version and workload.
+The load generator on a second CPU checked every response and verified the waiting count after each sample.
+With 1000 other handlers waiting, 30 extra clients disconnected one at a time. From closing the client
+to confirming the handler had unwound through a separate HTTP request took 0.14 ms at the median
+and 0.35 ms at the maximum on this loopback setup.
+
+With 1000 waiting handlers and no short GETs, 60 seconds of wall time cost 0.11 s of process CPU
+on the original server and 0.12 s with socket events (0.18% and 0.20% of one core).
+Linux reported 69,128 KiB and 95,284 KiB of resident memory respectively, about 25.5 MiB extra
+for the event-driven server in this workload. Closing the process holding all 1000 clients and
+confirming zero waiting handlers through HTTP took 87 ms.
+
+To isolate that RSS cost, measure the increase from zero to 1000 waiting handlers in a fresh process.
+Across three runs per variant the median growth was 30,828 KiB with the disconnect monitor removed,
+51,220 KiB with one extra started and suspended plain PHP fiber per connection, 55,268 KiB with a
+Thesis daemon awaiting a Deferred, and 57,316 KiB with the full disconnect monitor. The plain fibers
+accounted for 19.9 MiB of the 25.9 MiB difference. The last 2.0 MiB includes the live socket wait
+and its bookkeeping. These are process RSS deltas, not individual allocation sizes.
+
+#### Earlier disconnect experiments
+
+Against `d89b464`, opening a group and scheduling a disconnect daemon for each socket exchange
+reduced short GET throughput from 77.1k to 40.4k responses/s with 64 keep-alive clients.
+One client sending batches of 16 requests went from 74.6k to 32.0k responses/s.
+Both versions ran the baseline11 GET on Docker loopback with CLI OPcache enabled, Xdebug off and
+no access log. Four runs in ABBA order checked every response. Each workload used three one-second
+samples after a one-second warm-up per run. The in-memory connection benchmark skips the socket watcher.
+
+A shared 100 ms listener check brought median throughput to 76.6k vs 76.0k responses/s
+on `d89b464` with 64 clients, and 59.2k vs 59.7k with batches of 16. Both servers stayed warm
+on the same Linux CPU. The load generator ran on another CPU and checked every response.
+Each workload alternated eight three-second samples per version after warm-up. Both median throughputs
+were within the 5% regression budget. Individual samples varied with Docker host load.
+
+With 1000 handlers in a one-hour `delay()`, a 1 s check interval met the 5% median throughput
+budget on both short GET workloads. A 100 ms interval exceeded it.
+
+| Interval | CPU with waiting clients only (% of one core) | 64 keep-alive clients (GET/s) | Batches of 16 (GET/s) |
+| --- | ---: | ---: | ---: |
+| Original server without checks (`d89b464`) | 0.07% | 61,480 | 69,159 |
+| 100 ms | 2.27% | 53,121 (−13.6%) | 62,494 (−9.6%) |
+| 1 s | 0.40% | 59,107 (−3.9%) | 66,120 (−4.4%) |
+
+Each server reported 1000 active waiting handlers before measurement and after each load sample.
+The connection limit was 4096 so the waiting clients left room for 64 load clients.
+Server CPU includes user and kernel time from Linux process counters over 15 s at 100 ticks/s.
+For throughput, all three servers used the same CPU and only the server being measured ran.
+The load generator used another CPU and checked each response. For each workload and version,
+discard the first warm-up and take the median of six interleaved three-second samples.
+Docker host load varied across samples, so the percentages describe these medians.
+
 ### Server events
 
 Resolving subscriptions with `Dispatcher::for()` when the listener is created leaves nullable dispatchers

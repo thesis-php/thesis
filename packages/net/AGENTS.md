@@ -12,6 +12,8 @@ and `Closer` interfaces. DNS messages use `Buffer` for encoding and decoding.
   before `fclose()`: the kernel drops a closed descriptor, and the waiting fiber would never wake up.
   `Socket` and `Server` take an open stream and clear the stored resource on close.
   After any wait, re-read `$this->stream`: it may have been closed meanwhile, even if the wait returned true.
+- TLS shutdown can arrive as a TLS record while the TCP connection stays open. Wait for read readiness
+  on TLS and confirm shutdown by reading through the TLS stream.
 - Read first, wait only on an empty read, never the other way round. TLS keeps decrypted bytes inside OpenSSL
   where the event loop cannot see them, so waiting for readability first would hang with data pending.
   The PHP read buffer is off (`stream_set_read_buffer(0)`) for the same reason and so that `enableTls()` finds

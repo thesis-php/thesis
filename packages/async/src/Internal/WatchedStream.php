@@ -25,6 +25,11 @@ final class WatchedStream
     public array $writers = [];
 
     /**
+     * @var array<int, Waiter> first observer at zero, other observers by spl_object_id()
+     */
+    public array $hangups = [];
+
+    /**
      * null until the loop has added the stream to its context, and after it has removed it.
      */
     public ?Watcher $watcher = null;

@@ -79,6 +79,11 @@ final class ChunkedReader extends StreamingBody
     private ?MalformedMessage $failure = null;
 
     /**
+     * @var ?\Closure(): void
+     */
+    public ?\Closure $onComplete = null;
+
+    /**
      * @param positive-int $maxSizeLineLength bytes including chunk extensions and CRLF
      * @param positive-int $maxTrailersLength bytes including the final empty line
      * @param positive-int $maxTrailers
@@ -127,6 +132,9 @@ final class ChunkedReader extends StreamingBody
         if ($this->remaining === 0) {
             $this->remaining = $this->nextChunk();
             if ($this->remaining === 0) {
+                $this->onComplete?->__invoke();
+                $this->onComplete = null;
+
                 return null;
             }
         }

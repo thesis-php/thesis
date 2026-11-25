@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Internal\Server;
 
+use Thesis\Async\ReadObserver;
+use Thesis\Async\Task;
 use Thesis\Dispatcher;
 use Thesis\Http\Internal\Http1\MalformedMessage;
 use Thesis\Http\Internal\Http1\RequestHead;
@@ -15,7 +17,11 @@ use Thesis\Http\Server\ErrorHandler;
 use Thesis\Http\Server\Event;
 use Thesis\Io\Buffer;
 use Thesis\Io\Reader;
+use Thesis\Io\ReadFailed;
+use Thesis\Io\UnexpectedEof;
 use Thesis\Io\Writer;
+use Thesis\Net\Socket;
+use Thesis\Net\SocketClosed;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\isCancelled;
 use function Thesis\Io\close;
@@ -30,7 +36,14 @@ final class Connection
      */
     private ?int $requestsRemaining;
 
-    private bool $isHandlingRequest = false;
+    /**
+     * @var ?Task<void> the listener's task serving this connection
+     */
+    public ?Task $task = null;
+
+    private ?ReadObserver $recheckOnNextRequest = null;
+
+    private ?Exchange $exchange = null;
 
     private readonly Buffer $buffer;
 
@@ -64,6 +77,10 @@ final class Connection
      */
     public function run(callable $handler, string $scheme = 'http'): void
     {
+        if ($this->input instanceof Socket && $this->task !== null) {
+            $this->input->observeReadHangUp($this->probeDisconnect(...));
+        }
+
         $headReader = new HeadReader($this->buffer, $this->input, $this->config, $scheme, $this->idle);
         $canAcceptNextRequest = fn() => $this->requestsRemaining !== 0;
         $reused = false;
@@ -82,13 +99,15 @@ final class Connection
                 --$this->requestsRemaining;
             }
 
-            $this->isHandlingRequest = true;
-
             try {
-                $exchange = new Exchange($head, $this->bodyInput, $this->output, $canAcceptNextRequest);
-                $canReuse = $exchange->run($handler, $this->requestStarted, $this->requestEnded);
+                $this->exchange = new Exchange($head, $this->bodyInput, $this->output, $canAcceptNextRequest);
+                if ($this->recheckOnNextRequest !== null) {
+                    $this->recheckOnNextRequest->recheck();
+                    $this->recheckOnNextRequest = null;
+                }
+                $canReuse = $this->exchange->run($handler, $this->requestStarted, $this->requestEnded);
             } finally {
-                $this->isHandlingRequest = false;
+                $this->exchange = null;
             }
 
             if (!$canReuse || !$canAcceptNextRequest()) {
@@ -99,10 +118,44 @@ final class Connection
         }
     }
 
+    private function probeDisconnect(ReadObserver $observer): bool
+    {
+        $exchange = $this->exchange;
+        if ($exchange !== null && !$exchange->isBodyComplete) {
+            $exchange->onBodyComplete($observer->recheck(...));
+
+            return false;
+        }
+
+        if ($exchange !== null && $this->buffer->count() === 0) {
+            \assert($this->input instanceof Socket);
+
+            try {
+                $bytes = $this->input->tryRead(1);
+            } catch (SocketClosed) {
+                return false;
+            } catch (UnexpectedEof|ReadFailed) {
+                $this->task?->cancel();
+
+                return false;
+            }
+
+            if ($bytes === null) {
+                return true;
+            }
+
+            $this->buffer->write($bytes);
+        }
+
+        $this->recheckOnNextRequest = $observer;
+
+        return false;
+    }
+
     public function stop(): void
     {
         $this->requestsRemaining = 0;
-        if (!$this->isHandlingRequest) {
+        if ($this->exchange === null) {
             $this->close();
         }
     }
@@ -111,6 +164,8 @@ final class Connection
     {
         $this->requestsRemaining = 0;
 
+        $this->task = null;
+        $this->recheckOnNextRequest = null;
         close($this->input);
         $this->output->close();
     }

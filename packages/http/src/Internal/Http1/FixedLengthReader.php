@@ -40,6 +40,11 @@ final class FixedLengthReader extends StreamingBody
     public private(set) int $remaining;
 
     /**
+     * @var ?\Closure(): void
+     */
+    public ?\Closure $onComplete = null;
+
+    /**
      * @param non-negative-int $size the total number of body bytes
      */
     public function __construct(
@@ -75,6 +80,10 @@ final class FixedLengthReader extends StreamingBody
         /** @var non-negative-int $remaining a reader gives at most the bytes it is asked for */
         $remaining = $this->remaining - \strlen($bytes);
         $this->remaining = $remaining;
+        if ($remaining === 0) {
+            $this->onComplete?->__invoke();
+            $this->onComplete = null;
+        }
 
         return $bytes;
     }

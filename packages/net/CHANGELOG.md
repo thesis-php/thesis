@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Register a callback for possible peer shutdown with `Socket::observeReadHangUp()`.
+
 - Override `ClientTls::$peerName` on a cloned configuration for a TLS tunnel.
 
 - `Socket::tryRead()` reads available bytes immediately and returns null when it would have to wait.

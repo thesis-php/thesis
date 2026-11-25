@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async;
 
+use Io\Poll\Event;
 use Thesis\Async\Internal\ContinuationImpl;
 use Thesis\Async\Internal\Loop;
 use Thesis\Async\Internal\Scope;
@@ -28,10 +29,12 @@ final class StreamWatcher
     public private(set) bool $isClosed = false;
 
     /**
-     * @var array<int, array{ContinuationImpl<bool>, Loop, bool|Timer}> each wait, the loop it is registered in,
-     *     and for what: a write (true), a read (false) or a timer, by spl_object_id() of the continuation
+     * @var array<int, array{ContinuationImpl<bool>, Loop, Event::Read|Event::Write|Event::ReadHangUp|Timer}>
+     *     Each continuation, its loop and its event or timer, keyed by spl_object_id()
      */
     private array $waits = [];
+
+    private ?ReadObserver $observer = null;
 
     /**
      * @param resource $stream
@@ -48,7 +51,37 @@ final class StreamWatcher
      */
     public function readable(): bool
     {
-        return $this->wait(false);
+        return $this->wait(Event::Read);
+    }
+
+    /**
+     * Waits for a peer write shutdown on epoll, or readability on other backends.
+     * A subsequent read distinguishes buffered bytes, EOF and transport errors. Local close returns false.
+     */
+    public function readHangUp(): bool
+    {
+        return !$this->isClosed && $this->wait(Loop::get()->supportsReadHangUp() ? Event::ReadHangUp : Event::Read);
+    }
+
+    /**
+     * Replace the stream's observer. Its callback runs between fibers and must not suspend.
+     * Return true to wait for another event, or false to pause. Closing the watcher removes the observer.
+     *
+     * @param \Closure(ReadObserver): bool $probe
+     * @param bool $hangUpOnly wait for peer write shutdown on epoll, otherwise use read readiness
+     * @throws \LogicException if the watcher is closed
+     */
+    public function observeReadable(\Closure $probe, bool $hangUpOnly = false): ReadObserver
+    {
+        if ($this->isClosed) {
+            throw new \LogicException('Cannot observe a closed stream.');
+        }
+
+        $this->observer?->close();
+        $loop = Loop::get();
+        $event = $hangUpOnly && $loop->supportsReadHangUp() ? Event::ReadHangUp : Event::Read;
+
+        return $this->observer = new ReadObserver($this->stream, $loop, $event, $probe);
     }
 
     /**
@@ -58,7 +91,7 @@ final class StreamWatcher
      */
     public function writable(): bool
     {
-        return $this->wait(true);
+        return $this->wait(Event::Write);
     }
 
     /**
@@ -79,6 +112,8 @@ final class StreamWatcher
     public function close(): void
     {
         $this->isClosed = true;
+        $this->observer?->close();
+        $this->observer = null;
         $waits = $this->waits;
         $this->waits = [];
 
@@ -92,9 +127,9 @@ final class StreamWatcher
      * The steps of `suspend()` without its closures, a fifth of a wait: the check of cancellation,
      * the registration, the subscription, the park, and the unregistration whatever ends it.
      *
-     * @param bool|int $for a write (true), a read (false) or a sleep of so many nanoseconds
+     * @param Event::Read|Event::Write|Event::ReadHangUp|int $for the stream event or the nanoseconds to wait
      */
-    private function wait(bool|int $for): bool
+    private function wait(Event|int $for): bool
     {
         // Like a receive() from a closed channel: no wait, so no cancellation check either.
         if ($this->isClosed) {
@@ -112,7 +147,7 @@ final class StreamWatcher
             $registered = $loop->delay($for, $continuation);
         } else {
             $registered = $for;
-            $loop->watch($this->stream, $continuation, write: $for);
+            $loop->watch($this->stream, $continuation, $for);
         }
 
         $id = spl_object_id($continuation);
@@ -146,7 +181,7 @@ final class StreamWatcher
     }
 
     /**
-     * @param array{ContinuationImpl<bool>, Loop, bool|Timer} $wait
+     * @param array{ContinuationImpl<bool>, Loop, Event::Read|Event::Write|Event::ReadHangUp|Timer} $wait
      */
     private function unregister(array $wait): void
     {
@@ -155,7 +190,7 @@ final class StreamWatcher
         if ($registered instanceof Timer) {
             $loop->cancel($registered);
         } else {
-            $loop->unwatch($this->stream, $continuation, write: $registered);
+            $loop->unwatch($this->stream, $continuation, $registered);
         }
     }
 }

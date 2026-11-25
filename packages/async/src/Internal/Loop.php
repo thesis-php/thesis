@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Async\Internal;
 
+use Io\Poll\Backend;
 use Io\Poll\Context;
 use Io\Poll\Event;
 use Io\Poll\FailedHandleAddException;
@@ -471,7 +472,7 @@ final class Loop
     }
 
     /**
-     * Wakes $waiter once a read of $stream (or a write, if $write) would not block. Once, then it forgets it;
+     * Wakes $waiter once when the requested event occurs, then forgets it.
      * {@see unwatch()} forgets it before. A stream that cannot be watched (closed, or without a descriptor, like
      * `php://memory`) never blocks: its waiter is woken at once, and the read or the write tells what is wrong.
      *
@@ -479,13 +480,18 @@ final class Loop
      * and nothing would wake them.
      *
      * @param resource $stream
+     * @param Event::Read|Event::Write|Event::ReadHangUp $event
      */
-    public function watch(mixed $stream, Waiter $waiter, bool $write): void
+    public function watch(mixed $stream, Waiter $waiter, Event $event): void
     {
         $key = get_resource_id($stream);
         $watched = $this->streams[$key] ??= new WatchedStream($stream);
 
-        if ($write) {
+        if ($event === Event::ReadHangUp) {
+            // A socket normally has one observer. A zero key keeps its array packed.
+            $id = $watched->hangups === [] ? 0 : spl_object_id($waiter);
+            $watched->hangups[$id] = $waiter;
+        } elseif ($event === Event::Write) {
             $watched->writers[spl_object_id($waiter)] = $waiter;
         } else {
             $watched->readers[spl_object_id($waiter)] = $waiter;
@@ -499,26 +505,28 @@ final class Loop
      * No effect once the waiter wakes or leaves the queue.
      *
      * @param resource $stream
+     * @param Event::Read|Event::Write|Event::ReadHangUp $event
      */
-    public function unwatch(mixed $stream, Waiter $waiter, bool $write): void
+    public function unwatch(mixed $stream, Waiter $waiter, Event $event): void
     {
         $key = get_resource_id($stream);
         $watched = $this->streams[$key] ?? null;
-        $id = spl_object_id($waiter);
 
         if ($watched === null) {
             return;
         }
 
-        if ($write ? !isset($watched->writers[$id]) : !isset($watched->readers[$id])) {
+        $queue = match ($event) {
+            Event::Write => 'writers',
+            Event::Read => 'readers',
+            Event::ReadHangUp => 'hangups',
+        };
+        $id = $event === Event::ReadHangUp && ($watched->hangups[0] ?? null) === $waiter ? 0 : spl_object_id($waiter);
+        if (!isset($watched->{$queue}[$id])) {
             return;
         }
 
-        if ($write) {
-            unset($watched->writers[$id]);
-        } else {
-            unset($watched->readers[$id]);
-        }
+        unset($watched->{$queue}[$id]);
 
         --$this->streamWaits;
         $this->changed($key, $watched);
@@ -978,11 +986,15 @@ final class Loop
             $failed = $watcher->hasTriggered(Event::Error) || $watcher->hasTriggered(Event::HangUp);
 
             if ($failed || $watcher->hasTriggered(Event::Read) || $watcher->hasTriggered(Event::ReadHangUp)) {
-                $this->wakeAll($watched, write: false);
+                $this->wakeAll($watched, Event::Read);
             }
 
-            if ($failed || $watcher->hasTriggered(Event::Write)) {
-                $this->wakeAll($watched, write: true);
+            if ($watched->hangups !== [] && ($failed || $watcher->hasTriggered(Event::ReadHangUp))) {
+                $this->wakeAll($watched, Event::ReadHangUp);
+            }
+
+            if ($watched->writers !== [] && ($failed || $watcher->hasTriggered(Event::Write))) {
+                $this->wakeAll($watched, Event::Write);
             }
         }
 
@@ -1015,15 +1027,24 @@ final class Loop
         }
     }
 
-    private function wakeAll(WatchedStream $watched, bool $write): void
+    /**
+     * @param Event::Read|Event::Write|Event::ReadHangUp $event
+     */
+    private function wakeAll(WatchedStream $watched, Event $event): void
     {
-        $waiters = $write ? $watched->writers : $watched->readers;
+        $waiters = match ($event) {
+            Event::Write => $watched->writers,
+            Event::Read => $watched->readers,
+            Event::ReadHangUp => $watched->hangups,
+        };
 
         if ($waiters === []) {
             return;
         }
 
-        if ($write) {
+        if ($event === Event::ReadHangUp) {
+            $watched->hangups = [];
+        } elseif ($event === Event::Write) {
             $watched->writers = [];
         } else {
             $watched->readers = [];
@@ -1060,6 +1081,10 @@ final class Loop
 
             if ($watched->writers !== []) {
                 $events[] = Event::Write;
+            }
+
+            if ($watched->hangups !== []) {
+                $events[] = Event::ReadHangUp;
             }
 
             $watcher = $watched->watcher;
@@ -1106,9 +1131,15 @@ final class Loop
 
             // Closed, without a descriptor, or one that the kernel does not watch (/dev/null, php://temp):
             // it never blocks, a read or a write tells what is wrong with it.
-            $this->wakeAll($watched, write: false);
-            $this->wakeAll($watched, write: true);
+            $this->wakeAll($watched, Event::Read);
+            $this->wakeAll($watched, Event::Write);
+            $this->wakeAll($watched, Event::ReadHangUp);
         }
+    }
+
+    public function supportsReadHangUp(): bool
+    {
+        return $this->context()->getBackend() === Backend::Epoll;
     }
 
     private function context(): Context

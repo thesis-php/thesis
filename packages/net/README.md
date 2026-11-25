@@ -78,6 +78,10 @@ and Nagle would hold back the last packet of every request.
   socket makes pending and subsequent reads throw `SocketClosed`. A cancelled read consumes no bytes.
   A peer that sends without a pause does not starve the process: after a few reads that found bytes at once,
   `read()` lets the other tasks run for a tick.
+- `awaitReadHangUp()` waits for possible peer shutdown in the current fiber. Local close returns false.
+- `observeReadHangUp($probe)` calls a non-blocking probe on possible peer shutdown. Confirm with `tryRead()`:
+  the stream can still contain bytes. TLS and backends without a shutdown event use read readiness.
+  Return true to watch again, or false to pause until `$observer->recheck()`. Closing the socket removes the observer.
 - `tryRead(int $max)` returns `null` when no bytes are ready and throws `UnexpectedEof` at EOF.
 - `write(string $bytes)` returns once every byte is handed to the OS. Any number of fibers may write: writes go
   one after another, never interleaved, so a frame written by one call stays whole.
@@ -218,7 +222,7 @@ in the same event loop, without a network.
 | `listen(string $host, int $port, int $backlog = 511, bool $reusePort = false, bool $noDelay = true): Server` | TCP server on an IP address |
 | `listenUnix(string $path, int $backlog = 511): Server` | Unix server |
 | `socketPair(): array{Socket, Socket}` | two connected sockets |
-| `Socket`: `read()`, `tryRead()`, `write()`, `tryWrite()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
+| `Socket`: `read()`, `tryRead()`, `awaitReadHangUp()`, `observeReadHangUp()`, `write()`, `tryWrite()`, `closeWrite()`, `enableTls()`, `close()`, `$tls`, `$localAddress`, `$remoteAddress`, `$isClosed` | a connection |
 | `Server`: `accept(): ?Socket`, `awaitClose()`, `close()`, `$address`, `$isClosed` | a listening socket |
 | `ClientTls`, `ServerTls`, `Certificate`, `TlsVersion`, `TlsInfo` | TLS |
 | `Resolver`, `DnsResolver`: `system()`, `fromFiles()` | DNS |

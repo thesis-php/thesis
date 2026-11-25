@@ -176,7 +176,7 @@ final class Listener
                 dispatcher: $this->dispatcher,
             );
             $this->connections[$connection] = $socket;
-            $group->spawn(fn() => $this->serveConnection($socket, $connection, $permit));
+            $connection->task = $group->spawn(fn() => $this->serveConnection($socket, $connection, $permit));
         }
     }
 
