@@ -9,6 +9,8 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
 use Thesis\Http\Server\Config;
+use Thesis\Http\Server\Route;
+use Thesis\Http\Server\Router;
 use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Status;
 use Thesis\Net\InetAddress;
@@ -17,41 +19,41 @@ use function Thesis\Async\group;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
-$server = new Server(
-    config: new Config(
-        endpoint: new TcpEndpoint(new InetAddress('0.0.0.0', 8080), backlog: 4096),
-        maxConnections: 4096,
-    ),
-    handler: static function (Request $request) {
-        if ($request->uri->getRawPath() !== '/baseline11') {
-            return new Response(status: Status::NOT_FOUND);
-        }
+$baseline = static function (Request $request): Response {
+    $a = $request->query->get('a');
+    $b = $request->query->get('b');
 
-        parse_str($request->uri->getRawQuery() ?? '', $query);
-        $a = $query['a'] ?? null;
-        $b = $query['b'] ?? null;
-        if (!is_string($a) || !is_string($b) || !is_numeric($a) || !is_numeric($b)) {
+    if (!is_numeric($a) || !is_numeric($b)) {
+        return new Response(status: Status::BAD_REQUEST);
+    }
+
+    $sum = (int) $a + (int) $b;
+
+    if ($request->method === Method::POST) {
+        $body = $request->takeBody()->readAll();
+
+        if (!is_numeric($body)) {
             return new Response(status: Status::BAD_REQUEST);
         }
 
-        $sum = (int) $a + (int) $b;
-        if ($request->method === Method::POST) {
-            $body = $request->takeBody()->readAll();
+        $sum += (int) $body;
+    }
 
-            if (!is_numeric($body)) {
-                return new Response(status: Status::BAD_REQUEST);
-            }
+    return new Response(
+        headers: new Headers(['Content-Type' => 'text/plain']),
+        body: (string) $sum,
+    );
+};
 
-            $sum += (int) $body;
-        } elseif ($request->method !== Method::GET) {
-            return new Response(status: Status::METHOD_NOT_ALLOWED, headers: new Headers(['Allow' => 'GET, POST']));
-        }
-
-        return new Response(
-            headers: new Headers(['Content-Type' => 'text/plain']),
-            body: (string) $sum,
-        );
-    },
+$server = new Server(
+    config: new Config(
+        endpoint: new TcpEndpoint(new InetAddress('0.0.0.0', 8080), backlog: 4096, reusePort: true),
+        maxConnections: 4096,
+    ),
+    handler: new Router([
+        new Route([Method::GET, Method::POST], '/baseline11', $baseline),
+        Route::head('/baseline11', static fn(Request $request) => $baseline($request)->withBody('')),
+    ]),
 );
 
 group(static function (Group $group) use ($server) {

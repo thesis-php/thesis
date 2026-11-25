@@ -187,6 +187,11 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   stock and candidate reached 72.02% and 75.80% on one core, 66.15% and 69.92% on two.
   All 23,150,861 replies were 2xx. In all 54 samples the listen queues were empty and
   the workers had accepted all 4096 connections.
+- Rejected: sharing one `Headers` object across responses in the baseline example. The small
+  gain does not justify moving the content type out of the response constructor and capturing
+  it in the handler. With the raw string writer in both arms and 30 s to settle, this gained 1.80%, 1.04% and 1.45% on two cores. The median went
+  from 77,632 to 78,919 replies/s. With the original writer and a 5 s settle, the one-core
+  gains were 4.96%, 0.11% and 1.53%.
 
 - Run `examples/baseline11.php` with one PHP process, CLI OPcache on and Xdebug off. Use the same
   handler and listener settings for both revisions. The active connection limit and the TCP listen
