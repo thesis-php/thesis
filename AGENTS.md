@@ -111,6 +111,6 @@ the whole monorepo is for the final check.
 - `process`: Group-owned Unix worker processes with signal handling and inherited IPC descriptors. Requires: async, exceptionally, io.
 - `source-location`: Find source locations and callers outside a library, including in code run by eval().
 - `testo-plugin`: Testo plugins for testing thesis/async code with real or virtual time and PHP errors as failures. Requires: async.
-- `time`: Time\Duration polyfill for PHP 8.2+ with duration parsing, unit conversions and PSR-20 clocks.
+- `time`: Time\Duration polyfill for PHP 8.2+ with parsing, conversions, a stopwatch and PSR-20 clocks.
 
 <!-- packages:end -->

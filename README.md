@@ -34,7 +34,7 @@ from a read-only repository of its own, so issues and pull requests go here.
 | [thesis/process](packages/process) | [![Release](https://img.shields.io/github/v/release/thesis-php/process)](https://github.com/thesis-php/process/releases) | Group-owned Unix worker processes with signal handling and inherited IPC descriptors. |
 | [thesis/source-location](packages/source-location) | [![Release](https://img.shields.io/github/v/release/thesis-php/source-location)](https://github.com/thesis-php/source-location/releases) | Find source locations and callers outside a library, including in code run by eval(). |
 | [thesis/testo-plugin](packages/testo-plugin) | [![Release](https://img.shields.io/github/v/release/thesis-php/testo-plugin)](https://github.com/thesis-php/testo-plugin/releases) | Testo plugins for testing thesis/async code with real or virtual time and PHP errors as failures. |
-| [thesis/time](packages/time) | [![Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases) | Time\Duration polyfill for PHP 8.2+ with duration parsing, unit conversions and PSR-20 clocks. |
+| [thesis/time](packages/time) | [![Release](https://img.shields.io/github/v/release/thesis-php/time)](https://github.com/thesis-php/time/releases) | Time\Duration polyfill for PHP 8.2+ with parsing, conversions, a stopwatch and PSR-20 clocks. |
 
 <!-- packages:end -->
 

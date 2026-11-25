@@ -1,11 +1,12 @@
 {
     "name": "thesis/time",
-    "description": "Time\\Duration polyfill for PHP 8.2+ with duration parsing, unit conversions and PSR-20 clocks.",
+    "description": "Time\\Duration polyfill for PHP 8.2+ with parsing, conversions, a stopwatch and PSR-20 clocks.",
     "keywords": [
         "php",
         "time",
         "duration",
         "clock",
+        "stopwatch",
         "psr-20",
         "polyfill"
     ],

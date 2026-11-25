@@ -301,3 +301,17 @@ $clock->now = new DateTimeImmutable('2027-01-01 00:00:00 UTC');
 ```
 
 `FrozenClock` moves only when told: by `advance()` or by assigning `$clock->now`.
+
+## Stopwatch
+
+`Thesis\Time\Stopwatch` measures real elapsed time on the system's monotonic clock, even under virtual time.
+Each reading is a `Time\Duration`.
+
+```php
+$watch = Thesis\Time\Stopwatch::start();
+$records = readRecords();
+$readTime = $watch->lap();
+writeRecords($records);
+$writeTime = $watch->lap();
+$total = $watch->elapsed();
+```

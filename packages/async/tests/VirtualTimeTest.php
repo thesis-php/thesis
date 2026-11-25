@@ -10,6 +10,7 @@ use Testo\Test;
 use Thesis\Async\Internal\Loop;
 use Thesis\Async\Internal\Scope;
 use Thesis\TestoPlugin\VirtualTime;
+use Thesis\Time\Stopwatch;
 use Time\Duration;
 use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\later;
@@ -44,12 +45,12 @@ final class VirtualTimeTest
     public function longDelayIsOverAtOnce(): void
     {
         $start = Instant::now();
-        $realStart = hrtime(true);
+        $watch = Stopwatch::start();
 
         delay(sec(3600));
 
         Assert::same(secondsSince($start), 3600.0);
-        Assert::int(hrtime(true) - $realStart)->lessThan(1_000_000_000);
+        Assert::true($watch->elapsed() < sec(1));
     }
 
     public function timersFireInOrderOfDeadlines(): void
@@ -164,13 +165,13 @@ final class VirtualTimeTest
         });
 
         $spent = self::outsideVirtualTime(static function () {
-            $start = hrtime(true);
+            $watch = Stopwatch::start();
             burnCpu(ms(20));
 
-            return hrtime(true) - $start;
+            return $watch->elapsed();
         });
 
-        Assert::true($spent >= 20_000_000);
+        Assert::true($spent >= ms(20));
         Assert::false($deferred);
     }
 

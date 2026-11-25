@@ -8,10 +8,10 @@ use Thesis\Monorepo\Manifest;
 use Thesis\Monorepo\RectorSkip;
 
 return new Manifest(
-    description: 'Time\Duration polyfill for PHP 8.2+ with duration parsing, unit conversions and PSR-20 clocks.',
+    description: 'Time\Duration polyfill for PHP 8.2+ with parsing, conversions, a stopwatch and PSR-20 clocks.',
     licenseSince: 2026,
     version: '0.4',
-    keywords: ['php', 'time', 'duration', 'clock', 'psr-20', 'polyfill'],
+    keywords: ['php', 'time', 'duration', 'clock', 'stopwatch', 'psr-20', 'polyfill'],
     require: [
         // The polyfill runs where the rest of the monorepo does not: PHP 8.2 of Debian 12, the main 32-bit system.
         // 8.2.2: before it modify('@...') of shiftTime() moved a time by its UTC offset (php-src GH-9891).

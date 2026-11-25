@@ -95,8 +95,8 @@ and PSR-20 clocks on both 64-bit and 32-bit PHP. Read the
   on 8.6 and with the polyfill (`DurationTest` pins it, PHPStan types their result as `Time\Duration`),
   and the class has `$negative`. Rejected, removed in 0.4: `isPositive()`, `isNegative()`, `shortest()`,
   `longest()`. `isZero()` stays because the fixer would make `==` a `===`.
-- No days: like the class, a duration has no calendar units. No monotonic clock: a point in time is not
-  a duration (the `Time\Instant` RFC).
+- No days: like the class, a duration has no calendar units. `Stopwatch` exposes only elapsed durations. Its monotonic
+  readings stay private and use the seconds and nanoseconds of `hrtime()` for precision on 32-bit PHP.
 
 ### Arithmetic
 
