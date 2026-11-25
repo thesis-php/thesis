@@ -72,6 +72,6 @@ final readonly class Response
 
     public function withBody(string|Body $body): self
     {
-        return new self(status: $this->status, headers: $this->headers, body: $body);
+        return clone($this, ['pendingBody' => new PendingBody($body)]);
     }
 }

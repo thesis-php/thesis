@@ -44,7 +44,7 @@ final class StringBody implements ReplayableBody
             return EMPTY_BODY;
         }
 
-        return new self($this->bytes, $this->trailers);
+        return clone($this, ['offset' => 0]);
     }
 
     public function read(int $max): ?string
