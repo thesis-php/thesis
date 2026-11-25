@@ -42,15 +42,28 @@ final class RouteNode
     private array $routes = [];
 
     /**
+     * @var array{Route, list<non-empty-string>}|null
+     */
+    private ?array $fallback = null;
+
+    /**
      * @param list<non-empty-string> $names
      */
     public function register(Route $route, array $names): void
     {
+        if ($route->methods === null) {
+            if ($this->fallback !== null) {
+                throw new \InvalidArgumentException("Duplicate fallback route {$route->pattern}.");
+            }
+            $this->fallback = [$route, $names];
+
+            return;
+        }
         foreach ($route->methods as $method) {
             if (isset($this->routes[$method])) {
-                throw new \InvalidArgumentException("Duplicate route {$method} {$route->route}.");
+                throw new \InvalidArgumentException("Duplicate route {$method} {$route->pattern}.");
             }
-            $match = $names === [] ? new RouteMatch($method, $route->route, $route->defaults) : $names;
+            $match = $names === [] ? new RouteMatch($method, $route->pattern, $route->defaults) : $names;
             $this->routes[$method] = [$route, $match];
         }
     }
@@ -117,7 +130,7 @@ final class RouteNode
 
             return $node->matchRemainder(implode('/', \array_slice($segments, $offset - 1)), $values, $method);
         }
-        if ($node->routes !== []) {
+        if ($node->routes !== [] || $node->fallback !== null) {
             return $node->select($values, $method);
         }
 
@@ -157,10 +170,11 @@ final class RouteNode
      */
     public function select(array $values, string $method): array|string
     {
-        if ($method === Method::HEAD && !isset($this->routes[$method])) {
+        if ($method === Method::HEAD && !isset($this->routes[$method]) && isset($this->routes[Method::GET])) {
             $method = Method::GET;
         }
-        if (!isset($this->routes[$method])) {
+        $entry = $this->routes[$method] ?? $this->fallback;
+        if ($entry === null) {
             $methods = array_keys($this->routes);
             if (isset($this->routes[Method::GET]) && !isset($this->routes[Method::HEAD])) {
                 $methods[] = Method::HEAD;
@@ -169,7 +183,6 @@ final class RouteNode
             return implode(', ', $methods);
         }
 
-        $entry = $this->routes[$method];
         if ($entry[1] instanceof RouteMatch) {
             return $entry;
         }
@@ -179,6 +192,6 @@ final class RouteNode
             $params += $route->defaults;
         }
 
-        return [$route, new RouteMatch($method, $route->route, $params)];
+        return [$route, new RouteMatch($method, $route->pattern, $params)];
     }
 }

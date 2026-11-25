@@ -26,6 +26,11 @@ final class Router
     private array $exact = [];
 
     /**
+     * @var array<string, Route>
+     */
+    private array $exactFallback = [];
+
+    /**
      * @var array<string, RouteNode> literal prefixes ending in an ordinary parameter
      */
     private array $trailing = [];
@@ -124,7 +129,16 @@ final class Router
         if (isset($this->exact[$path])) {
             $routes = $this->exact[$path];
 
-            return $routes[$request->method] ?? implode(', ', array_keys($routes));
+            if (isset($routes[$request->method])) {
+                return $routes[$request->method];
+            }
+            if (isset($this->exactFallback[$path])) {
+                $route = $this->exactFallback[$path];
+
+                return [$route, new RouteMatch($request->method, $route->pattern)];
+            }
+
+            return implode(', ', array_keys($routes));
         }
         if ($path[0] !== '/') {
             return Status::NOT_FOUND;
@@ -150,11 +164,11 @@ final class Router
 
     private function register(Route $route): void
     {
-        $pattern = $route->route;
+        $pattern = $route->pattern;
         if (!str_starts_with($pattern, '/') || str_contains($pattern, "\0")) {
             throw new \InvalidArgumentException("Invalid route pattern '{$pattern}'.");
         }
-        foreach ($route->methods as $method) {
+        foreach ($route->methods ?? [] as $method) {
             if (!isToken($method)) {
                 throw new \InvalidArgumentException("Invalid HTTP method '{$method}'.");
             }
@@ -164,6 +178,15 @@ final class Router
         $path = $optionalSlash ? substr($pattern, 0, -3) : $pattern;
         if (strpbrk($path, '{}') === false && $route->requirements === [] && $route->defaults === []) {
             foreach ($optionalSlash ? [$path, $path . '/'] : [$path] as $literal) {
+                if ($route->methods === null) {
+                    if (isset($this->exactFallback[$literal])) {
+                        throw new \InvalidArgumentException("Duplicate fallback route {$pattern}.");
+                    }
+                    $this->exact[$literal] ??= [];
+                    $this->exactFallback[$literal] = $route;
+
+                    continue;
+                }
                 foreach ($route->methods as $method) {
                     if (isset($this->exact[$literal][$method])) {
                         throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");

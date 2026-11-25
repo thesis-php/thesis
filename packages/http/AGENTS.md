@@ -155,6 +155,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Register `[/]` with the route. Trimming request paths would change the value captured by a remainder.
 - At the root, an omitted suffix can follow an empty literal segment: `//{id?}` also matches `/`.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
+  On that path, try the exact method, GET for HEAD, then the null-method fallback with the original request method.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.
   Preserve empty segments, plus signs and dot segments.

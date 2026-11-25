@@ -39,7 +39,7 @@ final class RouterBench
         $router = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/users/{id}',
+                pattern: '/users/{id}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
         ]);

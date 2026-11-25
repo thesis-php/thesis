@@ -36,7 +36,7 @@ final readonly class RouterTest
             new Route(Method::POST, '/users/me', static fn() => new Response(body: 'me')),
             new Route(
                 methods: Method::GET,
-                route: '/{group}/me/{id}',
+                pattern: '/{group}/me/{id}',
                 handler: static fn($request) => new Response(body: implode('/', routeMatch($request)->params ?? [])),
             ),
             new Route(Method::GET, '/users/{id}/info', static fn() => new Response(body: 'info')),
@@ -96,12 +96,57 @@ final readonly class RouterTest
         Assert::same($response->headers->get('Allow'), '123, GET, HEAD');
     }
 
+    public function fallsBackToAnyMethodOnlyOnTheSelectedPath(): void
+    {
+        $forward = static fn(Request $request) => new Response(body: $request->method);
+        $get = static fn() => new Response(body: 'local');
+        $router = new Router([
+            Route::any('/storage/{path+}', $forward),
+            new Route(Method::GET, '/storage/{name+}', $get),
+            Route::get('/storage/status', $get),
+            new Route('*', '/exact[/]', $get),
+            new Route(null, '/exact[/]', $forward),
+        ]);
+
+        $custom = new Request('PROPFIND', new Uri('/storage/a.txt'));
+        Assert::same($router($custom, $this->context)->takeBody()->readAll(), 'PROPFIND');
+        $match = $router->lookup($custom);
+        Assert::same($match?->method, 'PROPFIND');
+        Assert::same($match->params, ['path' => 'a.txt']);
+        Assert::same($router->lookup(new Request('HEAD', $custom->uri))?->method, 'GET');
+        $denied = $router(new Request('DELETE', new Uri('/storage/status')), $this->context);
+        Assert::same($denied->status, 405);
+        Assert::same($denied->headers->get('Allow'), 'GET, HEAD');
+        $exact = new Uri('/exact/');
+        Assert::same($router(new Request('*', $exact), $this->context)->takeBody()->readAll(), 'local');
+        Assert::same($router->lookup(new Request('HEAD', $exact))?->method, 'HEAD');
+    }
+
+    public function keepsTheRequestMethodAndDefaultsOnADynamicFallback(): void
+    {
+        $handler = static fn() => new Response();
+        $route = new Route(null, '/{group}/items/{id?}', $handler, defaults: ['id' => 'latest']);
+        Assert::null($route->methods);
+        $router = new Router([$route]);
+        $match = $router->lookup(new Request('HEAD', new Uri('/news/items')));
+        Assert::same($match?->method, 'HEAD');
+        Assert::same($match->params, ['group' => 'news', 'id' => 'latest']);
+        Assert::same($router->lookup(Request::get('/news/items/42'))?->params, ['group' => 'news', 'id' => '42']);
+    }
+
+    public function rejectsDuplicateFallbackShapes(): void
+    {
+        $handler = static fn() => new Response();
+        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate fallback route /{b}.');
+        new Router([new Route(null, '/{a}', $handler), new Route(null, '/{b}', $handler)]);
+    }
+
     public function decodesOnceAndPreservesSegmentBoundaries(): void
     {
         $router = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/{value}',
+                pattern: '/{value}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('value') ?? ''),
             ),
         ]);
@@ -336,7 +381,7 @@ final readonly class RouterTest
         $router = new Router([
             new Route('GET', '/items/{value}', $handler),
             new Route('GET', '/items/{path*}', $handler),
-            new Route('POST', '/items/{id}', $handler, requirements: ['id' => '[0-9]+']),
+            Route::post('/items/{id}', $handler, requirements: ['id' => '[0-9]+']),
             new Route('GET', '/items/{key}.csv/detail', $handler),
         ]);
 
@@ -354,7 +399,7 @@ final readonly class RouterTest
         $handler = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/{id}',
+                pattern: '/{id}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
             new Route(Method::HEAD, '/{id}', static fn() => new Response(Status::NO_CONTENT)),

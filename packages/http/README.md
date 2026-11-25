@@ -222,14 +222,14 @@ and a `Thesis\Http\Server\Context` with connection information. It returns a `Th
 
 ### Routing
 
-Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Pass one method or a non-empty list of methods to each `Route`. Each route handler receives the request
+Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Pass one method, a non-empty list of methods, or `null` to each `Route`. Named constructors such as `Route::get()` and `Route::post()` cover every method in `Method`.
+Use `Route::any()` for the fallback. Each route handler receives the request
 and the connection context. Inside the route handler and its middleware, `Thesis\Http\Server\routeMatch($request)` returns the active match.
 Use `Thesis\Http\Server\routeParam($request, $name)` to read one decoded parameter. It returns null when the parameter is absent or the request has no active match.
-Outside dispatch `routeMatch()` returns null. The match’s `method` and `pattern` identify the selected route.
+Outside dispatch `routeMatch()` returns null. The match’s `method` identifies the selected method and its `pattern` comes from `Route::$pattern`.
 `param($name)` returns a decoded parameter or null, and `$match->params` contains all parameters.
 
 ```php
-use Thesis\Http\Method;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Route;
@@ -238,8 +238,8 @@ use Thesis\Http\Server;
 use function Thesis\Http\Server\routeParam;
 
 $router = new Router([
-    new Route(Method::GET, '/users/me', static fn() => new Response(body: 'Current user')),
-    new Route(Method::GET, '/users/{id}', static fn($request) => new Response(body: routeParam($request, 'id') ?? '')),
+    Route::get('/users/me', static fn() => new Response(body: 'Current user')),
+    Route::get('/users/{id}', static fn($request) => new Response(body: routeParam($request, 'id') ?? '')),
 ]);
 
 $server = new Server(new Config(8080), $router);
@@ -260,7 +260,10 @@ Duplicate method and path shapes fail during construction.
 
 `$router->lookup($request)` returns the selected RouteMatch or null without calling a handler
 or emitting an event. Dispatch checks the method after selecting the complete path.
-An explicit HEAD wins over the GET fallback. A mismatch yields 405 with Allow, an unknown path 404.
+An explicit HEAD wins over the GET fallback. A route with `methods: null` handles any remaining method
+for the selected path and reports the request's method in `RouteMatch`. Only one such route may occupy a path shape.
+For example, `Route::any('/storage/{path+}', $proxy)` forwards custom methods such as PROPFIND.
+A more specific path still owns its 405. A mismatch yields 405 with Allow, an unknown path 404.
 
 Matching uses the raw URI path. Dot segments, plus signs and trailing slashes keep their meaning.
 End a pattern with `[/]` to accept one optional slash. For example, `/docs[/]` matches both `/docs` and `/docs/`.

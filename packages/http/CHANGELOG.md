@@ -21,7 +21,9 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Customize routing errors and server-generated 500 responses with `Server\ErrorHandler`.
   Access it through `Context::$errorHandler`. Creating a context requires both the error handler and the dispatcher.
 - Read the active route in handlers and middleware with `Server\routeMatch($request)` or a single parameter with `Server\routeParam($request, $name)`.
-- Register one or more methods per route with `Route::$methods`. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
+- Create routes with named constructors for each standard HTTP method and `Route::any()` for a fallback.
+  Use `pattern:` for the path template and read it from `Route::$pattern`.
+- Register one or more methods per route or pass `methods: null` to accept any remaining method on that path. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
   Inspect matches with `Router::lookup()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
