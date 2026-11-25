@@ -7,6 +7,7 @@ use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
 use Thesis\Monorepo\Internal\Monorepo;
 use Thesis\Monorepo\Internal\Tools;
+use Thesis\PhpCsFixer\NamespaceConstantPhpdocFixer;
 use Thesis\PhpCsFixer\StaticCallChainFixer;
 
 $skipped = Tools::of(Monorepo::load(__DIR__))->fixerSkips;
@@ -26,7 +27,7 @@ return new Config()
     // The fixer parses syntax up to PHP 8.5 and refuses to run on 8.6. The code has no syntax of 8.6 (agents/php.md).
     // Delete once the fixer supports 8.6.
     ->setUnsupportedPhpVersionAllowed(true)
-    ->registerCustomFixers([new StaticCallChainFixer()])
+    ->registerCustomFixers([new NamespaceConstantPhpdocFixer(), new StaticCallChainFixer()])
     ->setRules([
         '@PHP8x4Migration' => true,
         '@PHP8x2Migration:risky' => true,
@@ -34,6 +35,7 @@ return new Config()
         '@PhpCsFixer:risky' => true,
         '@PER-CS2x0' => true,
         '@PER-CS2x0:risky' => true,
+        'Thesis/namespace_constant_phpdoc' => true,
         'Thesis/static_call_chain' => true,
         'attribute_empty_parentheses' => true,
         'blank_line_before_statement' => ['statements' => [

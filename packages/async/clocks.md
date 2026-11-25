@@ -11,8 +11,9 @@
 - The deadline is resolved like the cancellation mark: a `Scope` stores the absolute deadline (`Scope::now()`, null if
   none), the minimum of its own and the parent's, and a shield drops the parent's. `remaining()` reads one field and the
   clock; `suspend()` does not touch the deadline: only the `timeout()` timer enforces it.
-- `Internal\Scope::now()` is the only clock of the library (`Instant`, deadlines, the rate limiters): never call
-  `hrtime()` or `microtime()` elsewhere. Within `virtualTime()`, it reads `Internal\Scope::$virtualClock`, which
+- `Instant`, deadlines and rate limiters read `Internal\Scope::now()`. The event loop reads its own
+  `Internal\Loop::now()` to schedule timers. Both use `hrtime(true)` when running on real time.
+  Within `virtualTime()`, `Scope::now()` reads `Internal\Scope::$virtualClock`, which
   `virtualTime()` binds to the clock of its loop. The binding is on `Scope`, not on `Internal\VirtualClock`,
   so that an application that never calls `virtualTime()` never loads the class. The clock is not read
   in `suspend()`. The virtual clock starts at `Scope::now()` rounded up to a whole second, not at zero:

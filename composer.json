@@ -172,6 +172,7 @@
             "Thesis\\Net\\": "packages/net/tests/",
             "Thesis\\PhpCsFixer\\": "tools/php-cs-fixer/src/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
+            "Thesis\\PhpStanRules\\": "tools/phpstan/src/",
             "Thesis\\Process\\": "packages/process/tests/",
             "Thesis\\SourceLocation\\": "packages/source-location/tests/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",

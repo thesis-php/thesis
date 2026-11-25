@@ -65,6 +65,7 @@ return new Config(
         'Thesis\Monorepo\Tests\\' => 'tools/monorepo/tests/',
         'Thesis\PhpCsFixer\\' => 'tools/php-cs-fixer/src/',
         'Thesis\PhpCsFixer\Tests\\' => 'tools/php-cs-fixer/tests/',
+        'Thesis\PhpStanRules\\' => 'tools/phpstan/src/',
         'Thesis\TraceRecorder\\' => 'tools/trace-recorder/src/',
         'Thesis\TraceRecorder\Tests\\' => 'tools/trace-recorder/tests/',
     ],

@@ -13,7 +13,7 @@ use Testo\Test;
  * together with the rules that run around it.
  */
 #[Test]
-final readonly class StaticCallChainFixerTest
+final readonly class FixersTest
 {
     private const string SEPARATOR = "-----\n";
 

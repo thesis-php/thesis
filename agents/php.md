@@ -13,8 +13,7 @@ is not here: the tools fix the code anyway. The rules of tests are in `tests.md`
   than that PHP. Its `AGENTS.md` says which PHP the package runs on and why.
 - Lines are at most 120 characters, comments and tests included. The only exception is a line that cannot be wrapped:
   a single string literal (an exception message, an expected error) or a URL.
-- A PHPDoc of a declaration (class, method, function, property, namespace constant, class constant, enum case)
-  is multi-line, even with one tag. An inline annotation in code is one line: `/** @var list<int> $ids */`.
+- An inline annotation in code is one line: `/** @var list<int> $ids */`.
 - A call stays on one line while it fits in 120 characters, named arguments or not:
   `self::bytes($random, min: 0, max: 40)`. Otherwise its arguments go one per line with a trailing comma,
   and every argument is named, so the names form a column. The exception is a call whose arguments go

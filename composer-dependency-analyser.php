@@ -12,9 +12,9 @@ return Tools
     ->ignoreOptionalDependencies(new Configuration())
     // An extension of PHPStan uses nikic/php-parser bundled in the phar of phpstan/phpstan. The analyser finds
     // its classes in the copy that infection/infection installs and takes them for a dependency that is not listed.
-    ->ignoreErrorsOnPackageAndPath(
+    ->ignoreErrorsOnPackageAndPaths(
         packageName: 'nikic/php-parser',
-        path: __DIR__ . '/packages/phpstan-extension/src',
+        paths: [__DIR__ . '/packages/phpstan-extension/src', __DIR__ . '/tools/phpstan/src'],
         errorTypes: [ErrorType::SHADOW_DEPENDENCY],
     )
     // thesis/time takes \RoundingMode from it below PHP 8.4, where the analyser runs the class is native.

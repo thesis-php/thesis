@@ -28,3 +28,25 @@ parameters:
     reportAnyTypeWideningInVarTag: true
     reportPossiblyNonexistentConstantArrayOffset: true
     reportPossiblyNonexistentGeneralArrayOffset: true
+
+services:
+    -
+        class: Thesis\PhpStanRules\PackageApiRule
+        arguments:
+            packagesDirectory: packages
+        tags: [phpstan.rules.rule]
+    -
+        class: Thesis\PhpStanRules\PackageApiRule
+        arguments:
+            packagesDirectory: tools/phpstan/fixtures/packages
+        tags: [phpstan.rules.rule]
+    -
+        class: Thesis\PhpStanRules\AsyncClockRule
+        arguments:
+            sourceDirectory: packages/async/src
+        tags: [phpstan.rules.rule]
+    -
+        class: Thesis\PhpStanRules\AsyncClockRule
+        arguments:
+            sourceDirectory: tools/phpstan/fixtures/packages/async/src
+        tags: [phpstan.rules.rule]

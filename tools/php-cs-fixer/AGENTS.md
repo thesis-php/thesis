@@ -27,3 +27,10 @@ one level deeper than the line of the class.
   calls, property fetches and `[...]`, and ends at a dynamic name. Only a class name starts one: `Foo`, `Foo\Bar`,
   `self`, `static`, `parent`, not `$foo::`, `new Foo()::` or `$foo->bar::`.
 - `make fix` runs Rector before PHP CS Fixer: Rector prints a chain it changes as `Foo::create()->...`.
+
+## Thesis/namespace_constant_phpdoc
+
+PHP CS Fixer classifies namespace constants as `other` in `phpdoc_line_span`
+(PHP-CS-Fixer/PHP-CS-Fixer#9962). Setting `other` to `multi` would also expand inline annotations.
+The custom fixer uses the same multiline formatter for namespace constants, including those with attributes.
+Remove it once the upstream fixer handles namespace constants with its `const` setting.

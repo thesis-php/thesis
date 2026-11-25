@@ -53,8 +53,8 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   and throws with every conflict at once. A platform requirement (`php-64bit`, `ext-*`) is one of them:
   declared in `require` of a manifest, it goes to the root too, one vendor serves the whole monorepo.
   There is no platform of every package in `Config` (`agents/platform.md`).
-- Conventions (dependency direction, references between packages, `@api`/`@internal`, namespaces, `AGENTS.md`)
-  are not checked: a check is added when a real problem shows up, not in advance, and preferably by running
+- The monorepo generator does not check conventions (dependency direction, references between packages, namespaces,
+  `AGENTS.md`): a check is added when a real problem shows up, not in advance, and preferably by running
   the final tool (composer, composer-dependency-analyser) rather than by reimplementing it.
   Rejected: layers, no cycles, a validator of code references against `require`.
 - `sync` throws on a link of `README.md` of a package out of the package (`../async`, or `/AGENTS.md`,
