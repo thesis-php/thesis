@@ -331,7 +331,7 @@ final class Connection
 
         try {
             try {
-                $response = $errorHandler->handle(Status::INTERNAL_SERVER_ERROR, $request);
+                $response = $errorHandler->handleError(Status::INTERNAL_SERVER_ERROR, $request);
                 if ($response->status !== Status::INTERNAL_SERVER_ERROR) {
                     throw new \ValueError('The error handler must preserve the status.');
                 }

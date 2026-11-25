@@ -17,5 +17,5 @@ interface ErrorHandler
      *
      * @param int<400, 599> $status
      */
-    public function handle(int $status, Request $request): Response;
+    public function handleError(int $status, Request $request): Response;
 }

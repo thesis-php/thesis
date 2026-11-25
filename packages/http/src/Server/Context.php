@@ -14,7 +14,7 @@ use Thesis\Net\TlsInfo;
  *
  * @api
  */
-final readonly class Context implements ErrorHandler
+final readonly class Context
 {
     /**
      * @param ?TlsInfo $tls the negotiated TLS details, or null for a plaintext connection
@@ -23,12 +23,16 @@ final readonly class Context implements ErrorHandler
         public Address $localAddress,
         public Address $remoteAddress,
         public ?TlsInfo $tls,
-        private ErrorHandler $errorHandler,
+        private ErrorHandler $errorHandler = new DefaultErrorHandler(),
     ) {}
 
-    public function handle(int $status, Request $request): Response
+    /**
+     * @param int<400, 599> $status
+     * @throws \ValueError if the error handler returns a different status
+     */
+    public function handleError(int $status, Request $request): Response
     {
-        $response = $this->errorHandler->handle($status, $request);
+        $response = $this->errorHandler->handleError($status, $request);
         if ($response->status !== $status) {
             throw new \ValueError('The error handler must preserve the status.');
         }

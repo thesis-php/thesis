@@ -259,7 +259,7 @@ and its standard reason phrase when known. Pass an optional `Server\ErrorHandler
 
 ```php
 $errorHandler = new class implements \Thesis\Http\Server\ErrorHandler {
-    public function handle(int $status, \Thesis\Http\Request $request): \Thesis\Http\Response
+    public function handleError(int $status, \Thesis\Http\Request $request): \Thesis\Http\Response
     {
         return new \Thesis\Http\Response($status, body: "Request failed ($status)");
     }
@@ -329,7 +329,7 @@ $server = new Server($config, $pipeline);
 
 The first middleware receives the request first and the response last.
 Each layer receives `handle(Request $request, Context $context, callable $next)`. It can use
-`$context->handle(403, $request)` to format an error with the server’s configured error handler.
+`$context->handleError(403, $request)` to format an error with the server’s configured error handler.
 Server middleware can return a response directly or call `$next()`. After that call returns or throws,
 the middleware can call `$next()` again while its own `handle()` is running. Overlapping calls to the
 same `$next` and calls after its `handle()` has returned or thrown raise a `LogicException`.

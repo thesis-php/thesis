@@ -10,7 +10,7 @@ use Thesis\Http\Server\ErrorHandler;
 
 final readonly class TextErrorHandler implements ErrorHandler
 {
-    public function handle(int $status, Request $request): Response
+    public function handleError(int $status, Request $request): Response
     {
         return new Response($status, body: "{$request->method} {$status}");
     }

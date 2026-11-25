@@ -38,7 +38,7 @@ final class PipelineTest
         $inner = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
             $calls[] = $connection;
 
-            return $incoming->uri->getRawPath() === '/' ? $next() : $connection->handle(403, $incoming);
+            return $incoming->uri->getRawPath() === '/' ? $next() : $connection->handleError(403, $incoming);
         });
         $endpoint = static function (Request $incoming, Context $connection) use (&$calls) {
             $calls[] = [$incoming, $connection];

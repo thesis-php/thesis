@@ -41,7 +41,7 @@ final readonly class Router
         $result = $this->routes->lookup($request->method, $path);
 
         if ($result instanceof RoutingError) {
-            $response = $context->handle($result->status, $request);
+            $response = $context->handleError($result->status, $request);
 
             return $result->allow === [] ? $response : $response->withHeader('Allow', implode(', ', $result->allow));
         }

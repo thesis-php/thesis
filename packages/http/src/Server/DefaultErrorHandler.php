@@ -14,7 +14,7 @@ use Thesis\Http\Status;
  */
 final readonly class DefaultErrorHandler implements ErrorHandler
 {
-    public function handle(int $status, Request $request): Response
+    public function handleError(int $status, Request $request): Response
     {
         $reason = Status::reasonPhrase($status);
         $title = $reason === null ? (string) $status : "{$status} {$reason}";
