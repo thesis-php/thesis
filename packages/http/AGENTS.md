@@ -218,8 +218,10 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   for the body or next request. Only a head that still needs bytes needs a head timer.
 - Keep-alive has no request count limit by default. This lets busy clients reuse the socket without periodic
   reconnects. The idle timeout still applies between requests. An explicit request limit closes after the last response.
-- Write a small string body with its response head. Reading a stream can wait for the peer to receive
-  the head, so send the head before reading a streaming body. A small fixed-length echo can share
+- Take a response string through the same one-shot handoff as a reader. The server can write a
+  length-framed string of up to 8 KiB with its head without creating a `StringBody`.
+  Reading a stream can wait for the peer to receive the head, so send the head before reading
+  a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
 - Each connection reuses its last encoded length-framed response head up to 1 KiB for a string body when its length,

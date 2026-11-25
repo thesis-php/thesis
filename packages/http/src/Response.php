@@ -70,6 +70,16 @@ final readonly class Response
         return $this->pendingBody->take();
     }
 
+    /**
+     * Transfers the body in its original form for HTTP/1 output.
+     *
+     * @internal
+     */
+    public function takePayload(): string|Body
+    {
+        return $this->pendingBody->takePayload();
+    }
+
     public function withBody(string|Body $body): self
     {
         return clone($this, ['pendingBody' => new PendingBody($body)]);

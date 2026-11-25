@@ -110,7 +110,7 @@ final class Exchange
             }
 
             $response = $handler($request);
-            $body = $response->takeBody();
+            $body = $response->takePayload();
 
             return $this->sendResponse($response, $body);
         } catch (Cancelled $error) {
@@ -120,7 +120,9 @@ final class Exchange
 
             return false;
         } finally {
-            $body?->close();
+            if ($body instanceof Body) {
+                $body->close();
+            }
         }
     }
 
@@ -154,7 +156,7 @@ final class Exchange
         );
     }
 
-    private function sendResponse(Response $response, Body $body): bool
+    private function sendResponse(Response $response, string|Body $body): bool
     {
         if ($this->continue?->failure !== null) {
             throw $this->continue->failure;
@@ -181,13 +183,13 @@ final class Exchange
             if ($isEcho) {
                 // The client may abandon the body on seeing a final head before it has sent any bytes.
                 $first = ResponseWriter::readBody($body, $reply->length);
-            } elseif ($response->status < Status::BAD_REQUEST && !$body->isBuffered) {
+            } elseif ($response->status < Status::BAD_REQUEST && !\is_string($body) && !$body->isBuffered) {
                 // A streaming response may read from the request only after producing response bytes.
                 $this->continue->send();
             }
         }
 
-        $ignoresBody = $reply->length === 0 || $body->isBuffered;
+        $ignoresBody = $reply->length === 0 || \is_string($body) || $body->isBuffered;
         $mustClose = $this->continue?->isPending === true || !($this->canAcceptNextRequest)()
             || ($ignoresBody && !$this->isBodyComplete);
 
