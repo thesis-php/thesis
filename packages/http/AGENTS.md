@@ -131,6 +131,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 
 - The Router constructor calls a private register() once per route.
   Registration parses the pattern once and indexes the route by each method. All requests share them.
+  `Router::$list` contains each registered Route once in input order.
 - Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
   Both constructors accept a callable and store its closure.
 - Route handlers receive the request and the connection context. routeMatch($request) reads the active match from a WeakMap keyed by request identity.

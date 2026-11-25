@@ -11,6 +11,8 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Use `Router::$list` to read the original routes in registration order.
+
 - Log server events and optional per-request access records to a PSR-3 logger with `ServerLogger`.
 - Observe server, connection, request and routing events through a dispatcher in place of the server error callback.
   RequestStarted, RouteMatched and RequestEnded carry the request object. The server emits RequestEnded with duration, status and response write outcome.

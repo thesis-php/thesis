@@ -258,6 +258,8 @@ ordinary parameter, then remainder at each position. Overlapping expressions at 
 position are tried in registration order. An explicit endpoint precedes an omitted suffix.
 Duplicate method and path shapes fail during construction.
 
+`$router->list` contains the original `Route` objects in registration order. A route with several methods appears once.
+
 `$router->match($request)` selects a route without calling a handler or emitting an event.
 On success it returns a `RouteMatch`. Read the registered route from `$match->route` and the decoded parameters from `$match->params`.
 An invalid path returns `RouteFailure::BadPath` (400), an unknown path returns `RouteFailure::NotFound` (404),

@@ -29,6 +29,15 @@ final readonly class RouterTest
         $this->context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
     }
 
+    public function listsOriginalRoutesInRegistrationOrder(): void
+    {
+        $user = new Route([Method::GET, Method::POST, Method::PUT], '/users/{id}', self::user(...));
+        $current = Route::get('/users/me', self::user(...));
+        $router = new Router(['user' => $user, 'current' => $current]);
+
+        Assert::same($router->list, [$user, $current]);
+    }
+
     public function choosesTheMostSpecificCompletePathBeforeTheMethod(): void
     {
         $router = new Router([

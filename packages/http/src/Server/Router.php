@@ -18,6 +18,11 @@ use const Thesis\Http\Internal\ROUTE_MATCHES;
  */
 final class Router
 {
+    /**
+     * @var list<Route> original routes in registration order
+     */
+    public readonly array $list;
+
     private readonly RouteNode $root;
 
     /**
@@ -42,9 +47,12 @@ final class Router
     public function __construct(iterable $routes)
     {
         $this->root = new RouteNode();
+        $registered = [];
         foreach ($routes as $route) {
             $this->register($route);
+            $registered[] = $route;
         }
+        $this->list = $registered;
         foreach ($this->exact as &$methods) {
             if (isset($methods[Method::GET])) {
                 $methods[Method::HEAD] ??= $methods[Method::GET];
