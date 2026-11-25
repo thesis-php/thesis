@@ -61,11 +61,12 @@ final class ConnectionTest
             };
             $output = new RecordingWriter();
             $paths = [];
-            Connection::serve($input, $output, static function (Request $request) use (&$paths) {
+            $connection = new Connection($input, $output, $config);
+            $connection->run(static function (Request $request) use (&$paths) {
                 $paths[] = $request->uri->getRawPath();
 
                 return new Response(body: $request->takeBody());
-            }, $config);
+            });
             Assert::same(['/first', '/second'], $paths);
             Assert::same($expected, $output->bytes);
         }
@@ -77,12 +78,8 @@ final class ConnectionTest
         $last = "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\n";
         $input = new TimedReader([[null, $head . 'ab'], [null, $head . 'cd' . $last . 'xyz']]);
         $output = new RecordingWriter();
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn(Request $request) => new Response(body: $request->takeBody()),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $short = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n";
         Assert::same($short . 'ab' . $short . 'cd' . "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nxyz", $output->bytes);
@@ -93,12 +90,8 @@ final class ConnectionTest
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\none"
             . "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\ntwo");
         $output = new RecordingWriter();
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn(Request $request) => new Response(body: $request->takeBody()),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $head = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n";
         Assert::same($output->bytes, $head . 'one' . $head . 'two');
@@ -111,13 +104,14 @@ final class ConnectionTest
         $input = new StringReader($request . $request);
         $output = new RecordingWriter();
         $requests = 0;
-        Connection::serve($input, $output, static function () use (&$requests) {
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static function () use (&$requests) {
             if (++$requests === 1) {
                 return new Response(body: 'a');
             }
 
             return new Response(body: new StringBody('a', new Headers(['X-End' => 'yes'])));
-        }, new Config('/test.sock'));
+        });
 
         Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
             . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-End: yes\r\n\r\n");
@@ -152,12 +146,8 @@ final class ConnectionTest
             }
         };
 
-        Connection::serve(
-            input: $exchange,
-            output: $exchange,
-            handler: static fn(Request $request) => new Response(body: $request->takeBody()),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($exchange, $exchange, new Config('/test.sock'));
+        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
         Assert::true(str_ends_with($exchange->output, "1\r\na\r\n1\r\nb\r\n0\r\n\r\n"));
     }
 
@@ -165,14 +155,10 @@ final class ConnectionTest
     {
         $input = new StringReader("HEAD / HTTP/1.1\r\nHost: local\r\n\r\nGET / HTTP/1.1\r\nHost: local\r\n\r\n");
         $output = new RecordingWriter();
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn(Request $request) => $request->method === Method::HEAD
-                ? new Response(headers: new Headers(['content-length' => '5']))
-                : new Response(body: 'hello'),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn(Request $request) => $request->method === Method::HEAD
+            ? new Response(headers: new Headers(['content-length' => '5']))
+            : new Response(body: 'hello'));
 
         Assert::same($output->writes, 2);
         Assert::same(
@@ -185,12 +171,12 @@ final class ConnectionTest
     {
         $body = str_repeat('a', 65536) . 'tail';
         $output = new RecordingWriter();
-        Connection::serve(
+        $connection = new Connection(
             input: new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n"),
             output: $output,
-            handler: static fn() => new Response(body: $body),
             config: new Config('/test.sock'),
         );
+        $connection->run(static fn() => new Response(body: $body));
 
         Assert::same($output->writes, 3);
         Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 65540\r\n\r\n{$body}");
@@ -205,7 +191,8 @@ final class ConnectionTest
         Expect::exception(ReadFailed::class);
 
         try {
-            Connection::serve($input, $output, static fn() => new Response(body: $body), new Config('/test.sock'));
+            $connection = new Connection($input, $output, new Config('/test.sock'));
+            $connection->run(static fn() => new Response(body: $body));
         } finally {
             Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nbc");
         }
@@ -216,7 +203,8 @@ final class ConnectionTest
         $input = new StringReader("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\nGET /next HTTP/1.0\r\n\r\n");
         $output = new RecordingWriter();
         $body = new PrefixedBody(new StringBody('hello'));
-        Connection::serve($input, $output, static fn() => new Response(body: $body), new Config('/test.sock'));
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => new Response(body: $body));
         Assert::same("HTTP/1.0 200 OK\r\n\r\n!hello", $output->bytes);
     }
 }

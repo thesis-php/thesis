@@ -165,8 +165,16 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   can produce bytes as the server reads it. Few tasks need to keep running independently after the handler
   returns. Revisit this if middleware needs the server to own such a task until the response has been sent.
 
-- The listener owns its sockets and drains active exchanges on shutdown. The internal `Connection::serve()`
-  runs HTTP/1 exchanges on a reader and writer so tests and benchmarks can run without sockets.
+- The listener registers each connection before spawning its task so shutdown sees it even before TLS negotiation.
+  It drains active exchanges on shutdown.
+  Each connection closes its own transport.
+  The head reader and body decoders share the connection buffer so bytes after a body survive for the next request.
+  Each accepted request runs in a fresh exchange. The connection is active until that exchange returns or throws.
+  When shutdown starts, the listener calls `stop()` on each
+  connection before returning control to handlers. An idle connection closes immediately. An active
+  connection finishes the current exchange. Stopping sets its remaining request count to zero. The exchange
+  reads the same request limit when deciding which persistence headers to send.
+  Tests and benchmarks run the same connection loop with an in-memory reader and writer.
 - Each connection keeps its last parsed head if the wire head fits in 1 KiB, excluding the final delimiter.
   A byte-for-byte match can reuse the immutable head. The scheme belongs to the connection after the TLS handshake.
   Create the request and its body reader anew even when two heads match.
@@ -189,7 +197,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
-- Reuse the last encoded length-framed response head up to 1 KiB for a string body when its length,
+- Each connection reuses its last encoded length-framed response head up to 1 KiB for a string body when its length,
   status, version, persistence and ordered fields match. HEAD and CONNECT have their own framing rules.
   A string body with trailer fields uses the head formatter. The formatter reads a custom body's trailer state once.
 - A fixed-length body already in the buffer has passed the size check and cannot wait on the transport.

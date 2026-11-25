@@ -38,15 +38,13 @@ final class ServerConnectionBench
         $input = new StringReader(str_repeat("GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n", $count));
         $output = new RecordingWriter();
 
-        group(static fn() => Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => new Response(
+        group(static function () use ($input, $output, $count) {
+            $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: $count));
+            $connection->run(static fn() => new Response(
                 headers: new Headers(['Content-Type' => 'text/plain']),
                 body: 'Hello, World!',
-            ),
-            config: new Config('/test.sock', maxRequestsPerConnection: $count),
-        ));
+            ));
+        });
 
         if (substr_count($output->bytes, 'Hello, World!') !== $count) {
             throw new \LogicException('The server did not finish every response.');

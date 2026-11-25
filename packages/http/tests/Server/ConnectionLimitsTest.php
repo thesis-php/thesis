@@ -33,12 +33,8 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
         $start = Instant::now();
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => throw new \LogicException('An incomplete head must not reach the handler.'),
-            config: new Config('/test.sock', headTimeout: sec(3)),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock', headTimeout: sec(3)));
+        $connection->run(static fn() => throw new \LogicException('An incomplete head must not reach the handler.'));
 
         Assert::equals(Instant::now()->since($start), sec(3));
         Assert::string($output->bytes)->startsWith('HTTP/1.1 408 ');
@@ -55,17 +51,13 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
         $start = Instant::now();
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static function (Request $request) {
-                $body = $request->takeBody();
-                Assert::same($body->read(1) . $body->read(1), 'ab');
+        $connection = new Connection($input, $output, new Config('/test.sock', bodyIdleTimeout: sec(3)));
+        $connection->run(static function (Request $request) {
+            $body = $request->takeBody();
+            Assert::same($body->read(1) . $body->read(1), 'ab');
 
-                return new Response();
-            },
-            config: new Config('/test.sock', bodyIdleTimeout: sec(3)),
-        );
+            return new Response();
+        });
 
         Assert::equals(Instant::now()->since($start), sec(4));
         Assert::string($output->bytes)->startsWith('HTTP/1.1 200 ');
@@ -80,16 +72,12 @@ final class ConnectionLimitsTest
         ]);
         $output = new RecordingWriter();
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static function (Request $request) {
-                $request->takeBody()->read(1);
+        $connection = new Connection($input, $output, new Config('/test.sock', bodyIdleTimeout: sec(1)));
+        $connection->run(static function (Request $request) {
+            $request->takeBody()->read(1);
 
-                return new Response();
-            },
-            config: new Config('/test.sock', bodyIdleTimeout: sec(1)),
-        );
+            return new Response();
+        });
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 408 ');
     }
@@ -102,12 +90,8 @@ final class ConnectionLimitsTest
 
         Expect::exception(WriteFailed::class)->withMessage('The response write did not complete in time.');
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => new Response(),
-            config: new Config('/test.sock', writeTimeout: sec(1)),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock', writeTimeout: sec(1)));
+        $connection->run(static fn() => new Response());
     }
 
     #[VirtualTime]
@@ -120,12 +104,8 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
         $start = Instant::now();
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => new Response(),
-            config: new Config('/test.sock', idleTimeout: sec(1)),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock', idleTimeout: sec(1)));
+        $connection->run(static fn() => new Response());
 
         Assert::equals(Instant::now()->since($start), sec(1));
         Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
@@ -138,12 +118,12 @@ final class ConnectionLimitsTest
         foreach ([\strlen($head) - 1 => 431, \strlen($head) => 200, \strlen($head) + 1 => 200] as $limit => $status) {
             $output = new RecordingWriter();
 
-            Connection::serve(
+            $connection = new Connection(
                 input: new StringReader($head),
                 output: $output,
-                handler: static fn() => new Response(),
                 config: new Config('/test.sock', maxHeadBytes: $limit),
             );
+            $connection->run(static fn() => new Response());
 
             Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
         }
@@ -157,24 +137,24 @@ final class ConnectionLimitsTest
         foreach ([1 => 413, 2 => 200, 3 => 200] as $limit => $status) {
             $output = new RecordingWriter();
 
-            Connection::serve(
+            $connection = new Connection(
                 input: new StringReader($wire),
                 output: $output,
-                handler: static function (Request $request) {
-                    $reader = $request->takeBody();
-                    $body = '';
-
-                    while (($chunk = $reader->read(2)) !== null) {
-                        $body .= $chunk;
-                    }
-
-                    Assert::same($body, 'ab');
-                    Assert::same($reader->trailers()->get('x-end'), 'yes');
-
-                    return new Response();
-                },
                 config: new Config('/test.sock', maxBodyBytes: $limit),
             );
+            $connection->run(static function (Request $request) {
+                $reader = $request->takeBody();
+                $body = '';
+
+                while (($chunk = $reader->read(2)) !== null) {
+                    $body .= $chunk;
+                }
+
+                Assert::same($body, 'ab');
+                Assert::same($reader->trailers()->get('x-end'), 'yes');
+
+                return new Response();
+            });
 
             Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
         }
@@ -185,12 +165,8 @@ final class ConnectionLimitsTest
         $wire = "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 2\r\nExpect: 100-continue\r\n\r\n";
         $output = new RecordingWriter();
 
-        Connection::serve(
-            input: new StringReader($wire),
-            output: $output,
-            handler: static fn() => throw new \LogicException('An oversized body must not reach the handler.'),
-            config: new Config('/test.sock', maxBodyBytes: 1),
-        );
+        $connection = new Connection(new StringReader($wire), $output, new Config('/test.sock', maxBodyBytes: 1));
+        $connection->run(static fn() => throw new \LogicException('An oversized body must not reach the handler.'));
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 413 ');
     }
@@ -200,12 +176,8 @@ final class ConnectionLimitsTest
         $wire = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
         $output = new RecordingWriter();
 
-        Connection::serve(
-            input: new StringReader(str_repeat($wire, 1001)),
-            output: $output,
-            handler: static fn() => new Response(),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection(new StringReader(str_repeat($wire, 1001)), $output, new Config('/test.sock'));
+        $connection->run(static fn() => new Response());
 
         Assert::same(substr_count($output->bytes, 'HTTP/1.1 200 OK'), 1001);
         Assert::string($output->bytes)->notContains('Connection: close');
@@ -216,12 +188,12 @@ final class ConnectionLimitsTest
         $wire = "GET / HTTP/1.1\r\nHost: local\r\n\r\n";
         $output = new RecordingWriter();
 
-        Connection::serve(
+        $connection = new Connection(
             input: new StringReader(str_repeat($wire, 3)),
             output: $output,
-            handler: static fn() => new Response(),
             config: new Config('/test.sock', maxRequestsPerConnection: 2),
         );
+        $connection->run(static fn() => new Response());
 
         Assert::same(
             actual: $output->bytes,

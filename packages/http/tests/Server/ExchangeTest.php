@@ -28,11 +28,12 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new ContinueReader($output);
 
-        Connection::serve($input, $output, static function (Request $request) use ($output) {
+        $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: 1));
+        $connection->run(static function (Request $request) use ($output) {
             Assert::same(actual: $output->bytes, expected: '');
 
             return new Response(body: $request->takeBody());
-        }, new Config('/test.sock', maxRequestsPerConnection: 1));
+        });
 
         Assert::same(
             actual: $output->bytes,
@@ -46,12 +47,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new ContinueReader($output);
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())),
-            config: new Config('/test.sock', maxRequestsPerConnection: 1),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: 1));
+        $connection->run(static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())));
 
         Assert::same(
             actual: $output->bytes,
@@ -66,7 +63,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new ContinueReader($output);
 
-        Connection::serve($input, $output, static fn() => new Response(Status::FORBIDDEN), new Config('/test.sock'));
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => new Response(Status::FORBIDDEN));
 
         Assert::same(
             actual: $output->bytes,
@@ -79,12 +77,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new StringReader("POST / HTTP/1.0\r\nExpect: 100-continue\r\nContent-Length: 3\r\n\r\nabc");
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn(Request $request) => new Response(body: $request->takeBody()),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
         Assert::same(actual: $output->bytes, expected: "HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nabc");
     }
@@ -94,7 +88,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\nabc");
 
-        Connection::serve($input, $output, static fn() => new Response(), new Config('/test.sock'));
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => new Response());
 
         Assert::same(
             actual: $output->bytes,
@@ -107,12 +102,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nExpect: custom\r\nContent-Length: 3\r\n\r\n");
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => throw new \LogicException('Unexpected request.'),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
             actual: $output->bytes,
@@ -125,13 +116,14 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\na");
 
-        Connection::serve($input, $output, static function (Request $request) {
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static function (Request $request) {
             $body = $request->takeBody();
             $body->read(3);
             $body->read(2);
 
             return new Response();
-        }, new Config('/test.sock'));
+        });
 
         Assert::same(
             actual: $output->bytes,
@@ -146,12 +138,8 @@ final class ExchangeTest
         Expect::exception(ReadFailed::class);
 
         try {
-            Connection::serve(
-                input: $input,
-                output: $output,
-                handler: static fn(Request $request) => new Response(body: $request->takeBody()),
-                config: new Config('/test.sock'),
-            );
+            $connection = new Connection($input, $output, new Config('/test.sock'));
+            $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
         } finally {
             Assert::same(actual: $output->bytes, expected: "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\na");
         }
@@ -162,12 +150,8 @@ final class ExchangeTest
         $output = new RecordingWriter();
         $input = new StringReader("GET / HTTP/7.1\r\nHost: local\r\n\r\n");
 
-        Connection::serve(
-            input: $input,
-            output: $output,
-            handler: static fn() => throw new \LogicException('Unexpected request.'),
-            config: new Config('/test.sock'),
-        );
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
             actual: $output->bytes,
@@ -183,12 +167,8 @@ final class ExchangeTest
         Expect::exception(\LogicException::class);
 
         try {
-            Connection::serve(
-                input: $input,
-                output: $output,
-                handler: static fn() => $response->withStatus(Status::OK),
-                config: new Config('/test.sock'),
-            );
+            $connection = new Connection($input, $output, new Config('/test.sock'));
+            $connection->run(static fn() => $response->withStatus(Status::OK));
         } finally {
             Assert::same(
                 actual: $output->bytes,
@@ -205,13 +185,8 @@ final class ExchangeTest
         Expect::exception(\RuntimeException::class)->withMessage('Private details');
 
         try {
-            Connection::serve(
-                input: $input,
-                output: $output,
-                handler: static fn() => throw new \RuntimeException('Private details'),
-                config: new Config('/test.sock'),
-                errorHandler: new TextErrorHandler(),
-            );
+            $connection = new Connection($input, $output, new Config('/test.sock'), new TextErrorHandler());
+            $connection->run(static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
                 actual: $output->bytes,
@@ -227,12 +202,8 @@ final class ExchangeTest
         Expect::exception(\RuntimeException::class)->withMessage('Private details');
 
         try {
-            Connection::serve(
-                input: $input,
-                output: $output,
-                handler: static fn() => throw new \RuntimeException('Private details'),
-                config: new Config('/test.sock'),
-            );
+            $connection = new Connection($input, $output, new Config('/test.sock'));
+            $connection->run(static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
                 actual: $output->bytes,

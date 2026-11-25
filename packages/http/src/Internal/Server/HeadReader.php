@@ -34,23 +34,22 @@ final class HeadReader
      * @param 'http'|'https' $scheme the scheme of the connection
      */
     public function __construct(
+        private readonly Buffer $buffer,
+        private readonly Reader $input,
+        private readonly Config $config,
         private readonly string $scheme,
         private readonly ?SocketDeadlines $idle,
     ) {}
 
-    public function read(
-        Buffer $buffer,
-        Reader $input,
-        Config $config,
-        bool $isKeepAlive = false,
-    ): ?RequestHead {
+    public function read(bool $isKeepAlive): ?RequestHead
+    {
         try {
-            if ($isKeepAlive && $buffer->count() === 0) {
+            if ($isKeepAlive && $this->buffer->count() === 0) {
                 // Once a byte arrives, the entire remainder shares one deadline.
-                $max = min($this->readSize, $config->maxHeadBytes);
-                $first = $this->idle !== null && $input instanceof Socket
-                    ? $this->idle->read($input, $max)
-                    : timeoutOr($config->idleTimeout, static fn() => $input->read($max));
+                $max = min($this->readSize, $this->config->maxHeadBytes);
+                $first = $this->idle !== null && $this->input instanceof Socket
+                    ? $this->idle->read($this->input, $max)
+                    : timeoutOr($this->config->idleTimeout, fn() => $this->input->read($max));
 
                 if ($first === null) {
                     return null;
@@ -58,28 +57,28 @@ final class HeadReader
 
                 // A short exchange needs little read space. Grow again if the peer fills it.
                 $this->readSize = \strlen($first) < 2048 ? 2048 : 8192;
-                $buffer->drain();
+                $this->buffer->drain();
                 // The delimiter is part of the match. Everything after it belongs to the body or the next request.
                 if ($this->lastWire !== null && $this->lastHead !== null && str_starts_with($first, $this->lastWire)) {
-                    $buffer->write(substr($first, \strlen($this->lastWire)));
+                    $this->buffer->write(substr($first, \strlen($this->lastWire)));
 
                     return $this->lastHead;
                 }
 
-                $buffer->write($first);
+                $this->buffer->write($first);
             }
 
-            $bytes = $buffer->readUntil(self::END);
+            $bytes = $this->buffer->readUntil(self::END);
             if ($bytes !== null) {
-                if (\strlen($bytes) + \strlen(self::END) > $config->maxHeadBytes) {
+                if (\strlen($bytes) + \strlen(self::END) > $this->config->maxHeadBytes) {
                     throw new \OverflowException();
                 }
 
                 return $this->parse($bytes);
             }
 
-            $filled = timeoutOr($config->headTimeout, static function () use ($buffer, $input, $config) {
-                $buffer->fillUntil($input, self::END, $config->maxHeadBytes);
+            $filled = timeoutOr($this->config->headTimeout, function () {
+                $this->buffer->fillUntil($this->input, self::END, $this->config->maxHeadBytes);
 
                 return true;
             });
@@ -88,19 +87,19 @@ final class HeadReader
                 throw new MalformedMessage('The request head did not arrive in time.', Status::REQUEST_TIMEOUT);
             }
         } catch (UnexpectedEof) {
-            if ($buffer->count() === 0) {
+            if ($this->buffer->count() === 0) {
                 return null;
             }
 
             throw new MalformedMessage('The connection ended in a request head.');
         } catch (\OverflowException) {
             throw new MalformedMessage(
-                message: \sprintf('The request head exceeds %d bytes.', $config->maxHeadBytes),
+                message: \sprintf('The request head exceeds %d bytes.', $this->config->maxHeadBytes),
                 status: Status::REQUEST_HEADER_FIELDS_TOO_LARGE,
             );
         }
 
-        $bytes = $buffer->readUntil(self::END) ?? throw new \LogicException('The request head is missing.');
+        $bytes = $this->buffer->readUntil(self::END) ?? throw new \LogicException('The request head is missing.');
 
         return $this->parse($bytes);
     }

@@ -25,6 +25,10 @@ final class FixedLengthReader extends StreamingBody
         get => false;
     }
 
+    public bool $isFullyBuffered {
+        get => $this->buffer->count() >= $this->remaining;
+    }
+
     #[\Override]
     public bool $mayHaveTrailers {
         get => false;

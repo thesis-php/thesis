@@ -16,10 +16,7 @@ use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Server\UnixEndpoint;
 use Thesis\Net\Address;
 use Thesis\Net\ListenFailed;
-use Thesis\Net\Server as SocketListener;
 use function Thesis\Async\checkpoint;
-use function Thesis\Async\onCancel;
-use function Thesis\Async\shield;
 use function Thesis\Net\listen;
 use function Thesis\Net\listenUnix;
 
@@ -37,13 +34,13 @@ final class Server implements Service
      */
     private ?Task $task = null;
 
-    private ?SocketListener $listener = null;
+    private ?Listener $listener = null;
 
     /**
      * The bound address while listening, including the port assigned by the OS.
      */
     public ?Address $address {
-        get => $this->listener?->isClosed === false ? $this->listener->address : null;
+        get => $this->listener?->address;
     }
 
     /**
@@ -83,7 +80,7 @@ final class Server implements Service
         }
 
         $endpoint = $this->config->endpoint;
-        $listener = match (true) {
+        $socketListener = match (true) {
             $endpoint instanceof TcpEndpoint => listen(
                 host: $endpoint->address->ip,
                 port: $endpoint->address->port,
@@ -93,41 +90,29 @@ final class Server implements Service
             ),
             $endpoint instanceof UnixEndpoint => listenUnix($endpoint->path, $endpoint->backlog),
         };
-        $this->listener = $listener;
-        $ready = false;
 
         try {
-            $driver = new Listener(
-                listener: $listener,
+            $httpListener = new Listener(
+                socketListener: $socketListener,
                 handler: $this->handler,
                 config: $this->config,
                 onError: $this->onError,
                 errorHandler: $this->errorHandler,
             );
-            $task = $group->daemon(static function () use ($listener, $driver, &$ready) {
-                $unsubscribe = onCancel($listener->close(...));
-
-                try {
-                    $ready = true;
-                    shield($driver->run(...));
-                } finally {
-                    $unsubscribe();
-                    $listener->close();
-                }
-            });
-
+            $this->listener = $httpListener;
+            $task = $group->daemon($httpListener->run(...));
             $this->task = $task;
 
             // A group may finish as soon as start() returns. A daemon cancelled before it starts never runs its finally.
-            while (!$ready && !$task->isDone) {
+            while (!$httpListener->isReady && !$task->isDone) {
                 checkpoint();
             }
 
-            if (!$ready) {
+            if (!$httpListener->isReady) {
                 $task->await();
             }
         } catch (\Throwable $error) {
-            $listener->close();
+            $socketListener->close();
             $this->listener = null;
 
             throw $error;
@@ -143,7 +128,7 @@ final class Server implements Service
      */
     public function stop(): void
     {
-        $this->listener?->close();
+        $this->listener?->stop();
         $this->task?->await();
     }
 }
