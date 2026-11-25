@@ -39,7 +39,7 @@ final class RouterBench
         $router = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/users/:id',
+                route: '/users/{id}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
         ]);
@@ -51,6 +51,38 @@ final class RouterBench
         for ($i = 0; $i < $count; ++$i) {
             if ($router($request, $context)->takeBody()->readAll() !== '42') {
                 throw new \LogicException('Wrong parameter.');
+            }
+        }
+    }
+
+    #[DataProvider('sizes')]
+    #[Linear('count')]
+    public function benchMixedLookup(int $count): void
+    {
+        $routes = [];
+        $handler = static fn() => new Response();
+        for ($i = 0; $i < 100; ++$i) {
+            $routes[] = new Route('GET', "/v{$i}/docs/{path*}", $handler);
+            $routes[] = new Route(
+                'GET',
+                "/v{$i}/reports/{year}-{month}",
+                $handler,
+                requirements: ['year' => '[0-9]{4}'],
+            );
+            $routes[] = new Route('GET', "/v{$i}/archive/{year?}", $handler);
+        }
+        $router = new Router($routes);
+        $requests = [
+            Request::get('/v50/docs/a/b'),
+            Request::get('/v60/reports/2026-11'),
+            Request::get('/v70/archive'),
+            Request::get('/v80/archive/2026'),
+        ];
+        for ($i = 0; $i < $count; ++$i) {
+            foreach ($requests as $request) {
+                if ($router->lookup($request) === null) {
+                    throw new \LogicException('Expected a match.');
+                }
             }
         }
     }

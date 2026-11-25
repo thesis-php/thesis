@@ -129,7 +129,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Each accepted socket occupies one slot until it closes. Shutdown must wake the supervisor even when
   the accept loop is waiting for a slot. That is why it waits on `Net\Server::awaitClose()`.
 
-- The Router constructor calls a private register() once per route, then sorts the patterns once.
+- The Router constructor calls a private register() once per route.
   Registration parses the pattern once and indexes the route by each method. All requests share them.
 - Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
   Both constructors accept a callable and store its closure.
@@ -144,6 +144,9 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Configure the error handler on the server. Middleware and the router receive the same Context, which exposes the configured ErrorHandler as $errorHandler.
   The default error page contains only the status and its standard reason phrase. The router owns Allow. Error handlers format responses before the final head. If formatting a 500 fails,
   preserve the original failure for ConnectionHandlingFailed and attempt an empty 500 only before writing starts.
+- Match a requirement against its parameter value. Wrapping fragments together in capturing groups
+  changes numbered backreferences and can mistake user-named captures for route parameters.
+- At the root, an omitted suffix can follow an empty literal segment: `//{id?}` also matches `/`.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.
@@ -151,10 +154,15 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 
 ### Decisions
 
-- Exact paths have their own table. A single trailing parameter after a literal prefix uses one prefix lookup.
-  For other patterns, group by segment count and parameter positions and try shapes in left-to-right specificity order.
-  Rejected: the compressed tree and generated PHP dispatcher. Tables won the mixed lookup on the small and medium
-  route sets. Generated PHP won the two-parameter case on the large set.
+- Exact paths have their own table. Dynamic paths share segment prefixes. Try literal children before
+  expressions, ordinary parameters and the remainder. Only try another branch after an incomplete path.
+  After registration, index a final plain parameter by prefix only when its parent has no literal or expression children.
+  Record which nodes have only literal children so lookup can skip all fallback checks there. The exact
+  table stores the route and match per method, including HEAD for GET when there is no explicit HEAD.
+  Together these changes cut Tally instructions for mixed lookup from 120.44M to 105.19M at 2048
+  iterations on PHP 8.6 aarch64. Peak memory in that benchmark grew from 785,552 to 817,480 bytes.
+  Rejected: using a compressed tree or generated PHP for every path. On small and medium sets of
+  simple routes the tables won mixed lookup. Generated PHP won the large two-parameter case.
 
 - The constructor takes the configuration and handler. Bind the endpoint in `start()` so a DI container can build the server
   without opening sockets and the application sees a bind failure at startup.

@@ -40,12 +40,12 @@ group(static function (Group $group) {
         config: new Config($endpoint),
         handler: new Router([
             new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
-            new Route(Method::GET, '/:id', static function (Request $request) {
+            new Route(Method::GET, '/{id}', static function (Request $request) {
                 delay(ms(250));
 
                 $id = routeMatch($request)
                     ?->param('id')
-                    ?? throw new LogicException('Expected the /:id route to supply id.')
+                    ?? throw new LogicException('Expected the /{id} route to supply id.')
                 ;
 
                 return new Response(body: $id);

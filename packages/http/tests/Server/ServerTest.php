@@ -45,7 +45,7 @@ final class ServerTest
             };
             $server = new Server(
                 config: new Config(0),
-                handler: new Router([new Route('GET', '/:id', static function (Request $request) use (&$handled) {
+                handler: new Router([new Route('GET', '/{id}', static function (Request $request) use (&$handled) {
                     $handled = $request;
 
                     return new Response(Status::NO_CONTENT);
@@ -84,7 +84,7 @@ final class ServerTest
             $route = $events[3] ?? null;
             \assert($route instanceof Event\RouteMatched);
             Assert::same($route->request->method, 'HEAD');
-            Assert::same($route->match->pattern, '/:id');
+            Assert::same($route->match->pattern, '/{id}');
             $started = $events[2] ?? null;
             \assert($started instanceof Event\RequestStarted);
             $ended = $events[4] ?? null;

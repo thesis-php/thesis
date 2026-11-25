@@ -238,20 +238,31 @@ use function Thesis\Http\Server\routeMatch;
 
 $router = new Router([
     new Route(Method::GET, '/users/me', static fn() => new Response(body: 'Current user')),
-    new Route(Method::GET, '/users/:id', static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? '')),
+    new Route(Method::GET, '/users/{id}', static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? '')),
 ]);
 
 $server = new Server(new Config(8080), $router);
 ```
 
-Patterns start with a slash and contain decoded literal segments or whole-segment parameters such as `:user_id`.
-Parameter names are unique within a pattern and use ASCII letters, digits and underscores, starting with a
-letter or underscore. A parameter consumes one nonempty segment. The router prefers a literal at the first
-segment where two complete matches differ. It then checks the case-sensitive method. An explicit HEAD wins
-over the GET fallback. A method mismatch yields 405 with all allowed methods, including HEAD for GET.
-An unknown path yields 404. Duplicate method and path shapes fail during construction.
+Patterns start with a slash. A placeholder such as `{user_id}` consumes a nonempty segment.
+Names start with an ASCII letter or underscore and may also contain digits. Each name occurs once.
+Use trailing optional segments (`/archive/{year?}/{month?}`) or capture the remaining path
+with a final `{path+}` (nonempty) or `{path*}` (possibly empty). The remainder keeps its slashes.
+Omitted optional parameters are absent unless supplied in the route's `defaults` string map.
 
-Matching uses the raw path component of the request URI. Slashes, trailing slashes, dot segments and plus signs keep their meaning.
+A segment can combine literals and parameters, for example `/reports/{year}-{month}.csv`.
+Pass PCRE fragments by parameter name in `requirements`, for example `['year' => '[0-9]{4}']`.
+A requirement matches its parameter, including slashes for a remainder. The router tries literal, constrained or compound,
+ordinary parameter, then remainder at each position. Overlapping expressions at the same
+position are tried in registration order. An explicit endpoint precedes an omitted suffix.
+Duplicate method and path shapes fail during construction.
+
+`$router->lookup($request)` returns the selected RouteMatch or null without calling a handler
+or emitting an event. Dispatch checks the method after selecting the complete path.
+An explicit HEAD wins over the GET fallback. A mismatch yields 405 with Allow, an unknown path 404.
+
+Matching uses the raw URI path. Dot segments, plus signs and trailing slashes keep their meaning.
+Pass `ignoreTrailingSlash: true` to the router to trim trailing slashes from both definitions and requests.
 An absolute URI with an empty path matches `/`. The special targets `OPTIONS *` and authority-form `CONNECT` have no route path.
 Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
 For example, `/users/a%252Fb` passes `a%2Fb` to the handler.

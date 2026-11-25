@@ -32,14 +32,14 @@ final readonly class RouterTest
     public function choosesTheMostSpecificCompletePathBeforeTheMethod(): void
     {
         $router = new Router([
-            new Route(Method::GET, '/users/:id', self::user(...)),
+            new Route(Method::GET, '/users/{id}', self::user(...)),
             new Route(Method::POST, '/users/me', static fn() => new Response(body: 'me')),
             new Route(
                 methods: Method::GET,
-                route: '/:group/me/:id',
+                route: '/{group}/me/{id}',
                 handler: static fn($request) => new Response(body: implode('/', routeMatch($request)->params ?? [])),
             ),
-            new Route(Method::GET, '/users/:id/info', static fn() => new Response(body: 'info')),
+            new Route(Method::GET, '/users/{id}/info', static fn() => new Response(body: 'info')),
         ]);
 
         $head = new Request(Method::HEAD, new Uri('/users/a+b%20c'));
@@ -69,9 +69,9 @@ final readonly class RouterTest
     public function ordersOverlappingParameterizedShapesLeftToRight(): void
     {
         $router = new Router([
-            new Route(Method::GET, '/:a/:b/info', static fn() => new Response(body: 'info')),
-            new Route(Method::GET, '/:a/files/:b', static fn() => new Response(body: 'files')),
-            new Route(Method::GET, '/users/:a/:b', static fn() => new Response(body: 'users')),
+            new Route(Method::GET, '/{a}/{b}/info', static fn() => new Response(body: 'info')),
+            new Route(Method::GET, '/{a}/files/{b}', static fn() => new Response(body: 'files')),
+            new Route(Method::GET, '/users/{a}/{b}', static fn() => new Response(body: 'users')),
         ]);
 
         Assert::same($router(Request::get('/users/files/1'), $this->context)->takeBody()->readAll(), 'users');
@@ -101,7 +101,7 @@ final readonly class RouterTest
         $router = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/:value',
+                route: '/{value}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('value') ?? ''),
             ),
         ]);
@@ -124,7 +124,7 @@ final readonly class RouterTest
     {
         $get = new Request(Method::HEAD, new Uri('/a/items/42'));
         $inner = new Router([
-            new Route(Method::GET, '/:group/items/:name', function ($request, $context) use ($get) {
+            new Route(Method::GET, '/{group}/items/{name}', function ($request, $context) use ($get) {
                 Assert::same($request, $get);
                 Assert::same($context, $this->context);
                 Assert::same(routeMatch($request)?->params, ['group' => 'a', 'name' => '42']);
@@ -137,7 +137,7 @@ final readonly class RouterTest
             $match = routeMatch($request);
             Assert::instanceOf($match, RouteMatch::class);
             Assert::same($match->method, Method::GET);
-            Assert::same($match->pattern, '/:team/items/:item');
+            Assert::same($match->pattern, '/{team}/items/{item}');
             Assert::null($match->param('missing'));
             Assert::same($match->params, ['team' => 'a', 'item' => '42']);
 
@@ -151,8 +151,8 @@ final readonly class RouterTest
             }),
         ]);
         $router = new Router((static function () use ($outer) {
-            yield new Route([Method::POST, Method::GET], '/:team/items/:item', $outer);
-            yield new Route(Method::PUT, '/:group/items/:name', static fn() => new Response());
+            yield new Route([Method::POST, Method::GET], '/{team}/items/{item}', $outer);
+            yield new Route(Method::PUT, '/{group}/items/{name}', static fn() => new Response());
         })());
         Assert::same($router($get, $this->context)->status, Status::OK);
         Assert::null(routeMatch($get));
@@ -180,10 +180,10 @@ final readonly class RouterTest
 
     public function rejectsDuplicateShapesForTheSameMethod(): void
     {
-        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate route GET /:name/sub/:part.');
+        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate route GET /{name}/sub/{part}.');
         new Router([
-            new Route(Method::GET, '/:id/sub/:part', static fn() => new Response()),
-            new Route(Method::GET, '/:name/sub/:part', static fn() => new Response()),
+            new Route(Method::GET, '/{id}/sub/{part}', static fn() => new Response()),
+            new Route(Method::GET, '/{name}/sub/{part}', static fn() => new Response()),
         ]);
     }
 
@@ -192,15 +192,21 @@ final readonly class RouterTest
      */
     public static function invalidRoutes(): iterable
     {
+        yield 'optional before literal' => [
+            'GET',
+            '/{id?}/end',
+            "Optional parameters must be trailing in '/{id?}/end'.",
+        ];
+        yield 'nonfinal remainder' => ['GET', '/{id*}/end', "Invalid remainder in '/{id*}/end'."];
         yield 'invalid method' => ['GE T', '/', "Invalid HTTP method 'GE T'."];
         yield 'newline in method' => ["GET\n", '/', "Invalid HTTP method 'GET\n'."];
-        yield 'newline in name' => [Method::GET, "/:id\n", "Invalid parameter ':id\n' in '/:id\n'."];
-        yield 'leading digit in name' => [Method::GET, '/:1x', "Invalid parameter ':1x' in '/:1x'."];
+        yield 'newline in name' => [Method::GET, "/{id\n}", "Invalid parameter '{id\n}' in '/{id\n}'."];
+        yield 'leading digit in name' => [Method::GET, '/{1x}', "Invalid parameter '{1x}' in '/{1x}'."];
         yield 'relative path' => [Method::GET, 'abc', "Invalid route pattern 'abc'."];
         yield 'NUL in pattern' => [Method::GET, "/a\0b", "Invalid route pattern '/a\0b'."];
-        yield 'empty name' => [Method::GET, '/:', "Invalid parameter ':' in '/:'."];
-        yield 'numeric name' => [Method::GET, '/:42', "Invalid parameter ':42' in '/:42'."];
-        yield 'punctuation in name' => [Method::GET, '/:id?', "Invalid parameter ':id?' in '/:id?'."];
+        yield 'empty name' => [Method::GET, '/{}', "Invalid parameter '{}' in '/{}'."];
+        yield 'numeric name' => [Method::GET, '/{42}', "Invalid parameter '{42}' in '/{42}'."];
+        yield 'punctuation in name' => [Method::GET, '/{id!}', "Invalid parameter '{id!}' in '/{id!}'."];
     }
 
     /**
@@ -224,17 +230,85 @@ final readonly class RouterTest
 
     public function rejectsDuplicateTrailingParameters(): void
     {
-        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate route GET /users/:name.');
+        Expect::exception(\InvalidArgumentException::class)->withMessage('Duplicate route GET /users/{name}.');
         new Router([
-            new Route(Method::GET, '/users/:id', static fn() => new Response()),
-            new Route(Method::GET, '/users/:name', static fn() => new Response()),
+            new Route(Method::GET, '/users/{id}', static fn() => new Response()),
+            new Route(Method::GET, '/users/{name}', static fn() => new Response()),
         ]);
     }
 
     public function rejectsRepeatedParameterNamesAtStartup(): void
     {
-        Expect::exception(\InvalidArgumentException::class)->withMessage("Invalid parameter ':id' in '/:id/:id'.");
-        new Router([new Route(Method::GET, '/:id/:id', static fn() => new Response())]);
+        Expect::exception(\InvalidArgumentException::class)->withMessage("Invalid parameter '{id}' in '/{id}/{id}'.");
+        new Router([new Route(Method::GET, '/{id}/{id}', static fn() => new Response())]);
+    }
+
+    public function looksUpOptionalCompoundAndRemainderParametersWithoutDispatch(): void
+    {
+        $handler = static fn() => throw new \LogicException('Unexpected dispatch.');
+        $router = new Router([
+            new Route('GET', '/archive/{year?}/{month?}', $handler, defaults: ['month' => '01']),
+            new Route('GET', '/files/{path*}', $handler),
+            new Route('GET', '/reports/{year}-{month}.csv', $handler, requirements: ['year' => '[0-9]{4}']),
+            new Route('GET', '/assets/{path+}', $handler, requirements: ['path' => '[a-z/]+']),
+        ]);
+        Assert::same($router->lookup(Request::get('/archive'))?->params, ['month' => '01']);
+        Assert::same($router->lookup(Request::get('/archive/2026/11'))?->params, ['year' => '2026', 'month' => '11']);
+        Assert::same($router->lookup(Request::get('/files'))?->params, ['path' => '']);
+        Assert::same($router->lookup(Request::get('/files/a/b/'))?->params, ['path' => 'a/b/']);
+        Assert::null($router->lookup(Request::get('/assets/')));
+        Assert::null($router->lookup(Request::get('/assets/a/42')));
+        Assert::same($router->lookup(Request::get('/assets/a'))?->params, ['path' => 'a']);
+        $report = $router->lookup(Request::get('/reports/2026-11.csv'));
+        Assert::same($report?->params, ['year' => '2026', 'month' => '11']);
+        Assert::null($router->lookup(Request::get('/reports/current-11.csv')));
+
+        $lenient = new Router([new Route('GET', '/docs/', $handler)], ignoreTrailingSlash: true);
+        Assert::same($lenient->lookup(Request::get('/docs'))?->pattern, '/docs/');
+    }
+
+    public function keepsCaptureGroupsLocalToEachRequirement(): void
+    {
+        $handler = static fn() => new Response();
+        $repeat = '([a-z])\1';
+        $named = '(?<p1>[0-9]+)';
+        $router = new Router([
+            new Route('GET', '/single/{x}', $handler, requirements: ['x' => $named]),
+            new Route('GET', '/pair/{x}-{y}', $handler, requirements: ['x' => $repeat, 'y' => $named]),
+            new Route('GET', '/tail/{x+}', $handler, requirements: ['x' => $repeat]),
+        ]);
+        Assert::same($router->lookup(Request::get('/single/123'))?->params, ['x' => '123']);
+        Assert::same($router->lookup(Request::get('/pair/aa-123'))?->params, ['x' => 'aa', 'y' => '123']);
+        Assert::null($router->lookup(Request::get('/pair/ab-123')));
+        Assert::same($router->lookup(Request::get('/tail/aa'))?->params, ['x' => 'aa']);
+    }
+
+    public function preservesAnEmptyLiteralBeforeAnOmittedRootSuffix(): void
+    {
+        $handler = static fn() => new Response();
+        foreach (['//{id?}' => [], '//{tail*}' => ['tail' => '']] as $pattern => $params) {
+            $router = new Router([new Route('GET', $pattern, $handler)]);
+            Assert::same($router->lookup(Request::get('/'))?->params, $params);
+        }
+    }
+
+    public function choosesTheCompletePathAcrossDynamicBranches(): void
+    {
+        $handler = static fn() => new Response();
+        $router = new Router([
+            new Route('GET', '/items/{value}', $handler),
+            new Route('GET', '/items/{path*}', $handler),
+            new Route('POST', '/items/{id}', $handler, requirements: ['id' => '[0-9]+']),
+            new Route('GET', '/items/{key}.csv/detail', $handler),
+        ]);
+
+        $response = $router(Request::get('/items/42'), $this->context);
+        Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
+        Assert::same($response->headers->get('Allow'), 'POST');
+        Assert::same($router->lookup(Request::get('/items/a.csv'))?->params, ['value' => 'a.csv']);
+        Assert::same($router->lookup(Request::get('/items/a.csv/detail'))?->params, ['key' => 'a']);
+        Assert::same($router->lookup(Request::get('/items/a.csv/other'))?->params, ['path' => 'a.csv/other']);
+        Assert::null($router->lookup(Request::get('/items/a%2Fb')));
     }
 
     public function servesThesisRequests(): void
@@ -242,10 +316,10 @@ final readonly class RouterTest
         $handler = new Router([
             new Route(
                 methods: Method::GET,
-                route: '/:id',
+                route: '/{id}',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),
-            new Route(Method::HEAD, '/:id', static fn() => new Response(Status::NO_CONTENT)),
+            new Route(Method::HEAD, '/{id}', static fn() => new Response(Status::NO_CONTENT)),
         ]);
         $missing = $handler(Request::get('/two/parts'), $this->context);
         Assert::same($missing->status, Status::NOT_FOUND);
