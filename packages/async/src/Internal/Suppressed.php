@@ -23,7 +23,6 @@ final class Suppressed
         }
 
         // A constant cannot be written to by offset, its object can.
-        /** @var \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed */
         $suppressed = SUPPRESSED;
         // An object, not a list: neither a lookup nor a copy per add, so thousands of failures stay linear.
         $errors = $suppressed[$first] ?? null;
@@ -77,9 +76,7 @@ final class Suppressed
      */
     public static function of(\Throwable $error): array
     {
-        /** @var \WeakMap<\Throwable, \SplObjectStorage<\Throwable, null>> $suppressed */
-        $suppressed = SUPPRESSED;
-        $errors = $suppressed[$error] ?? null;
+        $errors = SUPPRESSED[$error] ?? null;
 
         return $errors === null ? [] : [...$errors];
     }

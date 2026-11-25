@@ -25,7 +25,6 @@ final class Context
      */
     public static function capture(): array
     {
-        /** @var Values */
         return CONTEXT[fiberKey()] ?? [];
     }
 
@@ -47,9 +46,7 @@ final class Context
     public static function get(ScopedValue $key, mixed $default): mixed
     {
         // Not through capture(): it is read on every get(), one call less.
-        /** @var \WeakMap<object, Values> $contexts */
-        $contexts = CONTEXT;
-        $binding = $contexts[fiberKey()][spl_object_id($key)] ?? null;
+        $binding = CONTEXT[fiberKey()][spl_object_id($key)] ?? null;
 
         return $binding === null ? $default : $binding[1];
     }
@@ -59,10 +56,7 @@ final class Context
      */
     public static function isBound(ScopedValue $key): bool
     {
-        /** @var \WeakMap<object, Values> $contexts */
-        $contexts = CONTEXT;
-
-        return isset($contexts[fiberKey()][spl_object_id($key)]);
+        return isset(CONTEXT[fiberKey()][spl_object_id($key)]);
     }
 
     /**

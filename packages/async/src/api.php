@@ -522,7 +522,6 @@ function map(iterable $items, int $concurrency, callable $fn): array
  */
 function synchronized(Semaphore $semaphore, callable $fn): mixed
 {
-    /** @var \WeakMap<object, \WeakMap<Semaphore, Lock>> $held */
     $held = Internal\HELD_LOCKS;
 
     // Only the inner map is kept in a variable, not the fiber's key: see fiberKey().
@@ -556,7 +555,6 @@ function synchronized(Semaphore $semaphore, callable $fn): mixed
  */
 function synchronizedKey(KeyedSemaphore $semaphore, int|string $key, callable $fn): mixed
 {
-    /** @var \WeakMap<object, \WeakMap<KeyedSemaphore, \ArrayObject<array-key, Lock>>> $held */
     $held = Internal\HELD_KEYED_LOCKS;
 
     // As in synchronized(), the fiber's key is not kept in a variable: see fiberKey().

@@ -11,6 +11,9 @@ How to use it is in `README.md`.
 - An extension returns `null` (the type of the PHPDoc) whenever it is not sure: a value that is not surely
   a callable, an unpacked argument, an iterable that is not an array. A wrong call keeps its error from PHPStan,
   and a type the extension cannot prove is never narrower than the PHPDoc promises.
+- For a constant fetch, resolve the name in the caller's scope, then reflect the fully qualified name with a null
+  scope. Passing the scope to `getConstant()` makes PHPStan resolve the PHP version through another constant fetch
+  and re-enter the extension. Track the declaration file because its PHPDoc supplies the type.
 - A shape describes the keys in their order, and so does a list. An extension carries the shape, `list` or
   `non-empty-` of the input to the result only for a function that returns a value for every key of its input,
   in its order: `all()` and `map()` do. `some()` returns the results in the order they succeeded.

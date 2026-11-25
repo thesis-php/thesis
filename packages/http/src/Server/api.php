@@ -14,8 +14,5 @@ use const Thesis\Http\Internal\ROUTE_MATCHES;
  */
 function routeMatch(Request $request): ?RouteMatch
 {
-    /** @var ?RouteMatch $match */
-    $match = ROUTE_MATCHES[$request] ?? null;
-
-    return $match;
+    return ROUTE_MATCHES[$request] ?? null;
 }

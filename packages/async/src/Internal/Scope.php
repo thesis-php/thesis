@@ -123,7 +123,6 @@ final class Scope implements Waiter
 
     public static function current(): self
     {
-        /** @var self */
         return CURRENT_SCOPE[fiberKey()] ?? ROOT_SCOPE;
     }
 
@@ -138,7 +137,6 @@ final class Scope implements Waiter
     {
         // A constant cannot be written to by offset, its object can.
         $scopes = CURRENT_SCOPE;
-        /** @var ?self $previous */
         $previous = $scopes[fiberKey()] ?? null;
         $scopes[fiberKey()] = $this;
 
