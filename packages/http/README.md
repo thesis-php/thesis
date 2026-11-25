@@ -57,6 +57,16 @@ Use `Response::json($value, status: Status::CREATED)` to encode a PHP value as `
 Use `Response::html($body)` for a UTF-8 HTML string or stream. Both constructors default to status 200.
 Pass a `Headers` object with `headers:` to either constructor. A supplied `Content-Type` takes precedence.
 
+```php
+$value = $request->takeJson(associative: false, limit: 64 * 1024);
+return Response::json($value);
+```
+
+`Request::takeJson()` takes the body once, even when decoding fails, and uses the same default limit as `readAll()`.
+If you need trailers, use `takeBody()`, read the body to the end, then call `trailers()` on it.
+JSON objects decode to associative arrays by default. Pass `associative: false` for `stdClass`.
+The default flags include `JSON_THROW_ON_ERROR`, so decoding failures throw `JsonException`.
+
 A client middleware that may resend an upload takes the body before calling the next handler.
 It passes `$request->withBody($body)` on the first attempt. When policy permits another attempt
 and the body implements `ReplayableBody`, it passes `$request->withBody($body->fresh())`.

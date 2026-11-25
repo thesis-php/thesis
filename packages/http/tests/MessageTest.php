@@ -50,6 +50,31 @@ final class MessageTest
         Assert::same(Response::html('', headers: $html)->headers->all('content-type'), ['text/html']);
     }
 
+    public function readsJsonObjectsAsObjectsOrAssociativeArrays(): void
+    {
+        $request = Request::get('/');
+        Assert::same($request->withBody('{"id":42}')->takeJson(), ['id' => 42]);
+        Assert::instanceOf($request->withBody('{}')->takeJson(associative: false), \stdClass::class);
+        Assert::null($request->withBody('null')->takeJson(limit: 4));
+        Expect::exception(\JsonException::class);
+        $request->takeJson();
+    }
+
+    public function invalidJsonConsumesTheSharedHandoff(): void
+    {
+        $request = Request::get('/')->withBody('{');
+        $copy = $request->withHeader('accept', 'application/json');
+        Assert::instanceOf(thrown($request->takeJson(...)), \JsonException::class);
+        Expect::exception(\LogicException::class);
+        $copy->takeBody();
+    }
+
+    public function boundsJsonBeforeDecoding(): void
+    {
+        Expect::exception(\OverflowException::class);
+        Request::get('/')->withBody('null')->takeJson(limit: 3);
+    }
+
     public function changingQueryAndHeadersLeavesTheOriginalRequestIntact(): void
     {
         $original = Request::get('/search?tag=a&sort=C++&tag=b#top');

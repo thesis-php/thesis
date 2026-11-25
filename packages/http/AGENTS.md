@@ -24,6 +24,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   calling that layer again cannot give it a fresh reader, even when the body implements `ReplayableBody`.
   Retry work that uses a decoded DTO after deserialization, where the caller can account for side effects.
 
+- `Request::takeJson()` shares the single handoff with `takeBody()`, including when decoding fails.
 - Messages share `EMPTY_BODY` for an empty payload without trailers. Each message still owns its body handoff.
 - Trailer fields may be pending until the reader finishes.
 - All metadata copies of a message share one body handoff. A replacement body has its own handoff.

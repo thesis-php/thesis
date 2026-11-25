@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Testo\Assert;
+
 /**
  * The lines of the headers as pairs of a name and a value, in the order of iteration. Not an array
  * indexed by name: PHP would turn a numeric name into an int key.
@@ -37,4 +39,18 @@ function failure(callable $call): ?string
     }
 
     return null;
+}
+
+/**
+ * @param callable(): mixed $fn
+ */
+function thrown(callable $fn): \Throwable
+{
+    try {
+        $fn();
+    } catch (\Throwable $exception) {
+        return $exception;
+    }
+
+    Assert::fail('Nothing was thrown.');
 }
