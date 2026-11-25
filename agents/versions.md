@@ -29,8 +29,8 @@ the minor of all.
   is outside the cascade: a new series of `async` releases it too when its types change.
   The new series of a dependent is started by hand, in the commit that changes its range: the release
   does not check it (`releases.md`).
-- **Development projects.** A manifest with `type: 'project'` can set `devMain: true` to pin its whole runtime
-  tree of monorepo dependencies to `dev-main` in the generated Composer project.
+- **Development projects.** A manifest with `type: 'project'` can set `devMain: true` to pin its runtime and
+  development trees of monorepo dependencies to `dev-main` in the generated Composer project.
 - **One branch.** Only `main` of the monorepo is split, to `main` of every package, the default branch:
   a series lives on `main` until the next one starts. There are no maintenance branches yet: a fix goes
   to the current series, and the branches of older series are designed with the first backport that someone needs.

@@ -60,16 +60,19 @@ final readonly class GeneratorTest
         );
     }
 
-    public static function pinsTheProjectsRuntimeDependencyTreeToDevMain(): void
+    public static function pinsTheProjectsDependenciesToDevMain(): void
     {
         $fixture = new Fixture()
             ->package('time')
             ->package('io', "require: ['thesis/time' => '*']")
             ->package('net', "require: ['thesis/io' => '*']")
             ->package('other')
+            ->package('process', "require: ['thesis/io' => '*']")
+            ->package('watch', "require: ['thesis/process' => '*']")
             ->package('async', "require: ['thesis/net' => '*'], requireDev: ['thesis/other' => '*']")
             ->package('demo', <<<'PHP'
                 require: ['psr/log' => '^3.0', 'thesis/async' => '*', 'thesis/io' => '*'],
+                requireDev: ['psr/log' => '^3.1', 'thesis/watch' => '*'],
                 type: 'project',
                 devMain: true,
                 PHP)
@@ -78,6 +81,11 @@ final readonly class GeneratorTest
         $files = Generator::generate($fixture->load());
 
         $project = Json::decode($files['packages/demo/composer.json'] ?? '', 'demo');
+        Assert::same($project['require-dev'] ?? null, [
+            'psr/log' => '^3.1',
+            'thesis/process' => 'dev-main',
+            'thesis/watch' => 'dev-main',
+        ]);
         Assert::same($project['type'] ?? null, 'project');
         Assert::same($project['require'] ?? null, [
             'php' => '^8.5',

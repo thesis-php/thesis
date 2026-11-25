@@ -52,7 +52,7 @@ final readonly class Manifest
      *     are also included in the split repository.
      * @param non-empty-string $type composer type: 'phpstan-extension' for a package that a composer plugin
      *     installs by its type
-     * @param bool $devMain pins the runtime Thesis dependencies of a Composer project to dev-main,
+     * @param bool $devMain pins the runtime and development Thesis dependencies of a Composer project to dev-main,
      *     including transitive dependencies
      * @param array<non-empty-string, mixed> $extra composer extra, the config of such a plugin. A file it names
      *     outside src/ goes to $dist too

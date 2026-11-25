@@ -160,12 +160,19 @@ final class Generator
         }
 
         $require = $this->versioned($package, $manifest->require);
+        $requireDev = $this->versioned($package, $manifest->requireDev);
         if ($manifest->devMain) {
             if ($manifest->type !== 'project') {
                 throw new MonorepoException("{$package->path}/package.php: devMain requires type: 'project'.");
             }
 
             $require = $this->pinDevMain($require);
+            $runtimePins = array_filter(
+                array: $require,
+                callback: fn(string $name) => $this->monorepo->package($name) !== null,
+                mode: ARRAY_FILTER_USE_KEY,
+            );
+            $requireDev = array_diff_key($this->pinDevMain($requireDev), $runtimePins);
         }
 
         $composer = [
@@ -180,7 +187,7 @@ final class Generator
                 'php' => $config->php,
                 ...$require,
             ]),
-            'require-dev' => self::sortRequire($this->versioned($package, $manifest->requireDev)),
+            'require-dev' => self::sortRequire($requireDev),
             'conflict' => self::sortRequire($manifest->conflict),
             'suggest' => self::sortRequire($manifest->suggest),
             'bin' => $manifest->bin,
