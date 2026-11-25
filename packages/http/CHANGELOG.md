@@ -24,7 +24,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Create routes with named constructors for each standard HTTP method and `Route::any()` for a fallback.
   Use `pattern:` for the path template and read it from `Route::$pattern`.
 - Register one or more methods per route or pass `methods: null` to accept any remaining method on that path. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
-  Inspect matches with `Router::lookup()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
+  Inspect the selected route and match or the failure reason (including allowed methods for 405) with `Router::match()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.

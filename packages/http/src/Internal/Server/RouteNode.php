@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Http\Internal\Server;
 
 use Thesis\Http\Method;
+use Thesis\Http\Server\MethodNotAllowed;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\RouteMatch;
 
@@ -37,7 +38,7 @@ final class RouteNode
     public ?self $optional = null;
 
     /**
-     * @var array<array-key, array{Route, list<non-empty-string>}|array{Route, RouteMatch}>
+     * @var array<array-key, array{Route, list<non-empty-string>}|RouteMatch>
      */
     private array $routes = [];
 
@@ -63,17 +64,17 @@ final class RouteNode
             if (isset($this->routes[$method])) {
                 throw new \InvalidArgumentException("Duplicate route {$method} {$route->pattern}.");
             }
-            $match = $names === [] ? new RouteMatch($method, $route->pattern, $route->defaults) : $names;
-            $this->routes[$method] = [$route, $match];
+            $this->routes[$method] = $names === []
+                ? new RouteMatch($route, $method, $route->defaults)
+                : [$route, $names];
         }
     }
 
     /**
      * @param list<string> $segments
      * @param list<string> $values
-     * @return array{Route, RouteMatch}|string|null
      */
-    public function find(array $segments, int $offset, array $values, string $method): null|array|string
+    public function find(array $segments, int $offset, array $values, string $method): null|RouteMatch|MethodNotAllowed
     {
         $node = $this;
 
@@ -139,9 +140,8 @@ final class RouteNode
 
     /**
      * @param list<string> $values
-     * @return array{Route, RouteMatch}|string|null
      */
-    private function matchRemainder(string $tail, array $values, string $method): null|array|string
+    private function matchRemainder(string $tail, array $values, string $method): null|RouteMatch|MethodNotAllowed
     {
         $node = $this->remainder;
         foreach ($this->remainderExpressions as $regex => $candidate) {
@@ -166,9 +166,8 @@ final class RouteNode
 
     /**
      * @param list<string> $values
-     * @return array{Route, RouteMatch}|string
      */
-    public function select(array $values, string $method): array|string
+    public function select(array $values, string $method): RouteMatch|MethodNotAllowed
     {
         if ($method === Method::HEAD && !isset($this->routes[$method]) && isset($this->routes[Method::GET])) {
             $method = Method::GET;
@@ -180,10 +179,13 @@ final class RouteNode
                 $methods[] = Method::HEAD;
             }
 
-            return implode(', ', $methods);
+            /** @var non-empty-list<string> $allowedMethods */
+            $allowedMethods = array_map(strval(...), $methods);
+
+            return new MethodNotAllowed($allowedMethods);
         }
 
-        if ($entry[1] instanceof RouteMatch) {
+        if ($entry instanceof RouteMatch) {
             return $entry;
         }
         [$route, $names] = $entry;
@@ -192,6 +194,6 @@ final class RouteNode
             $params += $route->defaults;
         }
 
-        return [$route, new RouteMatch($method, $route->pattern, $params)];
+        return new RouteMatch($route, $method, $params);
     }
 }

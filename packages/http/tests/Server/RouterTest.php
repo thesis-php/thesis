@@ -94,14 +94,18 @@ final readonly class RouterTest
         $response = $router(new Request(Method::POST, $uri), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), '123, GET, HEAD');
+        $result = $router->match(new Request(Method::POST, $uri));
+        Assert::instanceOf($result, MethodNotAllowed::class);
+        Assert::same($result->allowedMethods, ['123', 'GET', 'HEAD']);
     }
 
     public function fallsBackToAnyMethodOnlyOnTheSelectedPath(): void
     {
         $forward = static fn(Request $request) => new Response(body: $request->method);
         $get = static fn() => new Response(body: 'local');
+        $fallback = Route::any('/storage/{path+}', $forward);
         $router = new Router([
-            Route::any('/storage/{path+}', $forward),
+            $fallback,
             new Route(Method::GET, '/storage/{name+}', $get),
             Route::get('/storage/status', $get),
             new Route('*', '/exact[/]', $get),
@@ -110,16 +114,18 @@ final readonly class RouterTest
 
         $custom = new Request('PROPFIND', new Uri('/storage/a.txt'));
         Assert::same($router($custom, $this->context)->takeBody()->readAll(), 'PROPFIND');
-        $match = $router->lookup($custom);
-        Assert::same($match?->method, 'PROPFIND');
+        $match = $router->match($custom);
+        Assert::instanceOf($match, RouteMatch::class);
+        Assert::same($match->route, $fallback);
+        Assert::same($match->method, 'PROPFIND');
         Assert::same($match->params, ['path' => 'a.txt']);
-        Assert::same($router->lookup(new Request('HEAD', $custom->uri))?->method, 'GET');
+        Assert::same(self::matched($router, new Request('HEAD', $custom->uri))->method, 'GET');
         $denied = $router(new Request('DELETE', new Uri('/storage/status')), $this->context);
         Assert::same($denied->status, 405);
         Assert::same($denied->headers->get('Allow'), 'GET, HEAD');
         $exact = new Uri('/exact/');
         Assert::same($router(new Request('*', $exact), $this->context)->takeBody()->readAll(), 'local');
-        Assert::same($router->lookup(new Request('HEAD', $exact))?->method, 'HEAD');
+        Assert::same(self::matched($router, new Request('HEAD', $exact))->method, 'HEAD');
     }
 
     public function keepsTheRequestMethodAndDefaultsOnADynamicFallback(): void
@@ -128,10 +134,10 @@ final readonly class RouterTest
         $route = new Route(null, '/{group}/items/{id?}', $handler, defaults: ['id' => 'latest']);
         Assert::null($route->methods);
         $router = new Router([$route]);
-        $match = $router->lookup(new Request('HEAD', new Uri('/news/items')));
-        Assert::same($match?->method, 'HEAD');
+        $match = self::matched($router, new Request('HEAD', new Uri('/news/items')));
+        Assert::same($match->method, 'HEAD');
         Assert::same($match->params, ['group' => 'news', 'id' => 'latest']);
-        Assert::same($router->lookup(Request::get('/news/items/42'))?->params, ['group' => 'news', 'id' => '42']);
+        Assert::same(self::matched($router, Request::get('/news/items/42'))->params, ['group' => 'news', 'id' => '42']);
     }
 
     public function rejectsDuplicateFallbackShapes(): void
@@ -185,7 +191,7 @@ final readonly class RouterTest
             $match = routeMatch($request);
             Assert::instanceOf($match, RouteMatch::class);
             Assert::same($match->method, Method::GET);
-            Assert::same($match->pattern, '/{team}/items/{item}');
+            Assert::same($match->route->pattern, '/{team}/items/{item}');
             Assert::null($match->param('missing'));
             Assert::same($match->params, ['team' => 'a', 'item' => '42']);
 
@@ -301,16 +307,16 @@ final readonly class RouterTest
             new Route('GET', '/reports/{year}-{month}.csv', $handler, requirements: ['year' => '[0-9]{4}']),
             new Route('GET', '/assets/{path+}', $handler, requirements: ['path' => '[a-z/]+']),
         ]);
-        Assert::same($router->lookup(Request::get('/archive'))?->params, ['month' => '01']);
-        Assert::same($router->lookup(Request::get('/archive/2026/11'))?->params, ['year' => '2026', 'month' => '11']);
-        Assert::same($router->lookup(Request::get('/files'))?->params, ['path' => '']);
-        Assert::same($router->lookup(Request::get('/files/a/b/'))?->params, ['path' => 'a/b/']);
-        Assert::null($router->lookup(Request::get('/assets/')));
-        Assert::null($router->lookup(Request::get('/assets/a/42')));
-        Assert::same($router->lookup(Request::get('/assets/a'))?->params, ['path' => 'a']);
-        $report = $router->lookup(Request::get('/reports/2026-11.csv'));
-        Assert::same($report?->params, ['year' => '2026', 'month' => '11']);
-        Assert::null($router->lookup(Request::get('/reports/current-11.csv')));
+        Assert::same(self::matched($router, Request::get('/archive'))->params, ['month' => '01']);
+        Assert::same(self::matched($router, Request::get('/archive/2026/11'))->params, ['year' => '2026', 'month' => '11']);
+        Assert::same(self::matched($router, Request::get('/files'))->params, ['path' => '']);
+        Assert::same(self::matched($router, Request::get('/files/a/b/'))->params, ['path' => 'a/b/']);
+        Assert::same($router->match(Request::get('/assets/')), RouteFailure::NotFound);
+        Assert::same($router->match(Request::get('/assets/a/42')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, Request::get('/assets/a'))->params, ['path' => 'a']);
+        $report = self::matched($router, Request::get('/reports/2026-11.csv'));
+        Assert::same($report->params, ['year' => '2026', 'month' => '11']);
+        Assert::same($router->match(Request::get('/reports/current-11.csv')), RouteFailure::NotFound);
     }
 
     public function matchesOneOptionalTrailingSlash(): void
@@ -320,11 +326,11 @@ final readonly class RouterTest
             new Route('GET', '/docs[/]', $handler),
             new Route('GET', '/archive/{year?}[/]', $handler),
         ]);
-        Assert::same($router->lookup(Request::get('/docs'))?->pattern, '/docs[/]');
-        Assert::same($router->lookup(Request::get('/docs/'))?->pattern, '/docs[/]');
-        Assert::null($router->lookup(Request::get('/docs//')));
-        Assert::same($router->lookup(Request::get('/archive/'))?->params, []);
-        Assert::same($router->lookup(Request::get('/archive/2026/'))?->params, ['year' => '2026']);
+        Assert::same(self::matched($router, Request::get('/docs'))->route->pattern, '/docs[/]');
+        Assert::same(self::matched($router, Request::get('/docs/'))->route->pattern, '/docs[/]');
+        Assert::same($router->match(Request::get('/docs//')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, Request::get('/archive/'))->params, []);
+        Assert::same(self::matched($router, Request::get('/archive/2026/'))->params, ['year' => '2026']);
     }
 
     public function rejectsAnExplicitRouteCoveredByAnOptionalSlash(): void
@@ -345,9 +351,9 @@ final readonly class RouterTest
             static fn() => new Response(),
             requirements: ['first' => '[0-9]+', 'second' => '\d{2,3}'],
         )]);
-        $match = $router->lookup(Request::get('/123456.txt'));
-        Assert::same($match?->params, ['first' => '1', 'second' => '23', 'third' => '456']);
-        Assert::null($router->lookup(Request::get('/123.txt')));
+        $match = self::matched($router, Request::get('/123456.txt'));
+        Assert::same($match->params, ['first' => '1', 'second' => '23', 'third' => '456']);
+        Assert::same($router->match(Request::get('/123.txt')), RouteFailure::NotFound);
     }
 
     public function keepsCaptureGroupsLocalToEachRequirement(): void
@@ -360,10 +366,10 @@ final readonly class RouterTest
             new Route('GET', '/pair/{x}-{y}', $handler, requirements: ['x' => $repeat, 'y' => $named]),
             new Route('GET', '/tail/{x+}', $handler, requirements: ['x' => $repeat]),
         ]);
-        Assert::same($router->lookup(Request::get('/single/123'))?->params, ['x' => '123']);
-        Assert::same($router->lookup(Request::get('/pair/aa-123'))?->params, ['x' => 'aa', 'y' => '123']);
-        Assert::null($router->lookup(Request::get('/pair/ab-123')));
-        Assert::same($router->lookup(Request::get('/tail/aa'))?->params, ['x' => 'aa']);
+        Assert::same(self::matched($router, Request::get('/single/123'))->params, ['x' => '123']);
+        Assert::same(self::matched($router, Request::get('/pair/aa-123'))->params, ['x' => 'aa', 'y' => '123']);
+        Assert::same($router->match(Request::get('/pair/ab-123')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, Request::get('/tail/aa'))->params, ['x' => 'aa']);
     }
 
     public function preservesAnEmptyLiteralBeforeAnOmittedRootSuffix(): void
@@ -371,7 +377,7 @@ final readonly class RouterTest
         $handler = static fn() => new Response();
         foreach (['//{id?}' => [], '//{tail*}' => ['tail' => '']] as $pattern => $params) {
             $router = new Router([new Route('GET', $pattern, $handler)]);
-            Assert::same($router->lookup(Request::get('/'))?->params, $params);
+            Assert::same(self::matched($router, Request::get('/'))->params, $params);
         }
     }
 
@@ -388,10 +394,10 @@ final readonly class RouterTest
         $response = $router(Request::get('/items/42'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'POST');
-        Assert::same($router->lookup(Request::get('/items/a.csv'))?->params, ['value' => 'a.csv']);
-        Assert::same($router->lookup(Request::get('/items/a.csv/detail'))?->params, ['key' => 'a']);
-        Assert::same($router->lookup(Request::get('/items/a.csv/other'))?->params, ['path' => 'a.csv/other']);
-        Assert::null($router->lookup(Request::get('/items/a%2Fb')));
+        Assert::same(self::matched($router, Request::get('/items/a.csv'))->params, ['value' => 'a.csv']);
+        Assert::same(self::matched($router, Request::get('/items/a.csv/detail'))->params, ['key' => 'a']);
+        Assert::same(self::matched($router, Request::get('/items/a.csv/other'))->params, ['path' => 'a.csv/other']);
+        Assert::same($router->match(Request::get('/items/a%2Fb')), RouteFailure::BadPath);
     }
 
     public function servesThesisRequests(): void
@@ -419,5 +425,13 @@ final readonly class RouterTest
     private static function user(Request $request): Response
     {
         return new Response(body: $request->method . ' ' . (routeMatch($request)?->param('id') ?? ''));
+    }
+
+    private static function matched(Router $router, Request $request): RouteMatch
+    {
+        $result = $router->match($request);
+        Assert::instanceOf($result, RouteMatch::class);
+
+        return $result;
     }
 }

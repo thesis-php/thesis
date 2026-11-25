@@ -226,7 +226,7 @@ Build a `Router` once and pass it directly to `Server`. The constructor accepts 
 Use `Route::any()` for the fallback. Each route handler receives the request
 and the connection context. Inside the route handler and its middleware, `Thesis\Http\Server\routeMatch($request)` returns the active match.
 Use `Thesis\Http\Server\routeParam($request, $name)` to read one decoded parameter. It returns null when the parameter is absent or the request has no active match.
-Outside dispatch `routeMatch()` returns null. The match’s `method` identifies the selected method and its `pattern` comes from `Route::$pattern`.
+Outside dispatch `routeMatch()` returns null. Read the selected method from `$match->method` and the registered pattern from `$match->route->pattern`.
 `param($name)` returns a decoded parameter or null, and `$match->params` contains all parameters.
 
 ```php
@@ -258,8 +258,10 @@ ordinary parameter, then remainder at each position. Overlapping expressions at 
 position are tried in registration order. An explicit endpoint precedes an omitted suffix.
 Duplicate method and path shapes fail during construction.
 
-`$router->lookup($request)` returns the selected RouteMatch or null without calling a handler
-or emitting an event. Dispatch checks the method after selecting the complete path.
+`$router->match($request)` selects a route without calling a handler or emitting an event.
+On success it returns a `RouteMatch`. Read the registered route from `$match->route` and the decoded parameters from `$match->params`.
+An invalid path returns `RouteFailure::BadPath` (400), an unknown path returns `RouteFailure::NotFound` (404),
+and a method mismatch returns `MethodNotAllowed` (405) with the list of method strings in `$allowedMethods`. Dispatch checks the method after selecting the complete path.
 An explicit HEAD wins over the GET fallback. A route with `methods: null` handles any remaining method
 for the selected path and reports the request's method in `RouteMatch`. Only one such route may occupy a path shape.
 For example, `Route::any('/storage/{path+}', $proxy)` forwards custom methods such as PROPFIND.

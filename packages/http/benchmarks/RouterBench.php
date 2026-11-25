@@ -14,6 +14,7 @@ use Thesis\Http\Response;
 use Thesis\Http\Server\Context;
 use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\Route;
+use Thesis\Http\Server\RouteMatch;
 use Thesis\Http\Server\Router;
 use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
@@ -68,7 +69,8 @@ final class RouterBench
         $serial = str_repeat('1', $count);
         $request = Request::get("/parts/{$serial}ab");
         for ($i = 0; $i < 64; ++$i) {
-            if ($router->lookup($request)?->params !== ['serial' => $serial, 'code' => 'ab']) {
+            $result = $router->match($request);
+            if (!$result instanceof RouteMatch || $result->params !== ['serial' => $serial, 'code' => 'ab']) {
                 throw new \LogicException('Wrong parameter boundary.');
             }
         }
@@ -99,7 +101,7 @@ final class RouterBench
         ];
         for ($i = 0; $i < $count; ++$i) {
             foreach ($requests as $request) {
-                if ($router->lookup($request) === null) {
+                if (!$router->match($request) instanceof RouteMatch) {
                     throw new \LogicException('Expected a match.');
                 }
             }

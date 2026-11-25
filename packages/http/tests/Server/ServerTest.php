@@ -84,7 +84,7 @@ final class ServerTest
             $route = $events[3] ?? null;
             \assert($route instanceof Event\RouteMatched);
             Assert::same($route->request->method, 'HEAD');
-            Assert::same($route->match->pattern, '/{id}');
+            Assert::same($route->match->route->pattern, '/{id}');
             $started = $events[2] ?? null;
             \assert($started instanceof Event\RequestStarted);
             $ended = $events[4] ?? null;

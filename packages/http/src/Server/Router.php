@@ -21,7 +21,7 @@ final class Router
     private readonly RouteNode $root;
 
     /**
-     * @var array<string, array<array-key, array{Route, RouteMatch}>>
+     * @var array<string, array<array-key, RouteMatch>>
      */
     private array $exact = [];
 
@@ -59,51 +59,7 @@ final class Router
         }
     }
 
-    public function lookup(Request $request): ?RouteMatch
-    {
-        $result = $this->resolve($request);
-
-        return \is_array($result) ? $result[1] : null;
-    }
-
-    public function __invoke(Request $request, Context $context): Response
-    {
-        $result = $this->resolve($request);
-        if (\is_string($result)) {
-            $response = $context->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, $request);
-
-            return $response->withHeader('Allow', $result);
-        }
-        if (\is_int($result)) {
-            return $context->errorHandler->handleError($result, $request);
-        }
-        [$route, $match] = $result;
-        $matches = ROUTE_MATCHES;
-        $previous = $matches[$request] ?? null;
-        $matches[$request] = $match;
-
-        try {
-            if ($context->dispatcher->listens(Event\RouteMatched::class)) {
-                $context->dispatcher->dispatch(new Event\RouteMatched(
-                    request: $request,
-                    match: $match,
-                ));
-            }
-
-            return ($route->handler)($request, $context);
-        } finally {
-            if ($previous === null) {
-                unset($matches[$request]);
-            } else {
-                $matches[$request] = $previous;
-            }
-        }
-    }
-
-    /**
-     * @return array{Route, RouteMatch}|string|400|404
-     */
-    private function resolve(Request $request): array|string|int
+    public function match(Request $request): RouteMatch|RouteFailure|MethodNotAllowed
     {
         $path = $request->uri->getRawPath();
         if ($path === '') {
@@ -112,19 +68,19 @@ final class Router
                 || $request->method === Method::CONNECT
                 || ($request->method === Method::OPTIONS && $request->uri->getRawQuery() === null)
             ) {
-                return Status::NOT_FOUND;
+                return RouteFailure::NotFound;
             }
             $path = '/';
         }
 
         if (str_contains($path, '%')) {
             if (preg_match('/%(?:2f|00|(?![a-f0-9]{2}))/i', $path) === 1) {
-                return Status::BAD_REQUEST;
+                return RouteFailure::BadPath;
             }
             $path = rawurldecode($path);
         }
         if (str_contains($path, "\0")) {
-            return Status::BAD_REQUEST;
+            return RouteFailure::BadPath;
         }
         if (isset($this->exact[$path])) {
             $routes = $this->exact[$path];
@@ -135,13 +91,16 @@ final class Router
             if (isset($this->exactFallback[$path])) {
                 $route = $this->exactFallback[$path];
 
-                return [$route, new RouteMatch($request->method, $route->pattern)];
+                return new RouteMatch($route, $request->method);
             }
 
-            return implode(', ', array_keys($routes));
+            /** @var non-empty-list<string> $methods */
+            $methods = array_map(strval(...), array_keys($routes));
+
+            return new MethodNotAllowed($methods);
         }
         if ($path[0] !== '/') {
-            return Status::NOT_FOUND;
+            return RouteFailure::NotFound;
         }
         if ($this->trailing !== []) {
             $slash = strrpos($path, '/');
@@ -156,10 +115,43 @@ final class Router
         if ($path === '/') {
             return ($this->root->literals[''] ?? null)?->find([], 0, [], $request->method)
                 ?? $this->root->find([], 0, [], $request->method)
-                ?? Status::NOT_FOUND;
+                ?? RouteFailure::NotFound;
         }
 
-        return $this->root->find(explode('/', $path), 1, [], $request->method) ?? Status::NOT_FOUND;
+        return $this->root->find(explode('/', $path), 1, [], $request->method) ?? RouteFailure::NotFound;
+    }
+
+    public function __invoke(Request $request, Context $context): Response
+    {
+        $match = $this->match($request);
+        if ($match instanceof MethodNotAllowed) {
+            $response = $context->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, $request);
+
+            return $response->withHeader('Allow', implode(', ', $match->allowedMethods));
+        }
+        if ($match instanceof RouteFailure) {
+            return $context->errorHandler->handleError($match->value, $request);
+        }
+        $matches = ROUTE_MATCHES;
+        $previous = $matches[$request] ?? null;
+        $matches[$request] = $match;
+
+        try {
+            if ($context->dispatcher->listens(Event\RouteMatched::class)) {
+                $context->dispatcher->dispatch(new Event\RouteMatched(
+                    request: $request,
+                    match: $match,
+                ));
+            }
+
+            return ($match->route->handler)($request, $context);
+        } finally {
+            if ($previous === null) {
+                unset($matches[$request]);
+            } else {
+                $matches[$request] = $previous;
+            }
+        }
     }
 
     private function register(Route $route): void
@@ -191,7 +183,7 @@ final class Router
                     if (isset($this->exact[$literal][$method])) {
                         throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
                     }
-                    $this->exact[$literal][$method] = [$route, new RouteMatch($method, $pattern)];
+                    $this->exact[$literal][$method] = new RouteMatch($route, $method);
                 }
             }
 
