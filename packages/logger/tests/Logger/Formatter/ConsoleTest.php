@@ -42,13 +42,14 @@ final class ConsoleTest
         $record = new Record(
             time: new \DateTimeImmutable('2026-11-23T22:12:00.012345+03:00'),
             level: LogLevel::WARNING,
-            message: "HTTP failed\n\033[2J",
+            message: "HTTP 503 failed\n\033[2J",
             context: ['status' => 503, 'input' => "\r\033[2J", 'path' => "/café/\xff"],
+            interpolatedKeys: ['status'],
         );
 
-        $line = new Console(colors: false)->format($record);
+        $line = new Console(colors: false, removeUsedContextFields: false)->format($record);
 
-        Assert::same($line, '[2026-11-23T22:12:00.012345+03:00] WARNING HTTP failed\n\033[2J '
+        Assert::same($line, '[2026-11-23T22:12:00.012345+03:00] WARNING HTTP 503 failed\n\033[2J '
             . '{"status":503,"input":"\r\u001b[2J","path":"/café/' . "\u{FFFD}" . '"}');
     }
 }

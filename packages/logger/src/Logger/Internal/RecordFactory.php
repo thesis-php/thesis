@@ -46,13 +46,14 @@ final class RecordFactory
             $fields[$key] = self::field($key, $value);
         }
 
-        $text = self::text((string) $message);
+        [$text, $keys] = MessageInterpolator::interpolate(self::text((string) $message), $fields);
 
         return new Record(
             time: $time,
             level: $level,
-            message: self::text(MessageInterpolator::interpolate($text, $fields)),
+            message: self::text($text),
             context: $fields,
+            interpolatedKeys: $keys,
         );
     }
 

@@ -22,9 +22,11 @@ final readonly class Console implements Formatter
 {
     /**
      * @param bool $colors whether to emit ANSI colors for the output
+     * @param bool $removeUsedContextFields whether to omit context fields substituted into the message
      */
     public function __construct(
         private bool $colors = true,
+        private bool $removeUsedContextFields = true,
     ) {}
 
     #[\Override]
@@ -49,12 +51,19 @@ final readonly class Console implements Formatter
         $message = addcslashes($record->message, "\0..\37\177");
         $line = "[{$time}] {$level} {$message}";
 
-        if ($record->context !== []) {
+        $context = $record->context;
+        if ($this->removeUsedContextFields) {
+            foreach ($record->interpolatedKeys as $key) {
+                unset($context[$key]);
+            }
+        }
+
+        if ($context !== []) {
             $flags = JSON_THROW_ON_ERROR
                 | JSON_INVALID_UTF8_SUBSTITUTE
                 | JSON_UNESCAPED_UNICODE
                 | JSON_UNESCAPED_SLASHES;
-            $line .= ' ' . json_encode((object) $record->context, $flags);
+            $line .= ' ' . json_encode((object) $context, $flags);
         }
 
         return $line;

@@ -55,7 +55,8 @@ group(static function (Group $group) {
 and a `context` object. Scalar fields keep their JSON types.
 
 Use `Formatter\Console` for a text line with a timestamp, a colored level label, the message and any context.
-Pass `colors: false` for plain text.
+By default, the console omits fields already used in the message. When every field was used, the line ends with the
+message. Pass `removeUsedContextFields: false` to print the full context. Pass `colors: false` for plain text.
 
 ```php
 use Thesis\Logger\Formatter\Console;

@@ -17,16 +17,18 @@ final class MessageInterpolator
 {
     /**
      * @param Context $context
+     * @return array{string, list<array-key>} the message and the context keys it used
      */
-    public static function interpolate(string $message, array $context): string
+    public static function interpolate(string $message, array $context): array
     {
         if (!str_contains($message, '{')) {
             // Without placeholders, building the replacement table produces the same message.
             // @infection-ignore ReturnRemoval
-            return $message;
+            return [$message, []];
         }
 
         $replacements = [];
+        $keys = [];
 
         foreach ($context as $key => $value) {
             $name = (string) $key;
@@ -34,7 +36,13 @@ final class MessageInterpolator
                 continue;
             }
 
-            $replacements['{' . $name . '}'] = match ($value) {
+            $placeholder = '{' . $name . '}';
+            if (!str_contains($message, $placeholder)) {
+                continue;
+            }
+
+            $keys[] = $key;
+            $replacements[$placeholder] = match ($value) {
                 true => 'true',
                 false => 'false',
                 null => 'null',
@@ -42,6 +50,6 @@ final class MessageInterpolator
             };
         }
 
-        return strtr($message, $replacements);
+        return [strtr($message, $replacements), $keys];
     }
 }

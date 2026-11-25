@@ -32,6 +32,8 @@
 - Use `psr/log` for callers and `Thesis\Logger\Formatter` for the output. Built-in implementations live under
   `Thesis\Logger\Formatter\`. NDJSON is the default. Rejected: a second logger interface and classes for every event.
   Applications can give recurring records typed helpers around PSR-3.
+- Track substituted keys from the original message. A replacement value can itself contain a placeholder.
+  Console filtering keeps the normalized record context intact.
 - The clock controls the timezone. Both built-in formatters preserve its offset.
 - Select console colors explicitly with the formatter. A `Writer` can represent any destination, so its terminal
   support cannot be inferred from `STDERR` or `STDOUT`.

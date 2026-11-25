@@ -22,6 +22,7 @@ use Thesis\Async\Trace\TaskCreated;
 use Thesis\Async\Trace\TaskStarted;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
+use Thesis\Logger\Formatter\Console;
 use Thesis\Logger\Formatter\Json;
 use Thesis\Logger\Internal\MessageInterpolator;
 use Thesis\Logger\Internal\RecordFactory;
@@ -42,6 +43,7 @@ use function Thesis\Time\ms;
 #[Covers(RecordFactory::class)]
 #[Covers(MessageInterpolator::class)]
 #[Covers(Json::class)]
+#[Covers(Console::class)]
 final class LoggerTest
 {
     public function filtersLevelsAndDrainsTheQueueInOrder(): void
@@ -215,6 +217,22 @@ final class LoggerTest
             ))
             ->assertPath('$.context["http.status"]', static fn($status) => Assert::same($status->decode(), 503))
         ;
+    }
+
+    public function consoleOmitsOnlyTheFieldsUsedInTheMessage(): void
+    {
+        $output = new RecordingWriter();
+        $logger = new Logger($output, formatter: new Console(colors: false));
+
+        group(static function (Group $group) use ($logger) {
+            $logger->start($group);
+            $logger->info('{0} {0}', ['{other}', 'other' => 42]);
+            $logger->info('Ready {ok}', ['ok' => true]);
+            $logger->stop();
+        });
+
+        Assert::string($output->writes[0] ?? '')->endsWith(" INFO {other} {other} {\"other\":42}\n");
+        Assert::string($output->writes[1] ?? '')->endsWith(" INFO Ready true\n");
     }
 
     public function snapshotsContextBeforeTheFormatterRuns(): void

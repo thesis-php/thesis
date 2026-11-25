@@ -20,11 +20,13 @@ final readonly class Record
      * @param LogLevel::* $level the PSR-3 level
      * @param string $message the message after placeholder interpolation
      * @param Context $context the normalized values, including those used in the message
+     * @param list<array-key> $interpolatedKeys the context keys substituted into the message
      */
     public function __construct(
         public \DateTimeImmutable $time,
         public string $level,
         public string $message,
         public array $context,
+        public array $interpolatedKeys = [],
     ) {}
 }
