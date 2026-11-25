@@ -9,5 +9,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Start a Unix worker in an async group with inherited stdio and extra descriptors for IPC.
+- Start a Unix worker with `Thesis\Process::start()` in an async group with inherited stdio and extra descriptors for IPC.
 - Signal a worker and wait for its exit code or terminating signal.

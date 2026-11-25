@@ -31,7 +31,7 @@ Use an extra descriptor for the worker protocol so that logs can still go to std
 ```php
 use Thesis\Async\Group;
 use Thesis\Io\Stream;
-use Thesis\Process\Process;
+use Thesis\Process;
 use function Thesis\Async\group;
 
 $status = group(static function (Group $group) {

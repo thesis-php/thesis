@@ -20,6 +20,8 @@
 
 ## Decisions
 
+- The entry point is `Thesis\Process`. The exit status and exception belong to `Thesis\Process\`.
+
 - Rejected: a SIGCHLD trap per child. Exiting one worker in a pool of eight resumed all eight watcher fibers.
   One trap per group still woke unrelated pools.
 - Rejected: passing the PID from `siginfo` through the loop to handle the first exit. When 12 children exited

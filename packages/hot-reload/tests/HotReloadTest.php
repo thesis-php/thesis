@@ -9,7 +9,7 @@ use Testo\Test;
 use Thesis\Async\Group;
 use Thesis\Io\Buffer;
 use Thesis\Io\Stream;
-use Thesis\Process\Process;
+use Thesis\Process;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;

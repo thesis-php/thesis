@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Process;
+namespace Thesis;
 
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\TaskCancelled;
+use Thesis\Process\ExitStatus;
 use Thesis\Process\Internal\Children;
 use Thesis\Process\Internal\Descriptors;
+use Thesis\Process\ProcessException;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\shield;
-use function Thesis\exceptionally;
 
 /**
  * A direct child owned by a group. Ending the group kills and reaps a child that is still running.

@@ -8,7 +8,7 @@ use Thesis\Async\Channel;
 use Thesis\Async\Group;
 use Thesis\Async\Service;
 use Thesis\Async\Task;
-use Thesis\Process\Process;
+use Thesis\Process;
 use Thesis\Process\ProcessException;
 use function Thesis\Async\group;
 use function Thesis\Async\onCancel;

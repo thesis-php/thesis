@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Process\Internal;
 
-use Thesis\Process\Process;
+use Thesis\Process;
 use function Thesis\Async\onSignal;
 
 /**

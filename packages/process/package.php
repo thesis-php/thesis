@@ -24,4 +24,5 @@ return new Manifest(
         'thesis/dispatcher' => '*',
         'thesis/time' => '*',
     ],
+    rootEntry: true,
 );

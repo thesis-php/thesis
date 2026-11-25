@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\Process;
+namespace Thesis;
 
 use Testo\Assert;
 use Testo\Expect;
@@ -13,12 +13,13 @@ use Thesis\Async\TaskCancelled;
 use Thesis\Async\Trace\GroupCreated;
 use Thesis\Async\Trace\Resumed;
 use Thesis\Async\Trace\TaskCreated;
-use Thesis\Dispatcher;
 use Thesis\Io\Stream;
+use Thesis\Process\ProcessException;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\observe;
+use function Thesis\Process\thrown;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 

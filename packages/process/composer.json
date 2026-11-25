@@ -50,15 +50,15 @@
     },
     "autoload": {
         "psr-4": {
-            "Thesis\\Process\\": "src/"
+            "Thesis\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Thesis\\Process\\": "tests/"
+            "Thesis\\": "tests/"
         },
         "files": [
-            "tests/helpers.php"
+            "tests/Process/helpers.php"
         ]
     },
     "extra": {

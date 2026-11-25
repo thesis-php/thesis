@@ -109,7 +109,8 @@
             "Thesis\\": [
                 "packages/dispatcher/src/",
                 "packages/exceptionally/src/",
-                "packages/logger/src/"
+                "packages/logger/src/",
+                "packages/process/src/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/src/",
             "Thesis\\AsyncTrace\\": "packages/async-trace/src/",
@@ -121,7 +122,6 @@
             "Thesis\\Io\\": "packages/io/src/",
             "Thesis\\Net\\": "packages/net/src/",
             "Thesis\\PhpstanExtension\\": "packages/phpstan-extension/src/",
-            "Thesis\\Process\\": "packages/process/src/",
             "Thesis\\SourceLocation\\": "packages/source-location/src/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/src/",
             "Thesis\\Time\\": "packages/time/src/"
@@ -155,7 +155,8 @@
             "Thesis\\": [
                 "packages/dispatcher/tests/",
                 "packages/exceptionally/tests/",
-                "packages/logger/tests/"
+                "packages/logger/tests/",
+                "packages/process/tests/"
             ],
             "Thesis\\Amqp\\": "packages/amqp/tests/",
             "Thesis\\AsyncTrace\\": "packages/async-trace/tests/",
@@ -173,7 +174,6 @@
             "Thesis\\PhpCsFixer\\": "tools/php-cs-fixer/src/",
             "Thesis\\PhpCsFixer\\Tests\\": "tools/php-cs-fixer/tests/",
             "Thesis\\PhpStanRules\\": "tools/phpstan/src/",
-            "Thesis\\Process\\": "packages/process/tests/",
             "Thesis\\SourceLocation\\": "packages/source-location/tests/",
             "Thesis\\TestoPlugin\\": "packages/testo-plugin/tests/",
             "Thesis\\Time\\": "packages/time/tests/",
@@ -192,7 +192,7 @@
             "packages/io/tests/helpers.php",
             "packages/logger/tests/Logger/helpers.php",
             "packages/net/tests/helpers.php",
-            "packages/process/tests/helpers.php",
+            "packages/process/tests/Process/helpers.php",
             "packages/time/tests/helpers.php"
         ]
     },
