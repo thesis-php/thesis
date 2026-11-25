@@ -3,7 +3,8 @@
 Read before writing or changing a test, or running mutation testing (`make infect`). For tests on the Thesis loop,
 choose between [the event loop](../packages/testo-plugin/README.md#the-event-loop) and
 [virtual time](../packages/testo-plugin/README.md#virtual-time) using the plugin guide.
-Use the Testo skills for assertions and CLI options. Run the suite with `make test P=<name>` and pass options in `ARGS`.
+Run the suite with `make test P=<name>` and pass options in `ARGS`.
+For assertions and CLI options, see the [Testo reference guides](../vendor/testo/testo/skills/).
 For tests that depend on callback order, read `fibers.md`.
 
 ## Rules

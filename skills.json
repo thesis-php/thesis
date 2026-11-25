@@ -7,15 +7,7 @@
             "from": "dir",
             "package": "testo/testo",
             "path": "vendor/testo/testo/skills",
-            "skills": [
-                "testo-coverage",
-                "testo-data-driven",
-                "testo-mutation-testing",
-                "testo-plugin-author",
-                "testo-run-tests",
-                "testo-test-doubles",
-                "testo-write-tests"
-            ]
+            "skills": []
         }
     ]
 }
