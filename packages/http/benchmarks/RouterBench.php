@@ -38,7 +38,7 @@ final class RouterBench
     {
         $router = new Router([
             new Route(
-                method: Method::GET,
+                methods: Method::GET,
                 route: '/users/:id',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),

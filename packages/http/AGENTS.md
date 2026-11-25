@@ -129,8 +129,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Each accepted socket occupies one slot until it closes. Shutdown must wake the supervisor even when
   the accept loop is waiting for a slot. That is why it waits on `Net\Server::awaitClose()`.
 
-- The Router constructor calls a private register() for each route, then sorts the patterns once.
-  Registration writes directly to the router’s tables. All requests share them.
+- The Router constructor calls a private register() once per route, then sorts the patterns once.
+  Registration parses the pattern once and indexes the route by each method. All requests share them.
 - Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
   Both constructors accept a callable and store its closure.
 - Route handlers receive the request and the connection context. routeMatch($request) reads the active match from a WeakMap keyed by request identity.

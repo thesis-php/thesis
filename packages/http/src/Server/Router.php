@@ -128,56 +128,45 @@ final class Router
 
     private function register(Route $route): void
     {
-        $method = $route->method;
         $pattern = $route->route;
 
-        if (!isToken($method)) {
-            throw new \InvalidArgumentException("Invalid HTTP method '{$method}'.");
-        }
         if (!str_starts_with($pattern, '/') || str_contains($pattern, "\0")) {
             throw new \InvalidArgumentException("Invalid route pattern '{$pattern}'.");
         }
 
         $segments = explode('/', $pattern);
         $names = self::parameterNames($segments, $pattern);
-        if ($names === []) {
-            if (isset($this->exact[$pattern][$method])) {
-                throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
-            }
-
-            $this->exact[$pattern][$method] = [$route, new RouteMatch($method, $pattern)];
-
-            return;
-        }
-
-        $count = \count($segments);
         $last = array_key_last($segments);
-        if (\count($names) === 1 && isset($names[$last])) {
+        if ($names === []) {
+            $routes = &$this->exact[$pattern];
+        } elseif (\count($names) === 1 && isset($names[$last])) {
             $prefix = substr($pattern, 0, -\strlen($segments[$last]));
-            if (isset($this->trailing[$prefix][$method])) {
+            $routes = &$this->trailing[$prefix];
+            $names = [$names[$last]];
+        } else {
+            $count = \count($segments);
+            $mask = array_fill_keys(array_keys($names), ':');
+            // Sort literals before parameters at the first segment where two shapes differ.
+            $priority = str_repeat('1', $count);
+            foreach ($names as $index => $_) {
+                $priority = substr_replace($priority, '0', $index, 1);
+            }
+
+            $key = implode('/', array_replace($segments, $mask));
+            $this->patterns[$count][$priority] ??= ['mask' => $mask, 'paths' => []];
+            $routes = &$this->patterns[$count][$priority]['paths'][$key];
+        }
+
+        foreach ($route->methods as $method) {
+            if (!isToken($method)) {
+                throw new \InvalidArgumentException("Invalid HTTP method '{$method}'.");
+            }
+            if (isset($routes[$method])) {
                 throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
             }
 
-            $this->trailing[$prefix][$method] = [$route, [$names[$last]]];
-
-            return;
+            $routes[$method] = [$route, $names === [] ? new RouteMatch($method, $pattern) : $names];
         }
-
-        $mask = array_fill_keys(array_keys($names), ':');
-        // Sort literals before parameters at the first segment where two shapes differ.
-        $priority = str_repeat('1', $count);
-        foreach ($names as $index => $_) {
-            $priority = substr_replace($priority, '0', $index, 1);
-        }
-
-        $key = implode('/', array_replace($segments, $mask));
-        $this->patterns[$count][$priority] ??= ['mask' => $mask, 'paths' => []];
-
-        if (isset($this->patterns[$count][$priority]['paths'][$key][$method])) {
-            throw new \InvalidArgumentException("Duplicate route {$method} {$pattern}.");
-        }
-
-        $this->patterns[$count][$priority]['paths'][$key][$method] = [$route, $names];
     }
 
     /**
@@ -202,7 +191,7 @@ final class Router
                 $params[$name] = $segments[$index];
             }
 
-            $match = new RouteMatch($route->method, $route->route, $params);
+            $match = new RouteMatch($method, $route->route, $params);
         }
 
         $matches = ROUTE_MATCHES;

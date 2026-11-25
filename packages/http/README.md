@@ -222,7 +222,7 @@ and a `Thesis\Http\Server\Context` with connection information. It returns a `Th
 
 ### Routing
 
-Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Each route handler receives the request
+Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Pass one method or a non-empty list of methods to each `Route`. Each route handler receives the request
 and the connection context. Inside the route handler and its middleware, `Thesis\Http\Server\routeMatch($request)` returns the active match.
 Outside dispatch it returns null. The match’s `method` and `pattern` identify the selected route.
 `param($name)` returns a decoded parameter or null, and `$match->params` contains all parameters.

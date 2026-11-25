@@ -35,7 +35,7 @@ final readonly class RouterTest
             new Route(Method::GET, '/users/:id', self::user(...)),
             new Route(Method::POST, '/users/me', static fn() => new Response(body: 'me')),
             new Route(
-                method: Method::GET,
+                methods: Method::GET,
                 route: '/:group/me/:id',
                 handler: static fn($request) => new Response(body: implode('/', routeMatch($request)->params ?? [])),
             ),
@@ -100,7 +100,7 @@ final readonly class RouterTest
     {
         $router = new Router([
             new Route(
-                method: Method::GET,
+                methods: Method::GET,
                 route: '/:value',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('value') ?? ''),
             ),
@@ -151,14 +151,14 @@ final readonly class RouterTest
             }),
         ]);
         $router = new Router((static function () use ($outer) {
-            yield new Route(Method::GET, '/:team/items/:item', $outer);
+            yield new Route([Method::POST, Method::GET], '/:team/items/:item', $outer);
             yield new Route(Method::PUT, '/:group/items/:name', static fn() => new Response());
         })());
         Assert::same($router($get, $this->context)->status, Status::OK);
         Assert::null(routeMatch($get));
         $response = $router($get->withMethod('get'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
-        Assert::same($response->headers->get('Allow'), 'GET, PUT, HEAD');
+        Assert::same($response->headers->get('Allow'), 'POST, GET, PUT, HEAD');
         Assert::same($router(Request::get('/a/items/'), $this->context)->status, Status::NOT_FOUND);
     }
 
@@ -241,7 +241,7 @@ final readonly class RouterTest
     {
         $handler = new Router([
             new Route(
-                method: Method::GET,
+                methods: Method::GET,
                 route: '/:id',
                 handler: static fn($request) => new Response(body: routeMatch($request)?->param('id') ?? ''),
             ),

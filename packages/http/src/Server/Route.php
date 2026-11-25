@@ -13,19 +13,25 @@ use Thesis\Http\Response;
 final readonly class Route
 {
     /**
+     * @var non-empty-list<non-empty-string>
+     */
+    public array $methods;
+
+    /**
      * @var \Closure(Request, Context): Response
      */
     public \Closure $handler;
 
     /**
-     * @param non-empty-string $method
+     * @param non-empty-string|non-empty-list<non-empty-string> $methods
      * @param callable(Request, Context): Response $handler
      */
     public function __construct(
-        public string $method,
+        string|array $methods,
         public string $route,
         callable $handler,
     ) {
+        $this->methods = (array) $methods;
         $this->handler = $handler(...);
     }
 }
