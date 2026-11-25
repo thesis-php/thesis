@@ -193,6 +193,24 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   from 77,632 to 78,919 replies/s. With the original writer and a 5 s settle, the one-core
   gains were 4.96%, 0.11% and 1.53%.
 
+- Check the load generator's open-file limit before comparing servers. On Linux with a soft
+  limit of 1024, gcannon 0.10.0 reported the requested 4096 connections and zero errors while
+  only about 1020 connections were open. With `ulimit -n 65536`, `ss -Htn state established
+  sport = :8080` showed all 4096 connections during each measured run.
+- At `7977f38` on a Xeon E3-1230 v6, register GET and POST on the router and run one PHP 8.6
+  tracing-JIT process per physical core with `SO_REUSEPORT`. Pin gcannon to two separate physical
+  cores. Against HttpArena's true-async-server at `3388e458` with one worker thread per server
+  core, the median paired throughput ratio was 74.7% on one core (70.9–74.9%) and 67.7% on two
+  (63.0–69.2%). Three pairs ran the three raw templates with 4096 connections, pipeline depth 1,
+  a 5 s settle and a 20 s measurement. Median throughput in replies/s was 37,733 vs 50,772
+  on one core and 74,051 vs 107,467 on two. All 16,373,023 requests got a 2xx reply.
+- Using `$request->query->get()` for both operands and leaving method selection to the router,
+  the same Xeon setup gave 72.7% of TrueAsync on one core (70.2–73.9%) and 62.3% on two
+  (61.8–63.0%). Median replies/s were 36,265 vs 49,684 and 73,070 vs 116,870 respectively.
+  The two-core TrueAsync median rose 8.7% between series while Thesis fell 1.3%.
+  These runs paired Thesis with TrueAsync within each series. Isolating handler cost requires
+  interleaving the two Thesis handlers.
+
 - Run `examples/baseline11.php` with one PHP process, CLI OPcache on and Xdebug off. Use the same
   handler and listener settings for both revisions. The active connection limit and the TCP listen
   backlog are separate. Set both to 4096 for this profile: the default backlog of 511 overflowed
@@ -317,6 +335,67 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   −7.61% and +8.94%, −4.54% and +2.96%, and −4.08% and +4.16%. All 45,188,984 timed replies were 2xx.
   In six one-vCPU in-memory controls, chunked POST took 6.26 vs 6.93 µs of process CPU per request
   at the base and final medians (+10.04% at the paired median). The extra CPU cost persists without sockets.
+
+#### Experiments with the corrected router handler on the Xeon
+
+- The measured variant used the raw string handoff at `e99888a`, shared
+  response headers and an explicit HEAD route. With the original 5 s settle and 20 s measurement,
+  its median share of TrueAsync was 73.67% on one core and 68.56% on two, up 0.99 and 6.25
+  percentage points from the corrected-handler starting point. Median throughput was 37,846
+  vs 51,369 and 79,572 vs 115,558 replies/s. These shares are medians of three paired ratios.
+  Every one of the 17,005,449 requests got a 2xx reply with no errors or reconnects.
+  The one-core Thesis listener still had 1407–1471 connections queued at 6 s, and none at 21 s.
+
+- Rejected: combining the server's decoded-byte budget and failure tracking with the chunk
+  decoder. Early one-core tests of a prototype gained 1.77% at the median. The final version
+  on top of the raw writer and shared headers lost 0.50%, 1.22% and 1.08% on two warmed cores.
+  All 14,052,315 requests in the two-core three-way trial got 2xx.
+- With the routed `baseline11` handler on one physical Xeon core, disabling Zend GC changed
+  throughput by −4.2%, −4.0% and +1.1% in three pairs. With GC enabled, PHP reported 8–9
+  collections, zero collected cycles and 0.10–0.13 s of collector time in 26.4 s. Keep GC enabled.
+- Removing Xdebug from the project PHP image, compared with loading it with `XDEBUG_MODE=off`,
+  changed one-core throughput by −0.7%, −2.4% and −1.6%. Tracing JIT was active in both.
+  Median p99 was 118.8 ms with the extension loaded and 122.0 ms without it.
+- Replacing tracing JIT with function JIT lost 18.8–21.8% in three one-core corrected-handler
+  pairs on the Xeon. Increasing the default 2 MiB native fiber stack by one 4 KiB page to
+  change its memory layout changed throughput by −2.6%, +3.1% and −4.1%.
+- During the stock one-core run, 4096 established TCP connections included 1631 sockets still
+  on the listen queue at 5 s and 591 at 10 s. The queue was empty at 20 s. For a steady-state
+  comparison, check the sum of listener receive queues as well as the established count.
+- Debian's Sury PHP 8.6.0 NTS CLI with tracing JIT reached 36,538 replies/s against 36,634
+  for the project ZTS image on one Xeon core. Paired changes were −3.3%, −0.3% and +1.8%.
+  Median p99 was 118.8 ms for both. The builds also differ in packaging and compiler settings.
+- Rejected for the short Arena query: changing `Query` from a list of pairs to a packed list
+  of alternating names and values. Longer query controls improved 13–19%, but parsing the
+  nine-byte query and looking up both fields took 651 ns with pairs and 716 ns with the packed
+  list at the medians. Reusing the pair from `explode()` and checking for a percent sign before
+  decoding also gave mixed results across five local JIT pairs. Neither reached the TCP trials.
+- Retesting only the write side of the earlier buffered-body experiment on the Xeon, a small
+  fixed-length `StringBody` took one direct read and one write. The normal path already writes
+  once. Against the corrected router handler, three one-core mixed pairs changed throughput
+  by −0.59%, −0.05% and +4.37%. All 4,390,342 requests received 2xx. Keep the normal write path.
+- Rejected for now: a new buffer operation to replace the contents and reset the cursor after
+  a cached request head. Replacing the contents with the suffix saved 25 ns per short exchange
+  in a local handoff control. Keeping the whole wire string and setting an offset saved about
+  60 ns, but retained 4 MiB more across 4096 idle connections with long cached heads.
+- Sampling the corrected handler on one Xeon core attributed about two thirds of process CPU
+  to userspace. The stock process retired 0.74 instructions per cycle; no single sampled symbol
+  accounted for 3% of cycles. In a separate local two-clock-read control, replacing `Instant`
+  allocations with integers saved 154 ns per pair of reads, including one queued timestamp.
+  This does not establish a throughput gain large enough to change the cross-package clock API.
+- Rejected: keeping one `Exchange` per connection and clearing its head, decoder and response
+  state before the next request. With raw string response handoff in both arms, three of six
+  local routed-mix CPU pairs improved; the median reduction was 0.36%.
+- A local TCP probe sampled one contended read in 127 without consuming bytes. At 4096 clients
+  only 109 of 4000 samples found bytes before the keep-alive checkpoint, against 4000 afterwards.
+  At 64 clients, 166 of 3000 were ready before it and 2895 afterwards. An extra read before
+  yielding would usually add a syscall on this workload.
+- Adapting the packed checkpoint queue to preserve the current read observer's deferred wakes
+  passed the async suite. With 4096 fibers, the local CPU control saved about 0.07 µs per
+  checkpoint at the paired median. Two of six pairs regressed. Keep the existing queue.
+- Calling the privately owned chunk decoder's payload method directly from the server wrapper
+  saved 0.8% CPU on the local chunked-only workload but cost 1.6% on the mix. It also required
+  access to a protected method. Keep the public reader contract between those objects.
 
 ## HTTP/1 codec performance
 

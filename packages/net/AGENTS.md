@@ -100,6 +100,13 @@ and `Closer` interfaces. DNS messages use `Buffer` for encoding and decoding.
   then using the original stream for readiness and TLS. Against `d3043d3`, a ready write saved about 56 ns
   in a local TCP control. On the HTTP Arena mix, nine equal-duration pairs returned only 0.19% more responses
   in total, and the last block lost throughput in two of three pairs.
+- Rejected: replacing plaintext `fread()` with `stream_socket_recvfrom()`. On Linux with PHP 8.6,
+  the latter returned false without a PHP error for both a socket with no bytes ready and a TCP reset.
+  The reader needs to distinguish those results to wait or report a failed read.
+- Keep the accept budget at 16 per event loop tick. On a Xeon, raising it to 64 admitted
+  4088 new connections in 5 s instead of 15 s. During the first 5 s, p99 for eight clients
+  already sending requests rose in all three pairs, from 64.8 to 141.0 ms at the medians.
+  The median throughput gain during the burst was 1.38%.
 
 ## Tests
 
