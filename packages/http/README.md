@@ -295,6 +295,31 @@ curl --http1.1 -sS -H 'Transfer-Encoding: chunked' --data-binary 'one' http://12
   --next -sS --data-binary 'two' -w '\nnew connections: %{num_connects}\n' http://127.0.0.1:8080/second
 ```
 
+### Server middleware
+
+Wrap a handler in a `Pipeline` and pass it to the server. The same pipeline can handle concurrent requests.
+
+```php
+use Thesis\Http\Server;
+use Thesis\Http\Server\Pipeline;
+
+$pipeline = new Pipeline($handler, [$accessLog, $authorization]);
+$server = new Server($config, $pipeline);
+```
+
+The first middleware receives the request first and the response last.
+Server middleware can return a response directly or call `$next()`. After that call returns or throws,
+the middleware can call `$next()` again while its own `handle()` is running. Overlapping calls to the
+same `$next` and calls after its `handle()` has returned or thrown raise a `LogicException`.
+
+Each call starts at the same next layer with the same request and connection context.
+The server streams incoming bodies and the pipeline does not buffer them for replay. Once a layer calls
+`takeBody()`, another call on the same request throws a `LogicException`, even if the reader consumed
+no bytes. A `ReplayableBody` lets its owner open another reader, but the request still hands off its body only once.
+
+When a handler deserializes the body into a DTO, retry the operation that uses the DTO after deserialization.
+A retry runs downstream code again, so any side effects from an earlier attempt must be safe to repeat.
+
 ### Connection lifetime
 
 The server constructor takes a `Config` and the request handler and does no I/O.

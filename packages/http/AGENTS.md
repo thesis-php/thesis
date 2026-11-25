@@ -10,7 +10,13 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 ## Invariants
 
 - Client middleware passes an outgoing request on each call to the next handler. Server middleware can call
-  the next handler at most once, with the same incoming request bound to the call.
+  the same next handler again after it returns or throws, with the same request and context. Reject overlapping
+  calls to the same continuation and expire it when its own `handle()` exits. A public `Server\Pipeline`
+  wraps any handler and keeps delegation state local to each middleware invocation. Rejected: passing one mutable
+  cursor to every layer. If an inner layer returns early, a second call from the outer layer could skip it.
+- Server retries preserve the request's body handoff. Keep incoming bodies streaming. Once a layer takes the body,
+  calling that layer again cannot give it a fresh reader, even when the body implements `ReplayableBody`.
+  Retry work that uses a decoded DTO after deserialization, where the caller can account for side effects.
 
 - Messages share `EMPTY_BODY` for an empty payload without trailers. Each message still owns its body handoff.
 - Trailer fields may be pending until the reader finishes.

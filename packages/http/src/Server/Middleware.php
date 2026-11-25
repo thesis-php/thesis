@@ -13,7 +13,9 @@ use Thesis\Http\Response;
 interface Middleware
 {
     /**
-     * Return a response directly or call the next handler once for this incoming request.
+     * Return a response directly or delegate to the next handler for this incoming request.
+     * While handle() is running, it can call $next again after a previous call returns or throws.
+     * Calling $next concurrently or after this invocation of handle() ends throws a \LogicException.
      *
      * @param callable(): Response $next
      */
