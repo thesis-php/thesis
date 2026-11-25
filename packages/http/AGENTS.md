@@ -129,14 +129,14 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Each accepted socket occupies one slot until it closes. Shutdown must wake the supervisor even when
   the accept loop is waiting for a slot. That is why it waits on `Net\Server::awaitClose()`.
 
-- Build the dispatch table once and share it across requests.
+- The Router constructor calls a private register() for each route, then sorts the patterns once.
+  Registration writes directly to the router’s tables. All requests share them.
 - Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
   Both constructors accept a callable and store its closure.
 - Route handlers receive the request, the connection context and a RouteMatch with the registered method, pattern and decoded parameters.
-  The route table returns the handler alongside the match. Each match keeps its own parameters when nested routers handle the same request.
-- A method can be a numeric token. PHP casts decimal string array keys to integers, so convert keys back to strings
-  when building the Allow header.
-- Configure the error handler on the server. Middleware and the router receive the same Context, which implements ErrorHandler.
+  Each match keeps its own parameters when nested routers handle the same request.
+- A method can be a numeric token. PHP casts decimal string array keys to integers, so join method keys as text in the Allow header.
+- Configure the error handler on the server. Middleware and the router receive the same Context, which calls the configured ErrorHandler.
   The default error page contains only the status and its standard reason phrase. The router owns Allow. Error handlers format responses before the final head. If formatting a 500 fails,
   preserve the original failure for onError and attempt an empty 500 only before writing starts.
 - Match a complete path before checking the case-sensitive method. A more specific path owns its 405.

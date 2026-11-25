@@ -12,6 +12,7 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Stub\TextErrorHandler;
+use Thesis\Http\Status;
 use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
 
@@ -46,7 +47,7 @@ final readonly class RouterTest
         Assert::same($router(Request::get('/users/me/42'), $this->context)->takeBody()->readAll(), 'users/42');
 
         $response = $router(Request::get('/users/me'), $this->context);
-        Assert::same($response->status, 405);
+        Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), Method::POST);
     }
 
@@ -88,7 +89,7 @@ final readonly class RouterTest
         Assert::same($router(new Request('123', $uri), $this->context)->takeBody()->readAll(), 'numeric');
 
         $response = $router(new Request(Method::POST, $uri), $this->context);
-        Assert::same($response->status, 405);
+        Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), '123, GET, HEAD');
     }
 
@@ -103,7 +104,7 @@ final readonly class RouterTest
         ]);
 
         foreach (['/%2f', '/a%2Fb', '/%00'] as $path) {
-            Assert::same($router(Request::get($path), $this->context)->status, 400);
+            Assert::same($router(Request::get($path), $this->context)->status, Status::BAD_REQUEST);
         }
 
         foreach (['/%252F' => '%2F', '/%2e%2e' => '..', '/%3F' => '?'] as $path => $value) {
@@ -112,7 +113,7 @@ final readonly class RouterTest
         }
 
         foreach (['/', '/x/'] as $path) {
-            Assert::same($router(Request::get($path), $this->context)->status, 404);
+            Assert::same($router(Request::get($path), $this->context)->status, Status::NOT_FOUND);
         }
     }
 
@@ -141,26 +142,27 @@ final readonly class RouterTest
             yield new Route(Method::GET, '/:team/items/:item', $outer);
             yield new Route(Method::PUT, '/:group/items/:name', static fn() => new Response());
         })());
-        Assert::same($router($get, $this->context)->status, 200);
+        Assert::same($router($get, $this->context)->status, Status::OK);
         $response = $router($get->withMethod('get'), $this->context);
-        Assert::same($response->status, 405);
+        Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'GET, PUT, HEAD');
-        Assert::same($router(Request::get('/a/items/'), $this->context)->status, 404);
+        Assert::same($router(Request::get('/a/items/'), $this->context)->status, Status::NOT_FOUND);
     }
 
     public function matchesTheRootWhenAnAbsoluteUriHasAnEmptyPath(): void
     {
-        $router = new Router([new Route(Method::GET, '/', static fn() => new Response(204))]);
+        $router = new Router([new Route(Method::GET, '/', static fn() => new Response(Status::NO_CONTENT))]);
 
         foreach (['http://example.test', 'http://example.test?q=1', 'http://example.test/'] as $uri) {
-            Assert::same($router(Request::get($uri), $this->context)->status, 204);
+            Assert::same($router(Request::get($uri), $this->context)->status, Status::NO_CONTENT);
         }
 
         $options = new Request(Method::OPTIONS, new Uri('http://example.test'));
         $connect = new Request(Method::CONNECT, new Uri('//example.test:443'));
-        Assert::same($router($options, $this->context)->status, 404);
-        Assert::same($router($connect, $this->context)->status, 404);
-        Assert::same($router($options->withUri(new Uri('http://example.test?q=1')), $this->context)->status, 405);
+        Assert::same($router($options, $this->context)->status, Status::NOT_FOUND);
+        Assert::same($router($connect, $this->context)->status, Status::NOT_FOUND);
+        $options = $options->withUri(new Uri('http://example.test?q=1'));
+        Assert::same($router($options, $this->context)->status, Status::METHOD_NOT_ALLOWED);
     }
 
     public function rejectsDuplicateShapesForTheSameMethod(): void
@@ -230,17 +232,17 @@ final readonly class RouterTest
                 route: '/:id',
                 handler: static fn($request, $context, $match) => new Response(body: $match->param('id') ?? ''),
             ),
-            new Route(Method::HEAD, '/:id', static fn() => new Response(204)),
+            new Route(Method::HEAD, '/:id', static fn() => new Response(Status::NO_CONTENT)),
         ]);
         $missing = $handler(Request::get('/two/parts'), $this->context);
-        Assert::same($missing->status, 404);
+        Assert::same($missing->status, Status::NOT_FOUND);
         Assert::null($missing->headers->get('Allow'));
-        Assert::same($handler(Request::get('/a%2Fb'), $this->context)->status, 400);
+        Assert::same($handler(Request::get('/a%2Fb'), $this->context)->status, Status::BAD_REQUEST);
         $uri = new Uri('/abc?q=unused');
         Assert::same($handler(new Request(Method::GET, $uri), $this->context)->takeBody()->readAll(), 'abc');
-        Assert::same($handler(new Request(Method::HEAD, $uri), $this->context)->status, 204);
+        Assert::same($handler(new Request(Method::HEAD, $uri), $this->context)->status, Status::NO_CONTENT);
         $response = $handler(new Request(Method::POST, $uri), $this->context);
-        Assert::same($response->status, 405);
+        Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('allow'), 'GET, HEAD');
     }
 
