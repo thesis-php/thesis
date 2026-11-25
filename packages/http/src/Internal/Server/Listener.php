@@ -9,7 +9,6 @@ use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Http\Request;
-use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
 use Thesis\Net\Server;
@@ -23,6 +22,7 @@ use function Thesis\Time\sec;
 
 /**
  * @internal
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
  */
 final class Listener
 {
@@ -39,7 +39,7 @@ final class Listener
     private readonly LocalSemaphore $capacity;
 
     /**
-     * @param \Closure(Request, Context): Response $handler
+     * @param HandlerClosure $handler
      * @param (\Closure(\Throwable): void)|null $onError
      */
     public function __construct(

@@ -25,6 +25,8 @@ use function Thesis\Net\listenUnix;
  * An HTTP/1 server owning one TCP or Unix listener.
  *
  * @api
+ * @phpstan-type Handler callable(Request, Context): Response
+ * @phpstan-type HandlerClosure \Closure(Request, Context): Response
  */
 final class Server implements Service
 {
@@ -43,7 +45,7 @@ final class Server implements Service
     }
 
     /**
-     * @var \Closure(Request, Context): Response
+     * @var HandlerClosure
      */
     private readonly \Closure $handler;
 
@@ -53,7 +55,7 @@ final class Server implements Service
     private readonly ?\Closure $onError;
 
     /**
-     * @param callable(Request, Context): Response $handler
+     * @param Handler $handler
      * @param ?callable(\Throwable): void $onError observes connection failures. An exception it throws fails the group.
      */
     public function __construct(

@@ -1,6 +1,6 @@
 {
     "name": "thesis/monorepo",
-    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1, AMQP, PSR-3 logging, Unix processes, hot reload and a runnable demo. Monorepo of the thesis/* packages.",
+    "description": "Asynchronous PHP on an event loop of its own: structured concurrency for fibers, non-blocking I/O, TCP/TLS/DNS, HTTP/1, routing, AMQP, PSR-3 logging, Unix processes, hot reload and a runnable demo. Monorepo of the thesis/* packages.",
     "license": "MIT",
     "type": "project",
     "keywords": [
@@ -18,6 +18,7 @@
         "sockets",
         "dns",
         "http-server",
+        "router",
         "logging",
         "demo",
         "process",

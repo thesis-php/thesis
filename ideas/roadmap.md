@@ -30,8 +30,8 @@ What amphp has, then what thesis makes of it.
   HPACK inside HTTP/2, CONNECT inside the client.
 - HTTP client extensions (`http-client-cookies`, `http-client-cache`, `http-client-psr7`): cookies and cache
   as interceptors of the client, a PSR-18 bridge.
-- HTTP server extensions (`http-server-router`, `http-server-form-parser`, `http-server-static-content`):
-  router and form parser, static content later.
+- HTTP server extensions (`http-server-form-parser`, `http-server-static-content`):
+  form parser, static content later.
 - WebSocket (`websocket`, `websocket-client`, `websocket-server`): `websocket`.
 - SQL (`postgres`, `mysql`, `sql`, `sql-common`): `postgres`, later `mysql`; a common `sql` only with the second driver.
 - Redis (`redis`): `redis`: RESP3, pub/sub, distributed `Mutex`/`RateLimiter` behind the interfaces of `async`.

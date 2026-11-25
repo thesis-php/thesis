@@ -216,6 +216,42 @@ For HTTPS the client negotiates TLS inside the tunnel and verifies the origin's 
 Serve HTTP/1 requests on a TCP or Unix listener. Each connection runs in its own task.
 Requests on the same connection run in order. The handler receives the shared `Thesis\Http\Request`
 and a `Thesis\Http\Server\Context` with connection information. It returns a `Thesis\Http\Response`.
+`Thesis\Http\Server` defines two PHPStan types for this signature. The server constructor accepts
+`Handler` and stores the resulting closure as `HandlerClosure`. Import the latter with
+`@phpstan-import-type HandlerClosure from \Thesis\Http\Server`.
+
+### Routing
+
+Build a `Router` once and pass it directly to `Server`. The constructor accepts an iterable of routes. Each route handler receives the request,
+the connection context and a `Thesis\Http\Server\RouteMatch`. Its `method` and `pattern` identify the selected route.
+`param($name)` returns a decoded parameter or null, and `$match->params` contains all parameters.
+
+```php
+use Thesis\Http\Method;
+use Thesis\Http\Response;
+use Thesis\Http\Server\Config;
+use Thesis\Http\Server\Route;
+use Thesis\Http\Server\Router;
+use Thesis\Http\Server;
+
+$router = new Router([
+    new Route(Method::GET, '/users/me', static fn() => new Response(body: 'Current user')),
+    new Route(Method::GET, '/users/:id', static fn($request, $context, $match) => new Response(body: $match->param('id') ?? '')),
+]);
+
+$server = new Server(new Config(8080), $router);
+```
+
+Patterns start with a slash and contain decoded literal segments or whole-segment parameters such as `:user_id`.
+Parameter names are unique within a pattern and use ASCII letters, digits and underscores, starting with a
+letter or underscore. A parameter consumes one nonempty segment. The router prefers a literal at the first
+segment where two complete matches differ. It then checks the case-sensitive method. An explicit HEAD wins
+over the GET fallback. A method mismatch yields 405 with all allowed methods, including HEAD for GET.
+An unknown path yields 404. Duplicate method and path shapes fail during construction.
+
+Matching uses the raw path component of the request URI. Slashes, trailing slashes, dot segments and plus signs keep their meaning.
+Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
+For example, `/users/a%252Fb` passes `a%2Fb` to the handler.
 
 ### Streaming echo
 

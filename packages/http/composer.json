@@ -1,6 +1,6 @@
 {
     "name": "thesis/http",
-    "description": "Asynchronous HTTP/1 client and server with strict parsing, pooled connections, TLS, middleware and streamed bodies with trailers.",
+    "description": "Asynchronous HTTP/1 client and server with strict parsing, pooled connections, TLS, request routing, middleware and streamed bodies with trailers.",
     "keywords": [
         "php",
         "async",
@@ -12,6 +12,7 @@
         "tls",
         "http-message",
         "http-headers",
+        "router",
         "query-string",
         "http-trailers"
     ],

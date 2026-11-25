@@ -11,6 +11,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Route requests by method and path with named parameters, HEAD fallback and 405 with Allow.
 - Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.

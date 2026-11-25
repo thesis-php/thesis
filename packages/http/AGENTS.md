@@ -117,7 +117,23 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Each accepted socket occupies one slot until it closes. Shutdown must wake the supervisor even when
   the accept loop is waiting for a slot. That is why it waits on `Net\Server::awaitClose()`.
 
+- Build the dispatch table once and share it across requests.
+- Import the PHPStan types `Handler` and `HandlerClosure` from `Server` for server handlers. Write route handler signatures inline.
+  Both constructors accept a callable and store its closure.
+- Route handlers receive the request, the connection context and a RouteMatch with the registered method, pattern and decoded parameters.
+  The route table returns the handler alongside the match. Each match keeps its own parameters when nested routers handle the same request.
+- A method can be a numeric token. PHP casts decimal string array keys to integers, so convert keys back to strings
+  when building the Allow header.
+- Match a complete path before checking the case-sensitive method. A more specific path owns its 405.
+- Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.
+  Preserve empty segments, plus signs and dot segments.
+
 ### Decisions
+
+- Exact paths have their own table. A single trailing parameter after a literal prefix uses one prefix lookup.
+  For other patterns, group by segment count and parameter positions and try shapes in left-to-right specificity order.
+  Rejected: the compressed tree and generated PHP dispatcher. Tables won the mixed lookup on the small and medium
+  route sets. Generated PHP won the two-parameter case on the large set.
 
 - The constructor takes the configuration and handler. Bind the endpoint in `start()` so a DI container can build the server
   without opening sockets and the application sees a bind failure at startup.
