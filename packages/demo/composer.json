@@ -43,11 +43,6 @@
         "thesis/source-location": "dev-main",
         "thesis/time": "dev-main"
     },
-    "autoload": {
-        "psr-4": {
-            "Thesis\\Demo\\": "src/"
-        }
-    },
     "extra": {
         "branch-alias": {
             "dev-main": "0.1.x-dev"

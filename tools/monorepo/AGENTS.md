@@ -9,6 +9,7 @@ Rejected: a scaffolding command, a new package is copied by hand after an existi
   (`agents/repositories.md`). An allowlist: a new file of the monorepo stays out of the split, and so out
   of every install, without anyone remembering to exclude it. `sync` throws on a `dist` path that does not exist
   or is not a top-level entry: the split keeps whole entries, a path inside one would name nothing.
+  Include `src/` in Composer mappings, Testo paths and the split only when the directory exists.
   Declare Composer executables in `Manifest::$bin`. `sync` checks that each path names a file in the package
   and includes its top-level entry in the split.
   Rejected: a list of excluded files (a forgotten one leaks into every install); `.gitattributes`

@@ -51,6 +51,7 @@ final readonly class Monorepo
                 manifest: $manifest,
                 files: self::autoloadFiles($root, $path, 'src', 'files', $manifest->files),
                 devFiles: self::autoloadFiles($root, $path, 'tests', 'devFiles', $manifest->devFiles),
+                hasSrc: is_dir($dir . '/src'),
                 hasSkills: is_dir($dir . '/skills'),
                 hasTests: is_dir($dir . '/tests'),
             );

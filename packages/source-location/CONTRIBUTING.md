@@ -20,7 +20,7 @@ Use Git, Docker and Make. Containers use the monorepo's PHP version.
 
 1. Fork [thesis-php/thesis](https://github.com/thesis-php/thesis) and clone your fork.
 2. Install the dependencies: `make i`.
-3. Change the code in `packages/source-location/src/` and its tests in `packages/source-location/tests/`.
+3. Change the code in `packages/source-location/`.
    Cover each change with a test.
 4. Check the package while you work:
    - `make test P=source-location` runs its tests and starts the services they need,

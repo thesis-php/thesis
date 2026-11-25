@@ -3,16 +3,24 @@
 declare(strict_types=1);
 
 use Thesis\Async\Group;
-use Thesis\Demo\Internal\DelayedResponse;
+use Thesis\Http\Method;
+use Thesis\Http\Request;
+use Thesis\Http\Response;
 use Thesis\Http\Server;
 use Thesis\Http\Server\Config;
+use Thesis\Http\Server\Context;
+use Thesis\Http\Server\Route;
+use Thesis\Http\Server\RouteMatch;
+use Thesis\Http\Server\Router;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
 use function Thesis\Async\awaitSignal;
+use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeout;
 use function Thesis\Io\stderr;
+use function Thesis\Time\ms;
 use function Thesis\Time\sec;
 
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -24,7 +32,15 @@ if ($endpoint === '') {
 }
 
 $logger = new Logger(stderr(), formatter: new Console());
-$server = new Server(config: new Config($endpoint), handler: new DelayedResponse($logger));
+$router = new Router([
+    new Route(Method::GET, '/', static fn() => new Response(body: "Try GET /1 for a delayed response.\n")),
+    new Route(Method::GET, '/:id', static function (Request $request, Context $context, RouteMatch $match) {
+        delay(ms(250));
+
+        return new Response(body: "OK /{$match->param('id')}\n");
+    }),
+]);
+$server = new Server(config: new Config($endpoint), handler: $router);
 
 group(static function (Group $group) use ($logger, $server) {
     $logger->start($group);

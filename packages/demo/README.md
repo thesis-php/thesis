@@ -16,8 +16,9 @@
 
 <!-- head:end -->
 
-Each HTTP request waits for 250 ms, then returns `OK` and the request path. The console log timestamps
-the start and finish of each request so you can see the waits overlap.
+`GET /` returns a usage hint immediately. The router sends single-segment paths such as `GET /1` to a handler
+that reads `id` with `$match->param('id')`, waits for 250 ms and returns `OK /1`.
+The router decodes the parameter, so `GET /a%20b` returns `OK /a b`.
 
 ## Run
 
@@ -44,7 +45,6 @@ time curl -fsS --parallel --parallel-immediate 'http://127.0.0.1:8080/[1-8]'
 ```
 
 On an idle machine, expect about two seconds for the first command and about 250 ms for the second.
-In the parallel run, all eight `Started` lines appear before the first `Finished` line.
 Press Ctrl+C to stop the server.
 
 The server and logger are wired in [run.php](run.php).

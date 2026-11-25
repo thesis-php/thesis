@@ -83,12 +83,12 @@ final class Tools
     }
 
     /**
-     * @var list<non-empty-string> src/ of every package
+     * @var list<non-empty-string> existing package source directories
      */
     public array $testoSrc {
         get => array_map(
             fn(Package $package) => $this->monorepo->root . '/' . $package->path . '/src',
-            array_values($this->monorepo->packages),
+            array_values(array_filter($this->monorepo->packages, static fn(Package $package) => $package->hasSrc)),
         );
     }
 

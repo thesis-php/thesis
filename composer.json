@@ -115,7 +115,6 @@
             "Thesis\\AsyncTrace\\": "packages/async-trace/src/",
             "Thesis\\Async\\": "packages/async/src/",
             "Thesis\\Cache\\": "packages/cache/src/",
-            "Thesis\\Demo\\": "packages/demo/src/",
             "Thesis\\Formatter\\": "packages/formatter/src/",
             "Thesis\\HotReload\\": "packages/hot-reload/src/",
             "Thesis\\Http\\": "packages/http/src/",

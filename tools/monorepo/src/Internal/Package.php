@@ -70,6 +70,7 @@ final class Package
         public readonly Manifest $manifest,
         public readonly array $files,
         public readonly array $devFiles,
+        public readonly bool $hasSrc,
         public readonly bool $hasSkills,
         public readonly bool $hasTests,
     ) {}

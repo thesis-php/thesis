@@ -55,7 +55,12 @@ final readonly class Fixture
         string $arguments = '',
         int $licenseSince = 2026,
         string $version = '0.1',
+        bool $hasSrc = true,
     ): self {
+        if ($hasSrc) {
+            $this->file("packages/{$dir}/src/.gitignore", '');
+        }
+
         $this->file("packages/{$dir}/package.php", <<<PHP
             <?php
 

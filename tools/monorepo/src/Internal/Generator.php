@@ -185,7 +185,7 @@ final class Generator
             'suggest' => self::sortRequire($manifest->suggest),
             'bin' => $manifest->bin,
             'autoload' => array_filter([
-                'psr-4' => [$package->namespace => 'src/'],
+                'psr-4' => $package->hasSrc ? [$package->namespace => 'src/'] : [],
                 'files' => $package->files,
             ]),
             'autoload-dev' => array_filter([
@@ -282,7 +282,10 @@ final class Generator
             $path = $package->path;
             // The root is dev-main, which no ^0.Y of an external dependency on a package would accept.
             $replace[$package->name] = Series::of($package)->alias;
-            $psr4[$package->namespace][] = $path . '/src/';
+
+            if ($package->hasSrc) {
+                $psr4[$package->namespace][] = $path . '/src/';
+            }
 
             if ($package->hasTests) {
                 $psr4Dev[$package->namespace][] = $path . '/tests/';
@@ -381,7 +384,6 @@ final class Generator
         }
 
         $listed = [
-            'src',
             'composer.json',
             'LICENSE',
             'README.md',
@@ -391,6 +393,10 @@ final class Generator
             ...$package->manifest->dist,
             ...$binaryEntries,
         ];
+
+        if ($package->hasSrc) {
+            $listed[] = 'src';
+        }
 
         if ($package->hasSkills) {
             $listed[] = 'skills';
@@ -528,7 +534,7 @@ final class Generator
 
             1. Fork [{$monorepo}](https://github.com/{$monorepo}) and clone your fork.
             2. Install the dependencies: `make i`.
-            3. Change the code in `{$package->path}/src/` and its tests in `{$package->path}/tests/`.
+            3. Change the code in `{$package->path}/`.
                Cover each change with a test.
             4. Check the package while you work:
                - `make test P={$package->dir}` runs its tests and starts the services they need,

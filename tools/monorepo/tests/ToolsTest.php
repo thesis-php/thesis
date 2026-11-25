@@ -98,9 +98,9 @@ final readonly class ToolsTest
         );
     }
 
-    public static function hasTestoSrcOfEveryPackage(): void
+    public static function listsExistingSourceDirectories(): void
     {
-        $fixture = new Fixture()->package('async')->package('bytes');
+        $fixture = new Fixture()->package('async')->package('bytes')->package('demo', hasSrc: false);
 
         Assert::same(Tools::of($fixture->load())->testoSrc, [
             $fixture->root . '/packages/async/src',
