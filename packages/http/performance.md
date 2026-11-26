@@ -423,6 +423,18 @@ clock's DateTimeImmutable. In four pairs (ABBA twice), each process encoded the 
 response 100 times per writer. Median time per encode fell from 584 to 534 ns. Both arms formatted
 Date with gmdate. The probe excludes sockets, handlers and the event loop.
 
+## Gzip responses
+
+- A short read from a StringBody consumes its remaining bytes. Finish gzip on that read to send the
+  footer with the payload. Other bodies can produce more data after a short read. Across the seven
+  Arena JSON templates from `621e6cd`, mean HTTP/1 wire size fell from 988.7 to 977.0 bytes.
+  Six pinned in-memory comparisons with tracing JIT reduced process CPU per request by 4.64% at
+  the paired median. Five pairs improved. Reads of exactly 8192 bytes still check for EOF.
+- Rejected: lowering zlib's memory level from 8 to 6 or 5. With 180 live compressors the PHP heap
+  per context fell from 264 to 168 or 152 KiB. Compressing 256 KiB of high-entropy data in 8 KiB
+  blocks cost 5.51, 9.54 and 11.93 ms of CPU respectively at the medians of three pinned runs.
+  The lower levels also produced slightly larger output.
+
 ## HTTP/1 codec performance
 
 Unless a different base is given, these decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.

@@ -10,6 +10,7 @@ use Testo\Test;
 use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Stub\PrefixedBody;
 use Thesis\Http\Status;
 use Thesis\Http\StringBody;
 use Thesis\Net\InetAddress;
@@ -93,6 +94,16 @@ final readonly class GzipTest
         Assert::same('Accept-Encoding', $response->headers->get('vary'));
         Assert::same(null, $response->headers->get('content-encoding'));
         Assert::same('part', $response->takeBody()->readAll());
+    }
+
+    public function continuesAfterAShortStreamingRead(): void
+    {
+        $request = new Request('GET', '/', ['accept-encoding' => 'gzip']);
+        $response = new Gzip()->handle($request, $this->context, static fn() => new Response(
+            body: new PrefixedBody(new StringBody('tail')),
+        ));
+
+        Assert::same('!tail', gzdecode($response->takeBody()->readAll()));
     }
 
     public function compressesAnEmptyRepresentation(): void

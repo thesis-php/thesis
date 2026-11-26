@@ -7,6 +7,7 @@ namespace Thesis\Http\Server\Internal;
 use Thesis\Http\Body;
 use Thesis\Http\Headers;
 use Thesis\Http\StreamingBody;
+use Thesis\Http\StringBody;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StreamClosed;
 
@@ -15,6 +16,8 @@ use Thesis\Io\StreamClosed;
  */
 final class GzipBody extends StreamingBody
 {
+    private const int READ_SIZE = 8192;
+
     #[\Override]
     public ?int $size {
         get => null;
@@ -60,13 +63,14 @@ final class GzipBody extends StreamingBody
                 return null;
             }
 
-            $bytes = $this->body->read(8192);
+            $bytes = $this->body->read(self::READ_SIZE);
 
             if ($this->closed) {
                 throw new StreamClosed('The compressed response body is closed.');
             }
 
-            $output = deflate_add($this->context, $bytes ?? '', $bytes === null ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
+            $finished = $bytes === null || ($this->body instanceof StringBody && \strlen($bytes) < self::READ_SIZE);
+            $output = deflate_add($this->context, $bytes ?? '', $finished ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
 
             if ($output === false) {
                 $this->close();
@@ -74,7 +78,7 @@ final class GzipBody extends StreamingBody
                 throw new ReadFailed('Failed to compress the response body.');
             }
 
-            if ($bytes === null) {
+            if ($finished) {
                 $this->context = null;
             }
 
