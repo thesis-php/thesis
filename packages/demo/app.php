@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Thesis\Async\Group;
 use Thesis\Dispatcher;
-use Thesis\Http\Headers;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
@@ -51,10 +50,7 @@ $server = new Server(
         ),
     ]),
     handler: new Router([
-        Route::get('/', static fn() => new Response(
-            headers: new Headers(['Content-Type' => 'text/html; charset=utf-8']),
-            body: $index,
-        )),
+        Route::get('/', static fn() => Response::html($index)),
         Route::get('/wait/{duration?}', static function (Request $request) {
             $duration = routeParam($request, 'duration') ?? '0s';
 

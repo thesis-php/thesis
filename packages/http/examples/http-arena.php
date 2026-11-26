@@ -85,34 +85,31 @@ $router = new Router([
         headers: ['Content-Type' => 'text/plain'],
         body: 'ok',
     )),
-    Route::get('/json/{count}', Pipeline::wrap(
-        handler: static function (Request $request) use ($dataset) {
-            $count = filter_var(routeParam($request, 'count'), FILTER_VALIDATE_INT);
-            $multiplier = filter_var($request->query->get('m'), FILTER_VALIDATE_INT);
+    Route::get('/json/{count}', static function (Request $request) use ($dataset) {
+        $count = filter_var(routeParam($request, 'count'), FILTER_VALIDATE_INT);
+        $multiplier = filter_var($request->query->get('m'), FILTER_VALIDATE_INT);
 
-            if ($count === false || $count < 1 || $count > count($dataset) || $multiplier === false) {
-                return new Response(status: Status::BAD_REQUEST);
+        if ($count === false || $count < 1 || $count > count($dataset) || $multiplier === false) {
+            return new Response(status: Status::BAD_REQUEST);
+        }
+
+        $items = [];
+        foreach ($dataset as $i => $item) {
+            if ($i === $count) {
+                break;
             }
 
-            $items = [];
-            foreach ($dataset as $i => $item) {
-                if ($i === $count) {
-                    break;
-                }
+            $item['total'] = $item['price'] * $item['quantity'] * $multiplier;
+            $items[] = $item;
+        }
 
-                $item['total'] = $item['price'] * $item['quantity'] * $multiplier;
-                $items[] = $item;
-            }
-
-            return Response::json(['items' => $items, 'count' => $count]);
-        },
-        middleware: [new Gzip()],
-    )),
+        return Response::json(['items' => $items, 'count' => $count]);
+    }),
     Route::post('/echo', static fn(Request $request) => new Response(
         headers: ['Content-Type' => 'application/octet-stream'],
         body: $request->takeBody(),
     )),
-    new StaticFiles('/data/static')->route('/static'),
+    new StaticFiles('/data/static')->route(prefix: '/static'),
 ]);
 
 $server = new Server(
@@ -137,7 +134,7 @@ $server = new Server(
             maxConnections: 4096,
         ),
     ]),
-    handler: $router,
+    handler: Pipeline::wrap($router, middleware: [new Gzip()]),
 );
 
 group(static function (Group $group) use ($server) {
