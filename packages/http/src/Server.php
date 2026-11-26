@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Http;
 
 use Thesis\Async\Group;
+use Thesis\Async\Instant;
 use Thesis\Async\Service;
 use Thesis\Async\Task;
 use Thesis\Dispatcher;
@@ -18,11 +19,14 @@ use Thesis\Http\Server\UnixEndpoint;
 use Thesis\Net\Address;
 use Thesis\Net\ListenFailed;
 use function Thesis\Async\checkpoint;
+use function Thesis\Async\group;
+use function Thesis\Async\onCancel;
+use function Thesis\Async\shield;
 use function Thesis\Net\listen;
 use function Thesis\Net\listenUnix;
 
 /**
- * An HTTP/1 server owning one TCP or Unix listener.
+ * An HTTP/1 server serving one or more TCP or Unix endpoints.
  *
  * @api
  * @phpstan-type Handler callable(Request, Context): Response
@@ -35,13 +39,32 @@ final class Server implements Service
      */
     private ?Task $task = null;
 
-    private ?Listener $listener = null;
+    /**
+     * @var list<Listener>
+     */
+    private array $listeners = [];
+
+    /**
+     * @var list<Address> bound addresses in configuration order
+     */
+    public array $addresses {
+        get {
+            $addresses = [];
+            foreach ($this->listeners as $listener) {
+                if (($address = $listener->address) !== null) {
+                    $addresses[] = $address;
+                }
+            }
+
+            return $addresses;
+        }
+    }
 
     /**
      * The bound address while listening, including the port assigned by the OS.
      */
     public ?Address $address {
-        get => $this->listener?->address;
+        get => ($this->listeners[0] ?? null)?->address;
     }
 
     /**
@@ -69,43 +92,37 @@ final class Server implements Service
      */
     public function start(Group $group): void
     {
-        if ($this->listener !== null) {
+        if ($this->listeners !== []) {
             throw new \LogicException('The server has already started.');
         }
 
-        $endpoint = $this->config->endpoint;
-        $socketListener = match (true) {
-            $endpoint instanceof TcpEndpoint => listen(
-                host: $endpoint->address->ip,
-                port: $endpoint->address->port,
-                backlog: $endpoint->backlog,
-                reusePort: $endpoint->reusePort,
-                noDelay: $endpoint->noDelay,
-            ),
-            $endpoint instanceof UnixEndpoint => listenUnix($endpoint->path, $endpoint->backlog),
-        };
-
         try {
-            $this->listener = new Listener(
-                socketListener: $socketListener,
-                handler: $this->handler,
-                config: $this->config,
-                dispatcher: $this->dispatcher,
-                errorHandler: $this->errorHandler,
-            );
-            $this->task = $group->daemon($this->listener->run(...));
-
-            // A group may finish as soon as start() returns. A daemon cancelled before it starts never runs its finally.
-            while (!$this->listener->isReady && !$this->task->isDone) {
-                checkpoint();
+            foreach ($this->config->endpoints as $endpoint) {
+                $this->listeners[] = $this->bind($endpoint);
             }
+            $this->task = $group->daemon($this->run(...));
 
-            if (!$this->listener->isReady) {
-                $this->task->await();
+            foreach ($this->listeners as $listener) {
+                while (!$listener->isReady && !$this->task->isDone) {
+                    checkpoint();
+                }
+                if (!$listener->isReady) {
+                    $this->task->await();
+                }
             }
         } catch (\Throwable $error) {
-            $socketListener->close();
-            $this->listener = null;
+            $this->closeListeners();
+            if ($this->task !== null) {
+                $this->task->cancel();
+
+                try {
+                    shield($this->task->await(...));
+                } catch (\Throwable) {
+                    // Report the original startup failure after the daemon has released its listeners.
+                }
+            }
+            $this->listeners = [];
+            $this->task = null;
 
             throw $error;
         }
@@ -120,7 +137,54 @@ final class Server implements Service
      */
     public function stop(): void
     {
-        $this->listener?->stop();
+        $this->closeListeners();
         $this->task?->await();
+    }
+
+    private function closeListeners(): void
+    {
+        $started = Instant::now();
+        foreach ($this->listeners as $listener) {
+            $listener->stop($started);
+        }
+    }
+
+    private function run(): void
+    {
+        $unsubscribe = onCancel($this->closeListeners(...));
+
+        try {
+            shield(fn() => group(function (Group $group) {
+                foreach ($this->listeners as $listener) {
+                    $group->spawn($listener->run(...));
+                }
+            }));
+        } finally {
+            $unsubscribe();
+        }
+    }
+
+    private function bind(TcpEndpoint|UnixEndpoint $endpoint): Listener
+    {
+        $socketListener = match (true) {
+            $endpoint instanceof TcpEndpoint => listen(
+                host: $endpoint->address->ip,
+                port: $endpoint->address->port,
+                backlog: $endpoint->backlog,
+                reusePort: $endpoint->reusePort,
+                noDelay: $endpoint->noDelay,
+            ),
+            $endpoint instanceof UnixEndpoint => listenUnix($endpoint->path, $endpoint->backlog),
+        };
+
+        return new Listener(
+            socketListener: $socketListener,
+            handler: $this->handler,
+            config: $this->config,
+            tls: $endpoint->tls ?? $this->config->tls,
+            maxConnections: $endpoint->maxConnections ?? $this->config->maxConnections,
+            dispatcher: $this->dispatcher,
+            errorHandler: $this->errorHandler,
+        );
     }
 }

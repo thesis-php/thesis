@@ -48,7 +48,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Enable bounded retries of idempotent requests with replayable uploads with `RetryRequests`.
 - Submit URL-encoded and streaming multipart forms.
 - Use a custom socket connector or tunnel requests through an HTTP CONNECT proxy.
-- Set the endpoint and HTTP limits in `Config`. Use `TcpEndpoint` or `UnixEndpoint` to tune socket settings.
+- Serve multiple TCP or Unix endpoints with one `Server`, with TLS and connection limits per endpoint.
   Start listening with `Server::start($group)` and wait for active exchanges with `stop()`.
 - Serve TCP and Unix connections concurrently with a bounded number of open sockets.
 - Stream HTTP/1 requests and responses with fixed-length and chunked bodies, trailers and keep-alive.

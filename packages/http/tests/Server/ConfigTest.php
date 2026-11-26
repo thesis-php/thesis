@@ -32,6 +32,18 @@ final class ConfigTest
         Assert::equals($config->endpoint, new TcpEndpoint(new InetAddress('127.0.0.1', 8080)));
     }
 
+    public function requiresAtLeastOneEndpoint(): void
+    {
+        Expect::exception(\ValueError::class);
+        new Config(endpoints: []);
+    }
+
+    public function rejectsBothEndpointOptions(): void
+    {
+        Expect::exception(\ValueError::class);
+        new Config(8080, endpoints: [new UnixEndpoint('/test.sock')]);
+    }
+
     public function rejectsRelativeSocketPathStrings(): void
     {
         Expect::exception(\ValueError::class);

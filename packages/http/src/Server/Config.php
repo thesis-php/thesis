@@ -10,13 +10,21 @@ use Time\Duration;
 use function Thesis\Time\sec;
 
 /**
- * The listening endpoint, HTTP limits and optional TLS settings. Creating a config does no I/O.
+ * The listening endpoints, HTTP limits and optional TLS settings. Creating a config does no I/O.
  *
  * @api
  */
 final readonly class Config
 {
+    /**
+     * The first configured endpoint.
+     */
     public TcpEndpoint|UnixEndpoint $endpoint;
+
+    /**
+     * @var non-empty-list<TcpEndpoint|UnixEndpoint>
+     */
+    public array $endpoints;
 
     public Duration $headTimeout;
 
@@ -31,7 +39,7 @@ final readonly class Config
     public Duration $shutdownTimeout;
 
     /**
-     * @param int<0, 65535>|non-empty-string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint an IPv4 loopback port
+     * @param null|int<0, 65535>|non-empty-string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint an IPv4 loopback port
      *     (zero lets the OS choose), an absolute Unix socket path, a TCP address in IP:port or [IPv6]:port form,
      *     or a configured endpoint
      * @param ?ServerTls $tls the TLS settings, or null to serve plaintext
@@ -45,11 +53,13 @@ final readonly class Config
      * @param ?Duration $writeTimeout time to complete each write, defaults to 30 seconds
      * @param ?Duration $tlsHandshakeTimeout time to complete a TLS handshake, defaults to 10 seconds
      * @param ?Duration $shutdownTimeout time for active exchanges to finish after shutdown, defaults to 5 seconds
+     * @param list<TcpEndpoint|UnixEndpoint> $endpoints listening endpoints in bind order, used instead of $endpoint
+     * @throws \ValueError if neither or both endpoint options are supplied
      * @throws \ValueError if a timeout is negative
      * @throws \ValueError if an endpoint string is neither an absolute Unix path nor a valid TCP address
      */
     public function __construct(
-        int|string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint,
+        null|int|string|InetAddress|TcpEndpoint|UnixEndpoint $endpoint = null,
         public ?ServerTls $tls = null,
         public int $maxConnections = 1024,
         public ?int $maxRequestsPerConnection = null,
@@ -61,15 +71,27 @@ final readonly class Config
         ?Duration $writeTimeout = null,
         ?Duration $tlsHandshakeTimeout = null,
         ?Duration $shutdownTimeout = null,
+        array $endpoints = [],
     ) {
-        $this->endpoint = match (true) {
-            \is_int($endpoint) => new TcpEndpoint(new InetAddress('127.0.0.1', $endpoint)),
-            \is_string($endpoint) => str_starts_with($endpoint, '/')
-                ? new UnixEndpoint($endpoint)
-                : new TcpEndpoint(InetAddress::fromString($endpoint)),
-            $endpoint instanceof InetAddress => new TcpEndpoint($endpoint),
-            $endpoint instanceof TcpEndpoint, $endpoint instanceof UnixEndpoint => $endpoint,
-        };
+        if ($endpoint === null && $endpoints === []) {
+            throw new \ValueError('Supply at least one listening endpoint.');
+        }
+        if ($endpoint !== null && $endpoints !== []) {
+            throw new \ValueError('Supply either endpoint or endpoints.');
+        }
+
+        if ($endpoint !== null) {
+            $endpoints = [match (true) {
+                \is_int($endpoint) => new TcpEndpoint(new InetAddress('127.0.0.1', $endpoint)),
+                \is_string($endpoint) => str_starts_with($endpoint, '/')
+                    ? new UnixEndpoint($endpoint)
+                    : new TcpEndpoint(InetAddress::fromString($endpoint)),
+                $endpoint instanceof InetAddress => new TcpEndpoint($endpoint),
+                $endpoint instanceof TcpEndpoint, $endpoint instanceof UnixEndpoint => $endpoint,
+            }];
+        }
+        $this->endpoints = $endpoints;
+        $this->endpoint = $endpoints[0];
         $this->headTimeout = $headTimeout ?? sec(10);
         $this->idleTimeout = $idleTimeout ?? sec(30);
         $this->bodyIdleTimeout = $bodyIdleTimeout ?? sec(30);

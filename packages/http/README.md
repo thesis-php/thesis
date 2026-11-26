@@ -242,7 +242,7 @@ For HTTPS the client negotiates TLS inside the tunnel and verifies the origin's 
 
 ## Server
 
-Serve HTTP/1 requests on a TCP or Unix listener. Each connection runs in its own task.
+Serve HTTP/1 requests on one or more TCP or Unix listeners. Each connection runs in its own task.
 Requests on the same connection run in order. The handler receives the shared `Thesis\Http\Request`
 and a `Thesis\Http\Server\Context` with connection information. It returns a `Thesis\Http\Response`.
 `Thesis\Http\Server` defines two PHPStan types for this signature. The server constructor accepts
@@ -403,6 +403,22 @@ Both endpoint types let you set `backlog`, which defaults to 511. `TcpEndpoint` 
 
 `$server->start($group)` binds the endpoint and returns once the server is ready. A bind failure throws
 `Thesis\Net\ListenFailed` from `start()`. With TCP port zero, `$server->address` gives the assigned port.
+
+For several listeners, pass a non-empty list of endpoints in bind order. Each endpoint can override
+the TLS settings and connection limit from `Config`. Each listener counts its own connections.
+
+```php
+$config = new Config(endpoints: [
+    new TcpEndpoint(new InetAddress('0.0.0.0', 8080)),
+    new TcpEndpoint(new InetAddress('0.0.0.0', 8443), tls: $tls, maxConnections: 256),
+]);
+```
+
+The server binds every endpoint before accepting requests. If a bind fails, it releases all sockets
+opened by that start. Read the bound addresses from `$server->addresses` in configuration order.
+`$server->address` gives the first listener's address. Each listener emits its own lifecycle events.
+Stopping the server closes all listeners before waiting for active exchanges under one shutdown deadline.
+
 Call `$server->stop()` outside request handlers to stop accepting clients and wait for shutdown.
 The server closes idle sockets and lets active handlers
 and response writers finish until the shutdown deadline. Cancelling the serving scope also stops the server.

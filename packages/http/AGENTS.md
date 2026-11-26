@@ -183,11 +183,12 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   Rejected: using a compressed tree or generated PHP for every path. On small and medium sets of
   simple routes the tables won mixed lookup. Generated PHP won the large two-parameter case.
 
-- The constructor takes the configuration and handler. Bind the endpoint in `start()` so a DI container can build the server
+- The constructor takes the configuration and handler. Bind all endpoints before accepting in `start()` so a DI container can build the server
   without opening sockets and the application sees a bind failure at startup.
 - An integer endpoint in `Config` is a TCP port on `127.0.0.1`. Strings starting with `/` are absolute Unix paths.
   Other strings must be numeric TCP addresses with a port and brackets around IPv6. A relative path needs `UnixEndpoint`.
-- Both endpoint types own their backlog. TCP owns `reusePort` and `noDelay`. TLS, limits and timeouts live on `Config`.
+- Both endpoint types own their backlog. TCP owns `reusePort` and `noDelay`. TLS and connection limits use endpoint overrides over config defaults. Each listener counts connections separately.
+  All listeners share one shutdown deadline. Close them all before joining the serving task.
 - Like the AMQP client, the server starts a daemon in the group passed to `start()`. It returns once the daemon
   has registered shutdown. The owner calls `stop()` from outside request handlers because it waits for every active exchange.
 - One callback on the existing loop watches each socket for a kernel shutdown event on epoll, or readability on other backends

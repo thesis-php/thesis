@@ -266,7 +266,10 @@ final class ServerTest
             /** @var Deferred<null> $release */
             $release = new Deferred();
             $server = new Server(
-                config: new Config('127.0.0.1:0', maxConnections: 1),
+                config: new Config(endpoints: [
+                    new TcpEndpoint(new InetAddress('127.0.0.1', 0), maxConnections: 1),
+                    new TcpEndpoint(new InetAddress('127.0.0.1', 0)),
+                ]),
                 handler: static function (Request $request, Context $context) use ($entered, $release) {
                     $entered->complete($context);
                     $release->await();
@@ -295,6 +298,7 @@ final class ServerTest
                 });
                 $waiting->await();
                 Assert::null($server->address);
+                Assert::same($server->addresses, []);
                 Assert::false($stopped->isDone);
                 $release->complete();
                 $stopped->await();
@@ -494,20 +498,28 @@ final class ServerTest
             $occupied = listen('127.0.0.1', 0);
             $address = $occupied->address;
             \assert($address instanceof InetAddress);
-            $server = new Server(new Config(new TcpEndpoint($address, backlog: 16)), static fn() => new Response());
+            $path = sys_get_temp_dir() . '/http-' . bin2hex(random_bytes(8));
+            $server = new Server(
+                config: new Config(endpoints: [new UnixEndpoint($path), new TcpEndpoint($address)]),
+                handler: static fn() => new Response(),
+            );
             Assert::null($server->address);
 
             try {
                 $server->start($group);
                 Assert::fail('The port is already occupied.');
             } catch (ListenFailed) {
+                Assert::false(file_exists($path));
+                Assert::same($server->addresses, []);
                 Assert::null($server->address);
             } finally {
                 $occupied->close();
             }
 
             $server->start($group);
-            Assert::equals($server->address, $address);
+            Assert::equals($server->addresses[1] ?? null, $address);
+            $server->stop();
+            Assert::same($server->addresses, []);
         });
     }
 
@@ -544,16 +556,30 @@ final class ServerTest
                     $failure->complete($event->error);
                 };
                 $server = new Server(
-                    config: new Config(new InetAddress('127.0.0.1', 0), tls: $tls),
+                    config: new Config(endpoints: [
+                        new TcpEndpoint(new InetAddress('127.0.0.1', 0)),
+                        new TcpEndpoint(new InetAddress('127.0.0.1', 0), tls: $tls),
+                    ]),
                     handler: static function (Request $request, Context $context) use ($received) {
-                        $received->complete([$request->uri->getScheme(), $context->tls?->alpnProtocol]);
+                        if ($context->tls !== null) {
+                            $received->complete([$request->uri->getScheme(), $context->tls->alpnProtocol]);
+                        }
 
                         return new Response(Status::NO_CONTENT);
                     },
                     dispatcher: new Dispatcher([$observe]),
                 );
                 $server->start($group);
-                $address = $server->address;
+                $addresses = $server->addresses;
+                \assert(\count($addresses) === 2);
+                [$plainAddress, $address] = $addresses;
+                \assert($plainAddress instanceof InetAddress);
+                $plain = connect('127.0.0.1', $plainAddress->port);
+                $plain->write("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+                $buffer = new Buffer();
+                $buffer->fillUntil($plain, "\r\n");
+                Assert::same($buffer->readUntil("\r\n"), 'HTTP/1.1 204 No Content');
+                $plain->close();
                 \assert($address instanceof InetAddress);
                 $client = connect(
                     host: '127.0.0.1',

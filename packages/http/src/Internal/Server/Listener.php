@@ -7,6 +7,7 @@ namespace Thesis\Http\Internal\Server;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
+use Thesis\Async\Instant;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Async\Lock;
 use Thesis\Dispatcher;
@@ -51,6 +52,8 @@ final class Listener
      */
     private ?Deferred $drained = null;
 
+    private ?Instant $shutdownStarted = null;
+
     private int $forcedConnections = 0;
 
     private readonly LocalSemaphore $capacity;
@@ -65,16 +68,19 @@ final class Listener
 
     /**
      * @param HandlerClosure $handler
+     * @param positive-int $maxConnections
      */
     public function __construct(
         private readonly Server $socketListener,
         private readonly \Closure $handler,
         private readonly Config $config,
+        private readonly ?ServerTls $tls,
+        int $maxConnections,
         private readonly Dispatcher $dispatcher,
         private readonly ErrorHandler $errorHandler,
     ) {
         $this->connections = new \SplObjectStorage();
-        $this->capacity = new LocalSemaphore($config->maxConnections);
+        $this->capacity = new LocalSemaphore($maxConnections);
         $this->connectionAccepted = $dispatcher->for(Event\ConnectionAccepted::class);
         $this->connectionClosed = $dispatcher->for(Event\ConnectionClosed::class);
         $this->requestStarted = $dispatcher->for(Event\RequestStarted::class);
@@ -99,8 +105,9 @@ final class Listener
         }
     }
 
-    public function stop(): void
+    public function stop(?Instant $shutdownStarted = null): void
     {
+        $this->shutdownStarted ??= $shutdownStarted ?? Instant::now();
         $this->socketListener->close();
 
         foreach ($this->connections as $connection) {
@@ -119,7 +126,7 @@ final class Listener
         try {
             $this->dispatcher->dispatch(new Event\ServerStarted(
                 address: $this->socketListener->address,
-                tls: $this->config->tls !== null,
+                tls: $this->tls !== null,
             ));
             $this->socketListener->awaitClose();
             $this->dispatcher->dispatch(new Event\ServerStopping(
@@ -131,7 +138,11 @@ final class Listener
 
             if ($this->connections->count() > 0) {
                 $this->drained = new Deferred();
-                timeoutOr($this->config->shutdownTimeout, $this->drained->await(...));
+                \assert($this->shutdownStarted !== null);
+                $remaining = $this->config->shutdownTimeout->sub(Instant::now()->since($this->shutdownStarted));
+                if ($remaining > sec(0)) {
+                    timeoutOr($remaining, $this->drained->await(...));
+                }
                 foreach ($this->connections as $connection) {
                     if (!$this->connections[$connection]->isClosed) {
                         ++$this->forcedConnections;
@@ -192,7 +203,7 @@ final class Listener
                 return;
             }
 
-            $tls = $this->config->tls;
+            $tls = $this->tls;
             if ($tls !== null && !$this->negotiateTls($socket, $tls)) {
                 return;
             }
