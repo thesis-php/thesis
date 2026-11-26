@@ -490,6 +490,27 @@ It saved 2.12 MiB across 4096 idle connections with identical responses and noth
 response fields. Looking up the shared head before encoding lost throughput in five of six TCP
 pairs on the GET/POST mix. Reusing just the encoded bytes saved 0.44 MiB on identical responses.
 
+### Four-worker HTTP Arena comparison
+
+The table compares the HTTP package at `b2595f9` and `47857e5` on Docker Desktop arm64.
+Four PHP 8.6 ZTS workers with tracing JIT each had one pinned vCPU. The gcannon client had
+four other vCPUs and used the Arena request templates over loopback. After warmup each run
+settled for eight seconds and measured for ten. Each cell shows the baseline and final medians.
+Memory is the highest sampled Docker stats reading for the server container in each run.
+
+| Workload | Connections | Pairs | Replies/s before → after | p99 before → after (ms) | Container peak before → after (MiB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Async Delay | 32,000 | 4 | 169,934 → 179,536 | 278.6 → 223.9 | 1571.8 → 1409.0 |
+| Baseline (GET and both POST framings) | 4096 | 4 | 221,625 → 235,966 | 31.6 → 38.0 | 306.2 → 290.0 |
+| JSON Compressed (25, 40 and 50 items) | 4096 | 4 | 32,340 → 38,737 | 2061.4 → 1731.4 | 190.1 → 182.4 |
+| Pipelined (depth 16) | 4096 | 2 | 468,523 → 516,695 | 170.0 → 147.7 | 305.7 → 279.2 |
+
+Container memory fell in all 14 pairs. On the Baseline mix, throughput rose in three of four
+pairs and p99 improved in two. On the other workloads throughput rose and p99 fell in every
+pair. Every reply was 2xx and gcannon reported zero connection, read or timeout errors.
+JSON Compressed reopened each connection after 25 requests. The other workloads had zero
+reconnects. The official Arena host uses different hardware and a different worker count.
+
 ### Worker count at a fixed request rate
 
 At `a9bc752` on Docker arm64, each PHP worker had a dedicated vCPU. The generator used two other
