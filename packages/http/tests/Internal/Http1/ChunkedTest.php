@@ -67,6 +67,9 @@ final class ChunkedTest
         Assert::same(encodeLastChunk($trailers), "0\r\nX-Checksum: abc\r\nGrpc-Status: 0\r\nGrpc-Status: 1\r\n\r\n");
     }
 
+    /**
+     * @param non-empty-string $name
+     */
     #[DataProvider('fieldsNotInTrailers')]
     public function refusesTrailerThatFramesOrRoutesMessage(string $name): void
     {
@@ -88,7 +91,7 @@ final class ChunkedTest
     }
 
     /**
-     * @return iterable<string, array{string}>
+     * @return iterable<string, array{non-empty-string}>
      */
     public static function fieldsNotInTrailers(): iterable
     {

@@ -9,6 +9,7 @@ namespace Thesis\Http;
  * Names and values are percent-decoded. A plus sign stays a plus sign.
  *
  * @api
+ * @phpstan-type QueryInput string|array<int|non-empty-string, string|list<string>>|Query
  * @implements \IteratorAggregate<string, string>
  */
 final readonly class Query implements \IteratorAggregate
@@ -19,7 +20,7 @@ final readonly class Query implements \IteratorAggregate
     private array $pairs;
 
     /**
-     * @param iterable<int|string, string|list<string>> $parameters
+     * @param iterable<int|non-empty-string, string|list<string>> $parameters
      */
     public function __construct(iterable $parameters = [])
     {
@@ -102,6 +103,7 @@ final readonly class Query implements \IteratorAggregate
     /**
      * Replaces every occurrence at the position of the first. An empty list removes the parameter.
      *
+     * @param non-empty-string $name
      * @param string|list<string> $values
      */
     public function with(string $name, string|array $values): self
@@ -123,6 +125,37 @@ final readonly class Query implements \IteratorAggregate
         }
 
         array_push($pairs, ...$replacement);
+
+        return clone($this, ['pairs' => $pairs]);
+    }
+
+    /**
+     * Appends values after the last pair in the query.
+     *
+     * @param non-empty-string $name
+     * @param string|list<string> $values
+     */
+    public function withAdded(string $name, string|array $values): self
+    {
+        $pairs = $this->pairs;
+        foreach ((array) $values as $value) {
+            $pairs[] = [$name, $value];
+        }
+
+        return clone($this, ['pairs' => $pairs]);
+    }
+
+    /**
+     * @no-named-arguments
+     */
+    public function without(string ...$names): self
+    {
+        $pairs = [];
+        foreach ($this->pairs as $pair) {
+            if (!\in_array($pair[0], $names, true)) {
+                $pairs[] = $pair;
+            }
+        }
 
         return clone($this, ['pairs' => $pairs]);
     }

@@ -24,15 +24,15 @@ The [client](#client) and [server](#server) share [messages](#messages) and the 
 
 ## Messages
 
-Clients and servers use the same `Request` and `Response`. Use `with…` methods to derive a message
+Clients and servers use the same `Request` and `Response`. Both extend `Message`,
+the public type for working with the headers and body of either one. Use `with…` methods to derive a message
 with different metadata. The original and its copies share one right to take the body.
 
 ```php
 use Thesis\Http\Request;
 use Thesis\Http\Response;
-use Uri\Rfc3986\Uri;
 
-$request = new Request('GET', new Uri('https://example.org/search'))
+$request = new Request('GET', 'https://example.org/search')
     ->withQueryParameter('tag', ['php', 'http'])
     ->withHeader('Accept', 'application/json');
 
@@ -41,6 +41,15 @@ $body = $response->takeBody();
 $bytes = $body->readAll();
 $trailers = $body->trailers();
 ```
+
+Pass a URI string or a URI object to the request constructor or `withUri()`.
+`withQuery()` replaces the whole query. Pass an encoded string without the leading question mark,
+a `Query`, or an array of non-empty decoded names and their values. A list of values repeats the name.
+`withAddedQuery()` accepts the same inputs and appends pairs, preserving the original encoded query.
+Use `withAddedQueryParameter()` to append values for one name. `withoutQueryParameter()` removes every occurrence of the name.
+
+Message constructors, `withHeaders()` and `StringBody` trailers accept a `Headers` object or an array
+mapping each field name to a string or list of strings.
 
 Requests and responses default to `Thesis\Http\EMPTY_BODY`, a reusable empty body with empty trailers.
 Pass a string or an unread body to supply a payload. Give the message exclusive access until
@@ -56,18 +65,22 @@ its fields while reading. Calling `trailers()` while fields are still pending ra
 
 Use `Response::json($value, status: Status::CREATED)` to encode a PHP value as `application/json`.
 Use `Response::html($body)` for a UTF-8 HTML string or stream. Both constructors default to status 200.
-Pass a `Headers` object with `headers:` to either constructor. A supplied `Content-Type` takes precedence.
+Use `withAddedHeaders()` to append field lines to the response, or `withHeader()` to replace its `Content-Type`.
 
 ```php
 $value = $request->takeJson(associative: false, limit: 64 * 1024);
 return Response::json($value);
 ```
 
+Use `$request->withJson($value)` or `$response->withJson($value)` to copy a message with a new JSON body
+and set its `Content-Type` to `application/json`. Pass encoding options as `flags:` and the maximum nesting level as `depth:` (default 512).
+Encoding failures throw `JsonException`.
+
 On requests and responses, `takeJson()` takes the body once, even when decoding fails.
 It uses the same default limit as `readAll()`.
 If you need trailers, use `takeBody()`, read the body to the end, then call `trailers()` on it.
 JSON objects decode to associative arrays by default. Pass `associative: false` for `stdClass`.
-The default flags include `JSON_THROW_ON_ERROR`, so decoding failures throw `JsonException`.
+`takeJson()` adds `JSON_THROW_ON_ERROR` to the supplied flags, so decoding failures throw `JsonException`.
 
 A client middleware that may resend an upload takes the body before calling the next handler.
 It passes `$request->withBody($body)` on the first attempt. When policy permits another attempt

@@ -27,7 +27,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - On requests and responses, `takeJson()` shares the single handoff with `takeBody()`, including when decoding fails.
 - Messages share `EMPTY_BODY` for an empty payload without trailers. Each message still owns its body handoff.
 - Trailer fields may be pending until the reader finishes.
-- All metadata copies of a message share one body handoff. A replacement body has its own handoff.
+- `Message` is sealed to `Request` and `Response`. It owns their headers and body handoff.
+  All metadata copies of a message share one body handoff. A replacement body has its own handoff.
   Dropping the last copy closes an unclaimed body. After handoff the recipient owns its cleanup.
 - Changing metadata leaves the original intact. Replacing the payload replaces its trailers as well.
 - `readAll()` returns the whole body or fails once bytes have been consumed. Streaming implementations
@@ -79,7 +80,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   Storing both size and trailer presence did not give a repeatable gain on the tracing-JIT Arena mix.
   In five alternating pairs before the time limit, the candidate lost three; the median paired change was −9.5%.
 - A request parses its query on first access. A clone with a new URI parses its own query.
-  Replacing the query on a clone updates the URI that the codec writes.
+  Replacing the query on a clone updates the URI that the codec writes. A raw query string keeps its encoding
+  and is parsed on first access. Appending parameters preserves the original encoded query, including bare names and percent escapes.
 - Rejected: PSR-7 as the shared message contract. `StreamInterface` permits sequential reads, but an arbitrary
   implementation can block the event loop. PSR-7 has no standard access to trailers, which can arrive at EOF.
   It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives

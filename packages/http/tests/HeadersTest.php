@@ -167,8 +167,11 @@ final class HeadersTest
     {
         $message = "A header name must be a token, got {$quoted}.";
 
+        // @phpstan-ignore argument.type (the empty-name case checks runtime validation)
         Assert::same(failure(static fn() => new Headers([$name => 'value'])), $message);
+        // @phpstan-ignore argument.type (the empty-name case checks runtime validation)
         Assert::same(failure(static fn() => new Headers()->with($name, 'value')), $message);
+        // @phpstan-ignore argument.type (the empty-name case checks runtime validation)
         Assert::same(failure(static fn() => new Headers()->withAdded($name, 'value')), $message);
     }
 

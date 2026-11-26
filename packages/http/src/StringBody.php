@@ -6,6 +6,7 @@ namespace Thesis\Http;
 
 /**
  * @api
+ * @phpstan-import-type HeadersInput from Headers
  */
 final class StringBody implements ReplayableBody
 {
@@ -26,10 +27,17 @@ final class StringBody implements ReplayableBody
 
     private int $offset = 0;
 
+    private readonly Headers $trailers;
+
+    /**
+     * @param HeadersInput $trailers
+     */
     public function __construct(
         private readonly string $bytes,
-        private readonly Headers $trailers = EMPTY_HEADERS,
-    ) {}
+        array|Headers $trailers = EMPTY_HEADERS,
+    ) {
+        $this->trailers = Headers::normalize($trailers);
+    }
 
     private function __clone() {}
 

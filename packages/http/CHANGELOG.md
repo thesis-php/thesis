@@ -11,8 +11,12 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
-- Create JSON and HTML responses with optional headers using `Response::json()` and `Response::html()`.
-- Take and decode a JSON body with `Request::takeJson()` or `Response::takeJson()`.
+- Supply headers and string body trailers as arrays, request URIs as strings, and queries as encoded strings or parameter arrays.
+- Append field lines with `Message::withAddedHeaders()` and query pairs with `Request::withAddedQuery()`.
+- Append or remove query parameters with `Request::withAddedQueryParameter()` and `withoutQueryParameter()`, or `Query::withAdded()` and `without()`.
+
+- Create JSON and HTML responses using `Response::json()` and `Response::html()`.
+- Set a JSON body with `withJson()` and take and decode it with `takeJson()` on requests and responses. Both methods enable `JSON_THROW_ON_ERROR` with any supplied flags.
 
 - Use `Router::$list` to read the original routes in registration order.
 - Cancel the active server exchange when the peer disconnects after sending the request body.
@@ -31,7 +35,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
   Use `pattern:` for the path template and read it from `Route::$pattern`.
 - Register one or more methods per route or pass `methods: null` to accept any remaining method on that path. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
   Inspect the selected route and match or the failure reason (including allowed methods for 405) with `Router::match()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
-- Clients and servers share `Request` and `Response`. Metadata copies share a single `takeBody()` handoff.
+- Clients and servers share `Request` and `Response`, which extend the public `Message` class. Metadata copies share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.
 - Read streaming bodies incrementally or collect a whole unread payload. Replayable bodies can open independent readers.

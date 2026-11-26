@@ -17,10 +17,20 @@ use function Thesis\Http\Internal\quote;
  * so user input cannot add a line to a message. Spaces and tabs around a value are trimmed.
  *
  * @api
+ * @phpstan-type HeadersInput array<int|non-empty-string, string|list<string>>|Headers
  * @implements \IteratorAggregate<non-empty-lowercase-string, non-empty-list<string>>
  */
 final class Headers implements \IteratorAggregate
 {
+    /**
+     * @internal
+     * @param HeadersInput $headers
+     */
+    public static function normalize(array|self $headers): self
+    {
+        return \is_array($headers) ? new self($headers) : $headers;
+    }
+
     public bool $isEmpty {
         get => $this->lines === [];
     }
@@ -33,7 +43,7 @@ final class Headers implements \IteratorAggregate
     private readonly array $lines;
 
     /**
-     * @param iterable<string, string|list<string>> $fields if a name is given twice (`Accept` and `accept`),
+     * @param iterable<int|non-empty-string, string|list<string>> $fields if a name is given twice (`Accept` and `accept`),
      *     the lines of both are kept
      * @throws \ValueError if a name or a value is not valid
      */
@@ -49,7 +59,6 @@ final class Headers implements \IteratorAggregate
             $key = array_key_first($fields);
             $value = $fields[$key];
             if (\is_string($value)) {
-                // @phpstan-ignore cast.useless (PHP turns a numeric name into an int key)
                 $this->lines = self::single((string) $key, $value);
 
                 return;
@@ -59,7 +68,6 @@ final class Headers implements \IteratorAggregate
         $lines = [];
 
         foreach ($fields as $name => $values) {
-            // @phpstan-ignore cast.useless (PHP turns a numeric name into an int key)
             $name = self::name((string) $name);
 
             foreach (self::values($name, $values) as $value) {
@@ -111,6 +119,7 @@ final class Headers implements \IteratorAggregate
     /**
      * `with()` replaces the lines of a field. The field keeps its position. An empty list removes the field.
      *
+     * @param non-empty-string $name
      * @param string|list<string> $values
      * @throws \ValueError if the name or a value is not valid
      */
@@ -132,6 +141,7 @@ final class Headers implements \IteratorAggregate
     /**
      * `withAdded()` adds lines to a field after its existing lines.
      *
+     * @param non-empty-string $name
      * @param string|list<string> $values
      * @throws \ValueError if the name or a value is not valid
      */
@@ -142,6 +152,19 @@ final class Headers implements \IteratorAggregate
 
         foreach (self::values($name, $values) as $value) {
             $lines[$name][] = $value;
+        }
+
+        return clone($this, ['lines' => $lines]);
+    }
+
+    /**
+     * @internal
+     */
+    public function append(self $headers): self
+    {
+        $lines = $this->lines;
+        foreach ($headers->lines as $name => $values) {
+            $lines[$name] = [...($lines[$name] ?? []), ...$values];
         }
 
         return clone($this, ['lines' => $lines]);

@@ -10,6 +10,7 @@
   not `Internal`, not test helpers or fixtures: `Thesis\` is shared by all the packages, only the name
   of a package is guaranteed to be free there. A package with several peers (`async`, `io`, `time`) keeps them
   in its namespace. How the manifest declares it is in `manifests.md`.
+- In a union of primitive types and a class, put the primitive types first (`string|array|Query`).
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
