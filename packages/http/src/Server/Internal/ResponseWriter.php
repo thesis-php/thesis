@@ -38,7 +38,7 @@ final class ResponseWriter implements Writer, Closer
      */
     private ?array $lastResponseHead = null;
 
-    private ?int $lastResponseTime = null;
+    private ?\DateTimeImmutable $lastResponseTime = null;
 
     public function __construct(
         private readonly Writer $output,
@@ -54,12 +54,12 @@ final class ResponseWriter implements Writer, Closer
     public function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
         $now = $this->clock->now();
-        $second = $now->getTimestamp();
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
         if ($this->lastResponseHead !== null && $ordinary && $body instanceof StringBody) {
             $cached = $this->lastResponseHead;
             $head = $cached[0];
-            if ($this->lastResponseTime === $second && $response->status === $head->status
+            if ($this->lastResponseTime?->getTimestamp() === $now->getTimestamp()
+                && $response->status === $head->status
                 && $body->size === $head->length && $request->version === $head->version
                 && ($isPersistent && $request->isPersistent) === $head->isPersistent
                 && $response->headers->toArray() === $head->headers->toArray() && !$body->mayHaveTrailers) {
@@ -84,7 +84,7 @@ final class ResponseWriter implements Writer, Closer
         $result = [$head, $head->toString($now)];
         if ($ordinary && $head->framing === Framing::Length && \strlen($result[1]) <= 1024) {
             $this->lastResponseHead = $result;
-            $this->lastResponseTime = $second;
+            $this->lastResponseTime = $now;
         }
 
         return $result;
