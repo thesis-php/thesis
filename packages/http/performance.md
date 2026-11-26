@@ -466,6 +466,23 @@ clock's DateTimeImmutable. In four pairs (ABBA twice), each process encoded the 
 response 100 times per writer. Median time per encode fell from 584 to 534 ns. Both arms formatted
 Date with gmdate. The probe excludes sockets, handlers and the event loop.
 
+### Combined keep-alive measurements
+
+On Docker loopback, one worker held 4096 connections open after two checked GETs on each.
+Comparing `b2595f9` with `5983b2a` in ABBA order, live PHP heap fell from 120.4 to 112.9 MiB with
+a roughly 100-byte cookie, and from 151.0 to 105.9 MiB with a roughly 4000-byte cookie. Each client
+sent its own cookie. These measurements include the parser, connection tasks, listener and sockets.
+
+For `/delay/10`, four interleaved pairs at `b2595f9` and `c7ab305` used one pinned PHP server vCPU,
+8000 connections, eight seconds to settle and ten seconds of measurement. Peak process RSS fell in
+every pair, with medians of 321.7 and 274.9 MiB. Throughput changed by +16.1%, +3.6%, −23.0% and
+−6.8%. Median p99 was 249 vs 255 ms. All 3,189,377 replies were 2xx with zero reconnects.
+
+Rejected: trying a socket read before opening the body idle timeout. With 16 KiB waiting and
+256-byte reads, normal reads yielded to another task after 4096 bytes. The immediate reads bypassed
+the socket pacer and consumed all 16 KiB before yielding, delaying cancellation. They also succeeded
+with a zero idle timeout where the normal path returned 408.
+
 ## Gzip responses
 
 - A short read from a StringBody consumes its remaining bytes. Finish gzip on that read to send the
@@ -490,6 +507,13 @@ Date with gmdate. The probe excludes sockets, handlers and the event loop.
   caching the last Accept-Encoding decision. In six balanced comparisons, grouped edits cost 9.8%
   more CPU on the JSON mix and the header cache cost 21.4% more. The cached negotiation won three
   of six pairs. A shortcut for exactly `gzip` also misses Arena's `gzip, br`.
+- Rejected for the Arena workload: returning the original Headers when without() finds nothing to
+  remove. For a middleware dropping an absent digest on GET it saved 5.03% CPU, and eight header
+  lines took 94 vs 253 ns per no-op. The full JSON mix cost 4.53% more CPU in the first series
+  and 2.45% more in an independent eight-pair series (five slower). Successful removals were flat.
+- Rejected: caching the last encoded chunked head per connection. It added 6.50 MiB across 4096
+  writers and raised JSON CPU by 2.73%. A single worker entry saved 1.83% at the paired median
+  but retained the previous application's header fields across connections.
 - Rejected: lowering zlib's memory level from 8 to 6 or 5. With 180 live compressors the PHP heap
   per context fell from 264 to 168 or 152 KiB. Compressing 256 KiB of high-entropy data in 8 KiB
   blocks cost 5.51, 9.54 and 11.93 ms of CPU respectively at the medians of three pinned runs.
