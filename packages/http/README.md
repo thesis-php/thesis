@@ -64,7 +64,9 @@ Supply ready trailer fields with `new StringBody($bytes, $trailers)`. A streamin
 its fields while reading. Calling `trailers()` while fields are still pending raises `LogicException`.
 
 Use `Response::json($value, status: Status::CREATED)` to encode a PHP value as `application/json`.
-Use `Response::html($body)` for a UTF-8 HTML string or stream. Both constructors default to status 200.
+Use `Response::html($body)` for a UTF-8 HTML string or stream.
+For a local file, use `Response::html(new FileBody($path))` with `Thesis\Http\FileBody`.
+The body opens the file and gets its size from the same handle. Both constructors default to status 200.
 Use `withAddedHeaders()` to append field lines to the response, or `withHeader()` to replace its `Content-Type`.
 
 ```php
@@ -323,6 +325,22 @@ $server = new Server(new Config(8080), new Router($routes), errorHandler: $error
 
 Return the supplied status. The router sets `Allow` on a 405. Protocol rejections still have an empty body.
 An explicit error response from an application handler passes through as returned.
+
+### Static files
+
+`StaticFiles` looks up the decoded URI path relative to its directory. Pass it directly to the server
+to serve files at `/`, or register its `route()` under a URL prefix. GET returns the current file contents and HEAD
+returns the same media type and file length without reading the body. Directories, missing files
+and paths resolving outside the root return 404. GET streams the file in chunks and takes its length from the open file.
+Use a directory tree controlled by trusted writers, since path resolution and opening the file are separate operations.
+
+```php
+use Thesis\Http\Server\StaticFiles;
+use Thesis\Http\Server\Router;
+
+$files = new StaticFiles(__DIR__ . '/public');
+$router = new Router([$files->route('/static')]);
+```
 
 ### Streaming echo
 

@@ -66,3 +66,37 @@ function quote(string $bytes): string
 
     return '"' . addcslashes($bytes, "\0..\37\"\\\177..\377") . '"';
 }
+
+/**
+ * @internal
+ */
+function decodeRequestPath(string $path): ?string
+{
+    if (str_contains($path, '%')) {
+        if (preg_match('/%(?:2f|00|(?![a-f0-9]{2}))/i', $path) === 1) {
+            return null;
+        }
+        $path = rawurldecode($path);
+    }
+    if (str_contains($path, "\0")) {
+        return null;
+    }
+
+    return $path;
+}
+
+/**
+ * Returns the last suppressed error message without the function name.
+ * Call error_clear_last() before that call.
+ *
+ * @internal
+ * @param non-empty-string $default if the call raised nothing
+ * @return non-empty-string
+ */
+function lastError(string $default): string
+{
+    $message = error_get_last()['message'] ?? '';
+    $message = preg_replace('/^\w+\(\): /', '', $message) ?? $message;
+
+    return $message === '' ? $default : $message;
+}

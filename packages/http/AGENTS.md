@@ -127,6 +127,11 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 
 ### Invariants that must not be broken
 
+- A standalone `StaticFiles` reads the request URI. Its `route()` takes the decoded remainder from the router.
+  Resolve the configured root and the requested file on every request so switching a symlink to a new release takes effect.
+  GET takes the length and streams the bytes from the same open file so an atomic replacement cannot mix versions.
+  Arena checks the extension-based types `text/css`, `application/javascript` and `application/json`.
+
 - Gzip negotiation adds Accept-Encoding to Vary on both compressed and identity variants.
   The encoder reads the source on demand, weakens strong ETags and drops digests of the original bytes in headers
   and trailers. HEAD and 304 describe the negotiated encoding without sending a body.
@@ -175,7 +180,9 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   On that path, try the exact method, GET for HEAD, then the null-method fallback with the original request method.
 - Route an absolute URI with an empty path as `/`. Keep the empty path for `OPTIONS *` and authority-form `CONNECT`.
 - Patterns contain decoded literals. Reject encoded slashes and NUL before decoding the raw request path once.
-  Preserve empty segments, plus signs and dot segments.
+  Preserve empty segments, plus signs and dot segments. Router and standalone StaticFiles start with `getRawPath()`.
+  Rejected: `getPath()` removes dot segments (`/a/../b` becomes `/b`) and leaves escapes such as `%20`
+  encoded, while a file or route parameter can contain a space.
 
 ### Decisions
 

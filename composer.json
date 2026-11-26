@@ -47,6 +47,7 @@
         "ext-uri": "*",
         "composer-runtime-api": "^2.2",
         "internal/container": "^1.1",
+        "league/mime-type-detection": "^1.16",
         "phpstan/phpstan": "^2.3.6",
         "psr/clock": "^1.0",
         "psr/log": "^3.0",

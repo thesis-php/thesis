@@ -13,6 +13,7 @@ use Thesis\Http\Server\Gzip;
 use Thesis\Http\Server\Pipeline;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
+use Thesis\Http\Server\StaticFiles;
 use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Status;
 use Thesis\Net\Certificate;
@@ -111,33 +112,7 @@ $router = new Router([
         headers: ['Content-Type' => 'application/octet-stream'],
         body: $request->takeBody(),
     )),
-    Route::get('/static/{name}', static function (Request $request) {
-        $name = routeParam($request, 'name') ?? '';
-
-        $path = '/data/static/' . $name;
-
-        if (!is_file($path)) {
-            return new Response(Status::NOT_FOUND);
-        }
-
-        $type = match (pathinfo($name, PATHINFO_EXTENSION)) {
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'json' => 'application/json',
-            'html' => 'text/html',
-            'svg' => 'image/svg+xml',
-            'woff2' => 'font/woff2',
-            'webp' => 'image/webp',
-            default => 'application/octet-stream',
-        };
-
-        $bytes = exceptionally(static fn() => file_get_contents($path));
-
-        return new Response(
-            headers: ['Content-Type' => $type],
-            body: $bytes,
-        );
-    }, requirements: ['name' => '[\w\.-]+']),
+    new StaticFiles('/data/static')->route('/static'),
 ]);
 
 $server = new Server(

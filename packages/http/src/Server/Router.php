@@ -10,6 +10,7 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
+use function Thesis\Http\Internal\decodeRequestPath;
 use function Thesis\Http\Internal\isToken;
 use const Thesis\Http\Internal\ROUTE_MATCHES;
 
@@ -90,13 +91,8 @@ final class Router
             $path = '/';
         }
 
-        if (str_contains($path, '%')) {
-            if (preg_match('/%(?:2f|00|(?![a-f0-9]{2}))/i', $path) === 1) {
-                return RouteFailure::BadPath;
-            }
-            $path = rawurldecode($path);
-        }
-        if (str_contains($path, "\0")) {
+        $path = decodeRequestPath($path);
+        if ($path === null) {
             return RouteFailure::BadPath;
         }
         if (isset($this->exact[$path])) {

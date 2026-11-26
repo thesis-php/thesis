@@ -22,12 +22,14 @@ return new Manifest(
         'http-message',
         'http-headers',
         'router',
+        'static-files',
         'query-string',
         'http-trailers',
     ],
     require: [
         // Content-Length and chunk sizes can exceed 2^31.
         'php-64bit' => '*',
+        'league/mime-type-detection' => '^1.16',
         'psr/log' => '^3.0',
         'thesis/async' => '*',
         'thesis/dispatcher' => '*',
