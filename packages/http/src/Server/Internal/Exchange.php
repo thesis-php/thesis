@@ -15,6 +15,7 @@ use Thesis\Http\Server\Context;
 use Thesis\Http\Server\Event;
 use Thesis\Http\Server\Internal\Http1\ChunkedReader;
 use Thesis\Http\Server\Internal\Http1\FixedLengthReader;
+use Thesis\Http\Server\Internal\Http1\Framing;
 use Thesis\Http\Server\Internal\Http1\MalformedMessage;
 use Thesis\Http\Server\Internal\Http1\RequestHead;
 use Thesis\Http\Server\Internal\Http1\Version;
@@ -194,10 +195,15 @@ final class Exchange
         $mustClose = $this->continue?->isPending === true || !$this->connection->canAcceptNextRequest
             || ($ignoresBody && !$this->isBodyComplete);
 
-        if ($reply->isPersistent && $mustClose) {
+        $reframe = $reply->isPersistent && $mustClose;
+        if ($reframe) {
             [$reply, $bytes] = $this->output->encodeHead($response, $body, $this->head, isPersistent: false);
         }
 
+        // The clock or a body property can suspend while the replacement head is encoded.
+        $buffered = $reply->framing === Framing::Chunked
+            ? !$reframe && $ignoresBody
+            : $isEcho && $this->decoder instanceof FixedLengthReader && $this->decoder->isFullyBuffered;
         $this->continue?->commit();
         $this->status = $response->status;
         $this->output->writeResponse(
@@ -205,8 +211,7 @@ final class Exchange
             head: $reply,
             bytes: $bytes,
             first: $first,
-            bufferedEcho: $isEcho && $this->decoder instanceof FixedLengthReader
-                && $this->decoder->isFullyBuffered,
+            buffered: $buffered,
         );
 
         $this->responseWritten = true;

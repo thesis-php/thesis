@@ -135,13 +135,23 @@ final class ResponseWriter implements Writer, Closer
         ResponseHead $head,
         string $bytes,
         ?string $first = null,
-        bool $bufferedEcho = false,
+        bool $buffered = false,
     ): void {
         $remaining = $head->length;
-        if ($remaining !== null && $remaining > 0 && $remaining <= 8192
-            && ($first !== null || $bufferedEcho || $body->isBuffered)) {
+        if ($remaining === 0) {
+            $this->write($bytes);
+
+            return;
+        }
+
+        $shortLength = $remaining !== null && $remaining <= 8192;
+        $shortChunk = $head->framing === Framing::Chunked && \strlen($bytes) <= 8192
+            && ($first === null || \strlen($first) <= 8192);
+        $ready = $first !== null || $buffered || ($shortLength && $body->isBuffered);
+
+        if ($ready && ($shortLength || $shortChunk)) {
             try {
-                $chunk = $first ?? self::readBody($body, $remaining);
+                $chunk = $first ?? self::readBody($body, $remaining, max: 8192);
                 $first = null;
             } catch (\Throwable $error) {
                 $this->write($bytes);
@@ -149,14 +159,17 @@ final class ResponseWriter implements Writer, Closer
                 throw $error;
             }
 
-            $bytes .= $chunk;
-            $remaining -= \strlen($chunk);
+            if ($remaining !== null) {
+                $bytes .= $chunk;
+                $remaining -= \strlen($chunk);
+            } elseif ($chunk === '') {
+                $remaining = 0;
+            } else {
+                $bytes .= encodeChunk($chunk);
+            }
         }
 
         $this->write($bytes);
-        if ($head->framing === Framing::None) {
-            return;
-        }
 
         while ($remaining === null || $remaining > 0) {
             $bytes = $first ?? self::readBody($body, $remaining);
@@ -179,10 +192,11 @@ final class ResponseWriter implements Writer, Closer
 
     /**
      * @param ?positive-int $remaining
+     * @param ?positive-int $max
      */
-    public static function readBody(Body $body, ?int $remaining): string
+    public static function readBody(Body $body, ?int $remaining, ?int $max = null): string
     {
-        $max = match (true) {
+        $max ??= match (true) {
             $body->isBuffered => 64 * 1024,
             $body instanceof FileBody => 16 * 1024,
             default => 8192,

@@ -189,7 +189,8 @@ for all 76,800 TLS and 38,400 plaintext responses in the comparison.
 A client that stopped reading a 16 MiB response held another 8 KiB of PHP heap with 16 KiB reads.
 Rejected: 32 and 64 KiB file reads. They reached 11,938 and 12,354 TLS replies/s, but held another
 40–44 or 102–110 KiB per blocked client over the 8 KiB baseline. Small-file TLS p99 reached
-8.46 ms with 64 KiB reads, against 6.24 ms with 16 KiB reads.
+8.46 ms with 64 KiB reads, against 6.24 ms with 16 KiB reads. An initial 64 KiB trial ended with
+an unexplained client EOF. All 24 samples in the subsequent four-way TLS comparison completed.
 
 ### HTTP Arena H1 Baseline
 
@@ -518,6 +519,15 @@ official HttpArena host.
   1024 connections, three seconds of settling and eight seconds of measurement per arm. Throughput
   rose in three pairs, from 11,665 to 12,576 replies/s at the medians (+10.1% paired). Median p99
   fell from 126.6 to 121.7 ms. All 772,015 timed replies were 2xx with zero reconnects.
+- For a buffered chunked body, combine the final response head with the first data chunk when the
+  head and first payload each fit in 8 KiB. Send the head before reading a source that can wait.
+  Re-encoding a response to close the connection can call application code, so discard the earlier
+  buffering decision for chunked bodies in that case. A failed first read still sends the final head.
+  Against `4c84c8a`, four pairs used four PHP workers, 4096 clients, the three official compressed
+  JSON templates (25, 40 and 50 items), and a new TCP connection every 25 requests. All four pairs
+  improved throughput (+65.6%, +4.1%, +17.9%, +9.8%). The paired median was +13.85%.
+  Median p99 was 3.26 vs 2.68 s and rose in one pair. Docker memory peaks were 177.4 vs 180.2 MiB.
+  All 2,584,933 timed replies were 2xx with no connection, read or timeout errors.
 - Allocate the compressor after the first source read returns. With 150 response bodies waiting on
   that read, live PHP heap per suspended reader fell from 281.90 to 17.71 KiB. Once the first bytes
   have been compressed, both versions use about 282 KiB while waiting for more. Closing a body

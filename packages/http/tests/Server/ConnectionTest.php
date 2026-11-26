@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
+use Psr\Clock\ClockInterface;
 use Testo\Assert;
 use Testo\Codecov\Covers;
+use Testo\Data\DataSet;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Headers;
@@ -13,12 +15,16 @@ use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Internal\Connection;
+use Thesis\Http\Server\Internal\GzipBody;
+use Thesis\Http\Server\Internal\Http1\ScriptedReader;
 use Thesis\Http\Server\Stub\PrefixedBody;
+use Thesis\Http\Server\Stub\ReaderBody;
 use Thesis\Http\Server\Stub\RecordingWriter;
 use Thesis\Http\Server\Stub\TimedReader;
 use Thesis\Http\StringBody;
 use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
+use Thesis\Io\StreamClosed;
 use Thesis\Io\StringReader;
 use Thesis\Io\Writer;
 use function Thesis\Http\serverContext;
@@ -118,11 +124,68 @@ final class ConnectionTest
             return new Response(body: new StringBody('a', new Headers(['X-End' => 'yes'])));
         });
 
+        Assert::same($output->writes, 3);
         Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
             . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-End: yes\r\n\r\n");
     }
 
-    public function sendsFirstChunkBeforeReadingSecond(): void
+    public function sendsTheFinalHeadWhenTheFirstBufferedChunkFails(): void
+    {
+        $input = new StringReader("GET / HTTP/1.1\r\nHost: local\r\n\r\n");
+        $output = new RecordingWriter();
+        $body = new GzipBody(new StringBody('content'));
+        $body->close();
+        Expect::exception(StreamClosed::class);
+
+        try {
+            $connection = new Connection($input, $output, new Config('/test.sock'));
+            $connection->run(serverContext(), static fn() => new Response(body: $body));
+        } finally {
+            Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+            Assert::same($output->writes, 1);
+        }
+    }
+
+    /**
+     * @param ?positive-int $size
+     */
+    #[DataSet([null])]
+    #[DataSet([1])]
+    public function sendsTheHeadWhenTheBodyStopsBeingBufferedDuringReframing(?int $size): void
+    {
+        $output = new RecordingWriter();
+        $source = new ScriptedReader('a');
+        $source->beforeRead = static function () use ($output) {
+            Assert::true(str_contains($output->bytes, "Connection: close\r\n\r\n"));
+        };
+        $body = new ReaderBody($source, $size);
+        $clock = new class ($body) implements ClockInterface {
+            private int $reads = 0;
+
+            public function __construct(
+                private readonly ReaderBody $body,
+            ) {}
+
+            public function now(): \DateTimeImmutable
+            {
+                if (++$this->reads === 2) {
+                    $this->body->isBuffered = false;
+                }
+
+                return new \DateTimeImmutable('@0');
+            }
+        };
+        $connection = new Connection(
+            input: new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 1\r\n\r\nx"),
+            output: $output,
+            config: new Config('/test.sock'),
+            clock: $clock,
+        );
+        $connection->run(serverContext(), static fn() => new Response(body: $body));
+        Assert::false($body->isBuffered);
+    }
+
+    public function sendsTheHeadAndFirstChunkBeforeWaitingForMore(): void
     {
         $exchange = new class implements Reader, Writer {
             private int $reads = 0;
@@ -132,15 +195,18 @@ final class ConnectionTest
             public function read(int $max): string
             {
                 if (++$this->reads === 1) {
-                    return "POST / HTTP/1.1\r\nHost: local\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n"
-                        . "1\r\na\r\n";
+                    return "POST / HTTP/1.1\r\nHost: local\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n";
                 }
 
-                Assert::same(2, $this->reads);
-                Assert::same(
-                    "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1\r\na\r\n",
-                    withoutResponseDate($this->output),
-                );
+                $head = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+                if ($this->reads === 2) {
+                    Assert::same(withoutResponseDate($this->output), $head);
+
+                    return "1\r\na\r\n";
+                }
+
+                Assert::same(3, $this->reads);
+                Assert::same(withoutResponseDate($this->output), $head . "1\r\na\r\n");
 
                 return "1\r\nb\r\n0\r\n\r\n";
             }
