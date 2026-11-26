@@ -526,6 +526,13 @@ Revisit them if a profile shows a different workload or a PHP upgrade changes th
 
 - Rejected: scanning a path for escapable bytes before calling `strtr()`. Plain short paths saved
   0.07 µs per head, paths with brackets got slower, and TCP throughput changed by only 0.5%.
+- Read Unix seconds directly for the built-in final WallClock. A custom PSR clock supplies its
+  own timestamp on every response, including errors. Six tracing-JIT pairs drove 256 TCP clients
+  with the server near 97% of one vCPU. Median GET throughput rose from 63.8k to 70.0k replies/s
+  and the GET/POST mix from 58.8k to 63.0k. Paired server CPU per request fell by 7.69% and 7.89%.
+  GET p99 at saturation rose from 8.02 to 10.39 ms. Mixed p99 fell from 10.57 to 9.44 ms.
+  At a fixed 40k GET/s the CPU reduction was 5.72%. Measured from actual send, p99 was 11.18 vs
+  10.90 ms. Measuring from scheduled send included variable client delay and gave 24.99 vs 30.93 ms.
 - Keep the last GMT Date string and its Unix second in the worker. At `b2595f9`, six alternating
   pairs on PHP 8.6 with tracing JIT served 512 GETs per in-memory connection. Alternating one- and
   two-byte bodies missed the connection's response head cache. Reusing the date cut median exchange

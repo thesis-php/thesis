@@ -22,6 +22,7 @@ use Thesis\Io\ReadFailed;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
 use Thesis\Net\Socket;
+use Thesis\Time\WallClock;
 use Time\Duration;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Http\Server\Internal\Http1\encodeChunk;
@@ -54,7 +55,7 @@ final class ResponseWriter implements Writer, Closer
      */
     public function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
-        $now = $this->clock->now()->getTimestamp();
+        $now = $this->timestamp();
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
         if ($this->lastResponseHead !== null && $ordinary && $body instanceof StringBody) {
             $cached = $this->lastResponseHead;
@@ -103,7 +104,7 @@ final class ResponseWriter implements Writer, Closer
             $reply = ResponseHead::of($response, $head, $response->takeBody(), isPersistent: false);
         }
 
-        $this->write($reply->toString($this->clock->now()->getTimestamp()));
+        $this->write($reply->toString($this->timestamp()));
     }
 
     public function writeServerError(RequestHead $head, Request $request): void
@@ -220,5 +221,10 @@ final class ResponseWriter implements Writer, Closer
     public function close(): void
     {
         close($this->output);
+    }
+
+    private function timestamp(): int
+    {
+        return $this->clock instanceof WallClock ? time() : $this->clock->now()->getTimestamp();
     }
 }

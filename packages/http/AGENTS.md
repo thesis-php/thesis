@@ -224,7 +224,8 @@ contract for streaming bytes and trailers. Server implementation details live in
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Read a regular FileBody in blocks of up to 16 KiB. Other streaming reads stay at 8 KiB.
-- Use the server’s PSR-20 clock for Date on final responses, including errors. Format the time in UTC and preserve
+- Read Unix seconds for Date on final responses, including errors. The final WallClock follows system time.
+  For any other PSR-20 clock, read its timestamp on each response. Format the time in UTC and preserve
   a Date supplied by the handler.
   Each connection reuses its last encoded length-framed response head up to 1 KiB for a string body when its length,
   status, version, persistence, ordered fields and wall-clock second match. HEAD and CONNECT have their own framing rules.
