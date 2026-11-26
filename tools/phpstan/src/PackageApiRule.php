@@ -52,13 +52,14 @@ final readonly class PackageApiRule implements Rule
             return [];
         }
 
-        $internal = 'thesis\\' . str_replace('-', '', strtolower($parts[0])) . '\internal\\';
+        $package = 'thesis\\' . str_replace('-', '', strtolower($parts[0])) . '\\';
         $errors = [];
 
         foreach ($node->getNodes() as $statement) {
             if ($statement instanceof Namespace_) {
-                $namespace = ($statement->name?->toString() ?? '') . '\\';
-                $inInternal = str_starts_with(strtolower($namespace), $internal);
+                $namespace = strtolower($statement->name?->toString() ?? '') . '\\';
+                $inInternal = str_starts_with($namespace, $package)
+                    && \in_array('internal', explode('\\', substr($namespace, \strlen($package))), strict: true);
 
                 foreach ($statement->stmts as $declaration) {
                     $this->checkDeclaration($declaration, $inInternal, $errors);

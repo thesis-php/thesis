@@ -41,7 +41,12 @@ namespace Thesis\Sample\Internal\Nested {
     final class Implementation {}
 }
 
-namespace Thesis\Sample\INTERNAL {
+namespace Thesis\Sample\Feature\INTERNAL {
+    /**
+     * @internal
+     */
+    final class ComponentImplementation {}
+
     /**
      * @api
      */

@@ -1,8 +1,8 @@
 # PHP declarations and API contracts
 
 - Every top-level symbol (class, interface, trait, enum, function, constant) in `src/` is marked either `@api`
-  or `@internal` in its PHPDoc, never both. Internal symbols live in the `Internal` sub-namespace of the package
-  (`Thesis\Async\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
+  or `@internal` in its PHPDoc, never both. Internal symbols live in an `Internal` namespace inside the package or one of its components
+  (for example, `Thesis\Http\Server\Internal\...`) and nothing else does, so the namespace alone tells a user what is safe to depend on.
   Tests are not marked: they are not part of the API.
 - Everything of a package is in `Thesis\<Name>\`. The one exception is a package that *is* its entry point:
   that symbol, named after the package, may live in the root namespace (`Thesis\Dispatcher`,
