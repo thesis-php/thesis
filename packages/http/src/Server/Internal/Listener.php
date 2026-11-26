@@ -9,8 +9,6 @@ use Thesis\Async\Cancelled;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
-use Thesis\Async\LocalSemaphore;
-use Thesis\Async\Lock;
 use Thesis\Dispatcher;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
@@ -56,7 +54,10 @@ final class Listener
 
     private int $forcedConnections = 0;
 
-    private readonly LocalSemaphore $capacity;
+    /**
+     * @var ?Deferred<null>
+     */
+    private ?Deferred $slotAvailable = null;
 
     private readonly ?Dispatcher $connectionAccepted;
 
@@ -75,13 +76,12 @@ final class Listener
         private readonly \Closure $handler,
         private readonly Config $config,
         private readonly ?ServerTls $tls,
-        int $maxConnections,
+        private readonly int $maxConnections,
         private readonly Dispatcher $dispatcher,
         private readonly ErrorHandler $errorHandler,
         private readonly ClockInterface $clock,
     ) {
         $this->connections = new \SplObjectStorage();
-        $this->capacity = new LocalSemaphore($maxConnections);
         $this->connectionAccepted = $dispatcher->for(Event\ConnectionAccepted::class);
         $this->connectionClosed = $dispatcher->for(Event\ConnectionClosed::class);
         $this->requestStarted = $dispatcher->for(Event\RequestStarted::class);
@@ -168,11 +168,17 @@ final class Listener
     private function accept(Group $group, ?SocketDeadlines $idle, ?SocketDeadlines $writes): void
     {
         while (!$this->socketListener->isClosed) {
-            $permit = $this->capacity->acquire();
+            if ($this->connections->count() >= $this->maxConnections) {
+                $this->slotAvailable = new Deferred();
+
+                try {
+                    $this->slotAvailable->await();
+                } finally {
+                    $this->slotAvailable = null;
+                }
+            }
             $socket = $this->socketListener->accept();
             if ($socket === null) {
-                $permit->release();
-
                 return;
             }
 
@@ -189,11 +195,11 @@ final class Listener
                 clock: $this->clock,
             );
             $this->connections[$connection] = $socket;
-            $connection->task = $group->spawn(fn() => $this->serveConnection($socket, $connection, $permit));
+            $connection->task = $group->spawn(fn() => $this->serveConnection($socket, $connection));
         }
     }
 
-    private function serveConnection(Socket $socket, Connection $connection, Lock $permit): void
+    private function serveConnection(Socket $socket, Connection $connection): void
     {
         try {
             $this->connectionAccepted?->dispatch(new Event\ConnectionAccepted(
@@ -214,7 +220,7 @@ final class Listener
         } finally {
             $connection->close();
             unset($this->connections[$connection]);
-            $permit->release();
+            $this->slotAvailable?->complete();
 
             if ($this->connections->count() === 0) {
                 $this->drained?->complete();

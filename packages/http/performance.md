@@ -421,6 +421,13 @@ Rejected: creating BodyInput only after the first request with a body. This save
 connection after GET and nothing after POST. It also required the exchange to handle a missing input
 in body limits and request construction. The six-pair mixed timing control showed no consistent gain.
 
+With a single accept loop, the listener can use its active connection count and wait only when
+it reaches capacity. Removing the semaphore permit and its release closure saved 461–465 bytes per
+idle connection in a 1000-client TCP probe.
+In six pairs with 10,000 single-request TCP connections per arm after warm-up, the median paired
+server CPU per request fell by 3.86% at a limit of one and by 5.00% at a limit of 2048.
+Five of six pairs improved for each limit.
+
 The exchange reads the remaining connection capacity directly before committing the response.
 Removing the closure that previously read it saved 408 bytes of live PHP heap per idle connection
 after a GET at 64, 1024 and 2048 connections. In six alternating pairs with one pinned vCPU,
