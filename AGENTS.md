@@ -103,7 +103,7 @@ the whole monorepo is for the final check.
 - `exceptionally`: Turns PHP errors into exceptions around a callable, safe when the callable suspends a fiber.
 - `formatter`: Formats PHP values, classes, functions and parameters into short strings for error messages. Requires: source-location.
 - `hot-reload`: Restart a development server on file changes or SIGHUP, including after a failed launch. Requires: async, exceptionally, io, process, time.
-- `http`: Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies. Requires: async, dispatcher, net, time, io.
+- `http`: Asynchronous HTTP/1 server with routing and streamed bodies. Requires: async, dispatcher, net, time, io.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
 - `logger`: PSR-3 logger with bounded buffering and asynchronous JSON and colored console output. Requires: async, io, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.

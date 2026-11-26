@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http`.
+The HTTP messages, server and HTTP/1 codec ship together as `thesis/http`.
+
+### Removed
+
+- Remove the outgoing HTTP client, connection pool, client middleware and shared `Message` class.
+
+### Changed
+
+- Server handlers receive a non-cloneable `Request` with read-only metadata.
 
 ### Fixed
 
@@ -15,20 +23,22 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Stream the request body and its trailers back to the caller with `Request::echo()`.
+
 - Stream a local file as a request or response body with `new FileBody($path)`.
 - Serve files through GET and HEAD routes with `Server\StaticFiles`.
 
 - Consume the rest of a body and receive its trailers with `Body::discard()`.
 
-- Support installations without ext-zlib. Automatic client decoding and server gzip compression use this optional extension.
+- Support installations without ext-zlib. Server gzip compression uses this optional extension.
 
 - Add status constants and reason phrases for 205 Reset Content and 300 Multiple Choices.
 
 - Negotiate streaming gzip compression with the server middleware `Server\Gzip`.
 
 - Supply headers and string body trailers as arrays, request URIs as strings, and queries as encoded strings or parameter arrays.
-- Append field lines with `Message::withAddedHeaders()` and query pairs with `Request::withAddedQuery()`.
-- Append or remove query parameters with `Request::withAddedQueryParameter()` and `withoutQueryParameter()`, or `Query::withAdded()` and `without()`.
+- Append field lines with `Response::withAddedHeaders()`.
+- Append or remove query parameters with `Query::withAdded()` and `without()`.
 
 - Create JSON and HTML responses using `Response::json()` and `Response::html()`.
 - Set a JSON body with `withJson()` and take and decode it with `takeJson()` on requests and responses. Both methods enable `JSON_THROW_ON_ERROR` with any supplied flags.
@@ -52,19 +62,12 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
   Use `pattern:` for the path template and read it from `Route::$pattern`.
 - Register one or more methods per route or pass `methods: null` to accept any remaining method on that path. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.
   Inspect the selected route and match or the failure reason (including allowed methods for 405) with `Router::match()` and accept an optional trailing slash with `[/]`. Dispatch supports HEAD fallback and 405 with Allow.
-- Clients and servers share `Request` and `Response`, which extend the public `Message` class. Metadata copies share a single `takeBody()` handoff.
+- Copies of `Response` share a single `takeBody()` handoff.
 - Forwarding a message preserves the reader and its final trailer fields.
 - Share immutable headers, ordered query parameters, HTTP methods and status codes across roles.
 - Read streaming bodies incrementally or collect a whole unread payload. Replayable bodies can open independent readers.
-- Intercept client and server exchanges with `Client\Middleware` and `Server\Middleware`.
+- Intercept server exchanges with `Server\Middleware`.
   Pass an iterable to `Server\Pipeline::wrap()` to run ordered middleware and retry after the next handler returns or throws.
-- Send an HTTP or HTTPS GET by URL, or send a request with streaming bodies and trailers through `Client::send()`.
-- `Client::withResponse()` closes the body when the response callback returns or throws.
-- Limit concurrent connections per origin and pool persistent connections across exchanges.
-- Customize requests and responses with ordered middleware. The defaults follow redirects and decode gzip and deflate.
-- Enable bounded retries of idempotent requests with replayable uploads with `RetryRequests`.
-- Submit URL-encoded and streaming multipart forms.
-- Use a custom socket connector or tunnel requests through an HTTP CONNECT proxy.
 - Serve multiple TCP or Unix endpoints with one `Server`, with TLS and connection limits per endpoint.
   Start listening with `Server::start($group)` and wait for active exchanges with `stop()`.
 - Serve TCP and Unix connections concurrently with a bounded number of open sockets.

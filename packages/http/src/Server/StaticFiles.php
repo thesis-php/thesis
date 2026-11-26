@@ -11,7 +11,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Status;
 use Thesis\Io\ReadFailed;
-use function Thesis\Http\Internal\decodeRequestPath;
+use function Thesis\Http\Server\Internal\decodeRequestPath;
 
 /**
  * Streams files from a directory in response to GET and HEAD requests.

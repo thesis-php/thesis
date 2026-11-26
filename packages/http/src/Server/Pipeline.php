@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Internal\Server\Next;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Internal\Next;
 
 /**
  * Wraps a request handler with ordered server middleware.

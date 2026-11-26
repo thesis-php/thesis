@@ -1,12 +1,11 @@
 {
     "name": "thesis/http",
-    "description": "Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies.",
+    "description": "Asynchronous HTTP/1 server with routing and streamed bodies.",
     "keywords": [
         "php",
         "async",
         "http",
         "http1",
-        "http-client",
         "http-server",
         "streaming",
         "tls",
@@ -52,7 +51,6 @@
     "require-dev": {
         "ext-openssl": "*",
         "ext-zlib": "*",
-        "amphp/http-client": "^5.3",
         "amphp/http-server": "^3.4",
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
@@ -63,15 +61,15 @@
         "thesis/testo-plugin": "^0.1"
     },
     "suggest": {
-        "ext-zlib": "To compress server responses and decode gzip or deflate on the client"
+        "ext-zlib": "To compress server responses"
     },
     "autoload": {
         "psr-4": {
             "Thesis\\Http\\": "src/"
         },
         "files": [
-            "src/Internal/Http1/internal.php",
-            "src/Internal/internal.php",
+            "src/Server/Internal/Http1/internal.php",
+            "src/Server/Internal/internal.php",
             "src/Server/api.php",
             "src/api.php"
         ]
@@ -81,7 +79,7 @@
             "Thesis\\Http\\": "tests/"
         },
         "files": [
-            "tests/Internal/Http1/helpers.php",
+            "tests/Server/Internal/Http1/helpers.php",
             "tests/helpers.php"
         ]
     },

@@ -9,7 +9,7 @@ use Testo\Codecov\Covers;
 use Testo\Test;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
-use Thesis\Http\Internal\Server\SocketDeadlines;
+use Thesis\Http\Server\Internal\SocketDeadlines;
 use Thesis\Io\WriteFailed;
 use Thesis\Net\SocketClosed;
 use Thesis\TestoPlugin\VirtualTime;

@@ -1,16 +1,16 @@
 # thesis/http
 
-Clients and servers share the same request and response types so proxies can forward unread bodies and trailers.
-
-The public client and server entry points live beside the message types. Their options and middleware live in
-`Client` and `Server`. Implementation details live under `Internal`.
-
 Before HTTP/1 performance work, read [performance.md](performance.md) for measurements and rejected changes.
+
+The package implements the HTTP server. Work on the outgoing client is deferred, including its connection pool
+and middleware. Keep `Request` and `Response` in `Thesis\Http` so a future client can share them
+without moving the public types. Handlers receive a request and return a response. Both use the same `Body`
+contract for streaming bytes and trailers. Server implementation details live in `Server\Internal`.
 
 ## Invariants
 
-- Client middleware passes an outgoing request on each call to the next handler. Server middleware can call
-  the same next handler again after it returns or throws, with the same request and context. Reject overlapping
+- Server middleware calls `$next()` without arguments. It can call again after the previous call returns or throws.
+  Each call passes the original request and context. Reject overlapping
   calls to the same continuation and expire it when its own `handle()` exits. A public `Server\Pipeline`
   wraps any handler and keeps delegation state local to each middleware invocation. Rejected: passing one mutable
   cursor to every layer. If an inner layer returns early, a second call from the outer layer could skip it.
@@ -27,10 +27,11 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - On requests and responses, `takeJson()` shares the single handoff with `takeBody()`, including when decoding fails.
 - Messages share `EMPTY_BODY` for an empty payload without trailers. Each message still owns its body handoff.
 - Trailer fields may be pending until the reader finishes.
-- `Message` is sealed to `Request` and `Response`. It owns their headers and body handoff.
-  All metadata copies of a message share one body handoff. A replacement body has its own handoff.
+- The incoming request has read-only metadata, no `with…` methods and cannot be cloned.
+  A handler can copy an outgoing response to change its status, headers or body.
+  All metadata copies of a response share one body handoff. A replacement body has its own handoff.
   Dropping the last copy closes an unclaimed body. After handoff the recipient owns its cleanup.
-- Changing metadata leaves the original intact. Replacing the payload replaces its trailers as well.
+  Replacing the response payload replaces its trailers as well.
 - `readAll()` returns the whole body or fails once bytes have been consumed. Streaming implementations
   can extend `StreamingBody` to enforce this across partial reads and keep exclusive access until a read finishes.
 - Discard consumes the remaining bytes under one exclusive read and returns the final trailers at EOF.
@@ -48,14 +49,14 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 
 ## Decisions
 
-- Open: which factories, if any, should create outgoing requests. Use the request constructor for now.
-
 - Rejected: passing raw response strings to the HTTP/1 writer through `takePayload()`.
   Avoiding one `StringBody` allocation per short response improved throughput in the HTTP Arena baseline,
   but required separate string and reader paths for framing, writing and cleanup. Keep one `Body` path in the server.
   See [the measurements](performance.md#http-arena-h1-baseline).
 
-- Keep one `PendingBody` per message and share it with metadata copies. Rejected: binding two body
+- Request and Response are independent final classes. They share body ownership through `PendingBody`.
+  Rejected: a common `Message` base class. Its copy methods belonged only on the response.
+  Keep one `PendingBody` per message and share it with response metadata copies. Rejected: binding two body
   properties by reference and creating the owner on the first clone. This split cleanup between two
   destructors and made ownership depend on PHP preserving the reference across a clone.
   Bypassing both owners in a chunked POST probe saved 6.42% CPU at the paired median, but the probe
@@ -67,8 +68,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   `OPTIONS *` as an empty path, `CONNECT` as `//host:port`. `Uri\WhatWg\Url` rewrites what it parses: it drops
   tabs and new lines (`/a\tb` becomes `/ab`), removes dot segments, turns `\` into `/`, changes the host,
   and it requires a scheme and a host. The price of RFC 3986 is the bytes that browsers send unescaped,
-  see above. A client that accepts URLs typed by people (an IDN host, spaces) must convert them before
-  it makes a `Request`: that is a task for the HTTP client.
+  see above.
 - A method is a string and a status is an int, so callers can use custom values such as `PURGE` and 299.
   `Method` and `Status` give these values names such as `Method::GET` and `Status::OK`.
   HTTP/1 writes the phrase from `Status::reasonPhrase()`, or an empty phrase when the lookup returns null.
@@ -85,44 +85,15 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   made construction with one size read 3% faster and with two reads 12% faster. Construction alone cost 13% more.
   Storing both size and trailer presence did not give a repeatable gain on the tracing-JIT Arena mix.
   In five alternating pairs before the time limit, the candidate lost three; the median paired change was −9.5%.
-- A request parses its query on first access. A clone with a new URI parses its own query.
-  Replacing the query on a clone updates the URI that the codec writes. A raw query string keeps its encoding
-  and is parsed on first access. Appending parameters preserves the original encoded query, including bare names and percent escapes.
+- A request parses its query on first access.
 - Rejected: PSR-7 as the shared message contract. `StreamInterface` permits sequential reads, but an arbitrary
   implementation can block the event loop. PSR-7 has no standard access to trailers, which can arrive at EOF.
-  It lets a request's `Host` differ from its URI and requires preserving header name case. The codec derives
-  `Host` from the URI, and `Headers` stores lowercase names. Interoperability belongs in adapters at the
+  It requires preserving header name case, while `Headers` stores lowercase names. Interoperability belongs in adapters at the
   application boundary, where the adapter can define which streams and message fields it supports.
 - Each reader opened by `ReplayableBody::fresh()` can itself open an independent reader for another attempt.
   A general body is one-shot. Reading a streaming body never opens a replacement stream.
 - Rejected: using `Once` for incoming trailers. Reading before EOF must leave later reads able to see the final fields.
   `Once` can cache a premature exception or an unavailable value. The body owns its final fields and exposes them without advancing the reader.
-
-## Client
-
-- Only return a persistent connection with an empty input buffer at a complete message boundary.
-  Drop the body’s ownership before any later read, close or destruction can touch a reused socket.
-- Response copies share one body handoff. The reader that owns the lease cannot be cloned: two owners could
-  release or close the same socket after another request has acquired it.
-- Reserve idle sockets per scheme, host and effective port. Probe before reuse. EOF, pending data and
-  transport errors retire an idle socket. The transport leaves retry decisions to middleware.
-- A close-delimited response starts with any bytes the head reader already buffered.
-- Reading through EOF finishes the lease. Reading trailers delegates to the underlying body and never touches
-  a released socket. The transport takes the upload once and closes it on every exit.
-- A per-origin permit covers dialing, sending and the lifetime of the response body. Release it on every exit,
-  including cancellation, early close and destruction. Reuse the most recently idle socket for an origin and
-  evict the oldest idle socket across all origins at capacity.
-- Build the middleware chain once per client. A handler outside redirects sees one application request.
-  A handler inside redirects sees each destination. Credential middleware must check that destination.
-- Resolve Location against the current URI. Drop private and unrecognized fields across origins and refuse HTTPS
-  downgrades. Return the last response when following would require replaying a one-shot body.
-- Retry only by explicit policy. Idempotence and a `ReplayableBody` are both required. After returning the
-  response head, a download failure belongs to the caller.
-- Decode only the encoding the middleware negotiated. Keep explicit negotiation, partial responses and
-  bodyless representation metadata intact. Limit compressed input per inflate step and verify the stream end.
-- A proxy connector owns its CONNECT headers. The TLS peer name after CONNECT comes from the origin.
-- A multipart upload reads parts in order. Its total size includes boundaries and headers and is known only
-  when every part has a known length. Keep one-shot readers out of automatic replay.
 
 ## Server
 
@@ -137,14 +108,18 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   The encoder reads the source on demand, weakens strong ETags and drops digests of the original bytes in headers
   and trailers. HEAD and 304 describe the negotiated encoding without sending a body.
 - One buffer belongs to the connection. Finish writing the response before checking whether the incoming body
-  ended. An echo response can consume the request reader after the handler returns.
+  ended. `Request::echo()` hands the reader to a 200 response, including its trailers. It uses the same single
+  handoff as `takeBody()`. The response writer can read it after the handler returns. The caller sets response
+  headers explicitly. For example, the Arena `POST /echo` sets `Content-Type: application/octet-stream`.
 - For HEAD, the server writer frames an ordinary handler response with an empty wire body. The exchange
   still closes the original body. An empty handler body may stand in for an unknown representation length.
 - The writer takes the response body once, uses it for framing and writing, and closes it even on failure.
   Keep the incoming decoder to check for a direct echo and to decide whether the connection can be reused.
 - Reuse requires zero remaining bytes for fixed-length input or ready trailers for chunked input.
 - A final response head commits the response. If writing the body or its trailers fails, close the connection.
-  A second status line would become part of the first response.
+  A second status line would become part of the first response. A streaming echo can therefore start with 200
+  and end with an incomplete response. A handler whose success depends on a complete upload reads the body
+  through EOF before returning its response.
 - A timeout on the whole request head includes every fragment. The body idle timeout starts anew on each
   transport read, including reads of chunk framing. A keep-alive wait expires silently before the next request.
 - Each accepted socket occupies one slot until it closes. Shutdown must wake the supervisor even when
@@ -160,7 +135,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   The local type in routeMatch() is needed because PHPStan 2.3.7 ignores dynamicConstantNames for object values.
   RouteMatch holds the registered Route. Each match keeps its own parameters when nested routers handle the same request.
 - Special targets have no route match. A default handler can handle them. Without one, dispatch answers
-  server-wide OPTIONS with 204 and rejects CONNECT with 501.
+  `OPTIONS *` with 204 and rejects authority-form `CONNECT` with 501 because the server does not implement tunnels.
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so convert method keys back to strings in MethodNotAllowed. Dispatch joins that list for the Allow header.
 - Resolve RequestStarted, RequestEnded, ConnectionAccepted and ConnectionClosed once per listener with Dispatcher::for().
   Dispatch error events directly when the error occurs.
@@ -257,14 +232,15 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - A partially buffered fixed-length body still needs failure tracking and may need to send 100 Continue.
   Its declared length has passed the size limit, so the server passes a running decoded-byte budget to
   `BodyReader` only for chunked input.
+- Keep full duplex implicit. Echo already transfers the reader, and a response wrapper can keep reading it.
+  Defer a public opt-in on the request, body or context until another use case needs one.
 - Close after an unread body. Draining it would compete with any outstanding application read and would need
-  a separate size limit and deadline.
+  a separate size limit and deadline. With `Expect: 100-continue`, reading just to discard would invite an upload
+  the handler already rejected. A handler can return 403 immediately and let the server close the connection.
 
 ## HTTP/1 codec
 
-Clients and servers share the HTTP/1 codec for heads and bodies. The codec uses the message types in `thesis/http`.
-It needs 64-bit PHP for Content-Length and chunk sizes. The codec lives in `Internal\Http1`. The client and CONNECT proxy share
-the response-head reader so informational heads count toward the same byte limit as the final head.
+The server codec lives in `Server\Internal\Http1`. Content-Length and chunk sizes require 64-bit PHP.
 
 ### Invariants that must not be broken
 
@@ -305,25 +281,18 @@ the response-head reader so informational heads count toward the same byte limit
   Check the trailer count as each line arrives, even when the final empty line has not arrived.
 - `ChunkedReader` changes its state only when a step is complete, so a cancelled read continues from the same
   step: the CRLF after a chunk, the size line, each line of the trailers.
-- An error message quotes bytes from a peer through `Internal\quote()`: escaped (log injection) and cut
+- An error message quotes bytes from a peer through `Server\Internal\quote()`: escaped (log injection) and cut
   to 64 bytes.
 - The number of fields is limited before the fields get into an array: PHP arrays do not randomize their hash,
   so thousands of colliding names would make the parsing quadratic.
 - The head formatter rejects `Fields::OF_CONNECTION` in message headers, with the representation-length
-  exception above. On requests it also rejects `Host`, which comes from the URI. The parser extracts framing
+  exception above. The request parser extracts framing
   before handing headers to the application, so forwarding a message leaves each hop in charge of its framing.
 
 ### Decisions
 
 - Rejected: a lazy `Headers` proxy. If its initializer suspends, another reader of the proxy can see an
   uninitialized object. The codec publishes a complete immutable `Headers` at the end of the trailer section.
-- Trap: `toRawString()` of `Uri\Rfc3986\Uri` expands an IPv6 host (`[::1]` becomes `[0000:...:0001]`,
-  PHP 8.6.0), while `getRawHost()` returns it as it was written. The codec writes `Host` and the target
-  from the getters, never from `toRawString()`.
-- A head is a value with a private constructor, two static constructors (`parse()` from bytes, `of()` from
-  a message and the body taken by the sender) and `toString()`. So every head is either what a peer has sent or what a message allows.
-  The server and the client read from the same value what they must do after they write the head (chunk
-  the body, close the connection): it is not decided twice.
 - `Framing` is an enum, not `?int $length` with flags. A response to `HEAD` (no body, maybe a `content-length`
   header) differs from a body of zero bytes (`Content-Length: 0`), and the body of a response without framing
   fields lasts until the connection is closed.
@@ -332,8 +301,6 @@ the response-head reader so informational heads count toward the same byte limit
   to close.
 - An empty line before a request line is rejected, though RFC 9112 lets a server skip one. A server that wants
   to skip the line must do it before it calls `parse()`.
-- A status line without a reason phrase and without the space before it (`HTTP/1.1 200`) is accepted:
-  servers send such lines, and they cannot be understood in two ways.
 - An absolute target (`GET http://host/path`) wins over `Host`, as RFC 9112 says, and must be a valid URI
   as it was sent: the bytes that browsers leave unescaped are percent-encoded only in a path.
   Only a client of a forward proxy sends an absolute target.
@@ -355,7 +322,7 @@ the response-head reader so informational heads count toward the same byte limit
 
 ### Tests
 
-- A rejection is asserted with its status and its whole message (`rejection()` in `tests/Internal/Http1/helpers.php`),
+- A rejection is asserted with its status and its whole message (`rejection()` in `tests/Server/Internal/Http1/helpers.php`),
   so a test fails when an input is rejected for a reason other than the one the test names.
 - Keep regression cases for ambiguous heads in `RequestHeadParseTest` and malformed chunks in `ChunkedTest`.
 - `ScriptedReader` returns its bytes in pieces and fails on demand: a codec is tested with every piece size

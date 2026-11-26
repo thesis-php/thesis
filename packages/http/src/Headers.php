@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
-use function Thesis\Http\Internal\isFieldValue;
-use function Thesis\Http\Internal\isToken;
-use function Thesis\Http\Internal\quote;
+use function Thesis\Http\Server\Internal\isFieldValue;
+use function Thesis\Http\Server\Internal\isToken;
+use function Thesis\Http\Server\Internal\quote;
 
 /**
  * A `Headers` object holds immutable message headers or trailers. It treats names as case-insensitive

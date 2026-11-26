@@ -6,7 +6,7 @@ use Thesis\Monorepo\Manifest;
 use Thesis\TestoPlugin\EventLoopPlugin;
 
 return new Manifest(
-    description: 'Asynchronous HTTP/1 client and server with connection pooling, routing and streamed bodies.',
+    description: 'Asynchronous HTTP/1 server with routing and streamed bodies.',
     licenseSince: 2026,
     version: '0.1',
     title: 'Thesis HTTP',
@@ -15,7 +15,6 @@ return new Manifest(
         'async',
         'http',
         'http1',
-        'http-client',
         'http-server',
         'streaming',
         'tls',
@@ -40,7 +39,6 @@ return new Manifest(
     requireDev: [
         'ext-openssl' => '*',
         'ext-zlib' => '*',
-        'amphp/http-client' => '^5.3',
         'amphp/http-server' => '^3.4',
         'thesis/exceptionally' => '*',
         'thesis/testo-plugin' => '*',
@@ -50,7 +48,7 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
-    suggest: ['ext-zlib' => 'To compress server responses and decode gzip or deflate on the client'],
+    suggest: ['ext-zlib' => 'To compress server responses'],
     optional: ['ext-zlib'],
     testoPlugins: [new EventLoopPlugin()],
 );

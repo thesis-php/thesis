@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Thesis\Http\Server\Internal\PendingBody;
 use Uri\InvalidUriException;
 use Uri\Rfc3986\Uri;
 
 /**
- * HTTP request shared by clients and servers. Metadata copies share one body handoff.
+ * Incoming HTTP request.
  *
  * @api
  * @phpstan-import-type HeadersInput from Headers
- * @phpstan-import-type QueryInput from Query
  */
-final class Request extends Message
+final class Request
 {
+    public readonly Headers $headers;
+
+    private readonly PendingBody $pendingBody;
+
     public readonly Uri $uri;
 
     private ?Query $parsedQuery = null;
@@ -36,88 +40,48 @@ final class Request extends Message
         string|Body $body = EMPTY_BODY,
     ) {
         $this->uri = \is_string($uri) ? new Uri($uri) : $uri;
-        parent::__construct($headers, $body);
+        $this->headers = Headers::normalize($headers);
+        $this->pendingBody = new PendingBody($body);
     }
 
     /**
-     * @param non-empty-string $method
-     */
-    public function withMethod(string $method): self
-    {
-        return clone($this, ['method' => $method]);
-    }
-
-    /**
-     * @throws InvalidUriException if the URI string is invalid
-     */
-    public function withUri(string|Uri $uri): self
-    {
-        return clone($this, ['uri' => \is_string($uri) ? new Uri($uri) : $uri, 'parsedQuery' => null]);
-    }
-
-    /**
-     * @param QueryInput $query
-     * @throws InvalidUriException if the encoded query string is invalid
-     */
-    public function withQuery(string|array|Query $query): self
-    {
-        if (\is_string($query)) {
-            return clone($this, ['uri' => $this->uri->withQuery($query), 'parsedQuery' => null]);
-        }
-
-        if (\is_array($query)) {
-            $query = new Query($query);
-        }
-
-        $encoded = $query->toString();
-
-        $uri = $this->uri->withQuery($encoded === '' ? null : $encoded);
-
-        return clone($this, ['uri' => $uri, 'parsedQuery' => $query]);
-    }
-
-    /**
-     * Appends query pairs while preserving the original encoded query.
+     * Transfers the body to the caller.
      *
-     * @param QueryInput $query
-     * @throws InvalidUriException if the encoded query string is invalid
+     * @throws \LogicException if the request already handed off its body
      */
-    public function withAddedQuery(string|array|Query $query): self
+    public function takeBody(): Body
     {
-        if (\is_array($query)) {
-            $query = new Query($query);
-        }
-
-        $suffix = \is_string($query) ? $query : $query->toString();
-        if ($suffix === '') {
-            return $this;
-        }
-
-        $current = $this->uri->getRawQuery();
-
-        return $this->withQuery($current === null || $current === '' ? $suffix : $current . '&' . $suffix);
+        return $this->pendingBody->take();
     }
 
     /**
-     * @param non-empty-string $name
-     * @param string|list<string> $values
+     * Takes the body and decodes the whole payload as JSON.
+     * If you need trailers, use takeBody() and read the body to the end before calling trailers().
+     *
+     * @param int<1, 2147483647> $depth
+     * @param non-negative-int $limit maximum payload bytes to collect
+     * @throws \LogicException if the body has already been taken or partially read
+     * @throws \OverflowException if the payload exceeds the limit
+     * @throws \JsonException if decoding fails
      */
-    public function withQueryParameter(string $name, string|array $values): self
-    {
-        return $this->withQuery($this->query->with($name, $values));
+    public function takeJson(
+        bool $associative = true,
+        int $depth = 512,
+        int $flags = 0,
+        int $limit = Body::DEFAULT_BUFFER_LIMIT,
+    ): mixed {
+        return $this->pendingBody->takeJson($associative, $depth, $flags, $limit);
     }
 
     /**
-     * @param non-empty-string $name
-     * @param string|list<string> $values
+     * Transfers the request body and its trailers to a streaming 200 response.
+     *
+     * @throws \LogicException if the request already handed off its body
      */
-    public function withAddedQueryParameter(string $name, string|array $values): self
+    public function echo(): Response
     {
-        return $this->withAddedQuery([$name => $values]);
+        return new Response(body: $this->takeBody());
     }
 
-    public function withoutQueryParameter(string $name): self
-    {
-        return $this->withQuery($this->query->without($name));
-    }
+    private function __clone() {}
 }

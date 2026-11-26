@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Internal\Server\GzipBody;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Internal\GzipBody;
 use Thesis\Http\Status;
 
 /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Http\Server;
 
 use Thesis\Http\Request;
-use const Thesis\Http\Internal\ROUTE_MATCHES;
+use const Thesis\Http\Server\Internal\ROUTE_MATCHES;
 
 /**
  * The active route for this request, or null outside its handler.

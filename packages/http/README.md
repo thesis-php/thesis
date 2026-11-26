@@ -20,33 +20,9 @@
 
 Install with `composer require thesis/http` on 64-bit PHP 8.6+.
 
-The [client](#client) and [server](#server) share [messages](#messages) and the same HTTP/1 implementation.
-
 ## Messages
 
-Clients and servers use the same `Request` and `Response`. Both extend `Message`,
-the public type for working with the headers and body of either one. Use `with…` methods to derive a message
-with different metadata. The original and its copies share one right to take the body.
-
-```php
-use Thesis\Http\Request;
-use Thesis\Http\Response;
-
-$request = new Request('GET', 'https://example.org/search')
-    ->withQueryParameter('tag', ['php', 'http'])
-    ->withHeader('Accept', 'application/json');
-
-$response = (new Response(body: 'ok'))->withAddedHeader('Set-Cookie', 'theme=dark');
-$body = $response->takeBody();
-$bytes = $body->readAll();
-$trailers = $body->trailers();
-```
-
-Pass a URI string or a URI object to the request constructor or `withUri()`.
-`withQuery()` replaces the whole query. Pass an encoded string without the leading question mark,
-a `Query`, or an array of non-empty decoded names and their values. A list of values repeats the name.
-`withAddedQuery()` accepts the same inputs and appends pairs, preserving the original encoded query.
-Use `withAddedQueryParameter()` to append values for one name. `withoutQueryParameter()` removes every occurrence of the name.
+Handlers receive a non-cloneable `Request` and return a `Response`. Response copies share one body handoff.
 
 Message constructors, `withHeaders()` and `StringBody` trailers accept a `Headers` object or an array
 mapping each field name to a string or list of strings.
@@ -54,8 +30,7 @@ mapping each field name to a string or list of strings.
 Requests and responses default to `Thesis\Http\EMPTY_BODY`, a reusable empty body with empty trailers.
 Pass a string or an unread body to supply a payload. Give the message exclusive access until
 `takeBody()` transfers the reader to its caller. Dropping the last message copy closes an unclaimed body. A second call through any metadata copy raises
-`LogicException`. A proxy can pass `$request->withUri($upstream)` to the client and return its response
-directly. Taking either body also transfers its trailers. Use `withBody()` to supply a replacement.
+`LogicException`. Use `withBody()` to supply a replacement.
 
 Use `$body->discard()` to consume the remaining bytes and return the final trailer fields, even after a partial read.
 Read incrementally or call `readAll()` for the whole payload (8 MiB by default). Pass `limit:` to choose a byte limit.
@@ -75,7 +50,7 @@ $value = $request->takeJson(associative: false, limit: 64 * 1024);
 return Response::json($value);
 ```
 
-Use `$request->withJson($value)` or `$response->withJson($value)` to copy a message with a new JSON body
+Use `$response->withJson($value)` to copy a message with a new JSON body
 and set its `Content-Type` to `application/json`. Pass encoding options as `flags:` and the maximum nesting level as `depth:` (default 512).
 Encoding failures throw `JsonException` unless `JSON_PARTIAL_OUTPUT_ON_ERROR` requests partial output.
 
@@ -84,13 +59,6 @@ It uses the same default limit as `readAll()`.
 If you need trailers, use `takeBody()`, read the body to the end, then call `trailers()` on it.
 JSON objects decode to associative arrays by default. Pass `associative: false` for `stdClass`.
 `takeJson()` adds `JSON_THROW_ON_ERROR` to the supplied flags, so decoding failures throw `JsonException`.
-
-A client middleware that may resend an upload takes the body before calling the next handler.
-It passes `$request->withBody($body)` on the first attempt. When policy permits another attempt
-and the body implements `ReplayableBody`, it passes `$request->withBody($body->fresh())`.
-This creates a new handoff with its own reader and trailers.
-`StringBody` supports replay. Headers, methods, status codes and ordered query parameters
-are shared by requests and responses.
 
 ## `Headers`
 
@@ -125,128 +93,10 @@ foreach ($headers as $name => $lines) {
   So user input with `\r\n` in it cannot add a line to a message (response splitting). Spaces and tabs
   around a value are trimmed.
 
-## Client
-
-A URL string sends a GET. Reuse the client across calls. Wrap both the request and the read in an async
-timeout to apply one deadline to connection acquisition, redirects and downloading the body.
-
-```php
-use Thesis\Http\Client;
-use function Thesis\Async\timeout;
-use function Thesis\Time\sec;
-
-$client = new Client();
-$bytes = timeout(sec(10), static fn() => $client->send('https://example.com/')->takeBody()->readAll());
-```
-
-Send an HTTP/1.1 request inside a Thesis async scope. The final response head is available as soon as
-`send()` returns. Read the body under the deadline you want for the download. The client supplies a body that implements
-`Closer`. Close an unfinished body to close its connection immediately. A permanent read failure or dropping the last
-reference to an unfinished body also closes the connection. A malformed response head or body raises
-`Thesis\Io\IoException` during `send()` or while reading the body.
-
-```php
-use Thesis\Http\Request;
-use Thesis\Http\Client;
-use Thesis\Http\Response;
-use Uri\Rfc3986\Uri;
-use function Thesis\Async\timeout;
-use function Thesis\Time\sec;
-
-$request = new Request('GET', new Uri('https://example.com/'));
-$client = new Client();
-$response = timeout(sec(5), static fn() => $client->send($request));
-$status = $response->status;
-$response->takeBody()->close();
-```
-
-Use `withResponse()` to close the body when a callback returns or throws:
-
-```php
-$status = $client->withResponse('https://example.com/', static fn(Response $response) => $response->status);
-```
-
-Reuse the same client across requests to share connections for the same scheme, host and port.
-A fixed-length body releases its socket on the last byte. A chunked body releases it after the trailers.
-Take the body once, read until EOF to reuse the connection, then call `$body->trailers()` for the final fields. A bodyless response releases it immediately.
-The byte limit `maxResponseHeadBytes` covers informational and final response headers together (default 64 KiB).
-An outstanding body keeps its own socket and counts toward `maxConnectionsPerOrigin` (default 10).
-Further callers for that origin wait for a slot. The client retains up to `maxIdleConnections` sockets across
-all origins (default 32). Set it to zero to close each socket after its exchange.
-If a peer closes an idle connection, the next request opens a new one. A disconnect during a request
-propagates to the caller. Automatic retries are opt-in.
-
-HTTPS verifies the peer through thesis/net.
-Pass a Net ClientTls configuration to the constructor to use a private CA.
-The transport takes and closes the request body before it reads the response.
-For another send, supply a new body with `withBody()` or build a new request.
-
-### Middleware
-
-Pass `middleware: []` for a single exchange with the original content encoding. By default the client runs
-`FollowRedirects` then `DecodeContent`. Supplying a list replaces the defaults. A middleware implements
-`Thesis\Http\Client\Middleware` with `handle(Request $request, callable $next): Response`. It can return a cached response, change the request
-using `withHeader()` or `withBody()`, call `$next($request)`, or wrap the response body. Close intermediate responses before
-sending another request. Middleware before `FollowRedirects` sees the application request once.
-Middleware after it sees each destination. Scope credential injection to the intended origin.
-
-`FollowRedirects` follows up to ten redirects. It resolves relative locations, turns a POST into a GET on
-301/302, and drops the body on 303. For 307/308 it can resend a `ReplayableBody` with its original method.
-It returns the intermediate response when the body cannot be replayed, the limit is reached, the location
-is unusable, or HTTPS would downgrade to HTTP. Across origins only allowlisted negotiation and content
-headers carry over.
-
-With ext-zlib installed, `DecodeContent` negotiates gzip and deflate, decompresses the stream as it is read, and preserves trailers.
-Set `Accept-Encoding` yourself or send a range request to keep control of the encoded bytes.
-
-Place `new RetryRequests(maxRetries: 1)` last in the middleware list to retry an idempotent method with
-a `ReplayableBody` on a connection, read or write failure before the response arrives. It opens an independent
-reader on each retry. After `send()` returns, download errors propagate to the consumer.
-
-A custom `connector` receives the origin host, port and optional `ClientTls` and returns a connected
-`Thesis\Net\Socket`. It runs only when the pool needs a new socket. Each client owns its pool.
-
-### Form uploads
-
-`Form::urlEncoded()` builds a POST request. Use a list of values to repeat a name.
-`Form::multipart()` accepts ordered fields and files. Pass an unread `Thesis\Io\Reader` to upload a file or
-forward a stream. Construction only prepares the part headers. Sending the request reads the payload in chunks.
-
-```php
-use Thesis\Http\Client\Form;
-use Thesis\Http\Client\FormPart;
-
-$request = Form::urlEncoded('https://example.com/search', ['tag' => ['news', 'science']]);
-$upload = Form::multipart('https://example.com/files', [
-    new FormPart('description', 'Monthly report'),
-    new FormPart('file', $reader, filename: 'report.pdf', contentType: 'application/pdf'),
-]);
-$status = $client->withResponse($upload, static fn($response) => $response->status);
-```
-
-A string, an unread `StringReader`, or a `Body` of known size contributes its length automatically.
-For another reader, pass `size:` to send exactly that many bytes. An unknown length selects chunked transfer.
-Closing the multipart request body closes every part reader that implements `Closer`.
-
-### HTTP proxy
-
-```php
-use Thesis\Http\Headers;
-use Thesis\Http\Client;
-use Thesis\Http\Client\HttpProxy;
-
-$proxy = new HttpProxy('proxy.internal', 3128, new Headers(['Proxy-Authorization' => $proxyCredential]));
-$response = (new Client(connector: $proxy))->send('https://example.com/');
-```
-
-The client connects to the proxy over plaintext HTTP and requests a CONNECT tunnel for the origin.
-If the proxy refuses CONNECT or returns a malformed response, opening the tunnel throws `Thesis\Net\ConnectFailed`.
-For HTTPS the client negotiates TLS inside the tunnel and verifies the origin's certificate.
-
 ## Server
 
 Serve HTTP/1 requests on one or more TCP or Unix listeners. Each connection runs in its own task.
-Requests on the same connection run in order. The handler receives the shared `Thesis\Http\Request`
+Requests on the same connection run in order. The handler receives a `Thesis\Http\Request`
 and a `Thesis\Http\Server\Context` with connection information. It returns a `Thesis\Http\Response`.
 `Thesis\Http\Server` defines two PHPStan types for this signature. The server constructor accepts
 `Handler` and stores the resulting closure as `HandlerClosure`. Import the latter with
@@ -349,7 +199,6 @@ $router = new Router([$files->route('/static')]);
 ```php
 use Thesis\Async\Group;
 use Thesis\Http\Request;
-use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server;
 use function Thesis\Async\awaitShutdownSignal;
@@ -357,9 +206,7 @@ use function Thesis\Async\group;
 
 $server = new Server(
     config: new Config(8080),
-    handler: static fn(Request $request) => new Response(
-        body: $request->takeBody(),
-    ),
+    handler: static fn(Request $request) => $request->echo(),
 );
 
 group(static function (Group $group) use ($server) {
@@ -372,13 +219,7 @@ group(static function (Group $group) use ($server) {
 The response reads from the incoming body as it is written. A chunked request's trailers become available
 after its terminating chunk. The server reads them from the body and writes them in the last chunk of the response.
 
-From the Thesis monorepo, run the example in Docker.
-
-```sh
-docker compose run --rm -p 127.0.0.1:8080:8080 php php packages/http/examples/echo.php
-```
-
-In another terminal, send two requests with one curl process. The first uses chunked transfer encoding.
+With the server above running, send two requests with one curl process. The first uses chunked transfer encoding.
 Curl prints the number of new connections it opened for the second request; expect zero.
 
 ```sh
@@ -537,7 +378,7 @@ this proof of concept.
 
 ## HTTP/1 parsing
 
-The client derives `Host` from the URI. Both client and server choose the framing from the body and trailers.
+The server chooses the response framing from the body and trailers.
 Eligible `HEAD` and `304` responses preserve an explicit `Content-Length` as representation metadata.
 The server sends only the headers for HEAD and closes the response body without reading it.
 An ordinary GET handler can return its usual body for HEAD, including a stream.

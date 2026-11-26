@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server;
 
-use Thesis\Http\Internal\Server\RouteNode;
-use Thesis\Http\Internal\Server\RouteSegment;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Internal\RouteNode;
+use Thesis\Http\Server\Internal\RouteSegment;
 use Thesis\Http\Status;
-use function Thesis\Http\Internal\decodeRequestPath;
-use function Thesis\Http\Internal\isToken;
-use const Thesis\Http\Internal\ROUTE_MATCHES;
+use function Thesis\Http\Server\Internal\decodeRequestPath;
+use function Thesis\Http\Server\Internal\isToken;
+use const Thesis\Http\Server\Internal\ROUTE_MATCHES;
 
 /**
  * @api

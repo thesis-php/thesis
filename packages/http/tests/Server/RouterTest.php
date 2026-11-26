@@ -258,7 +258,7 @@ final readonly class RouterTest
         Assert::same($router($get, $this->context)->status, Status::OK);
         Assert::null(routeMatch($get));
         Assert::null(routeParam($get, 'team'));
-        $response = $router($get->withMethod('get'), $this->context);
+        $response = $router(new Request('get', $get->uri), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'POST, GET, PUT, HEAD');
         Assert::same($router(getRequest('/a/items/'), $this->context)->status, Status::NOT_FOUND);
@@ -276,7 +276,7 @@ final readonly class RouterTest
         $connect = new Request(Method::CONNECT, new Uri('//example.test:443'));
         Assert::same($router($options, $this->context)->status, Status::NO_CONTENT);
         Assert::same($router($connect, $this->context)->status, Status::NOT_IMPLEMENTED);
-        $options = $options->withUri(new Uri('http://example.test?q=1'));
+        $options = new Request(Method::OPTIONS, 'http://example.test?q=1');
         Assert::same($router($options, $this->context)->status, Status::METHOD_NOT_ALLOWED);
     }
 

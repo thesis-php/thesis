@@ -7,7 +7,7 @@ namespace Thesis\Http;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\Stream;
 use Thesis\Io\StreamClosed;
-use function Thesis\Http\Internal\lastError;
+use function Thesis\Http\Server\Internal\lastError;
 
 /**
  * Streams a local file, with the size it had when opened.

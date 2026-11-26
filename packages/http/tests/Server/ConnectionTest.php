@@ -9,10 +9,10 @@ use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
 use Thesis\Http\Headers;
-use Thesis\Http\Internal\Server\Connection;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Internal\Connection;
 use Thesis\Http\Server\Stub\PrefixedBody;
 use Thesis\Http\Server\Stub\RecordingWriter;
 use Thesis\Http\Server\Stub\TimedReader;
@@ -65,7 +65,7 @@ final class ConnectionTest
             $connection->run(static function (Request $request) use (&$paths) {
                 $paths[] = $request->uri->getRawPath();
 
-                return new Response(body: $request->takeBody());
+                return $request->echo();
             });
             Assert::same(['/first', '/second'], $paths);
             Assert::same($expected, $output->bytes);
