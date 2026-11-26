@@ -18,6 +18,10 @@ final readonly class DecodeContent implements Middleware
 {
     public function handle(Request $request, callable $next): Response
     {
+        if (!\extension_loaded('zlib')) {
+            return $next($request);
+        }
+
         if ($request->headers->has('accept-encoding') || $request->headers->has('range')) {
             return $next($request);
         }

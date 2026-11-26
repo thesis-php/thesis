@@ -28,7 +28,6 @@ return new Manifest(
     require: [
         // Content-Length and chunk sizes can exceed 2^31.
         'php-64bit' => '*',
-        'ext-zlib' => '*',
         'psr/log' => '^3.0',
         'thesis/async' => '*',
         'thesis/dispatcher' => '*',
@@ -38,6 +37,7 @@ return new Manifest(
     ],
     requireDev: [
         'ext-openssl' => '*',
+        'ext-zlib' => '*',
         'amphp/http-client' => '^5.3',
         'amphp/http-server' => '^3.4',
         'thesis/exceptionally' => '*',
@@ -48,5 +48,7 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
     ],
+    suggest: ['ext-zlib' => 'To compress server responses and decode gzip or deflate on the client'],
+    optional: ['ext-zlib'],
     testoPlugins: [new EventLoopPlugin()],
 );

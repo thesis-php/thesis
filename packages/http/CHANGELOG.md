@@ -11,6 +11,12 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 
 ### Added
 
+- Support installations without ext-zlib. Automatic client decoding and server gzip compression use this optional extension.
+
+- Add status constants and reason phrases for 205 Reset Content and 300 Multiple Choices.
+
+- Negotiate streaming gzip compression with the server middleware `Server\Gzip`.
+
 - Supply headers and string body trailers as arrays, request URIs as strings, and queries as encoded strings or parameter arrays.
 - Append field lines with `Message::withAddedHeaders()` and query pairs with `Request::withAddedQuery()`.
 - Append or remove query parameters with `Request::withAddedQueryParameter()` and `withoutQueryParameter()`, or `Query::withAdded()` and `without()`.

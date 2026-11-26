@@ -9,7 +9,8 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server;
 use Thesis\Http\Server\Config;
-use Thesis\Http\Server\Context;
+use Thesis\Http\Server\Gzip;
+use Thesis\Http\Server\Pipeline;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
 use Thesis\Http\Server\TcpEndpoint;
@@ -83,40 +84,25 @@ $router = new Router([
         headers: ['Content-Type' => 'text/plain'],
         body: 'ok',
     )),
-    Route::get('/json/{count}', static function (Request $request, Context $context) use ($dataset) {
-        $count = filter_var(routeParam($request, 'count'), FILTER_VALIDATE_INT);
-        $multiplier = filter_var($request->query->get('m'), FILTER_VALIDATE_INT);
+    Route::get('/json/{count}', Pipeline::wrap(
+        handler: static function (Request $request) use ($dataset) {
+            $count = filter_var(routeParam($request, 'count'), FILTER_VALIDATE_INT);
+            $multiplier = filter_var($request->query->get('m'), FILTER_VALIDATE_INT);
 
-        if ($count === false || $count < 1 || $count > count($dataset) || $multiplier === false) {
-            return new Response(status: Status::BAD_REQUEST);
-        }
+            if ($count === false || $count < 1 || $count > count($dataset) || $multiplier === false) {
+                return new Response(status: Status::BAD_REQUEST);
+            }
 
-        $items = [];
-        foreach (array_slice($dataset, 0, $count) as $item) {
-            $item['total'] = $item['price'] * $item['quantity'] * $multiplier;
-            $items[] = $item;
-        }
+            $items = [];
+            foreach (array_slice($dataset, 0, $count) as $item) {
+                $item['total'] = $item['price'] * $item['quantity'] * $multiplier;
+                $items[] = $item;
+            }
 
-        $response = Response::json(['items' => $items, 'count' => $count]);
-
-        if ($context->tls !== null) {
-            return $response;
-        }
-
-        $response = $response->withHeader('Vary', 'Accept-Encoding');
-        $encodings = explode(',', strtolower($request->headers->get('accept-encoding') ?? ''));
-        if (!in_array('gzip', array_map(trim(...), $encodings), true)) {
-            return $response;
-        }
-
-        $bytes = $response->takeBody()->readAll();
-        $compressed = exceptionally(static fn() => gzencode($bytes));
-
-        return $response
-            ->withBody($compressed)
-            ->withHeader('Content-Encoding', 'gzip')
-        ;
-    }),
+            return Response::json(['items' => $items, 'count' => $count]);
+        },
+        middleware: [new Gzip()],
+    )),
     Route::post('/echo', static fn(Request $request) => new Response(
         headers: ['Content-Type' => 'application/octet-stream'],
         body: $request->takeBody(),

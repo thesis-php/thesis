@@ -19,7 +19,9 @@ final class Status
     public const int CREATED = 201;
     public const int ACCEPTED = 202;
     public const int NO_CONTENT = 204;
+    public const int RESET_CONTENT = 205;
     public const int PARTIAL_CONTENT = 206;
+    public const int MULTIPLE_CHOICES = 300;
     public const int MOVED_PERMANENTLY = 301;
     public const int FOUND = 302;
     public const int SEE_OTHER = 303;
@@ -70,7 +72,9 @@ final class Status
             self::CREATED => 'Created',
             self::ACCEPTED => 'Accepted',
             self::NO_CONTENT => 'No Content',
+            self::RESET_CONTENT => 'Reset Content',
             self::PARTIAL_CONTENT => 'Partial Content',
+            self::MULTIPLE_CHOICES => 'Multiple Choices',
             self::MOVED_PERMANENTLY => 'Moved Permanently',
             self::FOUND => 'Found',
             self::SEE_OTHER => 'See Other',

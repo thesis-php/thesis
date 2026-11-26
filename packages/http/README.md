@@ -18,7 +18,7 @@
 
 <!-- head:end -->
 
-Install with `composer require thesis/http` on 64-bit PHP 8.6+ with ext-zlib.
+Install with `composer require thesis/http` on 64-bit PHP 8.6+.
 
 The [client](#client) and [server](#server) share [messages](#messages) and the same HTTP/1 implementation.
 
@@ -193,7 +193,7 @@ It returns the intermediate response when the body cannot be replayed, the limit
 is unusable, or HTTPS would downgrade to HTTP. Across origins only allowlisted negotiation and content
 headers carry over.
 
-`DecodeContent` negotiates gzip and deflate, decompresses the stream as it is read, and preserves trailers.
+With ext-zlib installed, `DecodeContent` negotiates gzip and deflate, decompresses the stream as it is read, and preserves trailers.
 Set `Accept-Encoding` yourself or send a range request to keep control of the encoded bytes.
 
 Place `new RetryRequests(maxRetries: 1)` last in the middleware list to retry an idempotent method with
@@ -377,6 +377,9 @@ use Thesis\Http\Server\Pipeline;
 $pipeline = Pipeline::wrap($handler, [$accessLog, $authorization]);
 $server = new Server($config, $pipeline);
 ```
+
+Install ext-zlib and use `new Thesis\Http\Server\Gzip()` to negotiate gzip on a handler. It streams the compressed body and forwards trailers.
+Compression weakens strong ETags and removes digests of the original bytes. The middleware adds `Accept-Encoding` to `Vary` on eligible responses, including when the client receives the original body.
 
 The first middleware receives the request first and the response last.
 Each layer receives `handle(Request $request, Context $context, callable $next)`. It can use

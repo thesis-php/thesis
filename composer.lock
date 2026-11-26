@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f79338d795eeedf506d1eef09e8d5248",
+    "content-hash": "bc75a5ffd6e0a4eb1f575ff95cfd8ba6",
     "packages": [
         {
             "name": "internal/container",
@@ -8299,7 +8299,6 @@
         "ext-openssl": "*",
         "ext-pcntl": "*",
         "ext-uri": "*",
-        "ext-zlib": "*",
         "composer-runtime-api": "^2.2"
     },
     "platform-dev": {
@@ -8307,7 +8306,8 @@
         "ext-posix": "*",
         "ext-simplexml": "*",
         "ext-sockets": "*",
-        "ext-tokenizer": "*"
+        "ext-tokenizer": "*",
+        "ext-zlib": "*"
     },
     "plugin-api-version": "2.11.0"
 }
