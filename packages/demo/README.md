@@ -17,7 +17,7 @@
 <!-- head:end -->
 
 This small HTTP server shows how requests overlap while a handler waits. Open the
-[home page](http://127.0.0.1:8080/) for links to the demo routes.
+[home page](http://127.0.0.1:18080/) for links to the demo routes.
 `GET /wait/250ms` waits for the requested duration and returns `Waited for 250ms`. With no duration, `GET /wait` returns `Waited for 0s`.
 `GET /error` throws an exception so you can see how the server handles a failed request.
 
@@ -39,18 +39,26 @@ To restart the installed server automatically whenever you save `app.php` or [in
 vendor/bin/hot-reload --watch app.php --watch index.html -- php app.php
 ```
 
-From the monorepo root, run `make install`, then start the server in Docker.
+The server listens on all IPv4 interfaces on ports 18080 (HTTP) and 18443 (HTTPS).
+The demo ships a self-signed localhost certificate and its private key for local development.
+From the installed project, verify HTTPS on port 18443 with:
 
 ```sh
-docker compose run --rm -p 127.0.0.1:8080:8080 php php packages/demo/app.php 0.0.0.0:8080
+curl --cacert tls/localhost.crt https://localhost:18443/wait
 ```
 
-To watch the demo in Docker, run this from the same directory.
+From the monorepo root, run `make install`, then publish both ports on loopback:
 
 ```sh
-docker compose run --rm -p 127.0.0.1:8080:8080 php \
+docker compose run --rm -p 127.0.0.1:18080:18080 -p 127.0.0.1:18443:18443 php php packages/demo/app.php
+```
+
+To watch the demo in Docker, run this from the same directory:
+
+```sh
+docker compose run --rm -p 127.0.0.1:18080:18080 -p 127.0.0.1:18443:18443 php \
     packages/hot-reload/bin/hot-reload --watch packages/demo/app.php --watch packages/demo/index.html \
-    -- php packages/demo/app.php 0.0.0.0:8080
+    -- php packages/demo/app.php
 ```
 
 ## Compare requests
@@ -58,8 +66,8 @@ docker compose run --rm -p 127.0.0.1:8080:8080 php \
 In another terminal, send the same eight requests sequentially and then concurrently.
 
 ```sh
-time curl -fsS 'http://127.0.0.1:8080/wait/25[0-7]ms'
-time curl -fsS --parallel --parallel-immediate 'http://127.0.0.1:8080/wait/25[0-7]ms'
+time curl -fsS 'http://127.0.0.1:18080/wait/25[0-7]ms'
+time curl -fsS --parallel --parallel-immediate 'http://127.0.0.1:18080/wait/25[0-7]ms'
 ```
 
 On an idle machine, expect about two seconds for the first command and about 250 ms for the second.

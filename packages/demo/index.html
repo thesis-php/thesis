@@ -18,7 +18,7 @@ The shorter request can finish first.</p>
 Each waits for 250–257 ms. The command waits for all eight and prints their total elapsed time,
 usually about a quarter of a second on an idle machine.</p>
 <pre><code>time curl -fsS --parallel --parallel-immediate \
-  'http://127.0.0.1:8080/wait/25[0-7]ms'</code></pre>
+  'http://127.0.0.1:18080/wait/25[0-7]ms'</code></pre>
 <p>Visit <a target="_blank" rel="noopener" href="/error">the error route</a> to trigger an exception.
 Check the server console for the request logs.</p>
 </html>

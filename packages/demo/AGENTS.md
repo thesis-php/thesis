@@ -2,10 +2,11 @@
 
 ## Invariants that must not be broken
 
-- Run the same entry point from the monorepo and the installed project. The split ships `app.php` and `index.html` through `dist`.
-- Listen on loopback by default. Accept an explicit address for Docker port forwarding.
+- Run the same entry point from the monorepo and the installed project. The split ships `app.php`, `index.html` and `tls/` through `dist`.
+- Bind fixed HTTP and HTTPS ports on all IPv4 interfaces so Docker can forward both.
+- HTTP and HTTPS start and stop together. Use the bundled localhost certificate and key.
 - Read `index.html` once at startup. The delayed route uses an async delay so curl can show waits overlapping.
-- The HTTP server finishes before the logger drains. Construct and run both inside the entry point’s group. The logger reports the listening address at startup.
+- The HTTP server finishes before the logger drains. Construct both before entering the group. The group owns startup and shutdown. The logger reports the listening address at startup.
 
 ## Decisions
 

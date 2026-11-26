@@ -8,7 +8,7 @@ return new Manifest(
     description: 'A small HTTP server with console logging that shows how concurrent requests overlap.',
     licenseSince: 2026,
     version: '0.1',
-    keywords: ['php', 'async', 'demo', 'http', 'http-server', 'logging'],
+    keywords: ['php', 'async', 'demo', 'http', 'http-server', 'https', 'logging'],
     require: [
         'ext-pcntl' => '*',
         'thesis/async' => '*',
@@ -17,10 +17,11 @@ return new Manifest(
         'thesis/http' => '*',
         'thesis/io' => '*',
         'thesis/logger' => '*',
+        'thesis/net' => '*',
         'thesis/time' => '*',
     ],
     requireDev: ['thesis/hot-reload' => '*'],
-    dist: ['app.php', 'index.html'],
+    dist: ['app.php', 'index.html', 'tls'],
     type: 'project',
     devMain: true,
 );

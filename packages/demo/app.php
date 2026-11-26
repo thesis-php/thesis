@@ -12,8 +12,12 @@ use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Route;
 use Thesis\Http\Server\Router;
 use Thesis\Http\Server\ServerLogger;
+use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
+use Thesis\Net\Certificate;
+use Thesis\Net\InetAddress;
+use Thesis\Net\ServerTls;
 use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
@@ -29,39 +33,43 @@ if ((@include __DIR__ . '/vendor/autoload.php') === false) {
     require dirname(__DIR__, 2) . '/vendor/autoload.php';
 }
 
-/** @var list<string> $arguments */
-$arguments = $_SERVER['argv'] ?? [];
-$endpoint = $arguments[1] ?? '127.0.0.1:8080';
-
-if ($endpoint === '') {
-    throw new InvalidArgumentException('The listening address must not be empty.');
-}
-
 $index = exceptionally(static fn() => file_get_contents(__DIR__ . '/index.html'));
 
-group(static function (Group $group) use ($endpoint, $index) {
-    $logger = new Logger(stderr(), formatter: new Console());
-    $server = new Server(
-        config: new Config($endpoint),
-        handler: new Router([
-            Route::get('/', static fn() => new Response(
-                headers: new Headers(['Content-Type' => 'text/html; charset=utf-8']),
-                body: $index,
-            )),
-            Route::get('/wait/{duration?}', static function (Request $request) {
-                $duration = routeParam($request, 'duration') ?? '0s';
+$logger = new Logger(stderr(), formatter: new Console());
+$server = new Server(
+    config: new Config(endpoints: [
+        new TcpEndpoint(new InetAddress('0.0.0.0', 18080)),
+        new TcpEndpoint(
+            address: new InetAddress('0.0.0.0', 18443),
+            tls: new ServerTls(
+                certificate: new Certificate(
+                    certFile: __DIR__ . '/tls/localhost.crt',
+                    keyFile: __DIR__ . '/tls/localhost.key',
+                ),
+                alpnProtocols: ['http/1.1'],
+            ),
+        ),
+    ]),
+    handler: new Router([
+        Route::get('/', static fn() => new Response(
+            headers: new Headers(['Content-Type' => 'text/html; charset=utf-8']),
+            body: $index,
+        )),
+        Route::get('/wait/{duration?}', static function (Request $request) {
+            $duration = routeParam($request, 'duration') ?? '0s';
 
-                delay(parseDuration($duration));
+            delay(parseDuration($duration));
 
-                return new Response(body: "Waited for {$duration}\n");
-            }),
-            Route::get('/error', static fn() => throw new Exception('Demo handler failed.')),
-        ]),
-        dispatcher: new Dispatcher([
-            new ServerLogger($logger, accessLog: true),
-        ]),
-    );
+            return new Response(body: "Waited for {$duration}\n");
+        }),
+        Route::get('/error', static fn() => throw new Exception('Demo handler failed.')),
+    ]),
+    dispatcher: new Dispatcher([
+        new ServerLogger($logger, accessLog: true),
+    ]),
+);
 
+group(static function (Group $group) use ($logger, $server) {
     $logger->start($group);
 
     try {
