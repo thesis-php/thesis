@@ -14,11 +14,6 @@ use Uri\Rfc3986\Uri;
  */
 final class Request
 {
-    public static function get(string|Uri $uri): self
-    {
-        return new self(Method::GET, \is_string($uri) ? new Uri($uri) : $uri);
-    }
-
     private ?Query $parsedQuery = null;
 
     public Query $query {

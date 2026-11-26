@@ -30,8 +30,9 @@ with different metadata. The original and its copies share one right to take the
 ```php
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Uri\Rfc3986\Uri;
 
-$request = Request::get('https://example.org/search')
+$request = new Request('GET', new Uri('https://example.org/search'))
     ->withQueryParameter('tag', ['php', 'http'])
     ->withHeader('Accept', 'application/json');
 

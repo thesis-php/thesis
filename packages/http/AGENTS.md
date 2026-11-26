@@ -46,6 +46,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 
 ## Decisions
 
+- Open: which factories, if any, should create outgoing requests. Use the request constructor for now.
+
 - Keep one `PendingBody` per message and share it with metadata copies. Rejected: binding two body
   properties by reference and creating the owner on the first clone. This split cleanup between two
   destructors and made ownership depend on PHP preserving the reference across a clone.

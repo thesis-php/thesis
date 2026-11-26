@@ -67,7 +67,7 @@ final class RouterBench
             requirements: ['serial' => '[0-9]+', 'code' => '[a-z]+'],
         )]);
         $serial = str_repeat('1', $count);
-        $request = Request::get("/parts/{$serial}ab");
+        $request = new Request(Method::GET, new Uri("/parts/{$serial}ab"));
         for ($i = 0; $i < 64; ++$i) {
             $result = $router->match($request);
             if (!$result instanceof RouteMatch || $result->params !== ['serial' => $serial, 'code' => 'ab']) {
@@ -94,10 +94,10 @@ final class RouterBench
         }
         $router = new Router($routes);
         $requests = [
-            Request::get('/v50/docs/a/b'),
-            Request::get('/v60/reports/2026-11'),
-            Request::get('/v70/archive'),
-            Request::get('/v80/archive/2026'),
+            new Request(Method::GET, new Uri('/v50/docs/a/b')),
+            new Request(Method::GET, new Uri('/v60/reports/2026-11')),
+            new Request(Method::GET, new Uri('/v70/archive')),
+            new Request(Method::GET, new Uri('/v80/archive/2026')),
         ];
         for ($i = 0; $i < $count; ++$i) {
             foreach ($requests as $request) {

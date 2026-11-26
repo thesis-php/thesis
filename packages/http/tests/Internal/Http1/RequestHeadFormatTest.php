@@ -16,6 +16,7 @@ use Thesis\Http\StringBody;
 use Thesis\Io\Buffer;
 use Thesis\Io\StringReader;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\getRequest;
 
 #[Test]
 #[Covers(RequestHead::class)]
@@ -187,7 +188,7 @@ final class RequestHeadFormatTest
 
     public function offersProtocolsToSwitchTo(): void
     {
-        $request = Request::get('http://example.com/chat');
+        $request = getRequest('http://example.com/chat');
         $head = outgoingRequestHead($request, upgrade: ['websocket', 'h2c']);
 
         Assert::same($head->upgrade, ['websocket', 'h2c']);

@@ -52,7 +52,7 @@ final class MessageTest
 
     public function readsJsonObjectsAsObjectsOrAssociativeArrays(): void
     {
-        $request = Request::get('/');
+        $request = getRequest('/');
         Assert::same($request->withBody('{"id":42}')->takeJson(), ['id' => 42]);
         Assert::instanceOf($request->withBody('{}')->takeJson(associative: false), \stdClass::class);
         Assert::null($request->withBody('null')->takeJson(limit: 4));
@@ -62,7 +62,7 @@ final class MessageTest
 
     public function invalidJsonConsumesTheSharedHandoff(): void
     {
-        $request = Request::get('/')->withBody('{');
+        $request = getRequest('/')->withBody('{');
         $copy = $request->withHeader('accept', 'application/json');
         Assert::instanceOf(thrown($request->takeJson(...)), \JsonException::class);
         Expect::exception(\LogicException::class);
@@ -81,12 +81,12 @@ final class MessageTest
     public function boundsJsonBeforeDecoding(): void
     {
         Expect::exception(\OverflowException::class);
-        Request::get('/')->withBody('null')->takeJson(limit: 3);
+        getRequest('/')->withBody('null')->takeJson(limit: 3);
     }
 
     public function changingQueryAndHeadersLeavesTheOriginalRequestIntact(): void
     {
-        $original = Request::get('/search?tag=a&sort=C++&tag=b#top');
+        $original = getRequest('/search?tag=a&sort=C++&tag=b#top');
         $copy = $original->withQueryParameter('tag', 'a & b')->withHeader('accept', 'text/plain');
         Assert::same($original->query->all('tag'), ['a', 'b']);
         Assert::same($original->query->get('sort'), 'C++');
@@ -156,7 +156,7 @@ final class MessageTest
 
     public function messagesShareTheEmptyReaderAndHandItOffSeparately(): void
     {
-        $request = Request::get('/');
+        $request = getRequest('/');
         $copy = $request->withHeader('accept', '*/*');
         Assert::same($copy->takeBody(), EMPTY_BODY);
         EMPTY_BODY->close();

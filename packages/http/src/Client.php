@@ -11,6 +11,7 @@ use Thesis\Http\Internal\Client\Http1Transport;
 use Thesis\Http\Internal\Client\Pipeline;
 use Thesis\Net\ClientTls;
 use Thesis\Net\Socket;
+use Uri\Rfc3986\Uri;
 
 /**
  * @api
@@ -52,7 +53,7 @@ final readonly class Client
      */
     public function send(Request|string $request): Response
     {
-        return ($this->dispatch)(\is_string($request) ? Request::get($request) : $request);
+        return ($this->dispatch)(\is_string($request) ? new Request(Method::GET, new Uri($request)) : $request);
     }
 
     /**

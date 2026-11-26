@@ -13,6 +13,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Io\WriteFailed;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\getRequest;
 use function Thesis\Net\socketPair;
 
 #[Test]
@@ -119,12 +120,12 @@ final class FollowRedirectsTest
         $uri = new Uri('https://example.com');
         foreach (['http://example.com', 'ftp://other.test', 'https://user@example.com', 'invalid path'] as $location) {
             $redirect = new Response(status: 301, headers: new Headers(['location' => $location]), body: 'redirect');
-            Assert::same(new FollowRedirects()->handle(Request::get($uri), static fn() => $redirect), $redirect);
+            Assert::same(new FollowRedirects()->handle(getRequest($uri), static fn() => $redirect), $redirect);
             Assert::same($redirect->takeBody()->read(10), 'redirect');
         }
 
         $calls = 0;
-        $last = new FollowRedirects(maxRedirects: 2)->handle(Request::get($uri), static function () use (&$calls) {
+        $last = new FollowRedirects(maxRedirects: 2)->handle(getRequest($uri), static function () use (&$calls) {
             ++$calls;
 
             return new Response(status: 308, headers: new Headers(['location' => '/loop']), body: 'last');

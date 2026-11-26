@@ -17,6 +17,7 @@ use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\getRequest;
 
 #[Test]
 final readonly class RouterTest
@@ -55,10 +56,10 @@ final readonly class RouterTest
         Assert::same($router($head, $this->context)->takeBody()->readAll(), 'HEAD a+b c');
         $post = new Request(Method::POST, new Uri('/users/m%65'));
         Assert::same($router($post, $this->context)->takeBody()->readAll(), 'me');
-        Assert::same($router(Request::get('/users/me/info'), $this->context)->takeBody()->readAll(), 'info');
-        Assert::same($router(Request::get('/users/me/42'), $this->context)->takeBody()->readAll(), 'users/42');
+        Assert::same($router(getRequest('/users/me/info'), $this->context)->takeBody()->readAll(), 'info');
+        Assert::same($router(getRequest('/users/me/42'), $this->context)->takeBody()->readAll(), 'users/42');
 
-        $response = $router(Request::get('/users/me'), $this->context);
+        $response = $router(getRequest('/users/me'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), Method::POST);
     }
@@ -69,10 +70,10 @@ final readonly class RouterTest
         $address = new UnixAddress('');
         $context = new Context($address, $address, null, new TextErrorHandler(), new Dispatcher());
 
-        $response = $router(Request::get('/'), $context);
+        $response = $router(getRequest('/'), $context);
         Assert::same($response->takeBody()->readAll(), 'GET 405');
         Assert::same($response->headers->get('Allow'), Method::POST);
-        Assert::same($router(Request::get('/missing'), $context)->takeBody()->readAll(), 'GET 404');
+        Assert::same($router(getRequest('/missing'), $context)->takeBody()->readAll(), 'GET 404');
     }
 
     public function ordersOverlappingParameterizedShapesLeftToRight(): void
@@ -83,9 +84,9 @@ final readonly class RouterTest
             new Route(Method::GET, '/users/{a}/{b}', static fn() => new Response(body: 'users')),
         ]);
 
-        Assert::same($router(Request::get('/users/files/1'), $this->context)->takeBody()->readAll(), 'users');
-        Assert::same($router(Request::get('/other/files/1'), $this->context)->takeBody()->readAll(), 'files');
-        Assert::same($router(Request::get('/one/two/info'), $this->context)->takeBody()->readAll(), 'info');
+        Assert::same($router(getRequest('/users/files/1'), $this->context)->takeBody()->readAll(), 'users');
+        Assert::same($router(getRequest('/other/files/1'), $this->context)->takeBody()->readAll(), 'files');
+        Assert::same($router(getRequest('/one/two/info'), $this->context)->takeBody()->readAll(), 'info');
     }
 
     public function prefersExplicitStaticHeadAndKeepsNumericMethodsAsStrings(): void
@@ -146,7 +147,7 @@ final readonly class RouterTest
         $match = self::matched($router, new Request('HEAD', new Uri('/news/items')));
         Assert::same($match->method, 'HEAD');
         Assert::same($match->params, ['group' => 'news', 'id' => 'latest']);
-        Assert::same(self::matched($router, Request::get('/news/items/42'))->params, ['group' => 'news', 'id' => '42']);
+        Assert::same(self::matched($router, getRequest('/news/items/42'))->params, ['group' => 'news', 'id' => '42']);
     }
 
     public function rejectsDuplicateFallbackShapes(): void
@@ -167,16 +168,16 @@ final readonly class RouterTest
         ]);
 
         foreach (['/%2f', '/a%2Fb', '/%00'] as $path) {
-            Assert::same($router(Request::get($path), $this->context)->status, Status::BAD_REQUEST);
+            Assert::same($router(getRequest($path), $this->context)->status, Status::BAD_REQUEST);
         }
 
         foreach (['/%252F' => '%2F', '/%2e%2e' => '..', '/%3F' => '?'] as $path => $value) {
-            $request = Request::get($path);
+            $request = getRequest($path);
             Assert::same($router($request, $this->context)->takeBody()->readAll(), $value);
         }
 
         foreach (['/', '/x/'] as $path) {
-            Assert::same($router(Request::get($path), $this->context)->status, Status::NOT_FOUND);
+            Assert::same($router(getRequest($path), $this->context)->status, Status::NOT_FOUND);
         }
     }
 
@@ -223,7 +224,7 @@ final readonly class RouterTest
         $response = $router($get->withMethod('get'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'POST, GET, PUT, HEAD');
-        Assert::same($router(Request::get('/a/items/'), $this->context)->status, Status::NOT_FOUND);
+        Assert::same($router(getRequest('/a/items/'), $this->context)->status, Status::NOT_FOUND);
     }
 
     public function matchesTheRootWhenAnAbsoluteUriHasAnEmptyPath(): void
@@ -231,7 +232,7 @@ final readonly class RouterTest
         $router = new Router([new Route(Method::GET, '/', static fn() => new Response(Status::NO_CONTENT))]);
 
         foreach (['http://example.test', 'http://example.test?q=1', 'http://example.test/'] as $uri) {
-            Assert::same($router(Request::get($uri), $this->context)->status, Status::NO_CONTENT);
+            Assert::same($router(getRequest($uri), $this->context)->status, Status::NO_CONTENT);
         }
 
         $options = new Request(Method::OPTIONS, new Uri('http://example.test'));
@@ -316,16 +317,16 @@ final readonly class RouterTest
             new Route('GET', '/reports/{year}-{month}.csv', $handler, requirements: ['year' => '[0-9]{4}']),
             new Route('GET', '/assets/{path+}', $handler, requirements: ['path' => '[a-z/]+']),
         ]);
-        Assert::same(self::matched($router, Request::get('/archive'))->params, ['month' => '01']);
-        Assert::same(self::matched($router, Request::get('/archive/2026/11'))->params, ['year' => '2026', 'month' => '11']);
-        Assert::same(self::matched($router, Request::get('/files'))->params, ['path' => '']);
-        Assert::same(self::matched($router, Request::get('/files/a/b/'))->params, ['path' => 'a/b/']);
-        Assert::same($router->match(Request::get('/assets/')), RouteFailure::NotFound);
-        Assert::same($router->match(Request::get('/assets/a/42')), RouteFailure::NotFound);
-        Assert::same(self::matched($router, Request::get('/assets/a'))->params, ['path' => 'a']);
-        $report = self::matched($router, Request::get('/reports/2026-11.csv'));
+        Assert::same(self::matched($router, getRequest('/archive'))->params, ['month' => '01']);
+        Assert::same(self::matched($router, getRequest('/archive/2026/11'))->params, ['year' => '2026', 'month' => '11']);
+        Assert::same(self::matched($router, getRequest('/files'))->params, ['path' => '']);
+        Assert::same(self::matched($router, getRequest('/files/a/b/'))->params, ['path' => 'a/b/']);
+        Assert::same($router->match(getRequest('/assets/')), RouteFailure::NotFound);
+        Assert::same($router->match(getRequest('/assets/a/42')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, getRequest('/assets/a'))->params, ['path' => 'a']);
+        $report = self::matched($router, getRequest('/reports/2026-11.csv'));
         Assert::same($report->params, ['year' => '2026', 'month' => '11']);
-        Assert::same($router->match(Request::get('/reports/current-11.csv')), RouteFailure::NotFound);
+        Assert::same($router->match(getRequest('/reports/current-11.csv')), RouteFailure::NotFound);
     }
 
     public function matchesOneOptionalTrailingSlash(): void
@@ -335,11 +336,11 @@ final readonly class RouterTest
             new Route('GET', '/docs[/]', $handler),
             new Route('GET', '/archive/{year?}[/]', $handler),
         ]);
-        Assert::same(self::matched($router, Request::get('/docs'))->route->pattern, '/docs[/]');
-        Assert::same(self::matched($router, Request::get('/docs/'))->route->pattern, '/docs[/]');
-        Assert::same($router->match(Request::get('/docs//')), RouteFailure::NotFound);
-        Assert::same(self::matched($router, Request::get('/archive/'))->params, []);
-        Assert::same(self::matched($router, Request::get('/archive/2026/'))->params, ['year' => '2026']);
+        Assert::same(self::matched($router, getRequest('/docs'))->route->pattern, '/docs[/]');
+        Assert::same(self::matched($router, getRequest('/docs/'))->route->pattern, '/docs[/]');
+        Assert::same($router->match(getRequest('/docs//')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, getRequest('/archive/'))->params, []);
+        Assert::same(self::matched($router, getRequest('/archive/2026/'))->params, ['year' => '2026']);
     }
 
     public function rejectsAnExplicitRouteCoveredByAnOptionalSlash(): void
@@ -360,9 +361,9 @@ final readonly class RouterTest
             static fn() => new Response(),
             requirements: ['first' => '[0-9]+', 'second' => '\d{2,3}'],
         )]);
-        $match = self::matched($router, Request::get('/123456.txt'));
+        $match = self::matched($router, getRequest('/123456.txt'));
         Assert::same($match->params, ['first' => '1', 'second' => '23', 'third' => '456']);
-        Assert::same($router->match(Request::get('/123.txt')), RouteFailure::NotFound);
+        Assert::same($router->match(getRequest('/123.txt')), RouteFailure::NotFound);
     }
 
     public function keepsCaptureGroupsLocalToEachRequirement(): void
@@ -375,10 +376,10 @@ final readonly class RouterTest
             new Route('GET', '/pair/{x}-{y}', $handler, requirements: ['x' => $repeat, 'y' => $named]),
             new Route('GET', '/tail/{x+}', $handler, requirements: ['x' => $repeat]),
         ]);
-        Assert::same(self::matched($router, Request::get('/single/123'))->params, ['x' => '123']);
-        Assert::same(self::matched($router, Request::get('/pair/aa-123'))->params, ['x' => 'aa', 'y' => '123']);
-        Assert::same($router->match(Request::get('/pair/ab-123')), RouteFailure::NotFound);
-        Assert::same(self::matched($router, Request::get('/tail/aa'))->params, ['x' => 'aa']);
+        Assert::same(self::matched($router, getRequest('/single/123'))->params, ['x' => '123']);
+        Assert::same(self::matched($router, getRequest('/pair/aa-123'))->params, ['x' => 'aa', 'y' => '123']);
+        Assert::same($router->match(getRequest('/pair/ab-123')), RouteFailure::NotFound);
+        Assert::same(self::matched($router, getRequest('/tail/aa'))->params, ['x' => 'aa']);
     }
 
     public function preservesAnEmptyLiteralBeforeAnOmittedRootSuffix(): void
@@ -386,7 +387,7 @@ final readonly class RouterTest
         $handler = static fn() => new Response();
         foreach (['//{id?}' => [], '//{tail*}' => ['tail' => '']] as $pattern => $params) {
             $router = new Router([new Route('GET', $pattern, $handler)]);
-            Assert::same(self::matched($router, Request::get('/'))->params, $params);
+            Assert::same(self::matched($router, getRequest('/'))->params, $params);
         }
     }
 
@@ -400,13 +401,13 @@ final readonly class RouterTest
             new Route('GET', '/items/{key}.csv/detail', $handler),
         ]);
 
-        $response = $router(Request::get('/items/42'), $this->context);
+        $response = $router(getRequest('/items/42'), $this->context);
         Assert::same($response->status, Status::METHOD_NOT_ALLOWED);
         Assert::same($response->headers->get('Allow'), 'POST');
-        Assert::same(self::matched($router, Request::get('/items/a.csv'))->params, ['value' => 'a.csv']);
-        Assert::same(self::matched($router, Request::get('/items/a.csv/detail'))->params, ['key' => 'a']);
-        Assert::same(self::matched($router, Request::get('/items/a.csv/other'))->params, ['path' => 'a.csv/other']);
-        Assert::same($router->match(Request::get('/items/a%2Fb')), RouteFailure::BadPath);
+        Assert::same(self::matched($router, getRequest('/items/a.csv'))->params, ['value' => 'a.csv']);
+        Assert::same(self::matched($router, getRequest('/items/a.csv/detail'))->params, ['key' => 'a']);
+        Assert::same(self::matched($router, getRequest('/items/a.csv/other'))->params, ['path' => 'a.csv/other']);
+        Assert::same($router->match(getRequest('/items/a%2Fb')), RouteFailure::BadPath);
     }
 
     public function servesThesisRequests(): void
@@ -419,10 +420,10 @@ final readonly class RouterTest
             ),
             new Route(Method::HEAD, '/{id}', static fn() => new Response(Status::NO_CONTENT)),
         ]);
-        $missing = $handler(Request::get('/two/parts'), $this->context);
+        $missing = $handler(getRequest('/two/parts'), $this->context);
         Assert::same($missing->status, Status::NOT_FOUND);
         Assert::null($missing->headers->get('Allow'));
-        Assert::same($handler(Request::get('/a%2Fb'), $this->context)->status, Status::BAD_REQUEST);
+        Assert::same($handler(getRequest('/a%2Fb'), $this->context)->status, Status::BAD_REQUEST);
         $uri = new Uri('/abc?q=unused');
         Assert::same($handler(new Request(Method::GET, $uri), $this->context)->takeBody()->readAll(), 'abc');
         Assert::same($handler(new Request(Method::HEAD, $uri), $this->context)->status, Status::NO_CONTENT);

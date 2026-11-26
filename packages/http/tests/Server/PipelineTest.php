@@ -13,6 +13,7 @@ use Thesis\Http\Request;
 use Thesis\Http\Response;
 use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Net\InetAddress;
+use function Thesis\Http\getRequest;
 
 #[Test]
 final readonly class PipelineTest
@@ -36,7 +37,7 @@ final readonly class PipelineTest
     public function wrapsInOrderAndBindsEachRequest(): void
     {
         $context = $this->context;
-        $request = Request::get('/');
+        $request = getRequest('/');
         $calls = [];
         $outer = new CallbackMiddleware(static function (Request $incoming, Context $connection, callable $next) use (&$calls) {
             $calls[] = [$incoming, $connection];
@@ -60,7 +61,7 @@ final readonly class PipelineTest
         $handler = Pipeline::wrap($endpoint, $middleware());
 
         Assert::same(201, $handler($request, $this->context)->status);
-        $denied = Request::get('/private');
+        $denied = getRequest('/private');
         Assert::same(403, $handler($denied, $this->context)->status);
         Assert::same([[$request, $context], $context, [$request, $context], [$denied, $context], $context], $calls);
     }
@@ -80,7 +81,7 @@ final readonly class PipelineTest
         $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class);
-        $handler(Request::get('/'), $this->context);
+        $handler(getRequest('/'), $this->context);
     }
 
     #[DataSet([false], 'middleware returns')]
@@ -106,7 +107,7 @@ final readonly class PipelineTest
         $handler = Pipeline::wrap($endpoint, [$outer, $inner]);
 
         Expect::exception(\LogicException::class)->withMessage('The middleware invocation has ended.');
-        $handler(Request::get('/'), $this->context);
+        $handler(getRequest('/'), $this->context);
     }
 
     public function repeatsTheSameInnerLayerAfterItReturns(): void
@@ -119,13 +120,13 @@ final readonly class PipelineTest
         $deny = new CallbackMiddleware(static fn() => new Response(403));
         $handler = Pipeline::wrap(static fn() => new Response(), [$twice, $deny]);
 
-        $response = $handler(Request::get('/'), $this->context);
+        $response = $handler(getRequest('/'), $this->context);
         Assert::same(403, $response->status);
     }
 
     public function retriesAfterTheHandlerThrows(): void
     {
-        $request = Request::get('/');
+        $request = getRequest('/');
         $attempts = [];
         $retry = new CallbackMiddleware(static function (Request $_, Context $context, callable $next) {
             try {

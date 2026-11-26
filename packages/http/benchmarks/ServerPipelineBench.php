@@ -15,6 +15,7 @@ use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\Pipeline;
 use Thesis\Http\Server\Stub\CallbackMiddleware;
 use Thesis\Net\InetAddress;
+use Uri\Rfc3986\Uri;
 
 /**
  * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
@@ -36,7 +37,7 @@ final class ServerPipelineBench
     {
         $address = new InetAddress('127.0.0.1', 80);
         $this->context = new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
-        $this->request = Request::get('/');
+        $this->request = new Request('GET', new Uri('/'));
     }
 
     /**

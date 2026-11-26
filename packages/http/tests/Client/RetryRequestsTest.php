@@ -18,6 +18,7 @@ use Thesis\Io\WriteFailed;
 use Thesis\Net\ConnectFailed;
 use Thesis\Net\TlsFailed;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\getRequest;
 use function Thesis\Net\socketPair;
 use const Thesis\Http\EMPTY_BODY;
 
@@ -110,8 +111,8 @@ final class RetryRequestsTest
         foreach ([
             [new Request('POST', $uri), new ConnectFailed()],
             [new Request('GET', $uri, body: $stream), new ReadFailed()],
-            [Request::get($uri), new TlsFailed()],
-            [Request::get($uri), new MalformedMessage('Invalid status line.')],
+            [getRequest($uri), new TlsFailed()],
+            [getRequest($uri), new MalformedMessage('Invalid status line.')],
         ] as [$request, $failure]) {
             $attempts = 0;
 

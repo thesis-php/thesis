@@ -7,9 +7,9 @@ namespace Thesis\Http\Server;
 use Testo\Assert;
 use Testo\Test;
 use Thesis\Dispatcher;
-use Thesis\Http\Request;
 use Thesis\Http\Server\Event\RequestEnded;
 use Thesis\Http\Server\Stub\RecordingLogger;
+use function Thesis\Http\getRequest;
 use function Thesis\Time\ms;
 
 #[Test]
@@ -22,7 +22,7 @@ final class ServerLoggerTest
 
         $dispatcher = new Dispatcher([new ServerLogger($logger, accessLog: true)]);
         $dispatcher->dispatch(new RequestEnded(
-            request: Request::get('/users/42?token=secret'),
+            request: getRequest('/users/42?token=secret'),
             status: 200,
             responseWritten: false,
             duration: ms(25),

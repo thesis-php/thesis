@@ -14,6 +14,7 @@ use Thesis\Http\Response;
 use Thesis\Http\StringBody;
 use Thesis\Io\ReadFailed;
 use Uri\Rfc3986\Uri;
+use function Thesis\Http\getRequest;
 
 #[Test]
 #[Covers(DecodeContent::class)]
@@ -46,7 +47,7 @@ final class DecodeContentTest
     {
         $wire = gzencode(str_repeat('x', 9000));
         \assert($wire !== false);
-        $response = new DecodeContent()->handle(Request::get('/'), static fn() => new Response(
+        $response = new DecodeContent()->handle(getRequest('/'), static fn() => new Response(
             headers: new Headers(['content-encoding' => 'gzip']),
             body: $wire,
         ));

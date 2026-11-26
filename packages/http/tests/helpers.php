@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Thesis\Http;
 
 use Testo\Assert;
+use Uri\Rfc3986\Uri;
+
+function getRequest(string|Uri $uri): Request
+{
+    return new Request(Method::GET, \is_string($uri) ? new Uri($uri) : $uri);
+}
 
 /**
  * The lines of the headers as pairs of a name and a value, in the order of iteration. Not an array
