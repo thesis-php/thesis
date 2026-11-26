@@ -40,6 +40,12 @@ final readonly class Query implements \IteratorAggregate
      */
     public static function parse(string $query): self
     {
+        /** @var self $empty */
+        static $empty = new self();
+        if ($query === '') {
+            return $empty;
+        }
+
         $pairs = [];
 
         foreach (explode('&', $query) as $field) {
@@ -51,7 +57,7 @@ final readonly class Query implements \IteratorAggregate
             $pairs[] = [rawurldecode($parts[0]), rawurldecode($parts[1] ?? '')];
         }
 
-        return clone(new self(), ['pairs' => $pairs]);
+        return clone($empty, ['pairs' => $pairs]);
     }
 
     public function get(string $name): ?string

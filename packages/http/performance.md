@@ -365,6 +365,13 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
 - Debian's Sury PHP 8.6.0 NTS CLI with tracing JIT reached 36,538 replies/s against 36,634
   for the project ZTS image on one Xeon core. Paired changes were −3.3%, −0.3% and +1.8%.
   Median p99 was 118.8 ms for both. The builds also differ in packaging and compiler settings.
+- Reuse an empty immutable Query as the prototype for parsed pairs. Reading both parameters of the
+  short Arena query took 552 ns against 611 ns in six tracing-JIT pairs. All six improved. Parsing
+  187 pairs took 30.52 vs 30.56 µs. Returning the prototype for an empty query also cut a routed GET
+  that accessed the empty query from 5.30 to 5.09 µs across six in-memory pairs.
+- Rejected: caching Query by URI in a WeakMap. It saved about 11% CPU on repeated GET and POST
+  but cost 7.8% on unique short queries. Across 256 idle connections a cacheable 747-byte query
+  with 187 pairs retained another 14.84 MiB. The prototype retains only an empty query.
 - Rejected for the short Arena query: changing `Query` from a list of pairs to a packed list
   of alternating names and values. Longer query controls improved 13–19%, but parsing the
   nine-byte query and looking up both fields took 651 ns with pairs and 716 ns with the packed
