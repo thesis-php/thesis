@@ -19,7 +19,7 @@ use function Thesis\Async\group;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
-$baseline = static function (Request $request): Response {
+$baseline = static function (Request $request) {
     $a = $request->query->get('a');
     $b = $request->query->get('b');
 
