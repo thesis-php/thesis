@@ -69,6 +69,15 @@ final class MessageTest
         $copy->takeBody();
     }
 
+    public function responseCopiesShareTheJsonBodyHandoff(): void
+    {
+        $response = new Response(body: '{"id":42}');
+        $copy = $response->withStatus(Status::CREATED);
+        Assert::same($copy->takeJson(), ['id' => 42]);
+        Expect::exception(\LogicException::class);
+        $response->takeBody();
+    }
+
     public function boundsJsonBeforeDecoding(): void
     {
         Expect::exception(\OverflowException::class);

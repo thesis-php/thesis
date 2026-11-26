@@ -115,6 +115,34 @@ final readonly class Response
         return $this->pendingBody->takePayload();
     }
 
+    /**
+     * Takes the body and decodes the whole payload as JSON.
+     * If you need trailers, use takeBody() and read the body to the end before calling trailers().
+     *
+     * @param positive-int $depth
+     * @param non-negative-int $limit maximum payload bytes to collect
+     * @throws \LogicException if the body has already been taken or partially read
+     * @throws \OverflowException if the payload exceeds the limit
+     * @throws \JsonException if decoding fails with JSON_THROW_ON_ERROR enabled
+     */
+    public function takeJson(
+        bool $associative = true,
+        int $depth = 512,
+        int $flags = JSON_THROW_ON_ERROR,
+        int $limit = Body::DEFAULT_BUFFER_LIMIT,
+    ): mixed {
+        $body = $this->takeBody();
+        $bytes = $body->readAll($limit);
+        $body->close();
+
+        return json_decode(
+            json: $bytes,
+            associative: $associative,
+            depth: $depth,
+            flags: $flags,
+        );
+    }
+
     public function withBody(string|Body $body): self
     {
         return clone($this, ['pendingBody' => new PendingBody($body)]);

@@ -62,7 +62,8 @@ $value = $request->takeJson(associative: false, limit: 64 * 1024);
 return Response::json($value);
 ```
 
-`Request::takeJson()` takes the body once, even when decoding fails, and uses the same default limit as `readAll()`.
+On requests and responses, `takeJson()` takes the body once, even when decoding fails.
+It uses the same default limit as `readAll()`.
 If you need trailers, use `takeBody()`, read the body to the end, then call `trailers()` on it.
 JSON objects decode to associative arrays by default. Pass `associative: false` for `stdClass`.
 The default flags include `JSON_THROW_ON_ERROR`, so decoding failures throw `JsonException`.
