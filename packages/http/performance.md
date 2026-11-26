@@ -425,6 +425,11 @@ Revisit them if a profile shows a different workload or a PHP upgrade changes th
 
 - Rejected: scanning a path for escapable bytes before calling `strtr()`. Plain short paths saved
   0.07 µs per head, paths with brackets got slower, and TCP throughput changed by only 0.5%.
+- Keep the last GMT Date string and its Unix second in the worker. At `b2595f9`, six alternating
+  pairs on PHP 8.6 with tracing JIT served 512 GETs per in-memory connection. Alternating one- and
+  two-byte bodies missed the connection's response head cache. Reusing the date cut median exchange
+  time from 5.55 to 5.15 µs (7.16% at the paired median). With identical bodies the paired change
+  was +0.31%. When the clock changed on every encode, the isolated encoder cost 4.39% more.
 - Rejected: caching the status line by HTTP version and status code. Creating and encoding a fresh
   response took 2.117 µs before and 2.110 µs after. The cache gave no TCP gain.
 - Rejected: storing encoded field lines on each `Headers`. Reusing the same headers cut response

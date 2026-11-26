@@ -129,7 +129,15 @@ final readonly class ResponseHead
         $bytes = "{$this->version->value} {$this->status} {$phrase}\r\n";
 
         if ($this->status >= 200 && !$this->headers->has('date')) {
-            $date = gmdate('D, d M Y H:i:s \G\M\T', $now);
+            /** @var ?int $timestamp */
+            static $timestamp = null;
+            /** @var string $date */
+            static $date = '';
+            if ($timestamp !== $now) {
+                $date = gmdate('D, d M Y H:i:s \G\M\T', $now);
+                $timestamp = $now;
+            }
+
             $bytes .= "Date: {$date}\r\n";
         }
 
