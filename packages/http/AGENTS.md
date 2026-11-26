@@ -110,7 +110,8 @@ contract for streaming bytes and trailers. Server implementation details live in
 - One buffer belongs to the connection. Finish writing the response before checking whether the incoming body
   ended. `Request::echo()` hands the reader to a 200 response, including its trailers. It uses the same single
   handoff as `takeBody()`. The response writer can read it after the handler returns. The caller sets response
-  headers explicitly. For example, the Arena `POST /echo` sets `Content-Type: application/octet-stream`.
+  headers explicitly. The Arena `POST /echo` streams the upload. Its compliance route `POST /spec` reads the
+  whole body under the server limit before returning the bytes, so framing errors surface before the final status.
 - For HEAD, the server writer frames an ordinary handler response with an empty wire body. The exchange
   still closes the original body. An empty handler body may stand in for an unknown representation length.
 - The writer takes the response body once, uses it for framing and writing, and closes it even on failure.

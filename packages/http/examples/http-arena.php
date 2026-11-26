@@ -41,6 +41,7 @@ $dataset = json_decode(
     flags: JSON_THROW_ON_ERROR,
 );
 
+$maxBodyBytes = 16 * 1024 * 1024;
 $router = new Router([
     new Route([Method::GET, Method::POST], '/baseline11', static function (Request $request) {
         $a = filter_var($request->query->get('a'), FILTER_VALIDATE_INT);
@@ -119,7 +120,7 @@ $router = new Router([
     }),
     Route::post('/spec', static fn(Request $request) => new Response(
         headers: ['Content-Type' => 'application/octet-stream'],
-        body: $request->takeBody(),
+        body: $request->takeBody()->readAll(limit: $maxBodyBytes),
     )),
     new Route([Method::GET, Method::POST], '/spec/headers', static function (Request $request) {
         $request->takeBody()->discard();
@@ -147,7 +148,7 @@ $router = new Router([
 ]);
 
 $server = new Server(
-    config: new Config(endpoints: [
+    config: new Config(maxBodyBytes: $maxBodyBytes, endpoints: [
         new TcpEndpoint(
             address: new InetAddress('0.0.0.0', 8080),
             backlog: 4096,

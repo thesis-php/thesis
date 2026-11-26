@@ -194,6 +194,15 @@ An HTTP/2 implementation needs connection-wide HPACK state, flow control and dis
 to individual streams. Applications can still read each stream through the same `Reader`. Defer a common codec
 interface until both implementations have callers that need one.
 
+### Proposed HTTP/1 full-duplex opt-in
+
+Let `Request::echo()` opt the exchange into reading the upload while writing the response.
+Keep the marker on the exchange or incoming request so response middleware can wrap the body.
+For ordinary successful responses, consider discarding unread input before committing the final status,
+under the request size limit and read deadline. Define what happens if an application read is still pending.
+An early rejection with a pending `Expect: 100-continue` should send the final status and close the
+connection immediately. Test these cases and measure the cost on bodyless requests before changing the default.
+
 ## Comparison with the installed Amp stack
 
 The reference versions are `amphp/http` 2.1.2, `amphp/http-client` 5.3.8 and `amphp/http-server` 3.4.9.
