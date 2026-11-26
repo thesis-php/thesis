@@ -107,6 +107,8 @@ final class Connection
 
             try {
                 $this->exchange = new Exchange($head, $this->bodyInput, $this->output, $this);
+                // Only the exchange needs this head. A long head must be released before the next idle wait.
+                unset($head);
                 if ($this->recheckOnNextRequest !== null) {
                     $this->recheckOnNextRequest->recheck();
                     $this->recheckOnNextRequest = null;

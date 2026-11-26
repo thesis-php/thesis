@@ -45,6 +45,7 @@ final class HeadReader
     {
         try {
             if ($isKeepAlive && $this->buffer->count() === 0) {
+                $this->buffer->drain();
                 // Once a byte arrives, the entire remainder shares one deadline.
                 $max = min($this->readSize, $this->config->maxHeadBytes);
                 $first = $this->idle !== null && $this->input instanceof Socket
@@ -57,7 +58,6 @@ final class HeadReader
 
                 // A short exchange needs little read space. Grow again if the peer fills it.
                 $this->readSize = \strlen($first) < 2048 ? 2048 : 8192;
-                $this->buffer->drain();
                 // The delimiter is part of the match. Everything after it belongs to the body or the next request.
                 if ($this->lastWire !== null && $this->lastHead !== null && str_starts_with($first, $this->lastWire)) {
                     $this->buffer->write(substr($first, \strlen($this->lastWire)));

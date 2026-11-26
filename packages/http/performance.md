@@ -412,6 +412,15 @@ The allocator still held 234–236 MiB. A control on the same PHP build measured
 to create a bare fiber and another 16,400 bytes to start and suspend it, per fiber.
 The HTTP listener starts a task for each accepted connection and keeps it across keep-alive requests.
 
+Release the completed head and discard consumed input bytes before the keep-alive wait. In two ABBA
+pairs with 1000 TCP clients after two GETs each, the live PHP heap fell by 4.06 MiB for a 1024-byte
+Cookie and 9.44 MiB for a 4000-byte Cookie. A 100-byte Cookie fit the existing head cache and showed
+no material difference. Six in-memory timing pairs had mixed results on GET, POST and long headers.
+
+Rejected: creating BodyInput only after the first request with a body. This saved 112 bytes per
+connection after GET and nothing after POST. It also required the exchange to handle a missing input
+in body limits and request construction. The six-pair mixed timing control showed no consistent gain.
+
 The exchange reads the remaining connection capacity directly before committing the response.
 Removing the closure that previously read it saved 408 bytes of live PHP heap per idle connection
 after a GET at 64, 1024 and 2048 connections. In six alternating pairs with one pinned vCPU,
