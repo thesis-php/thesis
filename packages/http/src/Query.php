@@ -43,7 +43,7 @@ final readonly class Query implements \IteratorAggregate
         /** @var self $empty */
         static $empty = new self();
         if ($query === '') {
-            return $empty;
+            return clone $empty;
         }
 
         $pairs = [];
