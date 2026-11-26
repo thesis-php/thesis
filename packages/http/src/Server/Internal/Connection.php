@@ -8,9 +8,8 @@ use Psr\Clock\ClockInterface;
 use Thesis\Async\ReadObserver;
 use Thesis\Async\Task;
 use Thesis\Dispatcher;
-use Thesis\Http\Request;
-use Thesis\Http\Response;
 use Thesis\Http\Server\Config;
+use Thesis\Http\Server\Context;
 use Thesis\Http\Server\DefaultErrorHandler;
 use Thesis\Http\Server\ErrorHandler;
 use Thesis\Http\Server\Event;
@@ -30,6 +29,7 @@ use function Thesis\Io\close;
 
 /**
  * @internal
+ * @phpstan-import-type Handler from \Thesis\Http\Server
  */
 final class Connection
 {
@@ -79,10 +79,10 @@ final class Connection
      * Serve HTTP/1 requests on one connection. The caller closes the connection in a finally block.
      * A handler failure before the final head gets a 500 response and still propagates to the caller.
      *
-     * @param callable(Request): Response $handler
+     * @param Handler $handler
      * @param 'http'|'https' $scheme
      */
-    public function run(callable $handler, string $scheme = 'http'): void
+    public function run(Context $context, callable $handler, string $scheme = 'http'): void
     {
         if ($this->input instanceof Socket && $this->task !== null) {
             $this->input->observeReadHangUp($this->probeDisconnect(...));
@@ -113,7 +113,7 @@ final class Connection
                     $this->recheckOnNextRequest->recheck();
                     $this->recheckOnNextRequest = null;
                 }
-                $canReuse = $this->exchange->run($handler, $this->requestStarted, $this->requestEnded);
+                $canReuse = $this->exchange->run($handler, $context, $this->requestStarted, $this->requestEnded);
             } finally {
                 $this->exchange = null;
             }

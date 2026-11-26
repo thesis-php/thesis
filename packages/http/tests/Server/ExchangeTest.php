@@ -18,6 +18,7 @@ use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
+use function Thesis\Http\serverContext;
 use function Thesis\Http\withoutResponseDate;
 
 #[Test]
@@ -30,7 +31,7 @@ final class ExchangeTest
         $input = new ContinueReader($output);
 
         $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: 1));
-        $connection->run(static function (Request $request) use ($output) {
+        $connection->run(serverContext(), static function (Request $request) use ($output) {
             Assert::same(actual: $output->bytes, expected: '');
 
             return new Response(body: $request->takeBody());
@@ -49,7 +50,10 @@ final class ExchangeTest
         $input = new ContinueReader($output);
 
         $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: 1));
-        $connection->run(static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())));
+        $connection->run(
+            context: serverContext(),
+            handler: static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())),
+        );
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -65,7 +69,7 @@ final class ExchangeTest
         $input = new ContinueReader($output);
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => new Response(Status::FORBIDDEN));
+        $connection->run(serverContext(), static fn() => new Response(Status::FORBIDDEN));
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -79,7 +83,7 @@ final class ExchangeTest
         $input = new StringReader("POST / HTTP/1.0\r\nExpect: 100-continue\r\nContent-Length: 3\r\n\r\nabc");
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
+        $connection->run(serverContext(), static fn(Request $request) => new Response(body: $request->takeBody()));
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -93,7 +97,7 @@ final class ExchangeTest
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\nabc");
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => new Response());
+        $connection->run(serverContext(), static fn() => new Response());
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -107,7 +111,7 @@ final class ExchangeTest
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nExpect: custom\r\nContent-Length: 3\r\n\r\n");
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
+        $connection->run(serverContext(), static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -121,7 +125,7 @@ final class ExchangeTest
         $input = new StringReader("POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\na");
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static function (Request $request) {
+        $connection->run(serverContext(), static function (Request $request) {
             $body = $request->takeBody();
             $body->read(3);
             $body->read(2);
@@ -143,7 +147,7 @@ final class ExchangeTest
 
         try {
             $connection = new Connection($input, $output, new Config('/test.sock'));
-            $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
+            $connection->run(serverContext(), static fn(Request $request) => new Response(body: $request->takeBody()));
         } finally {
             Assert::same(
                 actual: withoutResponseDate($output->bytes),
@@ -158,7 +162,7 @@ final class ExchangeTest
         $input = new StringReader("GET / HTTP/7.1\r\nHost: local\r\n\r\n");
 
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
+        $connection->run(serverContext(), static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),
@@ -175,7 +179,7 @@ final class ExchangeTest
 
         try {
             $connection = new Connection($input, $output, new Config('/test.sock'));
-            $connection->run(static fn() => $response->withStatus(Status::OK));
+            $connection->run(serverContext(), static fn() => $response->withStatus(Status::OK));
         } finally {
             Assert::same(
                 actual: withoutResponseDate($output->bytes),
@@ -193,7 +197,7 @@ final class ExchangeTest
 
         try {
             $connection = new Connection($input, $output, new Config('/test.sock'), new TextErrorHandler());
-            $connection->run(static fn() => throw new \RuntimeException('Private details'));
+            $connection->run(serverContext(), static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
                 actual: withoutResponseDate($output->bytes),
@@ -210,7 +214,7 @@ final class ExchangeTest
 
         try {
             $connection = new Connection($input, $output, new Config('/test.sock'));
-            $connection->run(static fn() => throw new \RuntimeException('Private details'));
+            $connection->run(serverContext(), static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
                 actual: withoutResponseDate($output->bytes),

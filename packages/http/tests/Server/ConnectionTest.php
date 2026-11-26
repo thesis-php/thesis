@@ -21,6 +21,7 @@ use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
 use Thesis\Io\Writer;
+use function Thesis\Http\serverContext;
 use function Thesis\Http\withoutResponseDate;
 
 #[Test]
@@ -63,7 +64,7 @@ final class ConnectionTest
             $output = new RecordingWriter();
             $paths = [];
             $connection = new Connection($input, $output, $config);
-            $connection->run(static function (Request $request) use (&$paths) {
+            $connection->run(serverContext(), static function (Request $request) use (&$paths) {
                 $paths[] = $request->uri->getRawPath();
 
                 return $request->echo();
@@ -80,7 +81,7 @@ final class ConnectionTest
         $input = new TimedReader([[null, $head . 'ab'], [null, $head . 'cd' . $last . 'xyz']]);
         $output = new RecordingWriter();
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
+        $connection->run(serverContext(), static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $short = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n";
         Assert::same(
@@ -95,7 +96,7 @@ final class ConnectionTest
             . "POST / HTTP/1.1\r\nHost: local\r\nContent-Length: 3\r\n\r\ntwo");
         $output = new RecordingWriter();
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
+        $connection->run(serverContext(), static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $head = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n";
         Assert::same(withoutResponseDate($output->bytes), $head . 'one' . $head . 'two');
@@ -109,7 +110,7 @@ final class ConnectionTest
         $output = new RecordingWriter();
         $requests = 0;
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static function () use (&$requests) {
+        $connection->run(serverContext(), static function () use (&$requests) {
             if (++$requests === 1) {
                 return new Response(body: 'a');
             }
@@ -151,7 +152,7 @@ final class ConnectionTest
         };
 
         $connection = new Connection($exchange, $exchange, new Config('/test.sock'));
-        $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
+        $connection->run(serverContext(), static fn(Request $request) => new Response(body: $request->takeBody()));
         Assert::true(str_ends_with($exchange->output, "1\r\na\r\n1\r\nb\r\n0\r\n\r\n"));
     }
 
@@ -160,7 +161,7 @@ final class ConnectionTest
         $input = new StringReader("HEAD / HTTP/1.1\r\nHost: local\r\n\r\nGET / HTTP/1.1\r\nHost: local\r\n\r\n");
         $output = new RecordingWriter();
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn(Request $request) => $request->method === Method::HEAD
+        $connection->run(serverContext(), static fn(Request $request) => $request->method === Method::HEAD
             ? new Response(headers: new Headers(['content-length' => '5']))
             : new Response(body: 'hello'));
 
@@ -176,7 +177,7 @@ final class ConnectionTest
         $input = new StringReader("HEAD / HTTP/1.1\r\nHost: local\r\n\r\nGET / HTTP/1.1\r\nHost: local\r\n\r\n");
         $output = new RecordingWriter();
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => new Response(body: 'hello'));
+        $connection->run(serverContext(), static fn() => new Response(body: 'hello'));
 
         Assert::same($output->writes, 2);
         Assert::same(
@@ -194,7 +195,7 @@ final class ConnectionTest
             output: $output,
             config: new Config('/test.sock'),
         );
-        $connection->run(static fn() => new Response(body: $body));
+        $connection->run(serverContext(), static fn() => new Response(body: $body));
 
         Assert::same($output->writes, 3);
         Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 65540\r\n\r\n{$body}");
@@ -210,7 +211,7 @@ final class ConnectionTest
 
         try {
             $connection = new Connection($input, $output, new Config('/test.sock'));
-            $connection->run(static fn() => new Response(body: $body));
+            $connection->run(serverContext(), static fn() => new Response(body: $body));
         } finally {
             Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nbc");
         }
@@ -222,7 +223,7 @@ final class ConnectionTest
         $output = new RecordingWriter();
         $body = new PrefixedBody(new StringBody('hello'));
         $connection = new Connection($input, $output, new Config('/test.sock'));
-        $connection->run(static fn() => new Response(body: $body));
+        $connection->run(serverContext(), static fn() => new Response(body: $body));
         Assert::same("HTTP/1.0 200 OK\r\n\r\n!hello", withoutResponseDate($output->bytes));
     }
 }

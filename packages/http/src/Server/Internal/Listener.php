@@ -12,7 +12,6 @@ use Thesis\Async\Instant;
 use Thesis\Async\LocalSemaphore;
 use Thesis\Async\Lock;
 use Thesis\Dispatcher;
-use Thesis\Http\Request;
 use Thesis\Http\Server\Config;
 use Thesis\Http\Server\Context;
 use Thesis\Http\Server\ErrorHandler;
@@ -268,7 +267,8 @@ final class Listener
                 dispatcher: $this->dispatcher,
             );
             $connection->run(
-                handler: fn(Request $request) => ($this->handler)($request, $context),
+                context: $context,
+                handler: $this->handler,
                 scheme: $socket->tls === null ? 'http' : 'https',
             );
         } catch (Cancelled $cancelled) {

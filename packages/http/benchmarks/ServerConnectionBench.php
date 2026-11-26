@@ -14,6 +14,7 @@ use Thesis\Http\Server\Internal\Connection;
 use Thesis\Http\Server\Stub\RecordingWriter;
 use Thesis\Io\StringReader;
 use function Thesis\Async\group;
+use function Thesis\Http\serverContext;
 
 #[Warmup(1)]
 final class ServerConnectionBench
@@ -40,7 +41,7 @@ final class ServerConnectionBench
 
         group(static function () use ($input, $output, $count) {
             $connection = new Connection($input, $output, new Config('/test.sock', maxRequestsPerConnection: $count));
-            $connection->run(static fn() => new Response(
+            $connection->run(serverContext(), static fn() => new Response(
                 headers: new Headers(['Content-Type' => 'text/plain']),
                 body: 'Hello, World!',
             ));

@@ -5,7 +5,18 @@ declare(strict_types=1);
 namespace Thesis\Http;
 
 use Testo\Assert;
+use Thesis\Dispatcher;
+use Thesis\Http\Server\Context;
+use Thesis\Http\Server\DefaultErrorHandler;
+use Thesis\Net\UnixAddress;
 use Uri\Rfc3986\Uri;
+
+function serverContext(): Context
+{
+    $address = new UnixAddress('');
+
+    return new Context($address, $address, null, new DefaultErrorHandler(), new Dispatcher());
+}
 
 function getRequest(string|Uri $uri): Request
 {

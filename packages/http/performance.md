@@ -426,6 +426,12 @@ Removing the closure that previously read it saved 408 bytes of live PHP heap pe
 after a GET at 64, 1024 and 2048 connections. In six alternating pairs with one pinned vCPU,
 the in-memory GET control took 5.08 vs 5.02 µs of CPU per request at the medians. Two pairs slowed down.
 
+Pass the connection context alongside the handler. Adapting the handler with a bound closure kept
+784 extra bytes per idle connection on loopback at 16, 256 and 1024 connections. An invokable adapter
+saved 704 bytes but still allocated an object per connection. In six rotated trials with 64 TCP
+clients, combined client and server CPU medians for the closure, direct call and adapter were
+12.73, 12.33 and 12.35 µs per request. The timing varied across runs.
+
 The response writer keeps the Unix second of its cached head. With 4096 warmed writers on PHP 8.6
 and CLI OPcache, retaining the integer saved 1.38 MiB of live PHP memory against retaining the wall
 clock's DateTimeImmutable. In four pairs (ABBA twice), each process encoded the same fixed-length GET

@@ -18,6 +18,7 @@ use Thesis\Http\Server\Stub\TimedReader;
 use Thesis\Io\StringReader;
 use Thesis\Io\WriteFailed;
 use Thesis\TestoPlugin\VirtualTime;
+use function Thesis\Http\serverContext;
 use function Thesis\Http\withoutResponseDate;
 use function Thesis\Time\sec;
 
@@ -43,7 +44,10 @@ final class ConnectionLimitsTest
                 requestStarted: new Dispatcher([$onStart]),
                 requestEnded: new Dispatcher([$onEnd]),
             );
-            $connection->run(static fn() => throw new \LogicException('Rejected request reached the handler.'));
+            $connection->run(
+                context: serverContext(),
+                handler: static fn() => throw new \LogicException('Rejected request reached the handler.'),
+            );
 
             \assert($ended instanceof Event\RequestEnded);
             Assert::same($ended->request, $started);
@@ -77,7 +81,10 @@ final class ConnectionLimitsTest
             config: new Config('/test.sock', headTimeout: sec(3)),
             dispatcher: $dispatcher,
         );
-        $connection->run(static fn() => throw new \LogicException('An incomplete head must not reach the handler.'));
+        $connection->run(
+            context: serverContext(),
+            handler: static fn() => throw new \LogicException('An incomplete head must not reach the handler.'),
+        );
 
         Assert::same($status, 408);
         Assert::equals(Instant::now()->since($start), sec(3));
@@ -96,7 +103,7 @@ final class ConnectionLimitsTest
         $start = Instant::now();
 
         $connection = new Connection($input, $output, new Config('/test.sock', bodyIdleTimeout: sec(3)));
-        $connection->run(static function (Request $request) {
+        $connection->run(serverContext(), static function (Request $request) {
             $body = $request->takeBody();
             Assert::same($body->read(1) . $body->read(1), 'ab');
 
@@ -117,7 +124,7 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
 
         $connection = new Connection($input, $output, new Config('/test.sock', bodyIdleTimeout: sec(1)));
-        $connection->run(static function (Request $request) {
+        $connection->run(serverContext(), static function (Request $request) {
             $request->takeBody()->read(1);
 
             return new Response();
@@ -135,7 +142,7 @@ final class ConnectionLimitsTest
         Expect::exception(WriteFailed::class)->withMessage('The response write did not complete in time.');
 
         $connection = new Connection($input, $output, new Config('/test.sock', writeTimeout: sec(1)));
-        $connection->run(static fn() => new Response());
+        $connection->run(serverContext(), static fn() => new Response());
     }
 
     #[VirtualTime]
@@ -149,7 +156,7 @@ final class ConnectionLimitsTest
         $start = Instant::now();
 
         $connection = new Connection($input, $output, new Config('/test.sock', idleTimeout: sec(1)));
-        $connection->run(static fn() => new Response());
+        $connection->run(serverContext(), static fn() => new Response());
 
         Assert::equals(Instant::now()->since($start), sec(1));
         Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
@@ -163,7 +170,10 @@ final class ConnectionLimitsTest
             output: $output,
             config: new Config('/test.sock', maxHeadBytes: 64),
         );
-        $connection->run(static fn() => throw new \LogicException('Oversized method reached the handler.'));
+        $connection->run(
+            context: serverContext(),
+            handler: static fn() => throw new \LogicException('Oversized method reached the handler.'),
+        );
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 501 ');
     }
@@ -180,7 +190,7 @@ final class ConnectionLimitsTest
                 output: $output,
                 config: new Config('/test.sock', maxHeadBytes: $limit),
             );
-            $connection->run(static fn() => new Response());
+            $connection->run(serverContext(), static fn() => new Response());
 
             Assert::string($output->bytes)->startsWith("HTTP/1.1 {$status} ");
         }
@@ -199,7 +209,7 @@ final class ConnectionLimitsTest
                 output: $output,
                 config: new Config('/test.sock', maxBodyBytes: $limit),
             );
-            $connection->run(static function (Request $request) {
+            $connection->run(serverContext(), static function (Request $request) {
                 $reader = $request->takeBody();
                 $body = '';
 
@@ -223,7 +233,10 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
 
         $connection = new Connection(new StringReader($wire), $output, new Config('/test.sock', maxBodyBytes: 1));
-        $connection->run(static fn() => throw new \LogicException('An oversized body must not reach the handler.'));
+        $connection->run(
+            context: serverContext(),
+            handler: static fn() => throw new \LogicException('An oversized body must not reach the handler.'),
+        );
 
         Assert::string($output->bytes)->startsWith('HTTP/1.1 413 ');
     }
@@ -234,7 +247,7 @@ final class ConnectionLimitsTest
         $output = new RecordingWriter();
 
         $connection = new Connection(new StringReader(str_repeat($wire, 1001)), $output, new Config('/test.sock'));
-        $connection->run(static fn() => new Response());
+        $connection->run(serverContext(), static fn() => new Response());
 
         Assert::same(substr_count($output->bytes, 'HTTP/1.1 200 OK'), 1001);
         Assert::string($output->bytes)->notContains('Connection: close');
@@ -250,7 +263,7 @@ final class ConnectionLimitsTest
             output: $output,
             config: new Config('/test.sock', maxRequestsPerConnection: 2),
         );
-        $connection->run(static fn() => new Response());
+        $connection->run(serverContext(), static fn() => new Response());
 
         Assert::same(
             actual: withoutResponseDate($output->bytes),

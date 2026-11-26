@@ -11,6 +11,7 @@ use Thesis\Http\Body;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Context;
 use Thesis\Http\Server\Event;
 use Thesis\Http\Server\Internal\Http1\ChunkedReader;
 use Thesis\Http\Server\Internal\Http1\FixedLengthReader;
@@ -26,6 +27,7 @@ use const Thesis\Http\EMPTY_BODY;
 
 /**
  * @internal
+ * @phpstan-import-type Handler from \Thesis\Http\Server
  */
 final class Exchange
 {
@@ -55,10 +57,14 @@ final class Exchange
     ) {}
 
     /**
-     * @param callable(Request): Response $handler
+     * @param Handler $handler
      */
-    public function run(callable $handler, ?Dispatcher $requestStarted, ?Dispatcher $requestEnded): bool
-    {
+    public function run(
+        callable $handler,
+        Context $context,
+        ?Dispatcher $requestStarted,
+        ?Dispatcher $requestEnded,
+    ): bool {
         $expect = $this->head->headers->get('expect');
         $rejection = match (true) {
             $this->head->length !== null && $this->head->length > $this->input->maxBodyBytes => Status::CONTENT_TOO_LARGE,
@@ -81,7 +87,7 @@ final class Exchange
                 return false;
             }
 
-            return $this->handle($handler, $request);
+            return $this->handle($handler, $request, $context);
         } finally {
             if ($requestEnded !== null) {
                 $requestEnded->dispatch(new Event\RequestEnded(
@@ -95,9 +101,9 @@ final class Exchange
     }
 
     /**
-     * @param callable(Request): Response $handler
+     * @param Handler $handler
      */
-    private function handle(callable $handler, Request $request): bool
+    private function handle(callable $handler, Request $request, Context $context): bool
     {
         $body = null;
 
@@ -106,7 +112,7 @@ final class Exchange
                 checkpoint();
             }
 
-            $response = $handler($request);
+            $response = $handler($request, $context);
             $body = $response->takeBody();
 
             return $this->sendResponse($response, $body);
