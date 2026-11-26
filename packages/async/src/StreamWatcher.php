@@ -157,26 +157,20 @@ final class StreamWatcher
         $error = null;
 
         try {
-            return $continuation->park();
+            $ready = $continuation->park();
+            // The loop removes a wait before waking it, and close() removes it before resuming it.
+            unset($this->waits[$id]);
+
+            return $ready;
         } catch (\Throwable $error) {
             throw $error;
         } finally {
             $scope->unsubscribe($continuation);
-            $this->forget($id);
+            if (isset($this->waits[$id])) {
+                $this->unregister($this->waits[$id]);
+                unset($this->waits[$id]);
+            }
             Scope::$tracer?->resumed($scope, $error);
-        }
-    }
-
-    /**
-     * This method does nothing if {@see close()} has already ended the wait.
-     */
-    private function forget(int $id): void
-    {
-        $wait = $this->waits[$id] ?? null;
-
-        if ($wait !== null) {
-            unset($this->waits[$id]);
-            $this->unregister($wait);
         }
     }
 

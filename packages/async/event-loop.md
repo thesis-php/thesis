@@ -44,6 +44,9 @@ or the process loop. `virtualTime()` runs a separate loop.
   of a stream share one `WatchedStream`, and its watcher is brought up to date lazily, right before a wait:
   a fiber that waits again in the tick it was woken costs no call to the kernel. Empty events are a `TypeError`,
   so a stream nobody waits for is removed. Level-triggered: bytes in the buffer of PHP count as readable.
+- `StreamWatcherBench::benchEcho` waits for ordinary reads 2,000 times. Run it when changing the event
+  queues. The loop removes a wait before waking it, and `StreamWatcher::close()` unregisters its waits
+  before resuming them. Only an interrupted wait still needs to unregister itself when the fiber resumes.
 - The `Watcher` holds its `WatchedStream` as data: the watcher of a stream nobody waits for, and every one
   in `release()`, is nulled after `remove()`, or the cycle keeps the descriptor open until the collector runs
   and a socket dropped by thesis/net is not closed for its peer. `release()` nulls the waiters of its timers too:
