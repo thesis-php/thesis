@@ -412,6 +412,12 @@ The allocator still held 234–236 MiB. A control on the same PHP build measured
 to create a bare fiber and another 16,400 bytes to start and suspend it, per fiber.
 The HTTP listener starts a task for each accepted connection and keeps it across keep-alive requests.
 
+The response writer keeps the Unix second of its cached head. With 4096 warmed writers on PHP 8.6
+and CLI OPcache, retaining the integer saved 1.38 MiB of live PHP memory against retaining the wall
+clock's DateTimeImmutable. In four pairs (ABBA twice), each process encoded the same fixed-length GET
+response 100 times per writer. Median time per encode fell from 584 to 534 ns. Both arms formatted
+Date with gmdate. The probe excludes sockets, handlers and the event loop.
+
 ## HTTP/1 codec performance
 
 Unless a different base is given, these decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.

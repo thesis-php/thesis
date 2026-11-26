@@ -21,20 +21,13 @@ final readonly class ResponseHeadTest
 {
     private const string DATE = 'Date: Thu, 01 Jan 1970 00:00:00 GMT';
 
-    private \DateTimeImmutable $epoch;
-
-    public function __construct()
-    {
-        $this->epoch = new \DateTimeImmutable('@0');
-    }
-
     public function preservesAnExplicitDate(): void
     {
         $response = new Response(headers: new Headers(['date' => 'Mon, 02 Jan 2006 15:04:05 GMT']));
         $head = outgoingResponseHead($response, requestHead('GET / HTTP/1.1'));
 
         $expected = head('HTTP/1.1 200 OK', 'Date: Mon, 02 Jan 2006 15:04:05 GMT', 'Content-Length: 0', '', '');
-        Assert::same($head->toString($this->epoch), $expected);
+        Assert::same($head->toString(now: 0), $expected);
     }
 
     public function writesResponseWithBodyOfKnownLength(): void
@@ -53,7 +46,7 @@ final readonly class ResponseHeadTest
         Assert::same($head->length, 5);
         Assert::true($head->isPersistent);
         Assert::same($head->upgrade, []);
-        Assert::same($head->toString($this->epoch), head(
+        Assert::same($head->toString(now: 0), head(
             'HTTP/1.1 200 OK',
             self::DATE,
             'Content-Type: text/plain',
@@ -69,7 +62,7 @@ final readonly class ResponseHeadTest
 
         Assert::same($head->framing, Framing::Length);
         Assert::same(
-            actual: $head->toString($this->epoch),
+            actual: $head->toString(now: 0),
             expected: head('HTTP/1.1 404 Not Found', self::DATE, 'Content-Length: 0', '', ''),
         );
     }
@@ -78,7 +71,7 @@ final readonly class ResponseHeadTest
     {
         $head = outgoingResponseHead(new Response(299), requestHead('GET / HTTP/1.1'));
 
-        Assert::same($head->toString($this->epoch), head('HTTP/1.1 299 ', self::DATE, 'Content-Length: 0', '', ''));
+        Assert::same($head->toString(now: 0), head('HTTP/1.1 299 ', self::DATE, 'Content-Length: 0', '', ''));
     }
 
     public function writesBodyOfUnknownLengthInChunks(): void
@@ -92,7 +85,7 @@ final readonly class ResponseHeadTest
         Assert::null($head->length);
         Assert::true($head->isPersistent);
         Assert::same(
-            actual: $head->toString($this->epoch),
+            actual: $head->toString(now: 0),
             expected: head('HTTP/1.1 200 OK', self::DATE, 'Transfer-Encoding: chunked', '', ''),
         );
     }
@@ -107,7 +100,7 @@ final readonly class ResponseHeadTest
         Assert::same($head->framing, Framing::UntilClose);
         Assert::null($head->length);
         Assert::false($head->isPersistent);
-        Assert::same($head->toString($this->epoch), head('HTTP/1.0 200 OK', self::DATE, '', ''));
+        Assert::same($head->toString(now: 0), head('HTTP/1.0 200 OK', self::DATE, '', ''));
     }
 
     public function usesChunkedFramingForAnEmptyReaderWithPendingTrailers(): void
@@ -119,7 +112,7 @@ final readonly class ResponseHeadTest
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
         Assert::same(
-            actual: $head->toString($this->epoch),
+            actual: $head->toString(now: 0),
             expected: head('HTTP/1.1 200 OK', self::DATE, 'Transfer-Encoding: chunked', '', ''),
         );
         Assert::same($body->readAll(), '');
@@ -159,7 +152,7 @@ final readonly class ResponseHeadTest
         );
 
         Assert::same($head->isPersistent, $isPersistent);
-        Assert::same($head->toString($this->epoch), $bytes);
+        Assert::same($head->toString(now: 0), $bytes);
     }
 
     /**
@@ -197,7 +190,7 @@ final readonly class ResponseHeadTest
         Assert::same($head->length, 0);
         Assert::same($head->headers, $response->headers);
         Assert::true($head->isPersistent);
-        Assert::same($head->toString($this->epoch), $bytes);
+        Assert::same($head->toString(now: 0), $bytes);
     }
 
     /**
@@ -256,7 +249,7 @@ final readonly class ResponseHeadTest
         );
 
         Assert::same($head->upgrade, ['websocket']);
-        Assert::same($head->toString($this->epoch), head(
+        Assert::same($head->toString(now: 0), head(
             'HTTP/1.1 101 Switching Protocols',
             'Sec-Websocket-Accept: abc',
             'Upgrade: websocket',

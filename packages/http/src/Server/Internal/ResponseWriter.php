@@ -38,7 +38,7 @@ final class ResponseWriter implements Writer, Closer
      */
     private ?array $lastResponseHead = null;
 
-    private ?\DateTimeImmutable $lastResponseTime = null;
+    private ?int $lastResponseTimestamp = null;
 
     public function __construct(
         private readonly Writer $output,
@@ -53,12 +53,12 @@ final class ResponseWriter implements Writer, Closer
      */
     public function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
-        $now = $this->clock->now();
+        $now = $this->clock->now()->getTimestamp();
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
         if ($this->lastResponseHead !== null && $ordinary && $body instanceof StringBody) {
             $cached = $this->lastResponseHead;
             $head = $cached[0];
-            if ($this->lastResponseTime?->getTimestamp() === $now->getTimestamp()
+            if ($this->lastResponseTimestamp === $now
                 && $response->status === $head->status
                 && $body->size === $head->length && $request->version === $head->version
                 && ($isPersistent && $request->isPersistent) === $head->isPersistent
@@ -84,7 +84,7 @@ final class ResponseWriter implements Writer, Closer
         $result = [$head, $head->toString($now)];
         if ($ordinary && $head->framing === Framing::Length && \strlen($result[1]) <= 1024) {
             $this->lastResponseHead = $result;
-            $this->lastResponseTime = $now;
+            $this->lastResponseTimestamp = $now;
         }
 
         return $result;
@@ -102,7 +102,7 @@ final class ResponseWriter implements Writer, Closer
             $reply = ResponseHead::of($response, $head, $response->takeBody(), isPersistent: false);
         }
 
-        $this->write($reply->toString($this->clock->now()));
+        $this->write($reply->toString($this->clock->now()->getTimestamp()));
     }
 
     public function writeServerError(RequestHead $head, Request $request): void
