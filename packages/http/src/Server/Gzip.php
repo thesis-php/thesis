@@ -48,12 +48,9 @@ final readonly class Gzip implements Middleware
             return $response;
         }
 
-        $vary = ($response->headers->get('vary') ?? '')
-            |> strtolower(...)
-            |> (static fn(string $field) => explode(',', $field))
-            |> (static fn(array $names) => array_map(trim(...), $names));
+        $vary = $response->headers->get('vary');
 
-        if (!\in_array('*', $vary, strict: true) && !\in_array('accept-encoding', $vary, strict: true)) {
+        if ($vary === null || !self::variesOnEncoding($vary)) {
             $response = $response->withAddedHeader('vary', 'Accept-Encoding');
         }
 
@@ -87,8 +84,25 @@ final readonly class Gzip implements Middleware
         return $response->withBody(new GzipBody($response->takeBody()));
     }
 
+    private static function variesOnEncoding(string $field): bool
+    {
+        foreach (explode(',', strtolower($field)) as $name) {
+            $name = trim($name);
+
+            if ($name === '*' || $name === 'accept-encoding') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function negotiate(string $field): ?string
     {
+        if ($field === '') {
+            return 'identity';
+        }
+
         $weights = self::parseWeights($field);
         $wildcard = $weights['*'] ?? null;
         $gzip = $weights['gzip'] ?? $wildcard ?? 0.0;
