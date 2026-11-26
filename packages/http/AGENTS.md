@@ -159,6 +159,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Route handlers receive the request and the connection context. routeMatch($request) reads the active match from a WeakMap keyed by request identity.
   The local type in routeMatch() is needed because PHPStan 2.3.7 ignores dynamicConstantNames for object values.
   RouteMatch holds the registered Route. Each match keeps its own parameters when nested routers handle the same request.
+- Special targets have no route match. A default handler can handle them. Without one, dispatch answers
+  server-wide OPTIONS with 204 and rejects CONNECT with 501.
 - A method can be a numeric token. PHP casts decimal string array keys to integers, so convert method keys back to strings in MethodNotAllowed. Dispatch joins that list for the Allow header.
 - Resolve RequestStarted, RequestEnded, ConnectionAccepted and ConnectionClosed once per listener with Dispatcher::for().
   Dispatch error events directly when the error occurs.

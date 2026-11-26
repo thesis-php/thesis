@@ -142,10 +142,20 @@ final class Router
 
             return $response->withHeader('Allow', implode(', ', $match->allowedMethods));
         }
-        if ($match === RouteFailure::NotFound && $this->defaultHandler !== null) {
-            return ($this->defaultHandler)($request, $context);
+        if ($match === RouteFailure::NotFound) {
+            if ($this->defaultHandler !== null) {
+                return ($this->defaultHandler)($request, $context);
+            }
+            $emptyPath = $request->uri->getRawPath() === '';
+            if ($emptyPath && $request->method === Method::OPTIONS && $request->uri->getRawQuery() === null) {
+                return new Response(Status::NO_CONTENT);
+            }
+
+            $status = $emptyPath && $request->method === Method::CONNECT ? Status::NOT_IMPLEMENTED : Status::NOT_FOUND;
+
+            return $context->errorHandler->handleError($status, $request);
         }
-        if ($match instanceof RouteFailure) {
+        if ($match === RouteFailure::BadPath) {
             return $context->errorHandler->handleError($match->value, $request);
         }
         $matches = ROUTE_MATCHES;

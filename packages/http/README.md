@@ -307,6 +307,7 @@ Matching uses the raw URI path. Dot segments, plus signs and trailing slashes ke
 End a pattern with `[/]` to accept one optional slash. For example, `/docs[/]` matches both `/docs` and `/docs/`.
 A remainder must end its pattern and captures trailing slashes itself.
 An absolute URI with an empty path matches `/`. The special targets `OPTIONS *` and authority-form `CONNECT` have no route path.
+Without a default handler, the router answers the former with 204 and the latter with 501.
 Percent escapes are decoded once. An invalid escape, an encoded slash or a NUL yields 400.
 For example, `/users/a%252Fb` passes `a%2Fb` to the handler.
 

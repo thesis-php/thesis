@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http`.
 
+### Fixed
+
+- Return 204 for server-wide OPTIONS and 501 for CONNECT when the router has no default handler.
+
 ### Added
 
 - Stream a local file as a request or response body with `new FileBody($path)`.

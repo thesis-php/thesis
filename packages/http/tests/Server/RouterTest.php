@@ -84,6 +84,23 @@ final readonly class RouterTest
         Assert::same($router(new Request(Method::POST, '/'), $this->context)->status, Status::METHOD_NOT_ALLOWED);
     }
 
+    public function returnsNotFoundForAnUnmatchedEmptyPath(): void
+    {
+        $router = new Router([]);
+        $request = new Request(Method::GET, 'http://example.test');
+
+        Assert::same($router($request, $this->context)->status, Status::NOT_FOUND);
+    }
+
+    public function delegatesSpecialTargetsToTheDefaultHandler(): void
+    {
+        $reply = new Response(body: 'fallback');
+        $router = new Router([], defaultHandler: static fn() => $reply);
+
+        Assert::same($router(new Request(Method::OPTIONS, 'http://example.test'), $this->context), $reply);
+        Assert::same($router(new Request(Method::CONNECT, '//example.test:443'), $this->context), $reply);
+    }
+
     public function formatsRoutingErrorsAndPreservesAllow(): void
     {
         $router = new Router([new Route(Method::POST, '/', static fn() => new Response())]);
@@ -257,8 +274,8 @@ final readonly class RouterTest
 
         $options = new Request(Method::OPTIONS, new Uri('http://example.test'));
         $connect = new Request(Method::CONNECT, new Uri('//example.test:443'));
-        Assert::same($router($options, $this->context)->status, Status::NOT_FOUND);
-        Assert::same($router($connect, $this->context)->status, Status::NOT_FOUND);
+        Assert::same($router($options, $this->context)->status, Status::NO_CONTENT);
+        Assert::same($router($connect, $this->context)->status, Status::NOT_IMPLEMENTED);
         $options = $options->withUri(new Uri('http://example.test?q=1'));
         Assert::same($router($options, $this->context)->status, Status::METHOD_NOT_ALLOWED);
     }
