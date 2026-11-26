@@ -25,6 +25,7 @@ use function Thesis\Async\timeoutOr;
 use function Thesis\Http\Internal\Http1\encodeChunk;
 use function Thesis\Http\Internal\Http1\encodeLastChunk;
 use function Thesis\Io\close;
+use const Thesis\Http\EMPTY_BODY;
 
 /**
  * @internal
@@ -58,6 +59,19 @@ final class ResponseWriter implements Writer, Closer
                 && $response->headers->toArray() === $head->headers->toArray() && !$body->mayHaveTrailers) {
                 return $cached;
             }
+        }
+
+        if ($request->method === Method::HEAD && $response->status >= 200
+            && $response->status !== Status::NO_CONTENT && $response->status !== Status::NOT_MODIFIED) {
+            $size = $body->size;
+            if ($size !== null && $size > 0 && !$response->headers->has('content-length')) {
+                $response = $response->withHeader('content-length', (string) $size);
+            }
+            if ($response->headers->has('trailer')) {
+                $response = $response->withoutHeader('trailer');
+            }
+
+            $body = EMPTY_BODY;
         }
 
         $head = ResponseHead::of($response, $request, $body, $isPersistent);

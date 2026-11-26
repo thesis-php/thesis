@@ -41,7 +41,7 @@ $dataset = json_decode(
 );
 
 $router = new Router([
-    new Route([Method::GET, Method::POST, Method::HEAD], '/baseline11', static function (Request $request) {
+    new Route([Method::GET, Method::POST], '/baseline11', static function (Request $request) {
         $a = filter_var($request->query->get('a'), FILTER_VALIDATE_INT);
         $b = filter_var($request->query->get('b'), FILTER_VALIDATE_INT);
 
@@ -63,7 +63,7 @@ $router = new Router([
 
         return new Response(
             headers: new Headers(['Content-Type' => 'text/plain']),
-            body: $request->method === Method::HEAD ? '' : (string) $sum,
+            body: (string) $sum,
         );
     }),
     Route::get('/delay/{ms}', static function (Request $request) {
@@ -94,7 +94,11 @@ $router = new Router([
             }
 
             $items = [];
-            foreach (array_slice($dataset, 0, $count) as $item) {
+            foreach ($dataset as $i => $item) {
+                if ($i === $count) {
+                    break;
+                }
+
                 $item['total'] = $item['price'] * $item['quantity'] * $multiplier;
                 $items[] = $item;
             }
@@ -109,10 +113,6 @@ $router = new Router([
     )),
     Route::get('/static/{name}', static function (Request $request) {
         $name = routeParam($request, 'name') ?? '';
-
-        if (preg_match('/\A[a-zA-Z0-9_-]+\.[a-z0-9]+\z/', $name) !== 1) {
-            return new Response(Status::NOT_FOUND);
-        }
 
         $path = '/data/static/' . $name;
 
@@ -137,7 +137,7 @@ $router = new Router([
             headers: ['Content-Type' => $type],
             body: $bytes,
         );
-    }),
+    }, requirements: ['name' => '[\w\.-]+']),
 ]);
 
 $server = new Server(
@@ -167,10 +167,5 @@ $server = new Server(
 
 group(static function (Group $group) use ($server) {
     $server->start($group);
-
-    try {
-        awaitShutdownSignal();
-    } finally {
-        $server->stop();
-    }
+    awaitShutdownSignal();
 });

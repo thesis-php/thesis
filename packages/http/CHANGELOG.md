@@ -37,6 +37,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Customize routing errors and server-generated 500 responses with `Server\ErrorHandler`.
   Access it through `Context::$errorHandler`. Creating a context requires both the error handler and the dispatcher.
 - Read the active route in handlers and middleware with `Server\routeMatch($request)` or a single parameter with `Server\routeParam($request, $name)`.
+- Serve HEAD with a GET handler. The server suppresses the response body and preserves representation headers.
 - Create routes with named constructors for each standard HTTP method and `Route::any()` for a fallback.
   Use `pattern:` for the path template and read it from `Route::$pattern`.
 - Register one or more methods per route or pass `methods: null` to accept any remaining method on that path. Route requests by method and path with brace parameters, optional suffixes, remainders, constraints, defaults and compound segments.

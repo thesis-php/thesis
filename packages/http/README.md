@@ -517,6 +517,8 @@ this proof of concept.
 
 The client derives `Host` from the URI. Both client and server choose the framing from the body and trailers.
 Eligible `HEAD` and `304` responses preserve an explicit `Content-Length` as representation metadata.
+The server sends only the headers for HEAD and closes the response body without reading it.
+An ordinary GET handler can return its usual body for HEAD, including a stream.
 
 The server rejects malformed request heads and closes the connection. Examples include:
 

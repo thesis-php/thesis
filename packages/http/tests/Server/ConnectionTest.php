@@ -167,6 +167,20 @@ final class ConnectionTest
         );
     }
 
+    public function headSuppressesTheHandlerBodyBeforeGet(): void
+    {
+        $input = new StringReader("HEAD / HTTP/1.1\r\nHost: local\r\n\r\nGET / HTTP/1.1\r\nHost: local\r\n\r\n");
+        $output = new RecordingWriter();
+        $connection = new Connection($input, $output, new Config('/test.sock'));
+        $connection->run(static fn() => new Response(body: 'hello'));
+
+        Assert::same($output->writes, 2);
+        Assert::same(
+            "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",
+            $output->bytes,
+        );
+    }
+
     public function writesLargeStringBodiesInBoundedBlocks(): void
     {
         $body = str_repeat('a', 65536) . 'tail';

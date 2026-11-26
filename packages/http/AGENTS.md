@@ -132,6 +132,8 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
   and trailers. HEAD and 304 describe the negotiated encoding without sending a body.
 - One buffer belongs to the connection. Finish writing the response before checking whether the incoming body
   ended. An echo response can consume the request reader after the handler returns.
+- For HEAD, the server writer frames an ordinary handler response with an empty wire body. The exchange
+  still closes the original body. An empty handler body may stand in for an unknown representation length.
 - The writer takes the response body once, uses it for framing and writing, and closes it even on failure.
   Keep the incoming decoder to check for a direct echo and to decide whether the connection can be reused.
 - Reuse requires zero remaining bytes for fixed-length input or ready trailers for chunked input.

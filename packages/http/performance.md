@@ -397,6 +397,21 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   saved 0.8% CPU on the local chunked-only workload but cost 1.6% on the mix. It also required
   access to a protected method. Keep the public reader contract between those objects.
 
+### HTTP Arena Async Delay memory
+
+At `f09c601` on PHP 8.6.0 CLI Alpine (arm64, ZTS, CLI OPcache), the default 128 MiB PHP limit
+exhausted a worker's heap in two runs with four workers and 32,000 configured connections.
+In a 10 s run with a 320 MiB limit per worker, all 1,166,430 responses were 2xx and the workers'
+PHP allocator peaks were 172–182 MiB. These peaks depend on how many connections each worker serves.
+
+A separate one-worker probe first read a response on every connection and kept all sockets open.
+At 1,024, 2,048, 4,096 and 8,000 idle connections, live PHP allocations were 30, 59, 117 and 224 MiB.
+Putting all 8,000 handlers to sleep at once raised live allocations by another 3.8 MiB.
+After disconnecting all clients, live allocations returned to 11.2 MiB in each of two cycles.
+The allocator still held 234–236 MiB. A control on the same PHP build measured about 800 bytes
+to create a bare fiber and another 16,400 bytes to start and suspend it, per fiber.
+The HTTP listener starts a task for each accepted connection and keeps it across keep-alive requests.
+
 ## HTTP/1 codec performance
 
 Unless a different base is given, these decisions come from PHP 8.6 TCP and in-memory comparisons against `016ed2c`.
