@@ -57,6 +57,7 @@
         "testo/data": "^0.1.10",
         "testo/test": "^0.1.8",
         "testo/testo": "^0.10.29",
+        "thesis/exceptionally": "^0.4",
         "thesis/testo-plugin": "^0.1"
     },
     "autoload": {

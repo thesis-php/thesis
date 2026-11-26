@@ -40,6 +40,7 @@ return new Manifest(
         'ext-openssl' => '*',
         'amphp/http-client' => '^5.3',
         'amphp/http-server' => '^3.4',
+        'thesis/exceptionally' => '*',
         'thesis/testo-plugin' => '*',
         'testo/assert' => '^0.1.17',
         'testo/codecov' => '^0.2.5',

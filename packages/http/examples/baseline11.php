@@ -20,23 +20,23 @@ use function Thesis\Async\group;
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 $baseline = static function (Request $request) {
-    $a = $request->query->get('a');
-    $b = $request->query->get('b');
+    $a = filter_var($request->query->get('a'), FILTER_VALIDATE_INT);
+    $b = filter_var($request->query->get('b'), FILTER_VALIDATE_INT);
 
-    if (!is_numeric($a) || !is_numeric($b)) {
+    if ($a === false || $b === false) {
         return new Response(status: Status::BAD_REQUEST);
     }
 
-    $sum = (int) $a + (int) $b;
+    $sum = $a + $b;
 
     if ($request->method === Method::POST) {
-        $body = $request->takeBody()->readAll();
+        $c = filter_var($request->takeBody()->readAll(), FILTER_VALIDATE_INT);
 
-        if (!is_numeric($body)) {
+        if ($c === false) {
             return new Response(status: Status::BAD_REQUEST);
         }
 
-        $sum += (int) $body;
+        $sum += $c;
     }
 
     return new Response(
@@ -47,7 +47,11 @@ $baseline = static function (Request $request) {
 
 $server = new Server(
     config: new Config(
-        endpoint: new TcpEndpoint(new InetAddress('0.0.0.0', 8080), backlog: 4096, reusePort: true),
+        endpoint: new TcpEndpoint(
+            address: new InetAddress('0.0.0.0', 8080),
+            backlog: 4096,
+            reusePort: true,
+        ),
         maxConnections: 4096,
     ),
     handler: new Router([
