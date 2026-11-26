@@ -53,6 +53,10 @@ final class Connection
 
     private readonly BodyInput $bodyInput;
 
+    public bool $canAcceptNextRequest {
+        get => $this->requestsRemaining !== 0;
+    }
+
     public function __construct(
         private readonly Reader $input,
         Writer $output,
@@ -85,7 +89,6 @@ final class Connection
         }
 
         $headReader = new HeadReader($this->buffer, $this->input, $this->config, $scheme, $this->idle);
-        $canAcceptNextRequest = fn() => $this->requestsRemaining !== 0;
         $reused = false;
 
         while (true) {
@@ -103,7 +106,7 @@ final class Connection
             }
 
             try {
-                $this->exchange = new Exchange($head, $this->bodyInput, $this->output, $canAcceptNextRequest);
+                $this->exchange = new Exchange($head, $this->bodyInput, $this->output, $this);
                 if ($this->recheckOnNextRequest !== null) {
                     $this->recheckOnNextRequest->recheck();
                     $this->recheckOnNextRequest = null;
@@ -113,7 +116,7 @@ final class Connection
                 $this->exchange = null;
             }
 
-            if (!$canReuse || !$canAcceptNextRequest()) {
+            if (!$canReuse || $this->requestsRemaining === 0) {
                 return;
             }
 

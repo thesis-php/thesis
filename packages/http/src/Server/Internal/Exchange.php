@@ -47,14 +47,11 @@ final class Exchange
         };
     }
 
-    /**
-     * @param \Closure(): bool $canAcceptNextRequest
-     */
     public function __construct(
         private readonly RequestHead $head,
         private readonly BodyInput $input,
         private readonly ResponseWriter $output,
-        private readonly \Closure $canAcceptNextRequest,
+        private readonly Connection $connection,
     ) {}
 
     /**
@@ -172,7 +169,7 @@ final class Exchange
             response: $response,
             body: $body,
             request: $this->head,
-            isPersistent: ($this->canAcceptNextRequest)(),
+            isPersistent: $this->connection->canAcceptNextRequest,
         );
         $first = null;
         $isEcho = $body === ($this->bodyReader ?? $this->decoder);
@@ -188,7 +185,7 @@ final class Exchange
         }
 
         $ignoresBody = $reply->length === 0 || $body->isBuffered;
-        $mustClose = $this->continue?->isPending === true || !($this->canAcceptNextRequest)()
+        $mustClose = $this->continue?->isPending === true || !$this->connection->canAcceptNextRequest
             || ($ignoresBody && !$this->isBodyComplete);
 
         if ($reply->isPersistent && $mustClose) {

@@ -412,6 +412,11 @@ The allocator still held 234–236 MiB. A control on the same PHP build measured
 to create a bare fiber and another 16,400 bytes to start and suspend it, per fiber.
 The HTTP listener starts a task for each accepted connection and keeps it across keep-alive requests.
 
+The exchange reads the remaining connection capacity directly before committing the response.
+Removing the closure that previously read it saved 408 bytes of live PHP heap per idle connection
+after a GET at 64, 1024 and 2048 connections. In six alternating pairs with one pinned vCPU,
+the in-memory GET control took 5.08 vs 5.02 µs of CPU per request at the medians. Two pairs slowed down.
+
 The response writer keeps the Unix second of its cached head. With 4096 warmed writers on PHP 8.6
 and CLI OPcache, retaining the integer saved 1.38 MiB of live PHP memory against retaining the wall
 clock's DateTimeImmutable. In four pairs (ABBA twice), each process encoded the same fixed-length GET
