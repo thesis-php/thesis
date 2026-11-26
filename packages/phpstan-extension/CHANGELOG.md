@@ -10,4 +10,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The PHPStan extension provides precise types for Thesis APIs where PHPDoc generics cannot express them.
-- PHPStan reads the key and value types from `@var` on namespace-level `WeakMap` constants.

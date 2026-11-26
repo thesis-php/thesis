@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\PhpstanExtension;
+namespace Thesis\PhpStanRules\Fixtures;
 
 use DateTimeImmutable as Key;
 use function PHPStan\Testing\assertType;

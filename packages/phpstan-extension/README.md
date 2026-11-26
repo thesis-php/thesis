@@ -72,13 +72,3 @@ assertType('array{sales: Report, costs: Report}', map(['sales' => $sales, 'costs
 
 Without such a key or for a generator, the type of the PHPDoc stays. `race()`, `timeout()`, `group()` and the others
 need no extension: their generics are precise.
-
-## WeakMap constants
-
-Declare the key and value types once on a namespace-level constant in a single-namespace file.
-PHPStan then checks offset writes and infers the value type on reads.
-
-```php
-/** @var \WeakMap<Request, RouteMatch> */
-const ROUTE_MATCHES = new \WeakMap();
-```

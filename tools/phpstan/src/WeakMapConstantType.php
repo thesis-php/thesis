@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Thesis\PhpstanExtension\Internal;
+namespace Thesis\PhpStanRules;
 
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name\FullyQualified;

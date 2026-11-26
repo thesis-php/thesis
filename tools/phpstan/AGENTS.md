@@ -1,6 +1,6 @@
-# Monorepo PHPStan rules
+# Monorepo PHPStan extensions
 
-The root `phpstan.neon` loads these rules for contributors. The published `thesis/phpstan-extension` describes
+The root `phpstan.neon` loads these extensions for contributors. The published `thesis/phpstan-extension` describes
 the types and contracts of packages for their users.
 
 - Each rule checks package sources and a second copy of the package layout under `fixtures/`. Both registrations
@@ -9,3 +9,8 @@ the types and contracts of packages for their users.
   A missing diagnostic fails the analysis as an unmatched ignore.
 - Check API tags on declarations in the file's namespace, including namespace constants and traits with no user.
   File nodes let the rule inspect declarations once without traversing method bodies or relying on trait usage.
+- The local type resolver reads the key and value types from `@var` on namespace-level `WeakMap` constants
+  in single-namespace files. These maps hold internal package state.
+- For a constant fetch, resolve the name in the caller's scope, then reflect the fully qualified name with a null
+  scope. Passing the scope to `getConstant()` makes PHPStan resolve the PHP version through another constant fetch
+  and re-enter the extension. Track the declaration file because its PHPDoc supplies the type.
