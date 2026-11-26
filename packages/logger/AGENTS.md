@@ -5,26 +5,16 @@
 - A PSR-3 call reads its PSR-20 clock, casts a Stringable message and interpolates it on the calling fiber.
   Copy the clock's `DateTimeImmutable` before casting the message. Calling its constructor again changes the
   original object, and a subclass can override `format()`. The default `WallClock` returns without suspending.
-  The queue keeps bounded snapshots of the message and context.
-- Formatters run only in the writer task. The logger adds the line terminator and counts oversized or multiline
-  formatter output as dropped. Console colors apply only to the level label. Escape ASCII controls in messages.
-- Use `trySend()`. Full queues drop the incoming record. `$dropped` also counts accepted lines that the
-  writer could not finish, including the line being written. Level filtering does not count as a drop.
-- Drop calls to the same logger from its writer context, including during a queue receive. A formatter, output
-  or trace listener can otherwise enqueue another record on every write or every wait. Other producers can
-  log while the writer waits, and the writer can log to a different logger. Bind the guard when spawning the writer
-  so its lifecycle events and those of its children inherit it.
-- Recheck the writer task after capturing the record. A custom clock or Stringable conversion can suspend while
-  the writer finishes. `trySend()` also detects a concurrent `stop()`.
-- The supplied group owns the writer. `stop()` closes the queue and waits for the same task on every call.
-  A clone would share the queue and task but copy the failure and drop count, so the logger cannot be cloned.
-  A cancelled wait does not cancel the writer. The logger borrows its destination and never closes it.
-- The writer closes its queue before discarding pending records. A trace listener can log after the writer
-  returns and before its task handle is marked done. The writer stores a formatting or output error in `$failure` before cleanup.
-  It returns the error to `stop()` so unrelated tasks can continue.
-  A daemon cancelled before it starts runs no cleanup, so `stop()` also discards pending records after joining it.
+- The stream handler borrows its destination and writes the formatted record followed by a newline.
+  Bind its recursion guard around capture, formatting and output so independent producers can still log.
+  Console colors apply only to the level label. Escape ASCII controls in messages.
 
 ## Decisions
+
+- Keep built-in output direct while the policy for diagnosing lost buffered records is undecided.
+  The original queue and writer are in `8d2d397:packages/logger/src/Logger.php`.
+  The local stash `Direct logger output and optional buffered handler` contains the previous implementation at
+  `e5679508^3:packages/logger/src/Logger/BufferedHandler.php`.
 
 - The package exposes `Thesis\Logger` through `rootEntry`. Its formatters and record type live in
   `Thesis\Logger\`.

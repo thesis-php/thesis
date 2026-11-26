@@ -105,7 +105,7 @@ the whole monorepo is for the final check.
 - `hot-reload`: Restart a development server on file changes or SIGHUP, including after a failed launch. Requires: async, exceptionally, io, process, time.
 - `http`: Asynchronous HTTP/1 server with routing and streamed bodies. Requires: async, dispatcher, net, time, io.
 - `io`: Fast binary I/O: typed byte buffer, non-blocking streams, stdio and a string reader. Requires: async, time.
-- `logger`: PSR-3 logger with bounded buffering and asynchronous JSON and colored console output. Requires: async, io, time.
+- `logger`: PSR-3 logger with direct JSON and colored console output. Requires: async, io, time.
 - `net`: Non-blocking TCP and Unix sockets with TLS and an async DNS resolver, cancelled by the task tree. Requires: async, io, time.
 - `phpstan-extension`: PHPStan extension for thesis packages: precise types where PHPDoc generics cannot express them.
 - `process`: Group-owned Unix worker processes with signal handling and inherited IPC descriptors. Requires: async, exceptionally, io.

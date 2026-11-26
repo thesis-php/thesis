@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Logger` implements PSR-3 with bounded buffering. `start($group)` starts its writer and `stop()` drains the queue.
+- `Logger` implements PSR-3 and writes directly by default.
 - `Formatter\Json` writes NDJSON. `Formatter\Console` renders text with optional level colors and omits interpolated context fields by default.
 - `Logger` accepts a PSR-20 clock, and both formatters preserve the clock's timezone offset.
 - Exception context includes the source file and line.
-- `Logger::$failure` exposes the error that stopped the writer before shutdown.
 - `Logger` casts `Stringable` messages to strings before interpolating placeholders.

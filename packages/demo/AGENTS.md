@@ -6,7 +6,8 @@
 - Bind fixed HTTP and HTTPS ports on all IPv4 interfaces so Docker can forward both.
 - HTTP and HTTPS start and stop together. Use the bundled localhost certificate and key.
 - Read `index.html` once at startup. The delayed route uses an async delay so curl can show waits overlapping.
-- The HTTP server finishes before the logger drains. Construct both before entering the group. The group owns startup and shutdown. The logger reports the listening address at startup.
+- Construct the server before entering the group. The group owns startup and shutdown.
+  The logger writes the listening address directly to stderr at startup.
 
 ## Decisions
 

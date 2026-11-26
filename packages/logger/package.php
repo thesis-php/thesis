@@ -3,10 +3,9 @@
 declare(strict_types=1);
 
 use Thesis\Monorepo\Manifest;
-use Thesis\TestoPlugin\VirtualTimePlugin;
 
 return new Manifest(
-    description: 'PSR-3 logger with bounded buffering and asynchronous JSON and colored console output.',
+    description: 'PSR-3 logger with direct JSON and colored console output.',
     licenseSince: 2026,
     version: '0.1',
     keywords: ['php', 'async', 'logging', 'psr-3', 'psr-20', 'ndjson', 'console'],
@@ -23,9 +22,6 @@ return new Manifest(
         'testo/codecov' => '^0.2.5',
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.29',
-        'thesis/dispatcher' => '*',
-        'thesis/testo-plugin' => '*',
     ],
     rootEntry: true,
-    testoPlugins: [new VirtualTimePlugin()],
 );

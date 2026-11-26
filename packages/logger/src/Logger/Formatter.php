@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Thesis\Logger;
 
 /**
- * Formats a log record for the writer task.
+ * Formats a log record for stream output.
  *
  * @api
  */
 interface Formatter
 {
     /**
-     * Returns one line with no line terminator. Logger adds the newline before writing.
+     * Returns the formatted record. StreamHandler appends a newline before writing.
      *
-     * @throws \Throwable if the formatter cannot produce a line
+     * @throws \Throwable if the formatter cannot format the record
      */
     public function format(Record $record): string;
 }

@@ -1,6 +1,6 @@
 {
     "name": "thesis/logger",
-    "description": "PSR-3 logger with bounded buffering and asynchronous JSON and colored console output.",
+    "description": "PSR-3 logger with direct JSON and colored console output.",
     "keywords": [
         "php",
         "async",
@@ -44,9 +44,7 @@
         "testo/assert": "^0.1.17",
         "testo/codecov": "^0.2.5",
         "testo/test": "^0.1.8",
-        "testo/testo": "^0.10.29",
-        "thesis/dispatcher": "^0.4",
-        "thesis/testo-plugin": "^0.1"
+        "testo/testo": "^0.10.29"
     },
     "autoload": {
         "psr-4": {

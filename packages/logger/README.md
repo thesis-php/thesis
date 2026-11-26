@@ -18,8 +18,8 @@
 
 <!-- head:end -->
 
-`Logger` implements PSR-3 and writes formatted records from a background task. Use it in CLI servers and
-workers that need logging to return even when standard error or another destination is slow.
+Logger implements PSR-3. Stream output runs on the calling fiber and propagates formatting and write errors.
+The default minimum level is `info`. Pass `minLevel` to change it.
 
 ## Installation
 
@@ -32,21 +32,11 @@ Requires 64-bit PHP 8.6+.
 ## Usage
 
 ```php
-use Thesis\Async\Group;
 use Thesis\Logger;
-use function Thesis\Async\group;
 use function Thesis\Io\stderr;
 
-group(static function (Group $group) {
-    $logger = new Logger(stderr());
-    $logger->start($group);
-
-    try {
-        $logger->info('Worker {worker} is ready', ['worker' => 3]);
-    } finally {
-        $logger->stop();
-    }
-});
+$logger = new Logger(stderr());
+$logger->info('Worker {worker} is ready', ['worker' => 3]);
 ```
 
 ## Output formats
@@ -60,14 +50,17 @@ message. Pass `removeUsedContextFields: false` to print the full context. Pass `
 
 ```php
 use Thesis\Logger\Formatter\Console;
+use Thesis\Logger\StreamHandler;
 
-$logger = new Logger(stderr(), formatter: new Console());
+$logger = new Logger(new StreamHandler(stderr(), new Console()));
 ```
 
-Implement `Formatter::format(Record $record)` to provide your own format. The writer task calls it with the
+Implement `Formatter::format(Record $record)` to provide your own format. The stream handler calls it with the
 `DateTimeImmutable` captured at the log call, the interpolated message and the normalized context.
-Return one line. `Logger` adds `\n` and counts output as dropped if it contains a line break or exceeds 16 KiB
-including the terminator.
+Return the formatted record. `StreamHandler` appends `\n` and writes the result to the stream.
+
+During capture, formatting and output, a stream handler ignores calls back into the same handler,
+including calls from tasks started in that context. Independent tasks can still log through it.
 
 ## Time and timezone
 
@@ -90,20 +83,3 @@ are represented by their type. A `Stringable` message is cast to a string on the
 Non-finite floats are written as `null`. The logger considers the first 32 entries, skips keys with invalid
 UTF-8, a leading NUL or more than 128 bytes, and limits text to 1024 bytes. If an exception carries a
 non-scalar message, the exception summary uses its type. Unset file and line fields become `''` and `0`.
-
-## Buffering and shutdown
-
-The default minimum level is `info` and the default queue holds 1024 lines. Pass `minLevel` or `capacity`
-to change these. A full queue drops the incoming record. `$dropped` counts records refused or lost, including
-before `start()` or after `stop()`. Logging to the same logger from its writer task or a task started by the
-writer also counts as a drop. This prevents a formatter, output or trace listener from feeding records back
-into the queue. Records filtered by level do not count.
-
-Read `$logger->failure` to check whether formatting or writing stopped the background task. It holds the
-original throwable as soon as the writer catches it, and `stop()` rethrows it. Queue overflow, normal
-shutdown and task cancellation leave this property null.
-
-Stop producers first and then call `stop()` while the group is still running. `stop()` stops accepting
-records and drains the queue. It leaves the destination open and throws if formatting or writing failed. In a cancelled
-scope use `shield()` with a `timeout()` to give the writer time to drain. A cancelled wait leaves the writer
-free to continue until the group ends, and a later `stop()` can wait for it again.

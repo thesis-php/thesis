@@ -14,6 +14,7 @@ use Thesis\Http\Server\ServerLogger;
 use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Logger;
 use Thesis\Logger\Formatter\Console;
+use Thesis\Logger\StreamHandler;
 use Thesis\Net\Certificate;
 use Thesis\Net\InetAddress;
 use Thesis\Net\ServerTls;
@@ -21,12 +22,10 @@ use function Thesis\Async\awaitShutdownSignal;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\shield;
-use function Thesis\Async\timeout;
 use function Thesis\exceptionally;
 use function Thesis\Http\Server\routeParam;
 use function Thesis\Io\stderr;
 use function Thesis\Time\parseDuration;
-use function Thesis\Time\sec;
 
 if ((@include __DIR__ . '/vendor/autoload.php') === false) {
     require dirname(__DIR__, 2) . '/vendor/autoload.php';
@@ -34,7 +33,6 @@ if ((@include __DIR__ . '/vendor/autoload.php') === false) {
 
 $index = exceptionally(static fn() => file_get_contents(__DIR__ . '/index.html'));
 
-$logger = new Logger(stderr(), formatter: new Console());
 $server = new Server(
     config: new Config(endpoints: [
         new TcpEndpoint(new InetAddress('0.0.0.0', 18080)),
@@ -61,22 +59,15 @@ $server = new Server(
         Route::get('/error', static fn() => throw new Exception('Demo handler failed.')),
     ]),
     dispatcher: new Dispatcher([
-        new ServerLogger($logger, accessLog: true),
+        new ServerLogger(
+            logger: new Logger(new StreamHandler(stderr(), new Console())),
+            accessLog: true,
+        ),
     ]),
 );
 
-group(static function (Group $group) use ($logger, $server) {
-    $logger->start($group);
-
-    try {
-        $server->start($group);
-
-        awaitShutdownSignal();
-    } finally {
-        try {
-            shield($server->stop(...));
-        } finally {
-            shield(static fn() => timeout(sec(2), $logger->stop(...)));
-        }
-    }
+group(static function (Group $group) use ($server) {
+    $server->start($group);
+    awaitShutdownSignal();
+    shield($server->stop(...));
 });

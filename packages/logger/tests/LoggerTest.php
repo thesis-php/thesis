@@ -13,13 +13,6 @@ use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Expect;
 use Testo\Test;
-use Thesis\Async\Deferred;
-use Thesis\Async\Group;
-use Thesis\Async\TaskCancelled;
-use Thesis\Async\Trace\Ended;
-use Thesis\Async\Trace\Suspended;
-use Thesis\Async\Trace\TaskCreated;
-use Thesis\Async\Trace\TaskStarted;
 use Thesis\Io\WriteFailed;
 use Thesis\Io\Writer;
 use Thesis\Logger\Formatter\Console;
@@ -27,18 +20,15 @@ use Thesis\Logger\Formatter\Json;
 use Thesis\Logger\Internal\MessageInterpolator;
 use Thesis\Logger\Internal\RecordFactory;
 use Thesis\Logger\Record;
+use Thesis\Logger\StreamHandler;
 use Thesis\Logger\Stub\CallbackFormatter;
 use Thesis\Logger\Stub\RecordingWriter;
 use Thesis\Time\FrozenClock;
-use function Thesis\Async\checkpoint;
-use function Thesis\Async\group;
-use function Thesis\Async\timeoutOr;
-use function Thesis\Async\Trace\observe;
 use function Thesis\Logger\thrown;
-use function Thesis\Time\ms;
 
 #[Test]
 #[Covers(Logger::class)]
+#[Covers(StreamHandler::class)]
 #[Covers(Record::class)]
 #[Covers(RecordFactory::class)]
 #[Covers(MessageInterpolator::class)]
@@ -46,144 +36,23 @@ use function Thesis\Time\ms;
 #[Covers(Console::class)]
 final class LoggerTest
 {
-    public function filtersLevelsAndDrainsTheQueueInOrder(): void
+    public function dropsNestedCallsToTheSameStreamHandler(): void
     {
         $output = new RecordingWriter();
-        $formatter = new CallbackFormatter(static fn(Record $record) => $record->message);
-        $logger = new Logger($output, capacity: 2, formatter: $formatter);
-        $logger->info('Before start');
-
-        group(static function (Group $group) use ($logger, $output) {
-            $logger->start($group);
-            $logger->debug('Below minimum');
-            $logger->info('First');
-            $logger->warning('Second');
-            $logger->error('Queue full');
-
-            Assert::same($output->writes, []);
-            Assert::same($logger->dropped, 2);
-            Assert::null($logger->failure);
-
-            $logger->stop();
-            $logger->stop();
-            $logger->info('After close');
-
-            Assert::same($output->writes, ["First\n", "Second\n"]);
-            Assert::same($logger->dropped, 3);
-        });
-    }
-
-    public function refusesToCloneTheWriterAndItsQueue(): void
-    {
-        $logger = new Logger(new RecordingWriter());
-
-        Assert::false(new \ReflectionObject($logger)->isCloneable());
-    }
-
-    public function dropsCallsFromItsOwnFormatterWhileOtherLoggersAcceptThem(): void
-    {
-        $formatted = new Deferred();
-        $output = new RecordingWriter();
-        $otherOutput = new RecordingWriter();
-        $plain = new CallbackFormatter(static fn(Record $record) => $record->message);
-        $other = new Logger($otherOutput, formatter: $plain);
-        $formatter = new CallbackFormatter(static function (Record $record) use (&$logger, $other, $formatted) {
-            if (!$formatted->isDone) {
-                /** @var Logger $logger The callback first runs after run(). */
-                $logger->info('From this formatter');
-                $other->info('From another formatter');
-                $formatted->complete();
+        $formatter = new CallbackFormatter(static function (Record $record) use (&$logger) {
+            if ($record->message === 'Outer') {
+                /** @var Logger $logger */
+                $logger->info('Nested');
             }
 
             return $record->message;
         });
-        $logger = new Logger($output, formatter: $formatter);
+        $logger = new Logger(new StreamHandler($output, $formatter));
 
-        group(static function (Group $group) use ($logger, $other, $formatted) {
-            $logger->start($group);
-            $other->start($group);
-            $logger->info('From a producer');
-            $formatted->await();
-            $logger->stop();
-            $other->stop();
-        });
+        $logger->info('Outer');
+        $logger->info('Next');
 
-        Assert::same($output->writes, ["From a producer\n"]);
-        Assert::same($logger->dropped, 1);
-        Assert::same($otherOutput->writes, ["From another formatter\n"]);
-        Assert::same($other->dropped, 0);
-    }
-
-    public function dropsTaskStartedFeedbackFromFormatterChildren(): void
-    {
-        $formatted = new Deferred();
-        $output = new RecordingWriter();
-        $formatter = new CallbackFormatter(static function (Record $record) use ($formatted) {
-            group(static fn(Group $group) => $group->spawn(static fn() => null, name: 'format record'));
-
-            if (!$formatted->isDone) {
-                $formatted->complete();
-            }
-
-            return $record->message;
-        });
-        $logger = new Logger($output, formatter: $formatter);
-        $child = null;
-        $attempts = 0;
-        $observer = new Dispatcher([
-            static function (TaskCreated $event) use (&$child) {
-                if ($event->name === 'format record') {
-                    $child = $event->scope;
-                }
-            },
-            static function (TaskStarted $event) use ($logger, &$child, &$attempts) {
-                // Bound the feedback loop so a regression fails without hanging.
-                if ($event->scope === $child && ++$attempts <= 3) {
-                    $logger->info('Formatter child started');
-                }
-            },
-        ]);
-
-        observe($observer, static fn() => group(static function (Group $group) use ($logger, $formatted) {
-            $logger->start($group);
-            $logger->info('From a producer');
-            $formatted->await();
-            $logger->stop();
-        }));
-
-        Assert::same($output->writes, ["From a producer\n"]);
-        Assert::same($attempts, 1);
-        Assert::same($logger->dropped, 1);
-    }
-
-    public function dropsTraceRecordsFromAWriterWaitingForInput(): void
-    {
-        $waiting = new Deferred();
-        $output = new RecordingWriter();
-        $formatter = new CallbackFormatter(static fn(Record $record) => $record->message);
-        $logger = new Logger($output, formatter: $formatter);
-        $writerScope = null;
-        $observer = new Dispatcher([
-            static function (TaskCreated $event) use (&$writerScope) {
-                $writerScope = $event->scope;
-            },
-            static function (Suspended $event) use (&$writerScope, $waiting, $logger) {
-                if ($event->scope === $writerScope && !$waiting->isDone) {
-                    $logger->info('The writer is waiting');
-                    $waiting->complete();
-                }
-            },
-        ]);
-
-        observe($observer, static fn() => group(static function (Group $group) use ($logger, $waiting) {
-            $logger->start($group);
-            $waiting->await();
-            $logger->info('From a producer');
-            $logger->stop();
-        }));
-
-        Assert::same($output->writes, ["From a producer\n"]);
-        Assert::same($logger->dropped, 1);
+        Assert::same($output->writes, ["Outer\n", "Next\n"]);
     }
 
     public function interpolatesOnceAndPreservesStructuredContext(): void
@@ -191,21 +60,17 @@ final class LoggerTest
         $output = new RecordingWriter();
         $logger = new Logger($output);
 
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('{exception} {} {two words} {http.status} {ok} {peer} {template} {undefined} {9} {done}', [
-                'exception' => new \RuntimeException('This is structured context'),
-                '' => 'Skipped',
-                'two words' => 'Skipped',
-                'http.status' => 503,
-                'ok' => false,
-                'peer' => null,
-                'template' => '{http.status}',
-                9 => 'Ninth',
-                'done' => true,
-            ]);
-            $logger->stop();
-        });
+        $logger->info('{exception} {} {two words} {http.status} {ok} {peer} {template} {undefined} {9} {done}', [
+            'exception' => new \RuntimeException('This is structured context'),
+            '' => 'Skipped',
+            'two words' => 'Skipped',
+            'http.status' => 503,
+            'ok' => false,
+            'peer' => null,
+            'template' => '{http.status}',
+            9 => 'Ninth',
+            'done' => true,
+        ]);
 
         Assert::string($output->writes[0] ?? '')->endsWith("\n");
         Assert
@@ -222,14 +87,10 @@ final class LoggerTest
     public function consoleOmitsOnlyTheFieldsUsedInTheMessage(): void
     {
         $output = new RecordingWriter();
-        $logger = new Logger($output, formatter: new Console(colors: false));
+        $logger = new Logger(new StreamHandler($output, new Console(colors: false)));
 
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('{0} {0}', ['{other}', 'other' => 42]);
-            $logger->info('Ready {ok}', ['ok' => true]);
-            $logger->stop();
-        });
+        $logger->info('{0} {0}', ['{other}', 'other' => 42]);
+        $logger->info('Ready {ok}', ['ok' => true]);
 
         Assert::string($output->writes[0] ?? '')->endsWith(" INFO {other} {other} {\"other\":42}\n");
         Assert::string($output->writes[1] ?? '')->endsWith(" INFO Ready true\n");
@@ -237,10 +98,9 @@ final class LoggerTest
 
     public function snapshotsContextBeforeTheFormatterRuns(): void
     {
-        /** @var Deferred<Record> $captured */
-        $captured = new Deferred();
-        $formatter = new CallbackFormatter(static function (Record $record) use ($captured) {
-            $captured->complete($record);
+        $record = null;
+        $formatter = new CallbackFormatter(static function (Record $captured) use (&$record) {
+            $record = $captured;
 
             return 'Done';
         });
@@ -251,36 +111,27 @@ final class LoggerTest
                 throw new \LogicException('Logging should not call user code.');
             }
         };
-        $logger = new Logger(new RecordingWriter(), formatter: $formatter);
-        $logger->error($contextValue);
+        $logger = new Logger(new StreamHandler(new RecordingWriter(), $formatter));
 
         $error = new \RuntimeException('Connection lost');
-        group(static function (Group $group) use ($logger, $contextValue, $error) {
-            $logger->start($group);
-            $logger->debug($contextValue);
-            $timezone = date_default_timezone_get();
-            date_default_timezone_set('Asia/Tokyo');
+        $logger->debug($contextValue);
+        $timezone = date_default_timezone_get();
+        date_default_timezone_set('Asia/Tokyo');
 
-            try {
-                $logger->log(LogLevel::ERROR, 'Connection lost', [
-                    'exception' => $error,
-                    'value' => $contextValue,
-                    'array' => [1, 2],
-                    'number' => INF,
-                    "\0hidden" => true,
-                    str_repeat('x', 129) => true,
-                    'long' => str_repeat('a', 1100),
-                ]);
-            } finally {
-                date_default_timezone_set($timezone);
-            }
+        try {
+            $logger->log(LogLevel::ERROR, 'Connection lost', [
+                'exception' => $error,
+                'value' => $contextValue,
+                'array' => [1, 2],
+                'number' => INF,
+                "\0hidden" => true,
+                str_repeat('x', 129) => true,
+                'long' => str_repeat('a', 1100),
+            ]);
+        } finally {
+            date_default_timezone_set($timezone);
+        }
 
-            $logger->stop();
-        });
-        $logger->error($contextValue);
-
-        $record = $captured->await();
-        Assert::same($logger->dropped, 2);
         Assert::instanceOf($record, Record::class);
         Assert::same($record->time->getTimezone()->getName(), 'Asia/Tokyo');
         Assert::same($record->message, 'Connection lost');
@@ -374,11 +225,7 @@ final class LoggerTest
         $output = new RecordingWriter();
         $logger = new Logger($output);
 
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('Context', ["\u{FFFD}" => 'valid key', "\xff" => 'invalid key']);
-            $logger->stop();
-        });
+        $logger->info('Context', ["\u{FFFD}" => 'valid key', "\xff" => 'invalid key']);
 
         Assert::string($output->writes[0] ?? '')->endsWith("\"context\":{\"\u{FFFD}\":\"valid key\"}}\n");
     }
@@ -399,11 +246,7 @@ final class LoggerTest
         $context = ['status' => 503, 'method' => 'POST'];
 
         $reference->warning($message, $context);
-        group(static function (Group $group) use ($logger, $message, $context) {
-            $logger->start($group);
-            $logger->warning($message, $context);
-            $logger->stop();
-        });
+        $logger->warning($message, $context);
 
         $expected = $referenceOutput->getRecords()[0] ?? throw new \LogicException('Monolog did not write the record.');
         $level = $expected->level->toPsrLogLevel();
@@ -424,31 +267,27 @@ final class LoggerTest
         ;
     }
 
-    public function capturesTheConfiguredClockTimeBeforeTheWriterRuns(): void
+    public function capturesTheConfiguredClockTimeBeforeCastingTheMessage(): void
     {
         $output = new RecordingWriter();
         $clock = new FrozenClock(new \DateTimeImmutable('2026-11-23T22:12:00.012345+03:00'));
         $logger = new Logger($output, clock: $clock);
 
-        group(static function (Group $group) use ($logger, $clock) {
-            $logger->start($group);
-            $message = new readonly class ($clock) implements \Stringable {
-                public function __construct(
-                    private FrozenClock $clock,
-                ) {}
+        $message = new readonly class ($clock) implements \Stringable {
+            public function __construct(
+                private FrozenClock $clock,
+            ) {}
 
-                public function __toString(): string
-                {
-                    // @phpstan-ignore constructor.call (A clock can return an object its owner reinitializes.)
-                    $this->clock->now->__construct('2026-11-23T14:13:00.012345-05:00');
+            public function __toString(): string
+            {
+                // @phpstan-ignore constructor.call (A clock can return an object its owner reinitializes.)
+                $this->clock->now->__construct('2026-11-23T14:13:00.012345-05:00');
 
-                    return 'First';
-                }
-            };
-            $logger->info($message);
-            $logger->info('Second');
-            $logger->stop();
-        });
+                return 'First';
+            }
+        };
+        $logger->info($message);
+        $logger->info('Second');
 
         Assert::string($output->writes[0] ?? '')->startsWith('{"time":"2026-11-23T22:12:00.012345+03:00",');
         Assert::string($output->writes[1] ?? '')->startsWith('{"time":"2026-11-23T14:13:00.012345-05:00",');
@@ -473,21 +312,17 @@ final class LoggerTest
 
             return 'Done';
         });
-        $logger = new Logger(new RecordingWriter(), formatter: $formatter);
+        $logger = new Logger(new StreamHandler(new RecordingWriter(), $formatter));
         $long = str_repeat('a', 1100);
         $key = str_repeat('k', 128);
 
         $error = new \ErrorException($long, filename: $long, line: 42);
-        group(static function (Group $group) use ($logger, $long, $key, $error) {
-            $logger->start($group);
-            $logger->info(str_repeat('a', 1020) . '{field}', [
-                $key => 'Kept',
-                'field' => 'Value',
-            ] + array_fill(1, 31, true));
-            $logger->info('{message}{message}', ['message' => $long, 'exception' => $error]);
-            $logger->info('Summarized', ['exception' => 'Reason', 'other' => new \RuntimeException('Text')]);
-            $logger->stop();
-        });
+        $logger->info(str_repeat('a', 1020) . '{field}', [
+            $key => 'Kept',
+            'field' => 'Value',
+        ] + array_fill(1, 31, true));
+        $logger->info('{message}{message}', ['message' => $long, 'exception' => $error]);
+        $logger->info('Summarized', ['exception' => 'Reason', 'other' => new \RuntimeException('Text')]);
 
         Assert::count($captured, 3);
         $first = $captured[0] ?? throw new \LogicException('The first record was not formatted.');
@@ -502,84 +337,30 @@ final class LoggerTest
         Assert::same($third->context, ['exception' => 'Reason', 'other' => '[RuntimeException]']);
     }
 
-    public function refusesToStartTwiceOrAfterClose(): void
-    {
-        $logger = new Logger(new RecordingWriter());
-
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-
-            Assert::instanceOf(thrown(static fn() => $logger->start($group)), \LogicException::class);
-
-            $logger->stop();
-
-            Assert::same($logger->dropped, 0);
-
-            $closed = new Logger(new RecordingWriter());
-            $closed->stop();
-
-            Assert::instanceOf(thrown(static fn() => $closed->start($group)), \LogicException::class);
-        });
-    }
-
-    public function dropsInvalidLinesAndKeepsTheLargestValidLine(): void
+    public function writesFormatterOutputWithATrailingNewline(): void
     {
         $output = new RecordingWriter();
-        $formatter = new CallbackFormatter(static fn(Record $record) => match ($record->message) {
-            'Oversized' => str_repeat('a', 16 * 1024),
-            'At limit' => str_repeat('a', 16 * 1024 - 1),
-            'LF' => "First\nSecond",
-            default => "First\rSecond",
-        });
-        $logger = new Logger($output, formatter: $formatter);
+        $formatted = str_repeat('a', 16 * 1024) . "\r\nSecond line";
+        $formatter = new CallbackFormatter(static fn(Record $record) => $formatted);
+        $logger = new Logger(new StreamHandler($output, $formatter));
 
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('Oversized');
-            $logger->info('LF');
-            $logger->info('CR');
-            $logger->info('At limit');
-            $logger->stop();
-        });
+        $logger->info('Message');
 
-        Assert::same($logger->dropped, 3);
-        Assert::same($output->writes, [str_repeat('a', 16 * 1024 - 1) . "\n"]);
+        Assert::same($output->writes, [$formatted . "\n"]);
     }
 
-    public function reportsFormatterFailureAndDiscardsPendingRecords(): void
+    public function propagatesFormatterFailure(): void
     {
         $failure = new \RuntimeException('The formatter failed.');
-        $failed = new Deferred();
-        $formatter = new CallbackFormatter(static function () use ($failed, $failure) {
-            $failed->complete();
-
-            throw $failure;
-        });
         $output = new RecordingWriter();
-        $logger = new Logger($output, formatter: $formatter);
-        $observer = new Dispatcher([static function (Ended $event) use ($logger, $failure) {
-            if ($event->value === $failure) {
-                $logger->info('The writer ended.');
-            }
-        }]);
+        $formatter = new CallbackFormatter(static fn() => throw $failure);
+        $logger = new Logger(new StreamHandler($output, $formatter));
 
-        observe($observer, static fn() => group(static function (Group $group) use ($logger, $failure, $failed) {
-            $logger->start($group);
-            $logger->info('First');
-            $logger->info('Second');
-            $failed->await();
-
-            Assert::same($logger->failure, $failure);
-
-            Assert::same($logger->dropped, 3);
-            Assert::same(thrown($logger->stop(...)), $failure);
-            Assert::same(thrown($logger->stop(...)), $failure);
-        }));
-
+        Assert::same(thrown(static fn() => $logger->info('Message')), $failure);
         Assert::same($output->writes, []);
     }
 
-    public function reportsWriteFailureWhenClosing(): void
+    public function propagatesWriteFailure(): void
     {
         $output = new class implements Writer {
             #[\Override]
@@ -588,126 +369,7 @@ final class LoggerTest
                 throw new WriteFailed('Output unavailable.');
             }
         };
-        $logger = new Logger($output);
-
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('First');
-
-            Expect::exception(WriteFailed::class)->withMessage('Output unavailable.');
-            $logger->stop();
-        });
-    }
-
-    public function dropsAStringableMessageIfTheWriterIsCancelledBeforeItStarts(): void
-    {
-        /** @var Deferred<null> $wasConverted */
-        $wasConverted = new Deferred();
-        $message = new readonly class ($wasConverted) implements \Stringable {
-            /**
-             * @param Deferred<null> $wasConverted
-             */
-            public function __construct(
-                private Deferred $wasConverted,
-            ) {}
-
-            #[\Override]
-            public function __toString(): string
-            {
-                $this->wasConverted->complete();
-                checkpoint();
-
-                return 'Late record';
-            }
-        };
-        $logger = new Logger(new RecordingWriter());
-
-        group(static function (Group $group) use ($logger, $message, $wasConverted) {
-            $logger->start($group);
-            $group->cancelTasks();
-            $logger->info($message);
-
-            Assert::true($wasConverted->isDone);
-            Assert::same($logger->dropped, 1);
-            Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
-        });
-    }
-
-    public function cancellingCloseLeavesTheWriterAvailableToDrain(): void
-    {
-        $output = new RecordingWriter();
-        $resume = new Deferred();
-        $formatter = new CallbackFormatter(static function (Record $record) use ($resume) {
-            $resume->await();
-
-            return $record->message;
-        });
-        $logger = new Logger($output, formatter: $formatter);
-
-        group(static function (Group $group) use ($logger, $resume, $output) {
-            $logger->start($group);
-            $logger->info('Done');
-            $closed = timeoutOr(ms(1), static function () use ($logger) {
-                $logger->stop();
-
-                return true;
-            });
-
-            Assert::null($closed);
-            Assert::same($output->writes, []);
-
-            $resume->complete();
-            $logger->stop();
-
-            Assert::same($output->writes, ["Done\n"]);
-            Assert::same($logger->dropped, 0);
-        });
-    }
-
-    public function discardsRecordsWhenTheWriterNeverStarts(): void
-    {
-        $output = new RecordingWriter();
-        $logger = new Logger($output);
-
-        group(static function (Group $group) use ($logger) {
-            $logger->start($group);
-            $logger->info('Pending');
-            $group->cancelTasks();
-        });
-
-        $logger->info('After cancellation');
-
-        Assert::same($logger->dropped, 1);
-        Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
-        Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
-        Assert::same($logger->dropped, 2);
-        Assert::same($output->writes, []);
-    }
-
-    public function discardsTheInFlightRecordWhenTheWriterIsCancelled(): void
-    {
-        $started = new Deferred();
-        $resume = new Deferred();
-        $formatter = new CallbackFormatter(static function (Record $record) use ($started, $resume) {
-            $started->complete();
-            $resume->await();
-
-            return $record->message;
-        });
-        $output = new RecordingWriter();
-        $logger = new Logger($output, formatter: $formatter);
-
-        group(static function (Group $group) use ($logger, $started) {
-            $logger->start($group);
-            $logger->info('Formatting');
-            $started->await();
-            $logger->info('Pending');
-            $group->cancelTasks();
-
-            Assert::instanceOf(thrown($logger->stop(...)), TaskCancelled::class);
-        });
-
-        Assert::same($logger->dropped, 2);
-        Assert::same($output->writes, []);
+        $direct = new Logger($output);
+        Assert::instanceOf(thrown(static fn() => $direct->info('First')), WriteFailed::class);
     }
 }
