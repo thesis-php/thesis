@@ -211,7 +211,7 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   These runs paired Thesis with TrueAsync within each series. Isolating handler cost requires
   interleaving the two Thesis handlers.
 
-- Run `examples/baseline11.php` with one PHP process, CLI OPcache on and Xdebug off. Use the same
+- Run `examples/http-arena.php` with one PHP process, CLI OPcache on and Xdebug off. Use the same
   handler and listener settings for both revisions. The active connection limit and the TCP listen
   backlog are separate. Set both to 4096 for this profile: the default backlog of 511 overflowed
   when the clients connected together. One run then lost 33 replies across reconnects.
