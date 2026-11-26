@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Psr\Clock\ClockInterface;
 use Thesis\Async\Group;
 use Thesis\Async\Instant;
 use Thesis\Async\Service;
@@ -18,6 +19,7 @@ use Thesis\Http\Server\TcpEndpoint;
 use Thesis\Http\Server\UnixEndpoint;
 use Thesis\Net\Address;
 use Thesis\Net\ListenFailed;
+use Thesis\Time\WallClock;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\group;
 use function Thesis\Async\onCancel;
@@ -80,6 +82,7 @@ final class Server implements Service
         callable $handler,
         private readonly Dispatcher $dispatcher = new Dispatcher(),
         private readonly ErrorHandler $errorHandler = new DefaultErrorHandler(),
+        private readonly ClockInterface $clock = new WallClock(),
     ) {
         $this->handler = $handler(...);
     }
@@ -185,6 +188,7 @@ final class Server implements Service
             maxConnections: $endpoint->maxConnections ?? $this->config->maxConnections,
             dispatcher: $this->dispatcher,
             errorHandler: $this->errorHandler,
+            clock: $this->clock,
         );
     }
 }

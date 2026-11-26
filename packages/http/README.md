@@ -378,6 +378,8 @@ this proof of concept.
 
 ## HTTP/1 parsing
 
+The server adds `Date` to final responses when the handler omits it. Pass a PSR-20 clock to `Server` with
+the `clock` argument to supply the response time. The default is `Thesis\Time\WallClock`.
 The server chooses the response framing from the body and trailers.
 Eligible `HEAD` and `304` responses preserve an explicit `Content-Length` as representation metadata.
 The server sends only the headers for HEAD and closes the response body without reading it.
@@ -389,8 +391,8 @@ The server rejects malformed request heads and closes the connection. Examples i
 - a name that is not a token, a control character in a value;
 - `Content-Length` together with `Transfer-Encoding`; a `Content-Length` that is repeated, is a list (`5, 5`),
   has a sign or an embedded space, or has more than 18 digits;
-- a transfer coding other than exactly `chunked` (`gzip, chunked` is rejected too), and any transfer coding
-  in HTTP/1.0;
+- a transfer coding list other than one `chunked` element, and any transfer coding in HTTP/1.0.
+  The parser ignores empty list elements and rejects unsupported codings such as `gzip, chunked`;
 - an HTTP/1.1 request without `Host` or with two, a `Host` that is not a host with an optional port;
 - a target that is none of these: an RFC 3986 path, an `http` or `https` URI, `*` for `OPTIONS`, a host
   and a port for `CONNECT`; a target with a fragment or user info;

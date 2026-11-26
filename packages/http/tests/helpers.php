@@ -60,3 +60,11 @@ function thrown(callable $fn): \Throwable
 
     Assert::fail('Nothing was thrown.');
 }
+
+/**
+ * Removes the variable timestamp so wire assertions can compare the remaining bytes.
+ */
+function withoutResponseDate(string $bytes): string
+{
+    return (string) preg_replace('/(HTTP\/1\.[01] [2-5]\d\d [^\r\n]*)\r\nDate: [^\r\n]+ GMT/', '$1', $bytes);
+}

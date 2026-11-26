@@ -93,6 +93,11 @@ final class HeadReader
 
             throw new MalformedMessage('The connection ended in a request head.');
         } catch (\OverflowException) {
+            $prefix = $bytes ?? $this->buffer->drain();
+            if (strcspn($prefix, " \r\n") >= $this->config->maxHeadBytes) {
+                throw new MalformedMessage('The request method exceeds the request head limit.', Status::NOT_IMPLEMENTED);
+            }
+
             throw new MalformedMessage(
                 message: \sprintf('The request head exceeds %d bytes.', $this->config->maxHeadBytes),
                 status: Status::REQUEST_HEADER_FIELDS_TOO_LARGE,

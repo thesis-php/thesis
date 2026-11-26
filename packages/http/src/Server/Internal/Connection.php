@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server\Internal;
 
+use Psr\Clock\ClockInterface;
 use Thesis\Async\ReadObserver;
 use Thesis\Async\Task;
 use Thesis\Dispatcher;
@@ -22,6 +23,7 @@ use Thesis\Io\UnexpectedEof;
 use Thesis\Io\Writer;
 use Thesis\Net\Socket;
 use Thesis\Net\SocketClosed;
+use Thesis\Time\WallClock;
 use function Thesis\Async\checkpoint;
 use function Thesis\Async\isCancelled;
 use function Thesis\Io\close;
@@ -61,10 +63,11 @@ final class Connection
         private readonly ?Dispatcher $requestStarted = null,
         private readonly ?Dispatcher $requestEnded = null,
         private readonly Dispatcher $dispatcher = new Dispatcher(),
+        ClockInterface $clock = new WallClock(),
     ) {
         $this->buffer = new Buffer();
         $this->requestsRemaining = $config->maxRequestsPerConnection;
-        $this->output = new ResponseWriter($output, $config->writeTimeout, $writes, $errorHandler);
+        $this->output = new ResponseWriter($output, $config->writeTimeout, $writes, $errorHandler, $clock);
         $this->bodyInput = new BodyInput($this->buffer, $input, $config->bodyIdleTimeout, $config->maxBodyBytes);
     }
 

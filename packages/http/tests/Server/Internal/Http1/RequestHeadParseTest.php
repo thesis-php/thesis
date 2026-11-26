@@ -34,6 +34,12 @@ final class RequestHeadParseTest
         Assert::same($head->upgrade, []);
     }
 
+    public function ignoresEmptyElementsAroundChunked(): void
+    {
+        $head = RequestHead::parse(self::post('Transfer-Encoding: , CHUNKED,'));
+        Assert::same($head->framing, Framing::Chunked);
+    }
+
     public function takesSchemeOfConnection(): void
     {
         $head = RequestHead::parse(head('GET / HTTP/1.1', 'Host: example.com'), scheme: 'https');
@@ -442,7 +448,7 @@ final class RequestHeadParseTest
     public static function ambiguousFramings(): iterable
     {
         $length = '400: Content-Length must be one number of at most 18 digits, got %s.';
-        $coding = '501: Transfer-Encoding must be "chunked", got %s.';
+        $coding = '400: Transfer-Encoding must be "chunked", got %s.';
         $request = self::post(...);
 
         yield 'length and chunks' => [
@@ -451,6 +457,10 @@ final class RequestHeadParseTest
         ];
         yield 'chunks and length' => [
             $request('Transfer-Encoding: chunked', 'Content-Length: 0'),
+            '400: A message must not have both Content-Length and Transfer-Encoding.',
+        ];
+        yield 'length with unsupported coding' => [
+            $request('Content-Length: 0', 'Transfer-Encoding: gzip'),
             '400: A message must not have both Content-Length and Transfer-Encoding.',
         ];
         yield 'two lengths' => [$request('Content-Length: 5', 'Content-Length: 6'), \sprintf($length, '"5, 6"')];
@@ -471,7 +481,7 @@ final class RequestHeadParseTest
         yield 'other coding' => [$request('Transfer-Encoding: gzip'), \sprintf($coding, '"gzip"')];
         yield 'coding before chunked' => [
             $request('Transfer-Encoding: gzip, chunked'),
-            \sprintf($coding, '"gzip, chunked"'),
+            '501: Transfer-Encoding must be "chunked", got "gzip, chunked".',
         ];
         yield 'chunked twice' => [
             $request('Transfer-Encoding: chunked, chunked'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server\Internal;
 
+use Psr\Clock\ClockInterface;
 use Thesis\Async\Cancelled;
 use Thesis\Async\Deferred;
 use Thesis\Async\Group;
@@ -78,6 +79,7 @@ final class Listener
         int $maxConnections,
         private readonly Dispatcher $dispatcher,
         private readonly ErrorHandler $errorHandler,
+        private readonly ClockInterface $clock,
     ) {
         $this->connections = new \SplObjectStorage();
         $this->capacity = new LocalSemaphore($maxConnections);
@@ -185,6 +187,7 @@ final class Listener
                 requestStarted: $this->requestStarted,
                 requestEnded: $this->requestEnded,
                 dispatcher: $this->dispatcher,
+                clock: $this->clock,
             );
             $this->connections[$connection] = $socket;
             $connection->task = $group->spawn(fn() => $this->serveConnection($socket, $connection, $permit));

@@ -21,6 +21,7 @@ use Thesis\Io\Reader;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
 use Thesis\Io\Writer;
+use function Thesis\Http\withoutResponseDate;
 
 #[Test]
 #[Covers(Connection::class)]
@@ -68,7 +69,7 @@ final class ConnectionTest
                 return $request->echo();
             });
             Assert::same(['/first', '/second'], $paths);
-            Assert::same($expected, $output->bytes);
+            Assert::same($expected, withoutResponseDate($output->bytes));
         }
     }
 
@@ -82,7 +83,10 @@ final class ConnectionTest
         $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $short = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n";
-        Assert::same($short . 'ab' . $short . 'cd' . "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nxyz", $output->bytes);
+        Assert::same(
+            actual: withoutResponseDate($output->bytes),
+            expected: $short . 'ab' . $short . 'cd' . "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nxyz",
+        );
     }
 
     public function writesBufferedEchoBeforeTheNextRequest(): void
@@ -94,7 +98,7 @@ final class ConnectionTest
         $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
         $head = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n";
-        Assert::same($output->bytes, $head . 'one' . $head . 'two');
+        Assert::same(withoutResponseDate($output->bytes), $head . 'one' . $head . 'two');
         Assert::same($output->writes, 2);
     }
 
@@ -113,7 +117,7 @@ final class ConnectionTest
             return new Response(body: new StringBody('a', new Headers(['X-End' => 'yes'])));
         });
 
-        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
+        Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"
             . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-End: yes\r\n\r\n");
     }
 
@@ -134,7 +138,7 @@ final class ConnectionTest
                 Assert::same(2, $this->reads);
                 Assert::same(
                     "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1\r\na\r\n",
-                    $this->output,
+                    withoutResponseDate($this->output),
                 );
 
                 return "1\r\nb\r\n0\r\n\r\n";
@@ -163,7 +167,7 @@ final class ConnectionTest
         Assert::same($output->writes, 2);
         Assert::same(
             "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",
-            $output->bytes,
+            withoutResponseDate($output->bytes),
         );
     }
 
@@ -177,7 +181,7 @@ final class ConnectionTest
         Assert::same($output->writes, 2);
         Assert::same(
             "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",
-            $output->bytes,
+            withoutResponseDate($output->bytes),
         );
     }
 
@@ -193,7 +197,7 @@ final class ConnectionTest
         $connection->run(static fn() => new Response(body: $body));
 
         Assert::same($output->writes, 3);
-        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 65540\r\n\r\n{$body}");
+        Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 65540\r\n\r\n{$body}");
     }
 
     public function partiallyReadStringBodyCommitsOnlyTheAvailableBytes(): void
@@ -208,7 +212,7 @@ final class ConnectionTest
             $connection = new Connection($input, $output, new Config('/test.sock'));
             $connection->run(static fn() => new Response(body: $body));
         } finally {
-            Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nbc");
+            Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nbc");
         }
     }
 
@@ -219,6 +223,6 @@ final class ConnectionTest
         $body = new PrefixedBody(new StringBody('hello'));
         $connection = new Connection($input, $output, new Config('/test.sock'));
         $connection->run(static fn() => new Response(body: $body));
-        Assert::same("HTTP/1.0 200 OK\r\n\r\n!hello", $output->bytes);
+        Assert::same("HTTP/1.0 200 OK\r\n\r\n!hello", withoutResponseDate($output->bytes));
     }
 }

@@ -18,6 +18,7 @@ use Thesis\Http\Server\Stub\TimedReader;
 use Thesis\Io\StringReader;
 use Thesis\Io\WriteFailed;
 use Thesis\TestoPlugin\VirtualTime;
+use function Thesis\Http\withoutResponseDate;
 use function Thesis\Time\sec;
 
 #[Test]
@@ -151,7 +152,20 @@ final class ConnectionLimitsTest
         $connection->run(static fn() => new Response());
 
         Assert::equals(Instant::now()->since($start), sec(1));
-        Assert::same($output->bytes, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        Assert::same(withoutResponseDate($output->bytes), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+    }
+
+    public function rejectsAMethodThatConsumesTheHeadLimit(): void
+    {
+        $output = new RecordingWriter();
+        $connection = new Connection(
+            input: new StringReader(str_repeat('A', 128)),
+            output: $output,
+            config: new Config('/test.sock', maxHeadBytes: 64),
+        );
+        $connection->run(static fn() => throw new \LogicException('Oversized method reached the handler.'));
+
+        Assert::string($output->bytes)->startsWith('HTTP/1.1 501 ');
     }
 
     public function headLimitIncludesTheFinalEmptyLine(): void
@@ -239,7 +253,7 @@ final class ConnectionLimitsTest
         $connection->run(static fn() => new Response());
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
             . "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );

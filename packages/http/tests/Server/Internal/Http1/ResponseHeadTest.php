@@ -17,8 +17,26 @@ use Thesis\Http\StringBody;
 #[Test]
 #[Covers(ResponseHead::class)]
 #[Covers(Fields::class)]
-final class ResponseHeadTest
+final readonly class ResponseHeadTest
 {
+    private const string DATE = 'Date: Thu, 01 Jan 1970 00:00:00 GMT';
+
+    private \DateTimeImmutable $epoch;
+
+    public function __construct()
+    {
+        $this->epoch = new \DateTimeImmutable('@0');
+    }
+
+    public function preservesAnExplicitDate(): void
+    {
+        $response = new Response(headers: new Headers(['date' => 'Mon, 02 Jan 2006 15:04:05 GMT']));
+        $head = outgoingResponseHead($response, requestHead('GET / HTTP/1.1'));
+
+        $expected = head('HTTP/1.1 200 OK', 'Date: Mon, 02 Jan 2006 15:04:05 GMT', 'Content-Length: 0', '', '');
+        Assert::same($head->toString($this->epoch), $expected);
+    }
+
     public function writesResponseWithBodyOfKnownLength(): void
     {
         $head = outgoingResponseHead(
@@ -35,8 +53,9 @@ final class ResponseHeadTest
         Assert::same($head->length, 5);
         Assert::true($head->isPersistent);
         Assert::same($head->upgrade, []);
-        Assert::same($head->toString(), head(
+        Assert::same($head->toString($this->epoch), head(
             'HTTP/1.1 200 OK',
+            self::DATE,
             'Content-Type: text/plain',
             'Content-Length: 5',
             '',
@@ -49,14 +68,17 @@ final class ResponseHeadTest
         $head = outgoingResponseHead(new Response(404), requestHead('GET / HTTP/1.1'));
 
         Assert::same($head->framing, Framing::Length);
-        Assert::same($head->toString(), head('HTTP/1.1 404 Not Found', 'Content-Length: 0', '', ''));
+        Assert::same(
+            actual: $head->toString($this->epoch),
+            expected: head('HTTP/1.1 404 Not Found', self::DATE, 'Content-Length: 0', '', ''),
+        );
     }
 
     public function writesStatusWithoutKnownReasonWithEmptyOne(): void
     {
         $head = outgoingResponseHead(new Response(299), requestHead('GET / HTTP/1.1'));
 
-        Assert::same($head->toString(), head('HTTP/1.1 299 ', 'Content-Length: 0', '', ''));
+        Assert::same($head->toString($this->epoch), head('HTTP/1.1 299 ', self::DATE, 'Content-Length: 0', '', ''));
     }
 
     public function writesBodyOfUnknownLengthInChunks(): void
@@ -69,7 +91,10 @@ final class ResponseHeadTest
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
         Assert::true($head->isPersistent);
-        Assert::same($head->toString(), head('HTTP/1.1 200 OK', 'Transfer-Encoding: chunked', '', ''));
+        Assert::same(
+            actual: $head->toString($this->epoch),
+            expected: head('HTTP/1.1 200 OK', self::DATE, 'Transfer-Encoding: chunked', '', ''),
+        );
     }
 
     public function endsBodyOfUnknownLengthWithConnectionForHttp10(): void
@@ -82,7 +107,7 @@ final class ResponseHeadTest
         Assert::same($head->framing, Framing::UntilClose);
         Assert::null($head->length);
         Assert::false($head->isPersistent);
-        Assert::same($head->toString(), head('HTTP/1.0 200 OK', '', ''));
+        Assert::same($head->toString($this->epoch), head('HTTP/1.0 200 OK', self::DATE, '', ''));
     }
 
     public function usesChunkedFramingForAnEmptyReaderWithPendingTrailers(): void
@@ -93,7 +118,10 @@ final class ResponseHeadTest
 
         Assert::same($head->framing, Framing::Chunked);
         Assert::null($head->length);
-        Assert::same($head->toString(), head('HTTP/1.1 200 OK', 'Transfer-Encoding: chunked', '', ''));
+        Assert::same(
+            actual: $head->toString($this->epoch),
+            expected: head('HTTP/1.1 200 OK', self::DATE, 'Transfer-Encoding: chunked', '', ''),
+        );
         Assert::same($body->readAll(), '');
         Assert::same($body->trailers()->get('x-end'), 'yes');
     }
@@ -131,7 +159,7 @@ final class ResponseHeadTest
         );
 
         Assert::same($head->isPersistent, $isPersistent);
-        Assert::same($head->toString(), $bytes);
+        Assert::same($head->toString($this->epoch), $bytes);
     }
 
     /**
@@ -169,7 +197,7 @@ final class ResponseHeadTest
         Assert::same($head->length, 0);
         Assert::same($head->headers, $response->headers);
         Assert::true($head->isPersistent);
-        Assert::same($head->toString(), $bytes);
+        Assert::same($head->toString($this->epoch), $bytes);
     }
 
     /**
@@ -179,30 +207,34 @@ final class ResponseHeadTest
     {
         $length = new Headers(['content-length' => '1024']);
 
-        yield 'HEAD' => ['HEAD / HTTP/1.1', new Response(), head('HTTP/1.1 200 OK', '', '')];
+        yield 'HEAD' => ['HEAD / HTTP/1.1', new Response(), head('HTTP/1.1 200 OK', self::DATE, '', '')];
         yield 'HEAD with length' => [
             'HEAD / HTTP/1.1',
             new Response(headers: $length),
-            head('HTTP/1.1 200 OK', 'Content-Length: 1024', '', ''),
+            head('HTTP/1.1 200 OK', self::DATE, 'Content-Length: 1024', '', ''),
         ];
         yield '304 with length' => [
             'GET / HTTP/1.1',
             new Response(304, $length),
-            head('HTTP/1.1 304 Not Modified', 'Content-Length: 1024', '', ''),
+            head('HTTP/1.1 304 Not Modified', self::DATE, 'Content-Length: 1024', '', ''),
         ];
         yield 'HEAD with zero representation length' => [
             'HEAD / HTTP/1.1',
             new Response(headers: new Headers(['content-length' => '0'])),
-            head('HTTP/1.1 200 OK', 'Content-Length: 0', '', ''),
+            head('HTTP/1.1 200 OK', self::DATE, 'Content-Length: 0', '', ''),
         ];
-        yield '204' => ['GET / HTTP/1.1', new Response(204), head('HTTP/1.1 204 No Content', '', '')];
+        yield '204' => ['GET / HTTP/1.1', new Response(204), head('HTTP/1.1 204 No Content', self::DATE, '', '')];
         yield '100' => ['POST / HTTP/1.1', new Response(100), head('HTTP/1.1 100 Continue', '', '')];
         yield '103' => [
             'GET / HTTP/1.1',
             new Response(103, new Headers(['link' => '</style.css>; rel=preload'])),
             head('HTTP/1.1 103 Early Hints', 'Link: </style.css>; rel=preload', '', ''),
         ];
-        yield 'CONNECT' => ['CONNECT example.com:443 HTTP/1.1', new Response(), head('HTTP/1.1 200 OK', '', '')];
+        yield 'CONNECT' => [
+            'CONNECT example.com:443 HTTP/1.1',
+            new Response(),
+            head('HTTP/1.1 200 OK', self::DATE, '', ''),
+        ];
     }
 
     public function rejectsMalformedUpgradeVersion(): void
@@ -224,7 +256,7 @@ final class ResponseHeadTest
         );
 
         Assert::same($head->upgrade, ['websocket']);
-        Assert::same($head->toString(), head(
+        Assert::same($head->toString($this->epoch), head(
             'HTTP/1.1 101 Switching Protocols',
             'Sec-Websocket-Accept: abc',
             'Upgrade: websocket',
@@ -345,7 +377,7 @@ final class ResponseHeadTest
      */
     private static function http11(string ...$fields): string
     {
-        return head('HTTP/1.1 200 OK', 'Content-Length: 1', ...$fields) . "\r\n\r\n";
+        return head('HTTP/1.1 200 OK', self::DATE, 'Content-Length: 1', ...$fields) . "\r\n\r\n";
     }
 
     /**
@@ -353,6 +385,6 @@ final class ResponseHeadTest
      */
     private static function http10(string ...$fields): string
     {
-        return head('HTTP/1.0 200 OK', 'Content-Length: 1', ...$fields) . "\r\n\r\n";
+        return head('HTTP/1.0 200 OK', self::DATE, 'Content-Length: 1', ...$fields) . "\r\n\r\n";
     }
 }

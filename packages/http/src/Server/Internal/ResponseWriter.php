@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http\Server\Internal;
 
+use Psr\Clock\ClockInterface;
 use Thesis\Async\Cancelled;
 use Thesis\Http\Body;
 use Thesis\Http\Method;
@@ -37,11 +38,14 @@ final class ResponseWriter implements Writer, Closer
      */
     private ?array $lastResponseHead = null;
 
+    private ?int $lastResponseTime = null;
+
     public function __construct(
         private readonly Writer $output,
         private readonly Duration $timeout,
         private readonly ?SocketDeadlines $deadlines,
         private readonly ErrorHandler $errorHandler,
+        private readonly ClockInterface $clock,
     ) {}
 
     /**
@@ -49,12 +53,14 @@ final class ResponseWriter implements Writer, Closer
      */
     public function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
+        $now = $this->clock->now();
+        $second = $now->getTimestamp();
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
         if ($this->lastResponseHead !== null && $ordinary && $body instanceof StringBody) {
             $cached = $this->lastResponseHead;
             $head = $cached[0];
-            if ($response->status === $head->status && $body->size === $head->length
-                && $request->version === $head->version
+            if ($this->lastResponseTime === $second && $response->status === $head->status
+                && $body->size === $head->length && $request->version === $head->version
                 && ($isPersistent && $request->isPersistent) === $head->isPersistent
                 && $response->headers->toArray() === $head->headers->toArray() && !$body->mayHaveTrailers) {
                 return $cached;
@@ -75,9 +81,10 @@ final class ResponseWriter implements Writer, Closer
         }
 
         $head = ResponseHead::of($response, $request, $body, $isPersistent);
-        $result = [$head, $head->toString()];
+        $result = [$head, $head->toString($now)];
         if ($ordinary && $head->framing === Framing::Length && \strlen($result[1]) <= 1024) {
             $this->lastResponseHead = $result;
+            $this->lastResponseTime = $second;
         }
 
         return $result;
@@ -95,7 +102,7 @@ final class ResponseWriter implements Writer, Closer
             $reply = ResponseHead::of($response, $head, $response->takeBody(), isPersistent: false);
         }
 
-        $this->write($reply->toString());
+        $this->write($reply->toString($this->clock->now()));
     }
 
     public function writeServerError(RequestHead $head, Request $request): void

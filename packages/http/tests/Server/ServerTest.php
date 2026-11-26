@@ -23,10 +23,12 @@ use Thesis\Net\InetAddress;
 use Thesis\Net\ListenFailed;
 use Thesis\Net\ServerTls;
 use Thesis\Net\TlsFailed;
+use Thesis\Time\FrozenClock;
 use function Thesis\Async\delay;
 use function Thesis\Async\group;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
+use function Thesis\Http\withoutResponseDate;
 use function Thesis\Net\connect;
 use function Thesis\Net\listen;
 use function Thesis\Time\ms;
@@ -81,6 +83,46 @@ final class ServerTest
                 $server->stop();
             }));
         }
+    }
+
+    public function datesResponsesWithTheServerClock(): void
+    {
+        timeout(sec(2), static fn() => group(static function (Group $group) {
+            $clock = new FrozenClock(new \DateTimeImmutable('2000-01-01T03:00:00+03:00'));
+            $server = new Server(
+                config: new Config(0),
+                handler: static function () use ($clock) {
+                    $clock->advance(sec(1));
+
+                    return new Response(body: 'ok');
+                },
+                clock: $clock,
+            );
+            $server->start($group);
+            $address = $server->address;
+            \assert($address instanceof InetAddress);
+            $client = connect('127.0.0.1', $address->port);
+
+            try {
+                $client->write(str_repeat("GET / HTTP/1.1\r\nHost: local\r\n\r\n", 2) . "invalid\r\n\r\n");
+                $bytes = '';
+
+                while (($chunk = $client->read(8192)) !== null) {
+                    $bytes .= $chunk;
+                }
+
+                Assert::same(
+                    actual: $bytes,
+                    expected: "HTTP/1.1 200 OK\r\nDate: Sat, 01 Jan 2000 00:00:01 GMT\r\nContent-Length: 2\r\n\r\nok"
+                        . "HTTP/1.1 200 OK\r\nDate: Sat, 01 Jan 2000 00:00:02 GMT\r\nContent-Length: 2\r\n\r\nok"
+                        . "HTTP/1.1 400 Bad Request\r\nDate: Sat, 01 Jan 2000 00:00:02 GMT\r\n"
+                        . "Content-Length: 0\r\nConnection: close\r\n\r\n",
+                );
+            } finally {
+                $client->close();
+                $server->stop();
+            }
+        }));
     }
 
     public function keepsAPipelinedRequestSentWhileTheHandlerWaits(): void
@@ -210,7 +252,7 @@ final class ServerTest
                 }
 
                 Assert::same(
-                    actual: $bytes,
+                    actual: withoutResponseDate($bytes),
                     expected: "HTTP/1.1 404 Not Found\r\nContent-Length: 7\r\nConnection: close\r\n\r\nGET 404",
                 );
             } finally {
@@ -308,7 +350,7 @@ final class ServerTest
                 $buffer->fillUntil($client, "\r\n\r\n");
                 Assert::same(
                     "HTTP/1.1 204 No Content\r\nConnection: close",
-                    $buffer->readUntil("\r\n\r\n"),
+                    withoutResponseDate((string) $buffer->readUntil("\r\n\r\n")),
                 );
                 Assert::null($client->read(1));
             } finally {
@@ -445,7 +487,7 @@ final class ServerTest
 
                 $buffer = new Buffer();
                 $buffer->fillUntil($client, "\r\n\r\n");
-                Assert::same('HTTP/1.1 204 No Content', $buffer->readUntil("\r\n\r\n"));
+                Assert::same('HTTP/1.1 204 No Content', withoutResponseDate((string) $buffer->readUntil("\r\n\r\n")));
 
                 $server->stop();
                 Assert::null($client->read(1));

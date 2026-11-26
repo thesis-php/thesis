@@ -42,12 +42,12 @@ final readonly class Fields
     public static function parse(array $lines, Version $version, int $maxFields): self
     {
         $fields = self::lines($lines, $maxFields);
-        $contentLength = isset($fields['content-length']) ? self::contentLength($fields['content-length']) : null;
-        $isChunked = isset($fields['transfer-encoding']) && self::isChunked($fields['transfer-encoding'], $version);
-
-        if ($isChunked && $contentLength !== null) {
+        if (isset($fields['transfer-encoding'], $fields['content-length'])) {
             throw new MalformedMessage('A message must not have both Content-Length and Transfer-Encoding.');
         }
+
+        $contentLength = isset($fields['content-length']) ? self::contentLength($fields['content-length']) : null;
+        $isChunked = isset($fields['transfer-encoding']) && self::isChunked($fields['transfer-encoding'], $version);
 
         $isPersistent = $version === Version::Http11;
         $upgrade = [];
@@ -310,10 +310,18 @@ final readonly class Fields
             throw new MalformedMessage('An HTTP/1.0 message must not have Transfer-Encoding.');
         }
 
-        if (\count($values) > 1 || strtolower($values[0]) !== 'chunked') {
+        if (\count($values) === 1 && strtolower($values[0]) === 'chunked') {
+            return true;
+        }
+
+        $codings = array_map(strtolower(...), self::list($values));
+        $final = array_pop($codings);
+        if ($final !== 'chunked' || $codings !== []) {
             throw new MalformedMessage(
                 message: \sprintf('Transfer-Encoding must be "chunked", got %s.', quote(implode(', ', $values))),
-                status: Status::NOT_IMPLEMENTED,
+                status: $final === 'chunked' && !\in_array('chunked', $codings, strict: true)
+                    ? Status::NOT_IMPLEMENTED
+                    : Status::BAD_REQUEST,
             );
         }
 

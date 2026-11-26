@@ -18,6 +18,7 @@ use Thesis\Http\Server\Stub\TextErrorHandler;
 use Thesis\Http\Status;
 use Thesis\Io\ReadFailed;
 use Thesis\Io\StringReader;
+use function Thesis\Http\withoutResponseDate;
 
 #[Test]
 #[Covers(Connection::class)]
@@ -36,7 +37,7 @@ final class ExchangeTest
         });
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 100 Continue\r\n\r\n"
                 . "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nabc",
         );
@@ -51,7 +52,7 @@ final class ExchangeTest
         $connection->run(static fn(Request $request) => new Response(body: new PrefixedBody($request->takeBody())));
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 100 Continue\r\n\r\n"
                 . "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
                 . "1\r\n!\r\n3\r\nabc\r\n0\r\n\r\n",
@@ -67,7 +68,7 @@ final class ExchangeTest
         $connection->run(static fn() => new Response(Status::FORBIDDEN));
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
     }
@@ -80,7 +81,10 @@ final class ExchangeTest
         $connection = new Connection($input, $output, new Config('/test.sock'));
         $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
 
-        Assert::same(actual: $output->bytes, expected: "HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nabc");
+        Assert::same(
+            actual: withoutResponseDate($output->bytes),
+            expected: "HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nabc",
+        );
     }
 
     public function advertisesClosureWhenReturningAnEmptyResponseWithAnUnreadBody(): void
@@ -92,7 +96,7 @@ final class ExchangeTest
         $connection->run(static fn() => new Response());
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
     }
@@ -106,7 +110,7 @@ final class ExchangeTest
         $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
     }
@@ -126,7 +130,7 @@ final class ExchangeTest
         });
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
     }
@@ -141,7 +145,10 @@ final class ExchangeTest
             $connection = new Connection($input, $output, new Config('/test.sock'));
             $connection->run(static fn(Request $request) => new Response(body: $request->takeBody()));
         } finally {
-            Assert::same(actual: $output->bytes, expected: "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\na");
+            Assert::same(
+                actual: withoutResponseDate($output->bytes),
+                expected: "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\na",
+            );
         }
     }
 
@@ -154,7 +161,7 @@ final class ExchangeTest
         $connection->run(static fn() => throw new \LogicException('Unexpected request.'));
 
         Assert::same(
-            actual: $output->bytes,
+            actual: withoutResponseDate($output->bytes),
             expected: "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         );
     }
@@ -171,7 +178,7 @@ final class ExchangeTest
             $connection->run(static fn() => $response->withStatus(Status::OK));
         } finally {
             Assert::same(
-                actual: $output->bytes,
+                actual: withoutResponseDate($output->bytes),
                 expected: "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
                     . self::defaultErrorResponse(),
             );
@@ -189,7 +196,7 @@ final class ExchangeTest
             $connection->run(static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
-                actual: $output->bytes,
+                actual: withoutResponseDate($output->bytes),
                 expected: "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 7\r\nConnection: close\r\n\r\nGET 500",
             );
         }
@@ -206,7 +213,7 @@ final class ExchangeTest
             $connection->run(static fn() => throw new \RuntimeException('Private details'));
         } finally {
             Assert::same(
-                actual: $output->bytes,
+                actual: withoutResponseDate($output->bytes),
                 expected: self::defaultErrorResponse(),
             );
         }

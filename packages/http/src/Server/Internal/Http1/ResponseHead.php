@@ -123,10 +123,15 @@ final readonly class ResponseHead
     /**
      * The bytes of the head, including the empty line that ends it.
      */
-    public function toString(): string
+    public function toString(\DateTimeImmutable $now): string
     {
         $phrase = Status::reasonPhrase($this->status) ?? '';
         $bytes = "{$this->version->value} {$this->status} {$phrase}\r\n";
+
+        if ($this->status >= 200 && !$this->headers->has('date')) {
+            $date = $now->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::RFC7231);
+            $bytes .= "Date: {$date}\r\n";
+        }
 
         return $bytes . Fields::format(
             headers: $this->headers,

@@ -19,9 +19,14 @@ The HTTP messages, server and HTTP/1 codec ship together as `thesis/http`.
 
 ### Fixed
 
+- Add Date to final HTTP/1 responses, distinguish malformed request framing from unsupported transfer codings,
+  and report a method that exhausts the request head limit as 501.
+
 - Return 204 for server-wide OPTIONS and 501 for CONNECT when the router has no default handler.
 
 ### Added
+
+- Accept a PSR-20 clock in `Server` to set the time used for the HTTP Date header.
 
 - Stream the request body and its trailers back to the caller with `Request::echo()`.
 

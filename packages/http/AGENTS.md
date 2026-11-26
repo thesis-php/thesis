@@ -224,8 +224,10 @@ contract for streaming bytes and trailers. Server implementation details live in
   the head, so send the head before reading a streaming body. A small fixed-length echo can share
   that write when the connection already has all its remaining input. A large string is already in memory:
   send it in blocks of up to 64 KiB to amortize the socket write and its timer. Keep streaming reads at 8 KiB.
-- Each connection reuses its last encoded length-framed response head up to 1 KiB for a string body when its length,
-  status, version, persistence and ordered fields match. HEAD and CONNECT have their own framing rules.
+- Use the server’s PSR-20 clock for Date on final responses, including errors. Format the time in UTC and preserve
+  a Date supplied by the handler.
+  Each connection reuses its last encoded length-framed response head up to 1 KiB for a string body when its length,
+  status, version, persistence, ordered fields and wall-clock second match. HEAD and CONNECT have their own framing rules.
   A string body with trailer fields uses the head formatter. The formatter reads a custom body's trailer state once.
 - A fixed-length body already in the buffer has passed the size check and cannot wait on the transport.
   Its fixed-length reader still tracks unread bytes. Wrap it when the first read must send `100 Continue`.
@@ -248,9 +250,12 @@ The server codec lives in `Server\Internal\Http1`. Content-Length and chunk size
   nothing is guessed or repaired, and nothing is read after it. Rejected: a bare CR or LF, obs-fold, a space
   before a colon, a name that is not a token, a control character in a value, `Content-Length` together with
   `Transfer-Encoding`, a `Content-Length` that is repeated, is a list or is not 1 to 18 digits, a transfer coding
-  other than exactly `chunked` (`gzip, chunked` too), any `Transfer-Encoding` in HTTP/1.0, a missing
-  or repeated `Host` in HTTP/1.1, a `Host` that is not a host with an optional port, a chunk size that is not
+  other than a single `chunked` after ignoring empty list elements (`gzip, chunked` too), any `Transfer-Encoding` in HTTP/1.0,
+  a missing or repeated `Host` in HTTP/1.1, a `Host` that is not a host with an optional port, a chunk size that is not
   1 to 15 hexadecimal digits, anything but CRLF after the data of a chunk, a framing field in trailers.
+- Reject Content-Length together with Transfer-Encoding before checking the coding list. Return 400 when
+  chunked is repeated or absent from the end of the list, and 501 for an unsupported coding before chunked.
+  If the method alone exhausts the head limit, return 501. A large header section still gets 431.
 - A parser changes one thing: in a target that is a path it percent-encodes `[ ] \ ^ `` ` `` { | }`.
   Browsers send these bytes unescaped (`?filter[name]=x`), and `Uri\Rfc3986\Uri` cannot hold them.
 - No backtracking regular expressions. No `(int)`, `intval()`, `hexdec()` or `is_numeric()` on bytes from a peer
