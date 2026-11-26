@@ -6,13 +6,19 @@ namespace Thesis\Http\Server;
 
 use Testo\Assert;
 use Testo\Data\DataSet;
+use Testo\Expect;
 use Testo\Test;
 use Thesis\Dispatcher;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
+use Thesis\Http\Server\Internal\GzipBody;
+use Thesis\Http\Server\Internal\Http1\FixedLengthReader;
+use Thesis\Http\Server\Internal\Http1\ScriptedReader;
 use Thesis\Http\Server\Stub\PrefixedBody;
 use Thesis\Http\Status;
 use Thesis\Http\StringBody;
+use Thesis\Io\Buffer;
+use Thesis\Io\StreamClosed;
 use Thesis\Net\InetAddress;
 
 #[Test]
@@ -106,12 +112,29 @@ final readonly class GzipTest
         Assert::same('!tail', gzdecode($response->takeBody()->readAll()));
     }
 
+    public function closingDuringTheFirstReadStopsCompression(): void
+    {
+        $source = new ScriptedReader('a');
+        $source->beforeRead = static function () {
+            \Fiber::suspend();
+        };
+        $body = new GzipBody(new FixedLengthReader(new Buffer(), $source, size: 1));
+        $reading = new \Fiber(static fn() => $body->read(1));
+        $reading->start();
+
+        $body->close();
+        Expect::exception(StreamClosed::class);
+        $reading->resume();
+    }
+
     public function compressesAnEmptyRepresentation(): void
     {
         $request = new Request('GET', '/', ['accept-encoding' => 'gzip, identity;q=0']);
         $response = new Gzip()->handle($request, $this->context, static fn() => new Response(headers: ['vary' => '*']));
         Assert::same('*', $response->headers->get('vary'));
-        Assert::same('', gzdecode($response->takeBody()->readAll()));
+        $body = $response->takeBody();
+        Assert::same('', gzdecode($body->readAll()));
+        Assert::null($body->read(1));
     }
 
     /**

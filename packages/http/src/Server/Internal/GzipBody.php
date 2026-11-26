@@ -33,7 +33,9 @@ final class GzipBody extends StreamingBody
         get => $this->body->mayHaveTrailers;
     }
 
-    private ?\DeflateContext $context;
+    private ?\DeflateContext $context = null;
+
+    private bool $finished = false;
 
     private string $output = '';
 
@@ -43,34 +45,36 @@ final class GzipBody extends StreamingBody
 
     public function __construct(
         private readonly Body $body,
-    ) {
-        $context = deflate_init(ZLIB_ENCODING_GZIP);
-        \assert($context !== false);
-
-        $this->context = $context;
-    }
+    ) {}
 
     private function __clone() {}
 
     protected function readPayload(int $max): ?string
     {
         while ($this->offset === \strlen($this->output)) {
-            if ($this->context === null) {
-                if ($this->closed) {
-                    throw new StreamClosed('The compressed response body is closed.');
-                }
+            if ($this->closed) {
+                throw new StreamClosed('The compressed response body is closed.');
+            }
 
+            if ($this->finished) {
                 return null;
             }
 
             $bytes = $this->body->read(self::READ_SIZE);
 
-            if ($this->closed) {
+            if ($this->closed) { // @phpstan-ignore if.alwaysFalse (close() can run while the source read waits)
                 throw new StreamClosed('The compressed response body is closed.');
             }
 
-            $finished = $bytes === null || ($this->body instanceof StringBody && \strlen($bytes) < self::READ_SIZE);
-            $output = deflate_add($this->context, $bytes ?? '', $finished ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
+            if ($this->context === null) {
+                $context = deflate_init(ZLIB_ENCODING_GZIP);
+                \assert($context !== false);
+                $this->context = $context;
+            }
+
+            $this->finished = $bytes === null
+                || ($this->body instanceof StringBody && \strlen($bytes) < self::READ_SIZE);
+            $output = deflate_add($this->context, $bytes ?? '', $this->finished ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
 
             if ($output === false) {
                 $this->close();
@@ -78,7 +82,7 @@ final class GzipBody extends StreamingBody
                 throw new ReadFailed('Failed to compress the response body.');
             }
 
-            if ($finished) {
+            if ($this->finished) {
                 $this->context = null;
             }
 

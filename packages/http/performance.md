@@ -452,6 +452,23 @@ Date with gmdate. The probe excludes sockets, handlers and the event loop.
   Arena JSON templates from `621e6cd`, mean HTTP/1 wire size fell from 988.7 to 977.0 bytes.
   Six pinned in-memory comparisons with tracing JIT reduced process CPU per request by 4.64% at
   the paired median. Five pairs improved. Reads of exactly 8192 bytes still check for EOF.
+  On Docker loopback, four alternating pairs at `b74fc16`/`d828ae5` used one pinned server vCPU,
+  1024 connections, three seconds of settling and eight seconds of measurement per arm. Throughput
+  rose in three pairs, from 11,665 to 12,576 replies/s at the medians (+10.1% paired). Median p99
+  fell from 126.6 to 121.7 ms. All 772,015 timed replies were 2xx with zero reconnects.
+- Allocate the compressor after the first source read returns. With 150 response bodies waiting on
+  that read, live PHP heap per suspended reader fell from 281.90 to 17.71 KiB. Once the first bytes
+  have been compressed, both versions use about 282 KiB while waiting for more. Closing a body
+  before reading it took 0.20 µs against 1.18 µs to create and close an eager compressor.
+  On the seven-template in-memory JSON mix, six pairs cost 1.58% more CPU at the paired median.
+- Rejected: setting a smaller deflate window for strings of at most 8192 bytes. A 16 KiB window
+  saved 64 KiB per allocated context, with the same output across 27 payloads. Six JSON pairs showed
+  no consistent CPU gain. With lazy allocation, a short string normally allocates and releases its
+  compressor during the same read.
+- Rejected: grouping gzip header edits, caching the derived fields by input header identity, and
+  caching the last Accept-Encoding decision. In six balanced comparisons, grouped edits cost 9.8%
+  more CPU on the JSON mix and the header cache cost 21.4% more. The cached negotiation won three
+  of six pairs. A shortcut for exactly `gzip` also misses Arena's `gzip, br`.
 - Rejected: lowering zlib's memory level from 8 to 6 or 5. With 180 live compressors the PHP heap
   per context fell from 264 to 168 or 152 KiB. Compressing 256 KiB of high-entropy data in 8 KiB
   blocks cost 5.51, 9.54 and 11.93 ms of CPU respectively at the medians of three pinned runs.
