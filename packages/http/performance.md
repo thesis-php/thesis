@@ -484,6 +484,29 @@ Rejected: trying a socket read before opening the body idle timeout. With 16 KiB
 the socket pacer and consumed all 16 KiB before yielding, delaying cancellation. They also succeeded
 with a zero idle timeout where the normal path returned 408.
 
+Rejected: sharing a length-framed response head through a weak reference to the previous writer.
+It saved 2.12 MiB across 4096 idle connections with identical responses and nothing with unique
+response fields. Looking up the shared head before encoding lost throughput in five of six TCP
+pairs on the GET/POST mix. Reusing just the encoded bytes saved 0.44 MiB on identical responses.
+
+### Worker count at a fixed request rate
+
+At `a9bc752` on Docker arm64, each PHP worker had a dedicated vCPU. The generator used two other
+vCPUs. Two passes in opposite orders targeted 10,000 GET/s with 1024 keep-alive connections, then
+drove the three baseline templates at saturation with 4096 connections. All 5,094,492 replies were
+2xx. The figures below are medians. The container column is the peak sampled by Docker stats.
+RSS counts resident pages in each process. PSS divides the cost of shared pages among the processes.
+
+| Workers | Fixed-rate replies/s | Container peak | Summed worker RSS | Summed worker PSS | Saturated mix replies/s |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 9971 | 63.5 MiB | 72.5 MiB | 59.4 MiB | 51,396 |
+| 2 | 9972 | 82 MiB | 111.0 MiB | 80.9 MiB | 108,680 |
+| 4 | 9971 | 120 MiB | 190.1 MiB | 121.7 MiB | 229,339 |
+
+Under light traffic one worker could serve the target rate. At saturation the additional workers
+used the extra CPU cores. These runs used local ZTS PHP and a different worker count from the
+official HttpArena host.
+
 ## Gzip responses
 
 - A short read from a StringBody consumes its remaining bytes. Finish gzip on that read to send the
