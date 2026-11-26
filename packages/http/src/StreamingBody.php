@@ -33,6 +33,25 @@ abstract class StreamingBody implements Body
         }
     }
 
+    final public function discard(): Headers
+    {
+        $this->beginRead();
+
+        try {
+            while ($this->readPayload(8192) !== null) {
+                $this->consumed = true;
+            }
+
+            return $this->trailers();
+        } catch (\Throwable $error) {
+            $this->close();
+
+            throw $error;
+        } finally {
+            $this->reading = false;
+        }
+    }
+
     final public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
         $this->beginRead(whole: true);

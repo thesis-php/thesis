@@ -47,6 +47,13 @@ interface Body extends Reader, Closer
     public function trailers(): Headers;
 
     /**
+     * Consumes the remaining payload and returns the final trailer fields.
+     * After a successful discard, further calls on the open body return the same trailer fields.
+     * A read failure closes the body.
+     */
+    public function discard(): Headers;
+
+    /**
      * Reads the entire payload into a string.
      *
      * A read failure or limit violation closes the body.

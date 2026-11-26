@@ -57,6 +57,7 @@ Pass a string or an unread body to supply a payload. Give the message exclusive 
 `LogicException`. A proxy can pass `$request->withUri($upstream)` to the client and return its response
 directly. Taking either body also transfers its trailers. Use `withBody()` to supply a replacement.
 
+Use `$body->discard()` to consume the remaining bytes and return the final trailer fields, even after a partial read.
 Read incrementally or call `readAll()` for the whole payload (8 MiB by default). Pass `limit:` to choose a byte limit.
 Overflow and read failures close the body. After any bytes have been consumed,
 collecting the whole body raises `LogicException`. Close the reader to release its resources.

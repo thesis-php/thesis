@@ -67,6 +67,13 @@ final class StringBody implements ReplayableBody
         return $bytes;
     }
 
+    public function discard(): Headers
+    {
+        $this->offset = $this->size;
+
+        return $this->trailers;
+    }
+
     public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
         if ($this->offset !== 0) {

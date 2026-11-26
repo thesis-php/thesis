@@ -33,6 +33,7 @@ Before HTTP/1 performance work, read [performance.md](performance.md) for measur
 - Changing metadata leaves the original intact. Replacing the payload replaces its trailers as well.
 - `readAll()` returns the whole body or fails once bytes have been consumed. Streaming implementations
   can extend `StreamingBody` to enforce this across partial reads and keep exclusive access until a read finishes.
+- Discard consumes the remaining bytes under one exclusive read and returns the final trailers at EOF.
 - Whole-body collection limits payload bytes after decoding (8 MiB by default). When an active collection
   fails or is cancelled, close the reader to release its resources. A competing read leaves the owner alone.
 - A message carries the meaning of HTTP. Protocol version, reason phrase and framing belong to the codec.

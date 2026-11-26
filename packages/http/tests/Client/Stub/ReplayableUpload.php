@@ -46,6 +46,11 @@ final class ReplayableUpload implements ReplayableBody
         return $this->reader->read($max);
     }
 
+    public function discard(): Headers
+    {
+        return $this->reader->discard();
+    }
+
     public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
         return $this->reader->readAll($limit);

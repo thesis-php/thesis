@@ -25,6 +25,16 @@ final class ChunkedTest
 {
     private const string HELLO_WORLD = "5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n";
 
+    public function discardReadsThroughTrailersAfterAPartialRead(): void
+    {
+        $reader = chunked("5\r\nhello\r\n0\r\nX-End: yes\r\n\r\n");
+        Assert::same($reader->read(2), 'he');
+        $fields = $reader->discard();
+        Assert::same($fields->get('x-end'), 'yes');
+        Assert::same($reader->discard()->toArray(), $fields->toArray());
+        Assert::null($reader->read(1));
+    }
+
     public function rejectsAConcurrentReadWhileReadingTheChunkSize(): void
     {
         $buffer = new Buffer();

@@ -252,6 +252,16 @@ final class MessageTest
         Assert::false(new StringBody('payload')->mayHaveTrailers);
     }
 
+    public function discardConsumesTheRemainingStringAndPreservesReplay(): void
+    {
+        $fields = new Headers(['x-end' => 'yes']);
+        $body = new StringBody('payload', $fields);
+        Assert::same($body->read(1), 'p');
+        Assert::same($body->discard(), $fields);
+        Assert::null($body->read(1));
+        Assert::same($body->fresh()->readAll(), 'payload');
+    }
+
     public function wholeBodyReadsRejectAPartiallyConsumedUpload(): void
     {
         $body = new StringBody('12345');

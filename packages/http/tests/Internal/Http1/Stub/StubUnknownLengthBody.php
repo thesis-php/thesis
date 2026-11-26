@@ -37,6 +37,11 @@ final class StubUnknownLengthBody implements Body
         return $this->body->read($max);
     }
 
+    public function discard(): Headers
+    {
+        return $this->body->discard();
+    }
+
     public function readAll(int $limit = self::DEFAULT_BUFFER_LIMIT): string
     {
         return $this->body->readAll($limit);

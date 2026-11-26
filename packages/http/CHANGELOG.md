@@ -14,6 +14,8 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Stream a local file as a request or response body with `new FileBody($path)`.
 - Serve files through GET and HEAD routes with `Server\StaticFiles`.
 
+- Consume the rest of a body and receive its trailers with `Body::discard()`.
+
 - Support installations without ext-zlib. Automatic client decoding and server gzip compression use this optional extension.
 
 - Add status constants and reason phrases for 205 Reset Content and 300 Multiple Choices.
