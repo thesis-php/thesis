@@ -24,6 +24,7 @@ The HTTP messages, client, server and HTTP/1 codec ship together as `thesis/http
 - Create JSON and HTML responses using `Response::json()` and `Response::html()`.
 - Set a JSON body with `withJson()` and take and decode it with `takeJson()` on requests and responses. Both methods enable `JSON_THROW_ON_ERROR` with any supplied flags.
 
+- Pass a default handler to `Router` to handle requests for unknown paths.
 - Use `Router::$list` to read the original routes in registration order.
 - Cancel the active server exchange when the peer disconnects after sending the request body.
 

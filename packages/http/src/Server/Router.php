@@ -15,6 +15,8 @@ use const Thesis\Http\Internal\ROUTE_MATCHES;
 
 /**
  * @api
+ * @phpstan-import-type Handler from \Thesis\Http\Server
+ * @phpstan-import-type HandlerClosure from \Thesis\Http\Server
  */
 final class Router
 {
@@ -22,6 +24,11 @@ final class Router
      * @var list<Route> original routes in registration order
      */
     public readonly array $list;
+
+    /**
+     * @var HandlerClosure|null
+     */
+    private readonly ?\Closure $defaultHandler;
 
     private readonly RouteNode $root;
 
@@ -42,10 +49,12 @@ final class Router
 
     /**
      * @param iterable<Route> $routes
+     * @param Handler|null $defaultHandler handles an unknown path, or null to use the context's error handler
      * @throws \InvalidArgumentException for duplicate routes, invalid patterns or methods
      */
-    public function __construct(iterable $routes)
+    public function __construct(iterable $routes, ?callable $defaultHandler = null)
     {
+        $this->defaultHandler = $defaultHandler === null ? null : $defaultHandler(...);
         $this->root = new RouteNode();
         $registered = [];
         foreach ($routes as $route) {
@@ -136,6 +145,9 @@ final class Router
             $response = $context->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, $request);
 
             return $response->withHeader('Allow', implode(', ', $match->allowedMethods));
+        }
+        if ($match === RouteFailure::NotFound && $this->defaultHandler !== null) {
+            return ($this->defaultHandler)($request, $context);
         }
         if ($match instanceof RouteFailure) {
             return $context->errorHandler->handleError($match->value, $request);

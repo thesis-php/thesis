@@ -296,7 +296,9 @@ and a method mismatch returns `MethodNotAllowed` (405) with the list of method s
 An explicit HEAD wins over the GET fallback. A route with `methods: null` handles any remaining method
 for the selected path and reports the request's method in `RouteMatch`. Only one such route may occupy a path shape.
 For example, `Route::any('/storage/{path+}', $proxy)` forwards custom methods such as PROPFIND.
-A more specific path still owns its 405. A mismatch yields 405 with Allow, an unknown path 404.
+A more specific path still owns its 405. A method mismatch yields 405 with Allow.
+Pass a default handler to serve unknown paths, for example `new Router($routes, defaultHandler: $staticHandler)`.
+It receives the request and context. If omitted, the context's error handler handles the 404.
 
 Matching uses the raw URI path. Dot segments, plus signs and trailing slashes keep their meaning.
 End a pattern with `[/]` to accept one optional slash. For example, `/docs[/]` matches both `/docs` and `/docs/`.

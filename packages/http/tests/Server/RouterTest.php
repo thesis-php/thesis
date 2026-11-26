@@ -64,6 +64,26 @@ final readonly class RouterTest
         Assert::same($response->headers->get('Allow'), Method::POST);
     }
 
+    public function callsTheDefaultHandlerOnlyForUnknownPaths(): void
+    {
+        $request = getRequest('/style.css');
+        $router = new Router(
+            routes: [Route::get('/', static fn() => new Response(body: 'home'))],
+            defaultHandler: function (Request $received, Context $context) use ($request) {
+                Assert::same($received, $request);
+                Assert::same($context, $this->context);
+
+                return new Response(body: 'css');
+            },
+        );
+
+        Assert::same($router->match($request), RouteFailure::NotFound);
+        Assert::same($router($request, $this->context)->takeBody()->readAll(), 'css');
+        Assert::same($router(getRequest('/'), $this->context)->takeBody()->readAll(), 'home');
+        Assert::same($router(getRequest('/a%2Fb'), $this->context)->status, Status::BAD_REQUEST);
+        Assert::same($router(new Request(Method::POST, '/'), $this->context)->status, Status::METHOD_NOT_ALLOWED);
+    }
+
     public function formatsRoutingErrorsAndPreservesAllow(): void
     {
         $router = new Router([new Route(Method::POST, '/', static fn() => new Response())]);
