@@ -177,6 +177,20 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
   Date and Content-Length. For a cross-server ranking, rerun the peers together. Workerman and
   Node's HTTP server are open comparisons; the local Amp result covers neither.
 
+### Static file responses
+
+At 32 keep-alive clients rotating through 20 Arena files, reading 16 KiB from a FileBody per write
+raised TLS throughput from 8272 to 11,236 responses/s at the medians of six comparisons on PHP 8.6
+with tracing JIT and one pinned server vCPU. Median server CPU fell from 121.05 to 89.15 µs per
+response, and p99 from 11.12 to 8.33 ms. Plain HTTP rose from 12,581 to 15,219 responses/s.
+Small files (at most 8 KiB) had a plaintext p99 of 5.79 vs 5.49 ms. Length and SHA-256 matched
+for all 76,800 TLS and 38,400 plaintext responses in the comparison.
+
+A client that stopped reading a 16 MiB response held another 8 KiB of PHP heap with 16 KiB reads.
+Rejected: 32 and 64 KiB file reads. They reached 11,938 and 12,354 TLS replies/s, but held another
+40–44 or 102–110 KiB per blocked client over the 8 KiB baseline. Small-file TLS p99 reached
+8.46 ms with 64 KiB reads, against 6.24 ms with 16 KiB reads.
+
 ### HTTP Arena H1 Baseline
 
 - Rejected: the raw string writer at `b2e389c` avoided allocating a reader for short

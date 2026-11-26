@@ -7,6 +7,7 @@ namespace Thesis\Http\Server\Internal;
 use Psr\Clock\ClockInterface;
 use Thesis\Async\Cancelled;
 use Thesis\Http\Body;
+use Thesis\Http\FileBody;
 use Thesis\Http\Method;
 use Thesis\Http\Request;
 use Thesis\Http\Response;
@@ -180,7 +181,11 @@ final class ResponseWriter implements Writer, Closer
      */
     public static function readBody(Body $body, ?int $remaining): string
     {
-        $max = $body->isBuffered ? 64 * 1024 : 8192;
+        $max = match (true) {
+            $body->isBuffered => 64 * 1024,
+            $body instanceof FileBody => 16 * 1024,
+            default => 8192,
+        };
         $bytes = $body->read(min($max, $remaining ?? $max));
         if ($bytes === null && $remaining !== null) {
             throw new ReadFailed('The response body ended before its declared length.');
