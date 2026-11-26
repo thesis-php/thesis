@@ -43,8 +43,8 @@ final class Headers implements \IteratorAggregate
     private readonly array $lines;
 
     /**
-     * @param iterable<int|non-empty-string, string|list<string>> $fields if a name is given twice (`Accept` and `accept`),
-     *     the lines of both are kept
+     * @param iterable<int|non-empty-string, string|list<string>> $fields if a name is given twice
+     *     (`Accept` and `accept`), the lines of both are kept
      * @throws \ValueError if a name or a value is not valid
      */
     public function __construct(iterable $fields = [])

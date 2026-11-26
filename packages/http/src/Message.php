@@ -85,7 +85,7 @@ abstract class Message
      * Takes the body and decodes the whole payload as JSON.
      * If you need trailers, use takeBody() and read the body to the end before calling trailers().
      *
-     * @param positive-int $depth
+     * @param int<1, 2147483647> $depth
      * @param non-negative-int $limit maximum payload bytes to collect
      * @throws \LogicException if the body has already been taken or partially read
      * @throws \OverflowException if the payload exceeds the limit
@@ -101,12 +101,7 @@ abstract class Message
         $bytes = $body->readAll($limit);
         $body->close();
 
-        return json_decode(
-            json: $bytes,
-            associative: $associative,
-            depth: $depth,
-            flags: $flags | JSON_THROW_ON_ERROR,
-        );
+        return json_decode(json: $bytes, associative: $associative, depth: $depth, flags: $flags | JSON_THROW_ON_ERROR);
     }
 
     final public function withBody(string|Body $body): static
@@ -118,19 +113,15 @@ abstract class Message
      * Returns a copy with the value encoded as JSON and Content-Type set to application/json.
      *
      * @param positive-int $depth
-     * @throws \JsonException if the value cannot be encoded
+     * @throws \JsonException if encoding fails and JSON_PARTIAL_OUTPUT_ON_ERROR is unset
      */
     final public function withJson(mixed $value, int $flags = 0, int $depth = 512): static
     {
+        $json = json_encode(value: $value, flags: $flags | JSON_THROW_ON_ERROR, depth: $depth);
+
         return clone($this, [
             'headers' => $this->headers->with('content-type', 'application/json'),
-            'pendingBody' => new PendingBody(
-                json_encode(
-                    value: $value,
-                    flags: $flags | JSON_THROW_ON_ERROR,
-                    depth: $depth,
-                ),
-            ),
+            'pendingBody' => new PendingBody($json),
         ]);
     }
 }

@@ -112,6 +112,7 @@ final class MessageTest
     public function encodesJsonWithTheSuppliedFlagsAndDepth(): void
     {
         $message = new Response();
+        Assert::same($message->withJson([NAN], JSON_PARTIAL_OUTPUT_ON_ERROR)->takeBody()->readAll(), '[0]');
         $copy = $message->withJson('/path', JSON_UNESCAPED_SLASHES, 1);
         Assert::same($copy->takeBody()->readAll(), '"/path"');
         Expect::exception(\JsonException::class);

@@ -318,7 +318,10 @@ final readonly class RouterTest
             new Route('GET', '/assets/{path+}', $handler, requirements: ['path' => '[a-z/]+']),
         ]);
         Assert::same(self::matched($router, getRequest('/archive'))->params, ['month' => '01']);
-        Assert::same(self::matched($router, getRequest('/archive/2026/11'))->params, ['year' => '2026', 'month' => '11']);
+        Assert::same(
+            actual: self::matched($router, getRequest('/archive/2026/11'))->params,
+            expected: ['year' => '2026', 'month' => '11'],
+        );
         Assert::same(self::matched($router, getRequest('/files'))->params, ['path' => '']);
         Assert::same(self::matched($router, getRequest('/files/a/b/'))->params, ['path' => 'a/b/']);
         Assert::same($router->match(getRequest('/assets/')), RouteFailure::NotFound);

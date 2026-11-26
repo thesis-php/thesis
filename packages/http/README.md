@@ -74,7 +74,7 @@ return Response::json($value);
 
 Use `$request->withJson($value)` or `$response->withJson($value)` to copy a message with a new JSON body
 and set its `Content-Type` to `application/json`. Pass encoding options as `flags:` and the maximum nesting level as `depth:` (default 512).
-Encoding failures throw `JsonException`.
+Encoding failures throw `JsonException` unless `JSON_PARTIAL_OUTPUT_ON_ERROR` requests partial output.
 
 On requests and responses, `takeJson()` takes the body once, even when decoding fails.
 It uses the same default limit as `readAll()`.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Thesis\Http;
 
+use Uri\InvalidUriException;
 use Uri\Rfc3986\Uri;
 
 /**
@@ -26,6 +27,7 @@ final class Request extends Message
     /**
      * @param non-empty-string $method
      * @param HeadersInput $headers
+     * @throws InvalidUriException if the URI string is invalid
      */
     public function __construct(
         public readonly string $method,
@@ -45,6 +47,9 @@ final class Request extends Message
         return clone($this, ['method' => $method]);
     }
 
+    /**
+     * @throws InvalidUriException if the URI string is invalid
+     */
     public function withUri(string|Uri $uri): self
     {
         return clone($this, ['uri' => \is_string($uri) ? new Uri($uri) : $uri, 'parsedQuery' => null]);
@@ -52,6 +57,7 @@ final class Request extends Message
 
     /**
      * @param QueryInput $query
+     * @throws InvalidUriException if the encoded query string is invalid
      */
     public function withQuery(string|array|Query $query): self
     {
@@ -74,6 +80,7 @@ final class Request extends Message
      * Appends query pairs while preserving the original encoded query.
      *
      * @param QueryInput $query
+     * @throws InvalidUriException if the encoded query string is invalid
      */
     public function withAddedQuery(string|array|Query $query): self
     {
