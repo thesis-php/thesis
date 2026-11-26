@@ -46,16 +46,16 @@ final class ResponseWriter implements Writer, Closer
     /**
      * @return array{ResponseHead, string}
      */
-    public function encodeHead(Response $response, string|Body $body, RequestHead $request, bool $isPersistent): array
+    public function encodeHead(Response $response, Body $body, RequestHead $request, bool $isPersistent): array
     {
         $ordinary = $request->method !== Method::HEAD && $request->method !== Method::CONNECT;
-        if ($this->lastResponseHead !== null && $ordinary && (\is_string($body) || $body instanceof StringBody)) {
+        if ($this->lastResponseHead !== null && $ordinary && $body instanceof StringBody) {
             $cached = $this->lastResponseHead;
             $head = $cached[0];
-            if ($response->status === $head->status && (\is_string($body) ? \strlen($body) : $body->size) === $head->length
+            if ($response->status === $head->status && $body->size === $head->length
                 && $request->version === $head->version
                 && ($isPersistent && $request->isPersistent) === $head->isPersistent
-                && $response->headers->toArray() === $head->headers->toArray() && (\is_string($body) || !$body->mayHaveTrailers)) {
+                && $response->headers->toArray() === $head->headers->toArray() && !$body->mayHaveTrailers) {
                 return $cached;
             }
         }
@@ -108,23 +108,13 @@ final class ResponseWriter implements Writer, Closer
     }
 
     public function writeResponse(
-        string|Body $body,
+        Body $body,
         ResponseHead $head,
         string $bytes,
         ?string $first = null,
         bool $bufferedEcho = false,
     ): void {
         $remaining = $head->length;
-        if (\is_string($body)) {
-            if ($remaining !== null && $remaining <= 8192) {
-                $this->write($bytes . $body);
-
-                return;
-            }
-
-            $body = new StringBody($body);
-        }
-
         if ($remaining !== null && $remaining > 0 && $remaining <= 8192
             && ($first !== null || $bufferedEcho || $body->isBuffered)) {
             try {

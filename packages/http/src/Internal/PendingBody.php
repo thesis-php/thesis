@@ -19,21 +19,14 @@ final class PendingBody
 
     public function take(): Body
     {
-        $body = $this->takePayload();
+        $body = $this->body ?? throw new \LogicException('The message body has already been taken.');
+        $this->body = null;
 
         if ($body === '') {
             return EMPTY_BODY;
         }
 
         return \is_string($body) ? new StringBody($body) : $body;
-    }
-
-    public function takePayload(): string|Body
-    {
-        $body = $this->body ?? throw new \LogicException('The message body has already been taken.');
-        $this->body = null;
-
-        return $body;
     }
 
     public function __destruct()

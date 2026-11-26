@@ -54,14 +54,4 @@ final class Response extends Message
     {
         return clone($this, ['status' => $status]);
     }
-
-    /**
-     * Transfers the body in its original form for HTTP/1 output.
-     *
-     * @internal
-     */
-    public function takePayload(): string|Body
-    {
-        return $this->pendingBody->takePayload();
-    }
 }

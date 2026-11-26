@@ -179,8 +179,8 @@ was +5.0% and -1.4% respectively. Timing varied across blocks. Keep the router's
 
 ### HTTP Arena H1 Baseline
 
-- Passing a response string through the existing body handoff lets HTTP/1 write a short
-  length-framed reply without allocating a reader. With the routed handler on the Xeon,
+- Rejected: the raw string writer at `b2e389c` avoided allocating a reader for short
+  length-framed responses. With the routed handler on the Xeon,
   the three one-core pairs with a 5 s settle gained 8.72%, 7.64% and 6.84% over stock.
   With a 30 s settle, all six pairs gained throughput and lowered p99. The paired median
   gain was 7.36% on one core and 5.70% on two. Relative to TrueAsync in the same triplets,

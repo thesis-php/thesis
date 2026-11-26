@@ -17,7 +17,7 @@ abstract class Message
 {
     public readonly Headers $headers;
 
-    protected readonly PendingBody $pendingBody;
+    private readonly PendingBody $pendingBody;
 
     /**
      * @param HeadersInput $headers
