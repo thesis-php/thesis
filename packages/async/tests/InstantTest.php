@@ -11,6 +11,7 @@ use Time\TimeException;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class InstantTest
@@ -55,7 +56,7 @@ final class InstantTest
         $later = $now->add(ms(1));
 
         Assert::true($now < $later);
-        Assert::equals($now, $now->add(sec(0)));
+        Assert::equals($now, $now->add(ZERO));
     }
 
     public function addOutOfRangeOfClockThrows(): void

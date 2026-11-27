@@ -9,6 +9,7 @@ use Testo\Test;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class RemainingTest
@@ -94,7 +95,7 @@ final class RemainingTest
             });
         });
 
-        Assert::equals($observed, [sec(0), false]);
+        Assert::equals($observed, [ZERO, false]);
     }
 
     public function isGoneAfterTimeoutReturns(): void

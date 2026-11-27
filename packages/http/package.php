@@ -34,7 +34,7 @@ return new Manifest(
         'thesis/async' => '*',
         'thesis/dispatcher' => '*',
         'thesis/net' => '*',
-        'thesis/time' => '*',
+        'thesis/time' => '^0.4.1',
         'thesis/io' => '*',
     ],
     requireDev: [

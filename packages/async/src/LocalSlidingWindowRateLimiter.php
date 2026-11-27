@@ -8,8 +8,8 @@ use Thesis\Async\Internal\Scope;
 use Time\Duration;
 use function Thesis\Time\formatDuration;
 use function Thesis\Time\ns;
-use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
+use const Thesis\Time\ZERO;
 
 /**
  * In-process {@see RateLimiter} with a sliding window: at most $limit calls start within any $window,
@@ -55,7 +55,7 @@ final class LocalSlidingWindowRateLimiter implements RateLimiter
         private readonly int $limit,
         Duration $window,
     ) {
-        if ($window <= sec(0)) {
+        if ($window <= ZERO) {
             throw new \ValueError(\sprintf(
                 'LocalSlidingWindowRateLimiter needs a positive window, got %s.',
                 formatDuration($window),

@@ -17,6 +17,7 @@ return new Manifest(
     ],
     requireDev: [
         'thesis/async' => '*',
+        'thesis/time' => '*',
     ],
     skip: [
         new RectorSkip(

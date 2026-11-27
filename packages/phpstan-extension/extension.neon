@@ -8,3 +8,6 @@ services:
     -
         class: Thesis\PhpstanExtension\Internal\MapReturnType
         tags: [phpstan.broker.dynamicFunctionReturnTypeExtension]
+    -
+        class: Thesis\PhpstanExtension\Internal\ZeroDurationType
+        tags: [phpstan.broker.expressionTypeResolverExtension]

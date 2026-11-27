@@ -104,6 +104,18 @@ duration(minutes: 1, sec: 30); // the sum of the parts
 
 A value out of range throws `Time\TimeException`, `NAN` and `INF` throw `\ValueError`.
 
+Use `Thesis\Time\ZERO` for a zero duration, including as a parameter default:
+
+```php
+use Time\Duration;
+use const Thesis\Time\ZERO;
+
+function retry(Duration $delay = ZERO): void
+{
+    // ...
+}
+```
+
 ### Converting to int
 
 ```php
@@ -123,7 +135,7 @@ toHours($duration, RoundingMode::PositiveInfinity); // 1
 `toNs()` is exact. The others take a `\RoundingMode` and have no default: the right one depends on what the number
 means. Round a timeout, a TTL or an interval up with `PositiveInfinity`, so that it never expires early and a positive
 one never becomes the `0` that many APIs take as "no limit", see [the table](#passing-to-other-apis) below.
-A deadline that has passed still gives `0` or less: take `max(1, ...)` or check it with `$remaining > sec(0)` first.
+A deadline that has passed still gives `0` or less: take `max(1, ...)` or check it with `$remaining > \Thesis\Time\ZERO` first.
 Drop the fraction of elapsed time with `TowardsZero`.
 
 On 64-bit PHP every duration fits in an int of any unit, nanoseconds too. On 32-bit PHP an int holds 2.1 seconds
@@ -182,11 +194,12 @@ What to pass where a timeout or a TTL is a number, and what `0` means there: rar
 ### Checking, comparing, multiplying, dividing
 
 ```php
-use function Thesis\Time\{isZero, multiply, ratio, sec};
+use function Thesis\Time\{isZero, multiply, ratio};
+use const Thesis\Time\ZERO;
 
 isZero($duration);
 $duration->negative;
-$duration > sec(0);
+$duration > ZERO;
 $elapsed >= $timeout;
 
 min($a, $b, $c);

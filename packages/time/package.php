@@ -27,7 +27,6 @@ return new Manifest(
         'testo/test' => '^0.1.8',
         'testo/testo' => '^0.10.60',
     ],
-    files: ['polyfill/load.php'],
     skip: [
         new FixerSkip(
             paths: ['polyfill/TimeException.php'],

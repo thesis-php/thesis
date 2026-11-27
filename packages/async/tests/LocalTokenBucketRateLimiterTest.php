@@ -15,6 +15,7 @@ use function Thesis\Async\Tests\withoutWarnings;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class LocalTokenBucketRateLimiterTest
@@ -215,7 +216,7 @@ final class LocalTokenBucketRateLimiterTest
         $starts = group(static function (Group $group) use ($limiter, $start) {
             // Blocks the loop while the body sleeps for the next token.
             $group->spawn(static function () {
-                delay(sec(0));
+                delay(ZERO);
                 burnCpu(sec(10));
             });
 
@@ -237,7 +238,7 @@ final class LocalTokenBucketRateLimiterTest
 
         $starts = group(static function (Group $group) use ($limiter, $start) {
             $group->spawn(static function () {
-                delay(sec(0));
+                delay(ZERO);
                 burnCpu(ms(2500));
             });
 
@@ -260,7 +261,7 @@ final class LocalTokenBucketRateLimiterTest
         $starts = group(static function (Group $group) use ($limiter, $start) {
             // The second token comes at 666 666 667 ns.
             $group->spawn(static function () {
-                delay(sec(0));
+                delay(ZERO);
                 burnCpu(ns(666_666_667));
             });
 
@@ -287,7 +288,7 @@ final class LocalTokenBucketRateLimiterTest
         $starts = group(static function (Group $group) use ($limiter, $start) {
             // Blocks the loop while the body sleeps for the next token, due in 2 seconds.
             $group->spawn(static function () {
-                delay(sec(0));
+                delay(ZERO);
                 burnCpu(sec(3));
             });
 

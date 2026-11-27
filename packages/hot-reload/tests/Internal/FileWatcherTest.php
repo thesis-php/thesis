@@ -13,6 +13,7 @@ use function Thesis\Async\group;
 use function Thesis\Async\virtualTime;
 use function Thesis\exceptionally;
 use function Thesis\Time\ms;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class FileWatcherTest
@@ -100,7 +101,7 @@ final class FileWatcherTest
             virtualTime(static fn() => group(static function (Group $group) use ($file) {
                 /** @var Channel<true> $reload */
                 $reload = new Channel(capacity: 1);
-                $watcher = new FileWatcher([$file], ms(0), $reload);
+                $watcher = new FileWatcher([$file], ZERO, $reload);
                 $watcher->run($group);
                 $watcher->refresh();
 

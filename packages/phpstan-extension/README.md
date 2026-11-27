@@ -72,3 +72,7 @@ assertType('array{sales: Report, costs: Report}', map(['sales' => $sales, 'costs
 
 Without such a key or for a generator, the type of the PHPDoc stays. `race()`, `timeout()`, `group()` and the others
 need no extension: their generics are precise.
+
+## thesis/time
+
+PHPStan infers `Time\Duration` for `Thesis\Time\ZERO`, including when imported with `use const`.

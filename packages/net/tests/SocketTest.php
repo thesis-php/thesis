@@ -21,6 +21,7 @@ use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class SocketTest
@@ -140,7 +141,7 @@ final class SocketTest
         $progress->reads = 0;
         $progress->readsWhenTicked = null;
         // A callback of the loop: it runs if the loop has ticked.
-        watchdog(sec(0), static function () use ($progress) {
+        watchdog(ZERO, static function () use ($progress) {
             $progress->readsWhenTicked = $progress->reads;
         });
 
@@ -290,7 +291,7 @@ final class SocketTest
         $progress->writes = 0;
         $progress->writesWhenTicked = null;
         // A callback of the loop: it runs if the loop has ticked.
-        watchdog(sec(0), static function () use ($progress) {
+        watchdog(ZERO, static function () use ($progress) {
             $progress->writesWhenTicked = $progress->writes;
         });
 

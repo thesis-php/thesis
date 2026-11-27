@@ -13,7 +13,7 @@ use function Thesis\Async\group;
 use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
-use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class ServerTest
@@ -139,7 +139,7 @@ final class ServerTest
         $progress->accepted = [];
         $progress->acceptedWhenTicked = null;
         // A callback of the loop: it runs if the loop has ticked.
-        watchdog(sec(0), static function () use ($progress) {
+        watchdog(ZERO, static function () use ($progress) {
             $progress->acceptedWhenTicked = \count($progress->accepted);
         });
 

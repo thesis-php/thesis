@@ -49,8 +49,7 @@
         },
         "files": [
             "src/Internal/internal.php",
-            "src/api.php",
-            "polyfill/load.php"
+            "src/api.php"
         ]
     },
     "autoload-dev": {

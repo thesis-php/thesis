@@ -133,7 +133,7 @@ final class DurationTest
     public static function arithmetic(): iterable
     {
         yield 'negate' => [static fn() => Duration::fromMilliseconds(1500)->negate(), '-1.500000000'];
-        yield 'negate zero' => [static fn() => Duration::fromSeconds(0)->negate(), '0.000000000'];
+        yield 'negate zero' => [ZERO->negate(...), '0.000000000'];
         yield 'negate twice' => [static fn() => Duration::fromSeconds(1)->negate()->negate(), '1.000000000'];
         yield 'absolute' => [static fn() => signed(5, negative: true)->absolute(), '5.000000000'];
         yield 'add with carry' => [static fn() => signed(1, 600_000_000)->add(signed(0, 600_000_000)), '2.200000000'];

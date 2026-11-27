@@ -38,7 +38,7 @@
         "thesis/exceptionally": "^0.4",
         "thesis/io": "^0.1",
         "thesis/process": "^0.1",
-        "thesis/time": "^0.4"
+        "thesis/time": "^0.4.1"
     },
     "require-dev": {
         "testo/assert": "^0.1.17",

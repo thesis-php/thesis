@@ -15,6 +15,7 @@ use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class GroupTest
@@ -197,7 +198,7 @@ final class GroupTest
             $handle = $group->spawn(static function () use (&$started) {
                 $started = true;
             });
-            delay(sec(0)); // the task would have started here
+            delay(ZERO); // the task would have started here
 
             Assert::true($handle->isDone);
             $awaited = thrown(static fn() => $handle->await());
@@ -651,7 +652,7 @@ final class GroupTest
                     }
                 });
                 // The event loop delivers the callback's exception to the test fiber while it waits for the group.
-                later(sec(0), static function () {
+                later(ZERO, static function () {
                     throw new \RuntimeException('foreign');
                 });
             });
@@ -673,14 +674,14 @@ final class GroupTest
                     try {
                         never();
                     } finally {
-                        later(sec(0), static function () {
+                        later(ZERO, static function () {
                             throw new \RuntimeException('foreign');
                         });
                         shield(static fn() => delay(sec(1)));
                         $events[] = 'task cleaned up';
                     }
                 });
-                delay(sec(0));
+                delay(ZERO);
 
                 throw new \LogicException('body failed');
             });
@@ -769,7 +770,7 @@ final class GroupTest
 
         // let the orphaned task finish
         $never->complete();
-        delay(sec(0));
+        delay(ZERO);
         assertNoCallbacksLeft();
     }
 

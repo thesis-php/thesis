@@ -15,6 +15,7 @@ use function Thesis\Async\Tests\secondsSince;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class TimeoutTest
@@ -64,7 +65,7 @@ final class TimeoutTest
 
     public function expiredDeadlineReturnsResultOfBodyThatDoesNotWait(): void
     {
-        Assert::equals(timeout(sec(-1), static fn() => remaining()), sec(0));
+        Assert::equals(timeout(sec(-1), static fn() => remaining()), ZERO);
         assertNoCallbacksLeft();
     }
 

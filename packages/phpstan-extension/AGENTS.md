@@ -44,7 +44,9 @@ How to use it is in `README.md`.
 - Nothing for the functions whose generics are already precise: `race()` (the union of the template),
   `timeout()`, `timeoutOr()`, `group()`, `shield()`, `synchronized()`, `Group::spawn()`.
   Nothing for `some()`: the best honest type is its PHPDoc, a shape or a list would lie about the order.
-  Nothing for the other packages: `ListenerRule` of `dispatcher` left with `#[Listener]` (its `AGENTS.md`).
+- PHPStan infers `mixed` for `Thesis\Time\ZERO` declared with `define()`. Resolve the constant name in the
+  caller's scope so imports work and an unrelated `ZERO` keeps its own type.
+- `ListenerRule` of `dispatcher` left with `#[Listener]` (its `AGENTS.md`).
 
 ## Tests
 

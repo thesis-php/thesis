@@ -17,7 +17,7 @@ return new Manifest(
         'php-64bit' => '*',
         'thesis/dispatcher' => '*',
         'thesis/source-location' => '*',
-        'thesis/time' => '*',
+        'thesis/time' => '^0.4.1',
     ],
     requireDev: [
         'ext-pcntl' => '*',

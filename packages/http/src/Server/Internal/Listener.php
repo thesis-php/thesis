@@ -26,7 +26,7 @@ use function Thesis\Async\onCancel;
 use function Thesis\Async\shield;
 use function Thesis\Async\timeout;
 use function Thesis\Async\timeoutOr;
-use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 /**
  * @internal
@@ -141,7 +141,7 @@ final class Listener
                 $this->drained = new Deferred();
                 \assert($this->shutdownStarted !== null);
                 $remaining = $this->config->shutdownTimeout->sub(Instant::now()->since($this->shutdownStarted));
-                if ($remaining > sec(0)) {
+                if ($remaining > ZERO) {
                     timeoutOr($remaining, $this->drained->await(...));
                 }
                 foreach ($this->connections as $connection) {
@@ -162,7 +162,7 @@ final class Listener
 
     private static function deadlines(Group $group, Duration $timeout): ?SocketDeadlines
     {
-        return $timeout > sec(0) ? new SocketDeadlines($group, $timeout) : null;
+        return $timeout > ZERO ? new SocketDeadlines($group, $timeout) : null;
     }
 
     private function accept(Group $group, ?SocketDeadlines $idle, ?SocketDeadlines $writes): void

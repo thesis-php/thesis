@@ -17,6 +17,7 @@ use function Thesis\Async\timeout;
 use function Thesis\Cache\Tests\thrown;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class AtomicCacheTest extends CacheContract
@@ -377,7 +378,7 @@ final class AtomicCacheTest extends CacheContract
 
         $elapsed = Instant::elapsed(static fn() => group(static function (Group $group) use ($cache, $compute) {
             for ($i = 0; $i < 3; ++$i) {
-                $group->spawn(static fn() => $cache->getOrCompute('a', $compute, sec(0)));
+                $group->spawn(static fn() => $cache->getOrCompute('a', $compute, ZERO));
             }
         }));
 

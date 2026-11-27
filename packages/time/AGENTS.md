@@ -83,14 +83,13 @@ and PSR-20 clocks on both 64-bit and 32-bit PHP. Read the
 
 - The functions take a negative value, unlike the factories of the class: a duration is negative anyway
   after `sub()`, `negate()` or `durationBetween()`, and `shiftTime($now, sec(-30))` beats `sec(30)->negate()`.
-  A caller that needs a positive duration (a timeout) checks it with `$duration > sec(0)`.
+  A caller that needs a positive duration (a timeout) checks it with `$duration > ZERO`.
 - They throw `Time\TimeException` out of range, as the class does, so a caller handles one kind,
   and `\ValueError` only for NAN and INF given. `Internal\fromFloat()` tells the two apart,
   its docblock says how (`multiply()` passes the factor).
-- No duration constants, not even `ZERO`: only `define()` could make one, a default of a duration parameter
-  is `null`, and `$duration === ZERO` compares identity (and sometimes passes, 8.6 caches the last duration).
-  The check is `isZero()`. Rejected for the same reason: `zero()` with a `static` instance, which makes
-  `=== zero()` pass for its own result and fail for a computed zero (`sub($a, $a)`).
+- `Thesis\Time\ZERO` gives callers a zero duration, including as a parameter default. Define it in
+  `src/api.php` after requiring the polyfill loader. Use `isZero()` to check a value:
+  `=== ZERO` compares object identity and can pass by accident because PHP 8.6 caches the last duration.
 - No second way to write what PHP has: `<`, `>`, `<=>`, `min()`, `max()` and `sort()` compare durations
   on 8.6 and with the polyfill (`DurationTest` pins it, PHPStan types their result as `Time\Duration`),
   and the class has `$negative`. Rejected, removed in 0.4: `isPositive()`, `isNegative()`, `shortest()`,

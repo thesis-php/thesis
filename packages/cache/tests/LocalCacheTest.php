@@ -16,6 +16,7 @@ use function Thesis\Time\hours;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class LocalCacheTest extends CacheContract
@@ -287,7 +288,7 @@ final class LocalCacheTest extends CacheContract
     public function valueOfTtlThatIsNotPositiveIsNotKept(): void
     {
         $cache = new LocalCache();
-        $reference = self::storeObject($cache, 'a', ttl: ns(0));
+        $reference = self::storeObject($cache, 'a', ttl: ZERO);
 
         Assert::null($reference->get());
     }

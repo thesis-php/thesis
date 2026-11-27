@@ -29,6 +29,11 @@ use const Thesis\Time\Internal\NUMBER_WITH_UNIT;
 use const Thesis\Time\Internal\SECONDS_PER_HOUR;
 use const Thesis\Time\Internal\SECONDS_PER_MINUTE;
 
+require_once \dirname(__DIR__) . '/polyfill/load.php';
+
+/** @api */
+\define('Thesis\Time\ZERO', Duration::fromSeconds(0));
+
 /**
  * Unlike Duration::fromNanoseconds(), takes a negative value.
  *
@@ -376,7 +381,7 @@ function parseDuration(string $string): Duration
 {
     $negative = str_starts_with($string, '-');
     $offset = $negative || str_starts_with($string, '+') ? 1 : 0;
-    $duration = Duration::fromSeconds(0);
+    $duration = ZERO;
 
     // Only zero has no unit.
     if (substr($string, $offset) === '0') {

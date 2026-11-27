@@ -267,7 +267,7 @@ final class DateTimeTest
         ];
         yield 'zero' => [
             '2026-01-01 00:00:00 UTC',
-            ns(0),
+            ZERO,
             \RoundingMode::NegativeInfinity,
             'ValueError: A unit of rounding must be positive, 0s given',
         ];

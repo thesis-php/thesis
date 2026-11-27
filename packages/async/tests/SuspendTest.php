@@ -13,6 +13,7 @@ use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class SuspendTest
@@ -51,7 +52,7 @@ final class SuspendTest
         Expect::exception(\RuntimeException::class)->withMessage('source failed');
 
         suspend(static function (Continuation $continuation) {
-            later(sec(0), static function () use ($continuation) {
+            later(ZERO, static function () use ($continuation) {
                 $continuation->throw(new \RuntimeException('source failed'));
             });
         });
@@ -135,7 +136,7 @@ final class SuspendTest
         $calls = 0;
 
         suspend(static function (Continuation $continuation) use (&$calls) {
-            later(sec(0), static function () use ($continuation) {
+            later(ZERO, static function () use ($continuation) {
                 $continuation->resume();
             });
 
@@ -188,7 +189,7 @@ final class SuspendTest
         $exception = thrown(static function () use (&$calls) {
             suspend(static function (Continuation $_) use (&$calls) {
                 // The event loop delivers the callback's exception to the test fiber waiting in suspend().
-                later(sec(0), static function () {
+                later(ZERO, static function () {
                     throw new \RuntimeException('foreign');
                 });
 

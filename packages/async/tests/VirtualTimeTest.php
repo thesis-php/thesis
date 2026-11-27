@@ -20,6 +20,7 @@ use function Thesis\Async\Tests\thrown;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 /**
  * Every test already runs on virtual time. The tests of virtualTime() start a nested virtualTime() run.
@@ -93,7 +94,7 @@ final class VirtualTimeTest
 
         Assert::same([secondsSince($start), $fired], [2.0, null]);
 
-        delay(sec(0));
+        delay(ZERO);
 
         Assert::same($fired, 2.0);
     }
@@ -103,7 +104,7 @@ final class VirtualTimeTest
         $start = Instant::now();
         $exception = thrown(static fn() => timeout(sec(1), static function () {
             burnCpu(sec(1));
-            delay(sec(0));
+            delay(ZERO);
         }));
 
         Assert::instanceOf($exception, TimedOut::class);
@@ -160,7 +161,7 @@ final class VirtualTimeTest
     public function burnCpuSpinsOnRealClockOutsideVirtualTime(): void
     {
         $deferred = false;
-        later(sec(0), static function () use (&$deferred) {
+        later(ZERO, static function () use (&$deferred) {
             $deferred = true;
         });
 
@@ -342,10 +343,10 @@ final class VirtualTimeTest
                 // Both in one tick: the first resumes the fiber of the run, which ends it,
                 // the second throws once the wait of that fiber has already fired.
                 suspend(static function (Continuation $continuation) {
-                    later(sec(0), static function () use ($continuation) {
+                    later(ZERO, static function () use ($continuation) {
                         $continuation->resume();
                     });
-                    later(sec(0), static function () {
+                    later(ZERO, static function () {
                         throw new \RuntimeException('left in the loop');
                     });
                 });
@@ -407,10 +408,10 @@ final class VirtualTimeTest
 
             // Both in one tick: the first resumes the fiber of the run, the second fires before the run ends.
             suspend(static function (Continuation $continuation) use ($start, &$seen) {
-                later(sec(0), static function () use ($continuation) {
+                later(ZERO, static function () use ($continuation) {
                     $continuation->resume();
                 });
-                later(sec(0), static function () use ($start, &$seen) {
+                later(ZERO, static function () use ($start, &$seen) {
                     $seen = secondsSince($start);
                 });
             });

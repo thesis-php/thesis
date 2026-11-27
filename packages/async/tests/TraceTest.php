@@ -22,6 +22,7 @@ use function Thesis\Async\Tests\reaches;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Trace\observe;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class TraceTest
@@ -140,7 +141,7 @@ final class TraceTest
 
         // lets the orphaned task finish
         $never->complete();
-        delay(sec(0));
+        delay(ZERO);
     }
 
     public function tracesNoWaitOfRootScope(): void
@@ -370,7 +371,7 @@ final class TraceTest
 
     public function tracesScopeCreatedCancelled(): void
     {
-        $log = self::record(static fn() => timeoutOr(sec(0), static fn() => group(static fn() => null)));
+        $log = self::record(static fn() => timeoutOr(ZERO, static fn() => group(static fn() => null)));
 
         Assert::same($log->lines, [
             '0 #1 timeout 0s in root',

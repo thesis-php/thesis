@@ -33,7 +33,8 @@
         "phpstan/phpstan": "^2.3"
     },
     "require-dev": {
-        "thesis/async": "^0.1"
+        "thesis/async": "^0.1",
+        "thesis/time": "^0.4"
     },
     "autoload": {
         "psr-4": {

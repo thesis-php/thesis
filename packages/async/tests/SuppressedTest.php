@@ -10,6 +10,7 @@ use Thesis\Async\Internal\Suppressed;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class SuppressedTest
@@ -266,7 +267,7 @@ final class SuppressedTest
 
         // let the orphaned task finish
         $never->complete();
-        delay(sec(0));
+        delay(ZERO);
     }
 
     public function deadlockIsNotSuppressedBySameDeadlock(): void
@@ -284,7 +285,7 @@ final class SuppressedTest
         Assert::same(suppressed($exception), []);
 
         $never->complete();
-        delay(sec(0));
+        delay(ZERO);
     }
 
     public function entryGoesAwayWithError(): void

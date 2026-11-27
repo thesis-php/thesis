@@ -16,7 +16,7 @@ return new Manifest(
         'thesis/exceptionally' => '*',
         'thesis/io' => '*',
         'thesis/process' => '*',
-        'thesis/time' => '*',
+        'thesis/time' => '^0.4.1',
     ],
     requireDev: [
         'testo/assert' => '^0.1.17',

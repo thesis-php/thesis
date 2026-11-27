@@ -8,7 +8,7 @@ use Thesis\Net\InetAddress;
 use Thesis\Net\Server;
 use Time\Duration;
 use function Thesis\Net\listen;
-use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 /**
  * A broker on a free local port that does what a test tells it: each accepted connection is a {@see FakePeer}.
@@ -24,14 +24,14 @@ final readonly class FakeServer
         private Server $server,
     ) {}
 
-    public function config(bool $reconnect = false, ?Duration $heartbeat = null): Config
+    public function config(bool $reconnect = false, Duration $heartbeat = ZERO): Config
     {
         $address = $this->server->address;
         \assert($address instanceof InetAddress);
 
         return new Config(
             hosts: ["127.0.0.1:{$address->port}"],
-            heartbeat: $heartbeat ?? sec(0),
+            heartbeat: $heartbeat,
             reconnect: $reconnect,
         );
     }

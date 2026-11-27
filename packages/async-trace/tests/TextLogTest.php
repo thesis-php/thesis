@@ -24,6 +24,7 @@ use function Thesis\AsyncTrace\Tests\unheardEvents;
 use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class TextLogTest
@@ -159,7 +160,7 @@ final class TextLogTest
 
     public function writesShieldAndScopesCreatedCancelled(): void
     {
-        $log = self::record(static fn() => timeoutOr(sec(0), static function () {
+        $log = self::record(static fn() => timeoutOr(ZERO, static function () {
             timeoutOr(sec(1), static fn() => null);
             group(static function (Group $group) {
                 $group->spawn(static fn() => null);

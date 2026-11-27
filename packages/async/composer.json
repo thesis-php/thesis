@@ -37,7 +37,7 @@
         "php-64bit": "*",
         "thesis/dispatcher": "^0.4",
         "thesis/source-location": "^0.1",
-        "thesis/time": "^0.4"
+        "thesis/time": "^0.4.1"
     },
     "require-dev": {
         "ext-pcntl": "*",

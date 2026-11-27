@@ -13,6 +13,7 @@ use function Thesis\Time\ms;
 use function Thesis\Time\ns;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class BackoffTest
@@ -85,7 +86,7 @@ final class BackoffTest
     {
         Expect::exception(\ValueError::class)->withMessage('The initial delay of a backoff must be positive.');
 
-        new Backoff(initial: ms(0), max: sec(1));
+        new Backoff(initial: ZERO, max: sec(1));
     }
 
     public function rejectsAMaximumBelowTheInitialDelay(): void

@@ -12,6 +12,7 @@ use function Thesis\Async\Tests\assertNoCallbacksLeft;
 use function Thesis\Async\Tests\never;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class SignalTest
@@ -209,7 +210,7 @@ final class SignalTest
 
         // A deadline of zero cancels the scope at once, and the body runs in it.
         $exception = thrown(static function () use (&$called) {
-            timeout(sec(0), static function () use (&$called) {
+            timeout(ZERO, static function () use (&$called) {
                 trapSignals([SIGUSR1], static function () use (&$called) {
                     $called = true;
                 });

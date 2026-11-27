@@ -13,6 +13,7 @@ use function Thesis\Async\Tests\later;
 use function Thesis\Async\Tests\thrown;
 use function Thesis\Async\Tests\untilCancelled;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class PacerTest
@@ -84,7 +85,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
 
-        delay(sec(0));
+        delay(ZERO);
 
         Assert::false(self::yields(static function () use ($pacer) {
             $pacer->pace();
@@ -97,7 +98,7 @@ final class PacerTest
         $pacer = new Pacer(perTick: 1);
         $pacer->pace();
 
-        delay(sec(0));
+        delay(ZERO);
 
         Assert::false(self::yields($pacer->pace(...)));
     }
@@ -152,7 +153,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
 
-        delay(sec(0));
+        delay(ZERO);
 
         assertNoCallbacksLeft();
     }
@@ -163,7 +164,7 @@ final class PacerTest
         $pacer->pace();
         $pacer->pace();
         // Another caller of the shared pacer, in the next tick before the yield below returns: it fills that tick.
-        later(sec(0), static function () use ($pacer) {
+        later(ZERO, static function () use ($pacer) {
             $pacer->pace();
             $pacer->pace();
         });

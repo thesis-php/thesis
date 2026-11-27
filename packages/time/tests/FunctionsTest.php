@@ -26,6 +26,7 @@ final class FunctionsTest
      */
     public static function calls(): iterable
     {
+        yield 'zero duration default' => [static fn(Duration $delay = ZERO) => $delay, '0.000000000'];
         yield 'ns' => [static fn() => ns(1_500_000_001), '1.500000001'];
         yield 'negative ns' => [static fn() => ns(-1), '-0.000000001'];
         yield 'us' => [static fn() => us(1.5), '0.000001500'];
@@ -103,14 +104,14 @@ final class FunctionsTest
             '10000000.500000002',
         ];
         yield 'toHoursFloat above 2^53 ns' => [static fn() => toHoursFloat(minutes(200_000.5)), '3333.3416666666667'];
-        yield 'isZero' => [static fn() => [isZero(ns(0)), isZero(ns(1)), isZero(ns(-1))], '[true, false, false]'];
+        yield 'isZero' => [static fn() => [isZero(ZERO), isZero(ns(1)), isZero(ns(-1))], '[true, false, false]'];
         yield 'multiply' => [static fn() => multiply(ms(1500), 3), '4.500000000'];
         yield 'multiply by negative' => [static fn() => multiply(ms(1500), -2), '-3.000000000'];
         yield 'multiply negative by negative' => [static fn() => multiply(ms(-1500), -2), '3.000000000'];
         yield 'multiply by float' => [static fn() => multiply(sec(1), 1.5), '1.500000000'];
         yield 'multiply by float rounds' => [static fn() => multiply(ns(3), 0.5), '0.000000002'];
         yield 'multiply by negative float' => [static fn() => multiply(sec(2), -0.25), '-0.500000000'];
-        yield 'multiply zero by min int' => [static fn() => multiply(ns(0), PHP_INT_MIN), '0.000000000'];
+        yield 'multiply zero by min int' => [static fn() => multiply(ZERO, PHP_INT_MIN), '0.000000000'];
         yield 'multiply above max' => [static fn() => multiply(hours(500_000), 2000), self::OUT_OF_RANGE];
         yield 'multiply long by float' => [static fn() => multiply(sec(2_000_000_000), -1.0), '-2000000000.000000000'];
         // The product of a finite factor may overflow to INF: the result is out of range, the factor is not wrong.
@@ -122,7 +123,7 @@ final class FunctionsTest
         ];
         // Not NAN, the product of zero and INF.
         yield 'multiply zero by INF' => [
-            static fn() => multiply(sec(0), INF),
+            static fn() => multiply(ZERO, INF),
             'ValueError: A duration must be finite, INF given',
         ];
         yield 'ratio' => [static fn() => ratio(sec(30), minutes(2)), '0.25'];
@@ -131,11 +132,11 @@ final class FunctionsTest
         yield 'ratio of negative' => [static fn() => ratio(ms(-1500), sec(1)), '-1.5'];
         yield 'ratio to negative' => [static fn() => ratio(ms(1500), sec(-1)), '-1.5'];
         yield 'ratio of negative to negative' => [static fn() => ratio(sec(-1), sec(-4)), '0.25'];
-        yield 'ratio of zero' => [static fn() => ratio(ns(0), sec(1)), '0.0'];
+        yield 'ratio of zero' => [static fn() => ratio(ZERO, sec(1)), '0.0'];
         // As the division of PHP gives it.
-        yield 'ratio of zero to negative' => [static fn() => ratio(ns(0), sec(-1)), '-0.0'];
-        yield 'ratio to zero' => [static fn() => ratio(sec(1), ns(0)), 'DivisionByZeroError: Division by zero'];
-        yield 'ratio of zero to zero' => [static fn() => ratio(ns(0), ns(0)), 'DivisionByZeroError: Division by zero'];
+        yield 'ratio of zero to negative' => [static fn() => ratio(ZERO, sec(-1)), '-0.0'];
+        yield 'ratio to zero' => [static fn() => ratio(sec(1), ZERO), 'DivisionByZeroError: Division by zero'];
+        yield 'ratio of zero to zero' => [static fn() => ratio(ZERO, ZERO), 'DivisionByZeroError: Division by zero'];
         // The float seconds are rounded already: 0.3 / 0.1 is 2.9999999999999996, and its floor loses an interval.
         yield 'ratio rounds once' => [static fn() => ratio(sec(0.3), sec(0.1)), '3.0'];
         yield 'ratio above 2^53 ns' => [static fn() => ratio(hours(24 * 365), hours(24)), '365.0'];
@@ -154,7 +155,7 @@ final class FunctionsTest
             '90.000000000',
         ];
         yield 'roundDurationTo of zero' => [
-            static fn() => roundDurationTo(ns(0), sec(1), \RoundingMode::AwayFromZero),
+            static fn() => roundDurationTo(ZERO, sec(1), \RoundingMode::AwayFromZero),
             '0.000000000',
         ];
         yield 'roundDurationTo of a negative' => [
@@ -235,7 +236,7 @@ final class FunctionsTest
             self::OUT_OF_RANGE,
         ];
         yield 'roundDurationTo zero' => [
-            static fn() => roundDurationTo(sec(1), ns(0), \RoundingMode::TowardsZero),
+            static fn() => roundDurationTo(sec(1), ZERO, \RoundingMode::TowardsZero),
             'ValueError: A unit of rounding must be positive, 0s given',
         ];
         yield 'roundDurationTo a negative unit' => [
@@ -351,7 +352,7 @@ final class FunctionsTest
      */
     public static function formats(): iterable
     {
-        yield '0s' => [ns(0), '0s'];
+        yield '0s' => [ZERO, '0s'];
         yield '15ns' => [ns(15), '15ns'];
         yield '1µs' => [us(1), '1µs'];
         yield '1.5µs' => [ns(1500), '1.5µs'];
@@ -532,7 +533,7 @@ final class FunctionsTest
             $maxCount = (int) min(PHP_INT_MAX, MAX_SECONDS / toSecFloat($unit) / 4);
             $count = $random->getInt(0, $maxCount >> $random->getInt(0, \PHP_INT_SIZE * 8 - 2));
             $remainder = match ($random->getInt(0, 3)) {
-                0 => ns(0),
+                0 => ZERO,
                 // A half of a unit of even nanoseconds, a half of a nanosecond less of odd ones.
                 1 => $unit->divideBy(2),
                 default => multiply($unit, $random->getInt(0, 999) / 1000),

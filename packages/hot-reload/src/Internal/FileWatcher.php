@@ -12,6 +12,7 @@ use function Thesis\Async\delay;
 use function Thesis\Async\isCancelled;
 use function Thesis\exceptionally;
 use function Thesis\Time\ms;
+use const Thesis\Time\ZERO;
 
 /**
  * @internal
@@ -79,7 +80,7 @@ final class FileWatcher implements Watcher
         }
 
         $remaining = $this->remainingDebounce();
-        if ($remaining === null || $remaining > ms(0)) {
+        if ($remaining === null || $remaining > ZERO) {
             return false;
         }
 

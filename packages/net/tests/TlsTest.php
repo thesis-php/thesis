@@ -18,6 +18,7 @@ use function Thesis\Async\timeoutOr;
 use function Thesis\Async\Trace\watchdog;
 use function Thesis\Time\ms;
 use function Thesis\Time\sec;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class TlsTest
@@ -265,7 +266,7 @@ final class TlsTest
             $group->spawn(static function () use ($client, $peer) {
                 $peer->close();
                 // The poll wakes the handshake. Close locally before its fiber resumes.
-                watchdog(sec(0), $client->close(...));
+                watchdog(ZERO, $client->close(...));
             });
 
             Assert::instanceOf($pending->await(), SocketClosed::class);

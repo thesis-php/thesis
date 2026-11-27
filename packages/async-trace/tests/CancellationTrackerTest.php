@@ -28,6 +28,7 @@ use function Thesis\Async\Trace\watchdog;
 use function Thesis\AsyncTrace\Tests\thrown;
 use function Thesis\Time\sec;
 use function Thesis\Time\toNs;
+use const Thesis\Time\ZERO;
 
 #[Test]
 final class CancellationTrackerTest
@@ -50,7 +51,7 @@ final class CancellationTrackerTest
     public function reportsScopesCreatedUnderCancellation(): void
     {
         $line = __LINE__ + 1;
-        $reports = self::reports(static fn() => timeoutOr(sec(0), static fn() => group(static function (Group $group) {
+        $reports = self::reports(static fn() => timeoutOr(ZERO, static fn() => group(static function (Group $group) {
             $group->spawn(static fn() => delay(sec(5)));
         })));
 
@@ -65,7 +66,7 @@ final class CancellationTrackerTest
     public function reportsTimeoutCreatedUnderCancellation(): void
     {
         $line = __LINE__ + 1;
-        $reports = self::reports(static fn() => timeoutOr(sec(0), static fn() => timeoutOr(sec(5), static fn() => delay(sec(1)))));
+        $reports = self::reports(static fn() => timeoutOr(ZERO, static fn() => timeoutOr(sec(5), static fn() => delay(sec(1)))));
 
         $timeout = self::at('timeout 0s', $line);
         Assert::same($reports, [
@@ -359,7 +360,7 @@ final class CancellationTrackerTest
     private static function cancelled(): Cancelled
     {
         $cancelled = null;
-        timeoutOr(sec(0), static function () use (&$cancelled) {
+        timeoutOr(ZERO, static function () use (&$cancelled) {
             try {
                 delay(sec(1));
             } catch (Cancelled $error) {
