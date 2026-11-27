@@ -22,3 +22,22 @@ function constantKeepsKeyAndValueTypes(Key $key): void
     // @phpstan-ignore offsetAssign.valueType
     $labels[$key] = 1;
 }
+
+/**
+ * @var list<string>
+ */
+const NAMES = ['first'];
+
+/**
+ * @var positive-int
+ */
+const TOTAL = 1 + 2;
+
+const DEFAULT_NAME = 'first';
+
+function namespaceConstantsKeepTheirDeclaredTypes(): void
+{
+    assertType('list<string>', NAMES);
+    assertType('int<1, max>', TOTAL);
+    assertType("'first'", DEFAULT_NAME);
+}

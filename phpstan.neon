@@ -51,7 +51,7 @@ services:
             sourceDirectory: tools/phpstan/fixtures/packages/async/src
         tags: [phpstan.rules.rule]
     -
-        class: Thesis\PhpStanRules\WeakMapConstantType
+        class: Thesis\PhpStanRules\NamespaceConstantType
         arguments:
             parser: @cachedRichParser
         tags: [phpstan.broker.expressionTypeResolverExtension]

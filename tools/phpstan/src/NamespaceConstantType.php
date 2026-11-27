@@ -18,7 +18,7 @@ use PHPStan\Type\Type;
 /**
  * @internal
  */
-final class WeakMapConstantType implements ExpressionTypeResolverExtension
+final class NamespaceConstantType implements ExpressionTypeResolverExtension
 {
     /**
      * @var array<string, array<string, Type>>
@@ -50,7 +50,7 @@ final class WeakMapConstantType implements ExpressionTypeResolverExtension
         $constant = $this->reflection->getConstant(new FullyQualified($name), null);
         $file = $constant->getFileName();
 
-        if ($file === null || $constant->getValueType()->getObjectClassNames() !== [\WeakMap::class]) {
+        if ($file === null) {
             return null;
         }
 
@@ -83,14 +83,14 @@ final class WeakMapConstantType implements ExpressionTypeResolverExtension
             $constant = array_first($statement->consts);
             $doc = $statement->getDocComment();
 
-            if ($constant->namespacedName === null || $doc === null || !$constant->value instanceof Expr\New_) {
+            if ($constant->namespacedName === null || $doc === null) {
                 continue;
             }
 
             $tags = $this->mapper->getResolvedPhpDoc($file, null, null, null, $doc->getText())->getVarTags();
             $type = ($tags[0] ?? null)?->getType();
 
-            if ($type !== null && $type->isObject()->yes() && $type->getObjectClassNames() === [\WeakMap::class]) {
+            if ($type !== null) {
                 $types[$constant->namespacedName->toString()] = $type;
             }
         }

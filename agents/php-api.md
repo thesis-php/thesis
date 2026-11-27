@@ -14,7 +14,7 @@
 - PHPStan (`level: max`, strict rules) is part of the contract. A constraint expressed in a PHPDoc type
   (`non-empty-array`, `positive-int`, ...) needs no runtime guard and no test for violating it.
   Don't flag "PHPDoc isn't enforced at runtime" in reviews: tighten the type instead.
-- Declare the key and value types of a namespace-level `WeakMap` constant once with `@var` above its declaration.
+- Use `@var` on a namespace-level constant to declare its type, including the key and value types of a `WeakMap`.
   The monorepo PHPStan extension reads the annotation. PHPStan's `dynamicConstantNames` skips object values.
 - Document a method or property in the interface or parent class that defines its contract. An override inherits
   that PHPDoc. Keep only details specific to the override and type annotations that PHPStan needs there. For
