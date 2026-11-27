@@ -116,6 +116,9 @@ function retry(Duration $delay = ZERO): void
 }
 ```
 
+To let PHPStan infer `Time\Duration` for `ZERO`, install
+[thesis/phpstan-extension](https://github.com/thesis-php/phpstan-extension).
+
 ### Converting to int
 
 ```php
@@ -215,8 +218,11 @@ ratio($cpuTime, $elapsed); // 0.8, a load
 ```
 
 `<`, `<=`, `>`, `>=` and `<=>` compare durations by value, on PHP 8.6 and with the polyfill,
-and so do `min()`, `max()` and `sort()` of PHP. Check zero with `isZero()`, not with `==`: PHP CS Fixer
-and others make it `===`, which compares the objects.
+and so do `min()`, `max()` and `sort()` of PHP.
+
+`$duration == ZERO` checks whether the duration is zero. `$duration === ZERO` checks object identity
+and can return `false` for a zero duration. Prefer `isZero($duration)`, especially when a tool such as
+PHP CS Fixer rewrites `==` to `===`.
 
 `ratio()` divides a duration by a duration, which the class does not. The result is the float nearest
 to the quotient while both are up to 104 days, so durations that divide evenly give a whole number.
